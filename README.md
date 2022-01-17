@@ -4,7 +4,7 @@ This Packer can be used to pack any C# Assembly, PE-File or Shellcode into a Nim
 
 My `GetSyscallStub` function currently has a bug, which correlates to a specific winim version. You need to install winim version 3.6.1 to get it working via `nimble install winim@3.6.1`.
 
-In addition you'll need `nimble install nimcrypto base64 docopt ptr_math strenc dynlib` plus `donut.exe` and `denim.exe` in the CWD depending on what you want to do.
+In addition you'll need `nimble install nimcrypto docopt ptr_math strenc` plus `donut.exe` and `denim.exe` in the CWD depending on what you want to do.
 
 ```
 NimSyscall_Loader v 1.0
