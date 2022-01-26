@@ -4,8 +4,6 @@ For some this might be self explanatory - but please don't upload the resulting 
 
 This Packer can be used to pack any C# Assembly, PE-File or Shellcode into a Nim binary. It will encrypt the target payload, build the corresponding Nim source code according to the given arguments and compiles it to an Nim binary.
 
-My `GetSyscallStub` function currently has a bug, which correlates to a specific winim version. You need to install winim version 3.6.1 to get it working via `nimble install winim@3.6.1`.
-
 In addition you'll need `nimble install nimcrypto docopt ptr_math strenc` plus `donut.exe` and `denim.exe` in the CWD depending on what you want to do.
 
 Make sure you use an up to date Nim version. It works fine for me with Nim version 1.6.2.
