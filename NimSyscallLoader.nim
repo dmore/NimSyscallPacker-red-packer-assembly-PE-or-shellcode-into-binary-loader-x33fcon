@@ -274,11 +274,12 @@ proc GetSyscallStub(functionName: LPCSTR, syscallStub: LPVOID): BOOL =
         var functionNameVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfNames[low2], rdataSection))
         var functionVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 1], textSection))
         var functionNameResolved: LPCSTR = cast[LPCSTR](functionNameVA)
-        if (functionNameResolved == functionName):
+        var compare: int = lstrcmpA(functionNameResolved,functionName)
+        if (compare == 0):
             #echo functionNameResolved
             copyMem(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
             stubFound = 1
-            #echo "Found Syscall STUB!"
+            #echo obf("Found Syscall STUB!")
     return stubFound
 
 """
