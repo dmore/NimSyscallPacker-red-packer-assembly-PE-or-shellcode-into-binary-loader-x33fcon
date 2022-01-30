@@ -9,10 +9,10 @@ In addition you'll need `nimble install nimcrypto docopt ptr_math strenc` plus `
 Make sure you use an up to date Nim version. It works fine for me with Nim version 1.6.2.
 
 ```
-NimSyscall_Loader v 1.0
+NimSyscall_Loader v 1.1
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep --shellcode --COMVARETW --remoteinject --unhook --reflective --obfuscate --hide --noArgs --pe]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --unhook --reflective --obfuscate --hide --noArgs --pe --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -28,7 +28,7 @@ Options:
   --csharp    Encrypt a C# Assembly to load it on runtime
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
   --shellcode    Encrypt shellcode to load it on runtime
-  --sleep    Sleep 20 secconds before decryption to evade in memory scanners
+  --sleep 10    Sleep 10 secconds before decryption to evade in memory scanners
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
   --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
                      Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
@@ -37,6 +37,15 @@ Options:
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation (not possible in combination with --reflective)
   --hide    Compile with --app:gui flag, so that the console won't pop up
   --pe    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
+  --hellsgate    Execute shellcode via Hellsgate technique
+  --replace    Replace common nim IOS's in the loader like the string 'nim'
+  --sandbox Check1    Include Sandbox Checks of your choice into the loader
+                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
+                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
+                      DiskSpace -> Only execute if c:\ disk space >= 200GB
+                      MemorySpace -> Only execute if more than 4GB RAM available
+  --domain targetdomain    Specify a domain for SandBox Evasion
+  --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
 ```
 
 
@@ -49,7 +58,7 @@ NimSyscall_Loader.exe --file=mimikatz.exe --unhook --noAMSI --pe
 For the moment you cannot pass arguments to e.g. Mimikatz after loading it because I'm using shellcode injection here. I'll update the tool to support PE-Loading via another method so that is possible. As a workaround you cann directly pass parameters to it via the commandline e.g.:
 
 ```
-Packedmimikatz.exe coffee
+Packedmimikatz.exe coffee exit
 ```
 
 
@@ -68,4 +77,15 @@ NimSyscall_Loader.exe --file=shellcode.bin --noAMSI --remoteprocess=teams.exe
 To load a C# assembly:
 ```
 NimSyscall_Loader.exe --file=Seatbelt.exe --csharp
+```
+
+To load a C# assembly and use hellsgate for Syscall retrieval :
+```
+NimSyscall_Loader.exe --file=Seatbelt.exe --csharp --hellsgate
+```
+
+To pack Shellcode for local injection + hellsgate usage + self-delete + sandbox checks:
+
+```
+NimSyscall_Loader.exe --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoined,MemorySpace
 ```
