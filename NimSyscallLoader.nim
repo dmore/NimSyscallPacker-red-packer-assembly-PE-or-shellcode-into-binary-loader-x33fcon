@@ -920,7 +920,6 @@ proc GetSyscallStub(functionName: LPCSTR, syscallStub: LPVOID): BOOL =
         var functionNameResolved: LPCSTR = cast[LPCSTR](functionNameVA)
         var compare: int = lstrcmpA(functionNameResolved,functionName)
         if (compare == 0):
-        if (functionNameResolved == functionName):
             #echo functionNameResolved
             copyMem(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
             stubFound = 1
