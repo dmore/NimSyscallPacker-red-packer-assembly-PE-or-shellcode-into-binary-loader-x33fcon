@@ -1301,7 +1301,7 @@ proc ntdllunhook(): bool =
 
 when isMainModule:
   var result = ntdllunhook()
-  echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}")
+  echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}"
 
 """
 
