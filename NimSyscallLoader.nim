@@ -73,7 +73,7 @@ Options:
   --hide    Compile with --app:gui flag, so that the console won't pop up
   --pe    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
-  --replace    Replace common nim IOS's in the loader like the string 'nim'
+  --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox Check1    Include Sandbox Checks of your choice into the loader
                       Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                       DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
