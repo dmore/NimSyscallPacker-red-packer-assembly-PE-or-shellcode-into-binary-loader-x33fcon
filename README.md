@@ -57,7 +57,11 @@ To pack Mimikatz for example with unhooking before execution and without patchin
 NimSyscall_Loader.exe --file=mimikatz.exe --unhook --noAMSI --pe
 ```
 
-For the moment you cannot pass arguments to e.g. Mimikatz after loading it because I'm using shellcode injection here. I'll update the tool to support PE-Loading via another method so that is possible. As a workaround you cann directly pass parameters to it via the commandline e.g.:
+Some of you had problems loading Mimikatz with the packer via "--file=Mimikatz --pe" arguments to afterwards issue custom commands on runtime.
+
+I found the reason for this behaviour. Don't ask me why but you cannot just take the release from Github but have to compile Mimikatz on your own (or build a custom version) and load this instead of the official release.
+
+If you still want to embed the release version from github you can directly pass arguments like this:
 
 ```
 Packedmimikatz.exe coffee exit
