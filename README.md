@@ -95,3 +95,8 @@ To pack Shellcode for local injection + hellsgate usage + self-delete + sandbox 
 ```
 NimSyscall_Loader.exe --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoined,MemorySpace
 ```
+
+## CREDITS
+
+- [X] [@WhyDee86](https://twitter.com/WhyDee86) - Sleep function + remote process Library module
+- [X] [@chvancooten](https://twitter.com/chvancooten) - Custom strenc + Inspiration from his Nim Packer
