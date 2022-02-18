@@ -15,10 +15,10 @@ If you're using NimSyscallPacker from Windows you should download the latest [do
 For Unix systems install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here.
 
 ```
-NimSyscall_Loader v 1.1
+NimSyscall_Loader v 1.2
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --unhook --reflective --obfuscate --hide --noArgs --pe --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -42,9 +42,10 @@ Options:
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation (not possible in combination with --reflective)
   --hide    Compile with --app:gui flag, so that the console won't pop up
-  --pe    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
+  --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
+  --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
-  --replace    Replace common nim IOS's in the loader like the string 'nim'
+  --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox Check1    Include Sandbox Checks of your choice into the loader
                       Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                       DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
@@ -58,7 +59,7 @@ Options:
 To pack Mimikatz for example with unhooking before execution and without patching AMSI use the following:
 
 ```
-NimSyscallLoader --file=mimikatz.exe --unhook --noAMSI --pe
+NimSyscallLoader --file=mimikatz.exe --unhook --noAMSI --peinject
 ```
 
 Some of you had problems loading Mimikatz with the packer via "--file=Mimikatz --pe" arguments to afterwards issue custom commands on runtime.
@@ -71,6 +72,13 @@ If you still want to embed the release version from github you can directly pass
 Packedmimikatz.exe coffee exit
 ```
 
+Donut shellcode is detected by some AV/EDR vendors. As alternative for PE-Loading I modified my [Nim-RunPE](https://github.com/S3cur3Th1sSh1t/Nim-RunPe) to use Syscalls for PE-Loading and integrated it here:
+
+To pack Mimikatz for example and load it via syscall PE-Loader use the following:
+
+```
+NimSyscallLoader --file=mimikatz.exe --peload
+```
 
 To pack Shellcode for local injection:
 
@@ -99,6 +107,16 @@ To pack Shellcode for local injection + hellsgate usage + self-delete + sandbox 
 ```
 NimSyscallLoader --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoined,MemorySpace
 ```
+
+## TO-DO
+- [x] PELoader via syscalls
+- [x] Hellsgate support
+- [ ] Load only the needed Winim libraries
+- [ ] Remote process AMSI/ETW Patching based on [SnD_AMSI](https://github.com/whydee86/SnD_AMSI)
+- [ ] Hellsgate support for remote shellcode injection + PELoading
+- [ ] DLL output + Sideloading capabilities?
+- [ ] Maybe ParallelNimcalls support as alternative to GetSyscallStub & Hellsgate
+- [ ] C# and/or Powershell output files
 
 ## CREDITS
 

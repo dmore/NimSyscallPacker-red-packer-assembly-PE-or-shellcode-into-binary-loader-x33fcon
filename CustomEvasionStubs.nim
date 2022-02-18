@@ -137,7 +137,7 @@ proc ds_rename_handle(hHandle: HANDLE): WINBOOL =
     RtlSecureZeroMemory(addr fRename, sizeof(fRename))
 
     var lpwStream: LPWSTR = cast[LPWSTR](DS_STREAM_RENAME)
-    fRename.FileNameLength = sizeof(lpwStream).DWORD;
+    fRename.FileNameLength = sizeof(lpwStream).DWORD
     RtlCopyMemory(addr fRename.FileName, lpwStream, sizeof(lpwStream))
 
     return SetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
@@ -146,7 +146,7 @@ proc ds_deposite_handle(hHandle: HANDLE): WINBOOL =
     var fDelete: FILE_DISPOSITION_INFO
     RtlSecureZeroMemory(addr fDelete, sizeof(fDelete))
 
-    fDelete.DeleteFile = TRUE;
+    fDelete.DeleteFile = TRUE
 
     return SetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
 
@@ -155,7 +155,7 @@ when isMainModule:
         wcPath: array[MAX_PATH + 1, WCHAR]
         hCurrent: HANDLE
 
-    RtlSecureZeroMemory(addr wcPath[0], sizeof(wcPath));
+    RtlSecureZeroMemory(addr wcPath[0], sizeof(wcPath))
 
     if GetModuleFileNameW(0, addr wcPath[0], MAX_PATH) == 0:
         echo obf("[-] Failed to get the current module handle")
