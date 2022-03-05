@@ -1,6 +1,5 @@
 import strformat
 import strutils
-from GlobalVars import targetdomain
 
 let DomainCheckStub * = """
 
@@ -40,13 +39,6 @@ proc getDomain*(): string {.tags: [ReadIOEffect].} =
 
 """
 
-let DomainCheckStub1 * = fmt"""
-when isMainModule:
-    var localdomain: string = getDomain()
-    if(localdomain != "{targetdomain}"):
-        echo obf("Domain not EQUAL, target / local :") & $localdomain & " / {targetdomain}"
-        quit()
-"""
 
 let MemorySpaceStub * = """
 

