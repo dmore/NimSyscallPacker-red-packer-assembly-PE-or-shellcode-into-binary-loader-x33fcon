@@ -117,6 +117,7 @@ NimSyscallLoader --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoi
 - [ ] DLL output + Sideloading capabilities?
 - [ ] Maybe ParallelNimcalls support as alternative to GetSyscallStub & Hellsgate
 - [ ] C# and/or Powershell output files
+- [ ] More syscalls and or D/Invoke for win32 functions
 
 ## CREDITS
 
