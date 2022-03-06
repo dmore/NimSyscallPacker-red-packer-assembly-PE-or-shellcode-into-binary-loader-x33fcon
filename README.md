@@ -18,7 +18,7 @@ For Unix systems install donut via `pip3 install donut-shellcode`. `denim` canno
 NimSyscall_Loader v 1.2
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -38,6 +38,8 @@ Options:
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
   --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
                      Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
+  --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
+  --remotepatchETW    Patch ETW in the remote process before shellcode execution
   --unhook    Unhook ntdll.dll before doing anything else for the current process
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation (not possible in combination with --reflective)
@@ -112,8 +114,10 @@ NimSyscallLoader --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoi
 - [x] PELoader via syscalls
 - [x] Hellsgate support
 - [ ] Load only the needed Winim libraries
-- [ ] Remote process AMSI/ETW Patching based on [SnD_AMSI](https://github.com/whydee86/SnD_AMSI)
-- [ ] Hellsgate support for remote shellcode injection + PELoading
+- [x] Remote process AMSI/ETW Patching based on [SnD_AMSI](https://github.com/whydee86/SnD_AMSI)
+- [ ] Use Syscalls for remote patching
+- [ ] Remotely load the "to patch" DLL (ntdll or amsi.dll) into the remote process before patching (otherwise it won't help us)
+- [x] Hellsgate support for remote shellcode injection + PELoading
 - [ ] DLL output + Sideloading capabilities?
 - [ ] Maybe ParallelNimcalls support as alternative to GetSyscallStub & Hellsgate
 - [ ] C# and/or Powershell output files

