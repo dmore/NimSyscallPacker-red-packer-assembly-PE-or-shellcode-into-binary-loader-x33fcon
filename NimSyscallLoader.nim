@@ -746,6 +746,9 @@ when system.hostOS == "windows":
     if (denim):
         var exist: bool = existsFile("denim.exe")
         if (exist):
+            # strenc and denim don't like each other, we have to remove it here
+            stub =  stub.replace("import strenc", "")
+            writeFile("Loader.nim", stub)
             discard os.execShellCmd(fmt".\denim.exe compile Loader.nim")
             let msg = fmt"[!] Encrypted file saved to Loader.exe"
             echo "\n" & msg
