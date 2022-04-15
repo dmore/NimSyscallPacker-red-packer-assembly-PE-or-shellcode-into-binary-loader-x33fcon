@@ -18,7 +18,7 @@ For Unix systems install donut via `pip3 install donut-shellcode`. `denim` canno
 NimSyscall_Loader v 1.2
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -48,11 +48,14 @@ Options:
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
   --replace    Replace common nim IoC's in the loader like the string 'nim'
-  --sandbox Check1    Include Sandbox Checks of your choice into the loader
+  --sandbox Check1    Include Sandbox Checks of your choice into the loader:
                       Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                       DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
                       DiskSpace -> Only execute if c:\ disk space >= 200GB
                       MemorySpace -> Only execute if more than 4GB RAM available
+  --pump value    Pump the file with:
+                  words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
+                  size -> just pump the size to avoid signatures for smaller files
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
 ```
@@ -109,6 +112,13 @@ To pack Shellcode for local injection + hellsgate usage + self-delete + sandbox 
 ```
 NimSyscallLoader --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoined,MemorySpace
 ```
+
+To add several thousand english words to bypass "Machine learning" detections:
+
+```
+NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
+```
+
 
 ## TO-DO
 - [x] PELoader via syscalls
