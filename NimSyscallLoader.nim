@@ -547,7 +547,13 @@ proc genEnglishwords (nuofWords: int): string =
 
     var englishdicts: seq[string]
     var output: seq[string]
-    for line in lines "Dicts\\englishwords.txt":
+    var dictionary: string
+    when system.hostOS == "windows":
+        dictionary = "Dicts\\englishwords.txt"
+    else:
+        dictionary = "Dicts/englishwords.txt"
+    for line in lines dictionary:
+
       englishdicts.add(line)
     for i in 1 .. numberofWords:
       output.add(sample(englishdicts))
