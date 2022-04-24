@@ -548,8 +548,13 @@ proc genEnglishwords (nuofWords: int): string =
   proc pumpenglishwords (numberofWords: int): seq[string] =
 
     var englishdicts: seq[string]
-    var output: seq[string]
-    for line in lines "Dicts\\englishwords.txt":
+    var output: seq[string]    
+    var dictionary: string
+    when system.hostOS == "windows":
+        dictionary = "Dicts\\englishwords.txt"
+    else:
+        dictionary = "Dicts/englishwords.txt"
+    for line in lines dictionary:
       englishdicts.add(line)
     for i in 1 .. numberofWords:
       output.add(sample(englishdicts))
@@ -867,7 +872,12 @@ discard os.execShellCmd(basicCompileFlags)
 proc replaceList () =
     var words: seq[string]
     var output: seq[string]
-    for line in lines "Dicts\\toReplace.txt":
+    var dictionary: string
+    when system.hostOS == "windows":
+        dictionary = "Dicts\\toReplace.txt"
+    else:
+        dictionary = "Dicts/toReplace.txt"
+    for line in lines dictionary:
       words.add(line)
     var length: int = len(words) - 1
     for i in 0..length:
