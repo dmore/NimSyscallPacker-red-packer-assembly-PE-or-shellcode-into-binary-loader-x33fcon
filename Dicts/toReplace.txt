@@ -1,0 +1,128 @@
+winim
+nim
+VirtualQuery failed
+bytes at address
+cannot register global variable; too many global variables
+could not import: 
+could not load: 
+cannot register thread local variable; too many thread local variables
+virtualFree failing!
+Error: unhandled exception: 
+SIGFPE: Arithmetic error.
+unknown signal
+SIGINT: Interrupted by Ctrl-C.
+SIGSEGV: Illegal storage access.
+Attempt to read from nil
+SIGABRT: Abnormal termination.
+SIGILL: Illegal operation.
+over- or underflow
+out of memory
+[[reraised from:
+no exception to reraise
+invalid format string, cannot parse: 
+invalid type in format string for string, expected 's', but got
+at location 
+Invalid base64 format character `
+, status: 
+convert from 
+uncatched exception inside event hander: 
+unable to invoke specified member: 
+variant is not a type object
+ not in 0 .. 
+index out of bounds, the container is empty
+variant is not a type
+unable to get default domain
+unable to start CorRuntimeHost
+unable to get interface of CorRuntimeHost
+unable to start CLRRuntimeHost
+unable to get interface of CLRRuntimeHost
+specified runtime is not loadable
+unable to get runtime of 
+unable to find a installed CLR
+unable to enumerate installed runtimes
+unable to create metahost instance
+unable to get type of object
+variant is not a object
+variant is nil
+Argument domain error
+DOMAIN
+Argument singularity
+SIGN
+Overflow range error
+OVERFLOW
+Partial loss of significance
+PLOSS
+Total loss of significance
+TLOSS
+The result is too small to be represented
+UNDERFLOW
+Unknown error
+Mingw-w64 runtime failure:
+Address %p has no image-section
+  VirtualProtect failed with code
+  Unknown pseudo relocation protocol version
+  Unknown pseudo relocation bit size
+GCC
+x86_64-posix-seh-rev0
+Built by MinGW-W64 project
+@VT_BSTR_BLOB
+@VT_CLSID
+@VT_CF
+@VT_BLOB_OBJECT
+@VT_STORED_OBJECT
+@VT_STREAMED_OBJECT
+@VT_STORAGE
+@VT_STREAM
+@VT_BLOB
+@VT_FILETIME
+@VT_UINT_PTR
+@VT_INT_PTR
+@VT_RECORD
+@VT_LPWSTR
+@VT_LPSTR
+@VT_USERDEFINED
+@VT_CARRAY
+@VT_SAFEARRAY
+@VT_PTR
+@VT_HRESULT
+@VT_VOID
+@VT_UINT
+@VT_INT
+@VT_UI8
+@VT_I8
+@VT_UI4
+@VT_UI2
+@VT_UI1
+@VT_I1
+@VT_DECIMAL
+@VT_UNKNOWN
+@VT_VARIANT
+@VT_BOOL
+@VT_ERROR
+@VT_DISPATCH
+@VT_BSTR
+@VT_DATE
+@VT_CY
+@VT_R8
+@VT_R4
+@VT_I4
+@VT_I2
+@VT_NULL
+@VT_EMPTY
+@VT_ARRAY
+@VT_ARRAY
+@VT_RESERVED
+@VT_BYREF
+@VT_VECTOR
+@VT_ILLEGAL
+parent
+procname
+line
+filename
+trace
+sysFatal
+ValueError
+IOError
+Field0
+Field1
+decode

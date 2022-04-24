@@ -864,9 +864,25 @@ echo basicCompileFlags
 echo "\n\n"
 discard os.execShellCmd(basicCompileFlags)
 
+proc replaceList () =
+    var words: seq[string]
+    var output: seq[string]
+    for line in lines "Dicts\\toReplace.txt":
+      words.add(line)
+    var length: int = len(words) - 1
+    for i in 0..length:
+        var wordLength: int = len(words[i])
+        var replacelength = wordLength - 1
+        #echo words[i]
+        #echo wordLength
+        var randstring: string = rndStr(replacelength)
+        echo fmt"[!] ---> replacing {words[i]} with {randstring} "
+        var command: string = fmt"nimgrep ""{words[i]}"""
+        command.add(fmt" --replace {randstring} {outfile}")
+        echo command  
+        discard exec_cmd_ex(command)
+
 if(replace):
-    var randstring: string = rndStr(2)
-    echo fmt"[!] ---> replacing nim with {randstring} "
-    discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
+    replaceList()
 let msg = fmt"[!] Encrypted file saved to {outfile}"
 echo "\n" & msg
