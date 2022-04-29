@@ -55,7 +55,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.3_dev
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -92,9 +92,10 @@ Options:
                      MemorySpace -> Only execute if more than 4GB RAM available
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
-                  size -> just pump the size to avoid signatures for smaller files
+                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome.exe (not ready yet)
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
+  --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
 """
 
 if (paramCount() == 0):
@@ -129,6 +130,7 @@ var
     noArgs: bool = false
     peinject: bool = false
     peload: bool = false
+    callobfs: bool = false
     hellsgate: bool = false
     selfdelete: bool = false
     remoteprocess: string = ""
@@ -239,6 +241,9 @@ if args["--domain"]:
 
 if args["--self-delete"]:
   selfdelete = true
+
+if args["--obfuscatefunctions"]:
+  callobfs = true
 
 var blob: string
 #Read file and if PE convert to shellcode before
@@ -855,7 +860,7 @@ else:
     basicCompileFlags.add("--app=console ")
 
 if (reflective):
-    basicCompileFlags.add("--app=gui --dynamicbase, --export-all-symbols ")
+    basicCompileFlags.add("--app=gui --passL:-Wl,--dynamicbase,--export-all-symbols ")
 
 if (hellsgate):
     echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
@@ -896,3 +901,12 @@ if(replace):
     replaceList()
 let msg = fmt"[!] Encrypted file saved to {outfile}"
 echo "\n" & msg
+
+if (callobfs):
+    when system.hostOS == "windows":
+        echo "\r\nObfuscating some Windows API's via CallObfuscator:\r\n"
+        echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfile} cobf\config.ini")
+        echo "\r\n"
+        echo fmt"Obfuscated binary saved to: cobf\{outfile}"
+    else:
+        echo "Only usable from a Windows OS, sorry!"    
