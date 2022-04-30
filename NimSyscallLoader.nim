@@ -620,6 +620,8 @@ if(unhook):
         stub.add(HellsgateNtCloseDelegate)
         stub.add(HellsgateUnhookStub)
     else:
+        stub.add(DInvokeBaseStub)
+        stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(GetSyscallStub)
         stub.add(NtProtectVirtualMemoryDelegate)
@@ -713,7 +715,8 @@ if (hellsgate):
             stub.add(LoadAssemblyStubArgs)
         csharp = false
 else:
-    stub.add(DInvokeBaseStub)
+    if ("VirtualAllocEx_HASH * = 3748893108" in stub) == false:
+        stub.add(DInvokeBaseStub)
 if (peload):
     if ("PS_ATTR_UNION" in stub) == false:
         stub.add(GetSyscallStub)
