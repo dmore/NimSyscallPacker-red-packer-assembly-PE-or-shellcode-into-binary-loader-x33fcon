@@ -613,6 +613,8 @@ if(gosleep):
 
 if(unhook):
     if(hellsgate):
+        stub.add(HellsgateDInvokeBaseStub)
+        stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(HellsgateStub)
         stub.add(HellsgateProtectDelegate)
@@ -637,8 +639,12 @@ stub = stub & Cryptstub2 & Cryptstub3
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
 
+if (AMSI or ETW or peload or (localinject == false)):
+    stub.add(DInvokeLoadLibraryAGetProcAddress)
 
-if (hellsgate):  
+if (hellsgate):
+    if ("OpenProcess_HASH * = 3768626" in stub) == false:
+        stub.add(HellsgateDInvokeBaseStub)  
     stub.add(WinLeanGetCurrentProcStub)
     if ("https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html" in stub) == false:
         stub.add(HellsgateStub)

