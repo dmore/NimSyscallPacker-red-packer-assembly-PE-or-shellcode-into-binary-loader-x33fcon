@@ -595,6 +595,7 @@ if (selfdelete):
     stub.add(FileDeleteStub)
 
 if(sandbox):
+    stub.add(DInvokeSandBoxStub)
     for m in sandboxchecks:
         if(m == "Domain"):
             stub.add(DomainCheckStub)
