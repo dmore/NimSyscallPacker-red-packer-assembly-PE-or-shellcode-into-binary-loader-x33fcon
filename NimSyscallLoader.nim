@@ -592,6 +592,7 @@ if(pump):
             stub.add("ToDo")
 
 if (selfdelete):
+    stub.add(DInvokeSelfDeleteStubs)
     stub.add(FileDeleteStub)
 
 if(sandbox):

