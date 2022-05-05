@@ -15,10 +15,10 @@ If you're using NimSyscallPacker from Windows you should download the latest [do
 For Unix systems install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here.
 
 ```
-NimSyscall_Loader v 1.2
+NimSyscall_Loader v 1.3
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size>]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -48,16 +48,17 @@ Options:
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
   --replace    Replace common nim IoC's in the loader like the string 'nim'
-  --sandbox Check1    Include Sandbox Checks of your choice into the loader:
-                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
-                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
-                      DiskSpace -> Only execute if c:\ disk space >= 200GB
-                      MemorySpace -> Only execute if more than 4GB RAM available
+  --sandbox value    Include Sandbox Checks of your choice into the loader:
+                     Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
+                     DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
+                     DiskSpace -> Only execute if c:\ disk space >= 200GB
+                     MemorySpace -> Only execute if more than 4GB RAM available
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
-                  size -> just pump the size to avoid signatures for smaller files
+                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
+  --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
 ```
 
 
@@ -123,7 +124,7 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 ## TO-DO
 - [x] PELoader via syscalls
 - [x] Hellsgate support
-- [ ] Load only the needed Winim libraries
+- [X] Load only the needed Winim libraries
 - [x] Remote process AMSI/ETW Patching based on [SnD_AMSI](https://github.com/whydee86/SnD_AMSI)
 - [ ] Use Syscalls for remote patching
 - [ ] Remotely load the "to patch" DLL (ntdll or amsi.dll) into the remote process before patching (otherwise it won't help us)
@@ -131,7 +132,7 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 - [ ] DLL output + Sideloading capabilities?
 - [ ] Maybe ParallelNimcalls support as alternative to GetSyscallStub & Hellsgate
 - [ ] C# and/or Powershell output files
-- [ ] More syscalls and or D/Invoke for win32 functions
+- [X] More syscalls and or D/Invoke for win32 functions
 - [ ] Cobalt Strike integration - CNA
 
 ## CREDITS
