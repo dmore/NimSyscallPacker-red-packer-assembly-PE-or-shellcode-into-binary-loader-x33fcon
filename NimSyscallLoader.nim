@@ -55,7 +55,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.3
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -96,6 +96,8 @@ Options:
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
+  --debug    Compiles the binary in debug mode (More DInvoke output)
+  --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
 """
 
 if (paramCount() == 0):
@@ -141,6 +143,8 @@ var
     pump: bool = false
     pumpfmt: string = ""
     pumpargs: seq[string]
+    debugMode: bool = false
+    compileX86: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.3")
 
@@ -244,6 +248,12 @@ if args["--self-delete"]:
 
 if args["--obfuscatefunctions"]:
   callobfs = true
+
+if args["--debug"]:
+  debugMode = true
+
+if args["--x86"]:
+  compileX86 = true
 
 var blob: string
 #Read file and if PE convert to shellcode before
@@ -863,6 +873,9 @@ if(pump):
         if(m == "words"):
             stub.add(genEnglishwords(rand(4750..7800)))
 
+if debugMode:
+    stub =  stub.replace("import strenc", "")
+
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim, compiling -> \n\n"
 
@@ -897,6 +910,9 @@ when system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:all:off --warning:all:off -d:danger -d:strip --opt:size "
 
+if compileX86:
+    basicCompileFlags.add("--cpu:i386 ")
+
 if(hide):
     basicCompileFlags.add("--app=gui ")
 else:
@@ -912,6 +928,13 @@ else:
     basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
 basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
+
+if debugMode:
+    basicCompileFlags =  basicCompileFlags.replace("-d:release", "")
+    basicCompileFlags =  basicCompileFlags.replace("--hint:all:off --warning:all:off -d:danger -d:strip --opt:size", "")
+    basicCompileFlags = basicCompileFlags.replace("--app=console --passc=-flto --passl=-flto", "")
+
+
 echo "Compile command:"
 echo basicCompileFlags
 echo "\n\n"
