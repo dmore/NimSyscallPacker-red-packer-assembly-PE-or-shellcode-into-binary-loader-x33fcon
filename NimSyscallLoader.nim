@@ -109,7 +109,8 @@ if (paramStr(1) == "-h"):
 
 var 
     filename: string = ""
-    outfile: string = "Loader.exe"
+    packerPath = os.getAppDir()
+    outfile: string = packerPath
     envkey: string = "TARGETDOMAIN"
     remoteprocesses : seq[string]
     targetdomain : string = ""
@@ -145,6 +146,11 @@ var
     pumpargs: seq[string]
     debugMode: bool = false
     compileX86: bool = false
+
+when system.hostOS == "windows":
+    outfile.add("\\Loader.exe")
+else:
+    outfile.add("/Loader.exe")
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.3")
 
@@ -565,7 +571,6 @@ proc genEnglishwords (nuofWords: int): string =
     var englishdicts: seq[string]
     var output: seq[string]    
     var dictionary: string
-    var packerPath = os.getAppDir()
     when system.hostOS == "windows":
         dictionary = fmt"{packerPath}\\Dicts\\englishwords.txt"
     else:
@@ -598,7 +603,6 @@ proc genTrustedwords (nuofWords: int): string =
     var trusteddicts: seq[string]
     var output: seq[string]    
     var dictionary: string
-    var packerPath = os.getAppDir()
     when system.hostOS == "windows":
         dictionary = fmt"{packerPath}\\Dicts\\trustedStrings.txt"
     else:
@@ -930,7 +934,6 @@ else:
     basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
 # for e.g. CNA Scripts
-var packerPath = os.getAppDir()
 basicCompileFlags.add(fmt"-p:{packerPath} ")
 
 basicCompileFlags.add(fmt"--out={outfile} Loader.nim")

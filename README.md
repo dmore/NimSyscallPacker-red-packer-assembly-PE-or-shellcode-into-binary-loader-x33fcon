@@ -133,9 +133,10 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 - [ ] Maybe ParallelNimcalls support as alternative to GetSyscallStub & Hellsgate
 - [ ] C# and/or Powershell output files
 - [X] More syscalls and or D/Invoke for win32 functions
-- [ ] Cobalt Strike integration - CNA
+- [X] Cobalt Strike integration - CNA
 
 ## CREDITS
 
 - [X] [@WhyDee86](https://twitter.com/WhyDee86) - Sleep function + remote process Library module
 - [X] [@chvancooten](https://twitter.com/chvancooten) - Custom strenc + Inspiration from his Nim Packer
+- [X] [@cerebro1_1]() - S3cur3Th1sSh1t Discord Channel
