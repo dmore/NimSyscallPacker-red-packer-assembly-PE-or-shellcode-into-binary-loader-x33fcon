@@ -565,10 +565,11 @@ proc genEnglishwords (nuofWords: int): string =
     var englishdicts: seq[string]
     var output: seq[string]    
     var dictionary: string
+    var packerPath = os.getAppDir()
     when system.hostOS == "windows":
-        dictionary = "Dicts\\englishwords.txt"
+        dictionary = fmt"{packerPath}\\Dicts\\englishwords.txt"
     else:
-        dictionary = "Dicts/englishwords.txt"
+        dictionary = fmt"{packerPath}\\Dicts/englishwords.txt"
     for line in lines dictionary:
       englishdicts.add(line)
     for i in 1 .. numberofWords:
@@ -597,10 +598,11 @@ proc genTrustedwords (nuofWords: int): string =
     var trusteddicts: seq[string]
     var output: seq[string]    
     var dictionary: string
+    var packerPath = os.getAppDir()
     when system.hostOS == "windows":
-        dictionary = "Dicts\\trustedStrings.txt"
+        dictionary = fmt"{packerPath}\\Dicts\\trustedStrings.txt"
     else:
-        dictionary = "Dicts/trustedStrings.txt"
+        dictionary = fmt"{packerPath}/Dicts/trustedStrings.txt"
     for line in lines dictionary:
       trusteddicts.add(line)
     for i in 1 .. numberofWords:
@@ -927,7 +929,12 @@ if (hellsgate):
 else:
     basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
+# for e.g. CNA Scripts
+var packerPath = os.getAppDir()
+basicCompileFlags.add(fmt"-p:{packerPath} ")
+
 basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
+
 
 if debugMode:
     basicCompileFlags =  basicCompileFlags.replace("-d:release", "")
