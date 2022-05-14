@@ -121,19 +121,28 @@ type
   PathFileExistsW_t* = proc (pszPath: LPCWSTR): WINBOOL {.stdcall.}
 
 const
-  CreateFileW_HASH * = 202946429
-  # This is a collision with GetFileInformationByHandle - ToDos for me.
-  SetFileInformationByHandle_HASH * = 244773879
-  GetModuleFileNameW_HASH * = 3757336305
-  CloseHandle_HASH * = 1614255471
-  #PathFileExistsW_HASH * = 520195386
-  PathFileExistsW_HASH * = 520195412
+  CreateFileW_HASH * = obf("CreateFileW")
+  SetFileInformationByHandle_HASH * = obf("SetFileInformationByHandle")
+  GetModuleFileNameW_HASH * = obf("GetModuleFileNameW")
+  CloseHandle_HASH * = obf("CloseHandle")
+  PathFileExistsW_HASH * = obf("PathFileExistsW")
 
 var MyCreateFileW*: CreateFileW_t
 var MySetFileInformationByHandle*: SetFileInformationByHandle_t
 var MyGetModuleFileNameW*: GetModuleFileNameW_t
 var MyCloseHandle*: CloseHandle_t
 var MyPathFileExistsW*: PathFileExistsW_t
+
+
+# temporary workaround, as the ordinal changes between OS Versions and the relative address via DInvoke is wrong.
+var shlwapi = MyLoadLibraryA(obf("shlwapi.dll"))
+if (shlwapi == 0):
+    echo obf("[X] Failed to load shlwapi.dll")
+
+var pathfileExistsAddress = MyGetProcAddress(shlwapi,obf("PathFileExistsW"))
+if isNil(pathfileExistsAddress):
+    echo obf("[X] Failed to get the address of 'PathFileExistsW'")
+
 
 MyCreateFileW = cast[CreateFileW_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CreateFileW_HASH, 0, FALSE)))
 
@@ -143,11 +152,11 @@ MyGetModuleFileNameW = cast[GetModuleFileNameW_t](get_function_address(cast[HMOD
 
 MyCloseHandle = cast[CloseHandle_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CloseHandle_HASH, 0, FALSE))
 
-# Works but potentially the ordinal could change later on - will maybe lead to bugs later on
-MyPathFileExistsW = cast[PathFileExistsW_t](get_function_address(cast[HMODULE](get_library_address(SHLWAPI_DLL, TRUE)), 0, 669, FALSE))
+# Works but potentially the ordinal could change later on - this lead to bugs
+#MyPathFileExistsW = cast[PathFileExistsW_t](get_function_address(cast[HMODULE](get_library_address(SHLWAPI_DLL, TRUE)), "", 669, FALSE))
 # Doesn't work, as the relative address is not correct. All those Ordinal functions are ignored maybe? Have to troubleshoot
 #MyPathFileExistsW = cast[PathFileExistsW_t](get_function_address(cast[HMODULE](get_library_address(SHLWAPI_DLL, TRUE)), PathFileExistsW_HASH, 0, FALSE))
-
+MyPathFileExistsW = cast[PathFileExistsW_t](pathfileExistsAddress)
 """
 
 let FileDeleteStub * = """
