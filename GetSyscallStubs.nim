@@ -15,11 +15,11 @@ type
   VirtualProtect_t* = proc (lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD): WINBOOL {.stdcall.}
 
 const
-  GetCurrentProcessId_HASH * = 1510184040
-  VirtualAllocEx_HASH * = 3748893108
-  GetCurrentProcess_HASH * = 4140327883
-  OpenProcess_HASH * = 3768626
-  VirtualProtect_HASH * = 4127757017
+  GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
+  VirtualAllocEx_HASH * = obf("VirtualAllocEx")
+  GetCurrentProcess_HASH * = obf("GetCurrentProcess")
+  OpenProcess_HASH * = obf("OpenProcess")
+  VirtualProtect_HASH * = obf("VirtualProtect")
 
 var MyGetCurrentProcess*: GetCurrentProcess_t
 var MyVirtualAllocEx*: VirtualAllocEx_t
@@ -43,8 +43,8 @@ type
   GetProcAddress_t* = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
   
 const
-  LoadLibraryA_HASH * = 1348397733
-  GetProcAddress_HASH * = 522356738
+  LoadLibraryA_HASH * = obf("LoadLibraryA")
+  GetProcAddress_HASH * = obf("GetProcAddress")
   
 var MyLoadLibraryA*: LoadLibraryA_t
 var MyGetProcAddress*: GetProcAddress_t
@@ -91,12 +91,12 @@ type
   lstrcmpA_t* = proc (lpString1: LPCSTR, lpString2: LPCSTR): int32 {.stdcall.}
 
 const
-  CreateFileA_HASH * = 202946403
-  GetFileSize_HASH * = 1145363296
-  RtlAllocateHeap_HASH * = 2825308343
-  GetProcessHeap_HASH * = 3349117104
-  ReadFile_HASH * = 1700130981
-  lstrcmpA_HASH * = 801946652
+  CreateFileA_HASH * = obf("CreateFileA")
+  GetFileSize_HASH * = obf("GetFileSize")
+  RtlAllocateHeap_HASH * = obf("RtlAllocateHeap")
+  GetProcessHeap_HASH * = obf("GetProcessHeap")
+  ReadFile_HASH * = obf("ReadFile")
+  lstrcmpA_HASH * = obf("lstrcmpA")
 
 var MyCreateFileA*: CreateFileA_t
 var MyGetFileSize*: GetFileSize_t
@@ -233,11 +233,11 @@ type
   FreeLibrary_t* = proc(hLibModule: HMODULE): WINBOOL {.stdcall.}
 
 const
-  GetModuleHandleA_HASH * = 171027927
-  GetModuleInformation_HASH * = 622102026
-  CreateFileMappingA_HASH * = 1584069263
-  MapViewOfFile_HASH * = 3922941889
-  FreeLibrary_HASH * = 945195088
+  GetModuleHandleA_HASH * = obf("GetModuleHandleA")
+  GetModuleInformation_HASH * = obf("GetModuleInformation")
+  CreateFileMappingA_HASH * = obf("CreateFileMappingA")
+  MapViewOfFile_HASH * = obf("MapViewOfFile")
+  FreeLibrary_HASH * = obf("FreeLibrary")
 
 var MyGetModuleHandleA*: GetModuleHandleA_t
 var MyGetModuleInformation*: GetModuleInformation_t

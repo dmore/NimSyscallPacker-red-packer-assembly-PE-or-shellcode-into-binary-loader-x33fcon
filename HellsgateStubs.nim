@@ -12,9 +12,9 @@ type
   OpenProcess_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwProcessId: DWORD): HANDLE {.stdcall.}
 
 const
-  GetCurrentProcessId_HASH * = 1510184040
-  GetCurrentProcess_HASH * = 4140327883
-  OpenProcess_HASH * = 3768626
+  GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
+  GetCurrentProcess_HASH * = obf("GetCurrentProcess")
+  OpenProcess_HASH * = obf("OpenProcess")
 
 var MyGetCurrentProcess*: GetCurrentProcess_t
 var MyGetCurrentProcessId*: GetCurrentProcessId_t

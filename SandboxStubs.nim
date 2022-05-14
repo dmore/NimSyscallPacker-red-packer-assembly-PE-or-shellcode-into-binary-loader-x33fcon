@@ -11,9 +11,9 @@ type
   GetDiskFreeSpaceExA_t* = proc (lpDirectoryName: LPCSTR, lpFreeBytesAvailableToCaller: PULARGE_INTEGER, lpTotalNumberOfBytes: PULARGE_INTEGER, lpTotalNumberOfFreeBytes: PULARGE_INTEGER): WINBOOL {.stdcall.}
 
 const
-  GetComputerNameExA_HASH * = 3307371997
-  GlobalMemoryStatusEx_HASH * = 3607992274
-  GetDiskFreeSpaceExA_HASH * = 1454108497
+  GetComputerNameExA_HASH * = obf("GetComputerNameExA")
+  GlobalMemoryStatusEx_HASH * = obf("GlobalMemoryStatusEx")
+  GetDiskFreeSpaceExA_HASH * = obf("GetDiskFreeSpaceExA")
 
 var MyGetComputerNameExA*: GetComputerNameExA_t
 var MyGlobalMemoryStatusEx*: GlobalMemoryStatusEx_t

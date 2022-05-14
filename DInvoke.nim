@@ -41,20 +41,18 @@ else:
 
 
 const
-  LdrLoadDll_SW2_HASH * = 4028654593
+  LdrLoadDll_SW2_HASH * = obf("LdrLoadDll")
   MZ* = 0x5A4D
 
 const
   NTDLL_DLL* = "ntdll.dll"
-  KERNEL32_DLL* = "kernel32.dll"
 
 type
   LdrLoadDll_t* = proc (PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.stdcall.}
-  # typedef NTSTATUS(WINAPI LdrLoadDll_t)(PWCHAR, ULONG, PUNICODE_STRING, PHANDLE);
-
+  
 type
   ND_LDR_DATA_TABLE_ENTRY* {.bycopy.} = object
-    InMemoryOrderLinks*: LIST_ENTRY ## struct _LIST_ENTRY InLoadOrderLinks;
+    InMemoryOrderLinks*: LIST_ENTRY
     InInitializationOrderLinks*: LIST_ENTRY
     DllBase*: PVOID
     EntryPoint*: PVOID
@@ -89,18 +87,6 @@ proc GetPPEB(p: culong): P_PEB {.
     importc: "__readgsqword"
 .}
 
-
-const
-    seed = 0xC0DE1337
-
-template ROR8(v: int64): int64 =
-  ((v shr 8 and 4294967295) or (v shl 24 and 4294967295))
-
-proc getHash(funcname: cstring): int64 =
-    var hash = seed
-    for letter in funcname:
-        hash = hash xor int64(letter) + ROR8(hash)
-    return hash
 
 
 template RVA*(atype: untyped, base_addr: untyped, rva: untyped): untyped = cast[atype](cast[ULONG_PTR](cast[ULONG_PTR](base_addr) + cast[ULONG_PTR](rva)))
@@ -271,8 +257,8 @@ proc GetPEB*(): PPEB {.asmNoStackFrame.} =
 proc is_dll*(hLibrary: PVOID): BOOL
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE
 proc resolve_reference*(hOriginalLibrary: HMODULE; functionAddress: PVOID): PVOID
-proc get_function_address*(hLibrary: HMODULE; fhash: int64; ordinal: int, specialCase: BOOL): PVOID
-proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: DWORD): PVOID
+proc get_function_address*(hLibrary: HMODULE; fhash: string; ordinal: int, specialCase: BOOL): PVOID
+proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: string): PVOID
 
 proc is_dll*(hLibrary: PVOID): BOOL =
   #echo "IS_DLL start"
@@ -407,16 +393,16 @@ proc resolve_reference*(hOriginalLibrary: HMODULE; functionAddress: PVOID): PVOI
   hLibrary = get_library_address(cast[LPWSTR](wc_dll), FALSE)
   if (cast[PVOID](hLibrary) == nil):
     ##  the library is not loaded, meaning it is a legacy DLL
-    new_addr = find_legacy_export(hOriginalLibrary, cast[DWORD](getHash(api)))
+    new_addr = find_legacy_export(hOriginalLibrary, cast[string](api))
     return new_addr
-  new_addr = get_function_address(hLibrary, cast[DWORD](getHash(api)), 0, FALSE)
+  new_addr = get_function_address(hLibrary, cast[string](api), 0, FALSE)
   return new_addr
 
 ##
 ##  Find an export in a DLL
 ##
 
-proc get_function_address*(hLibrary: HMODULE; fhash: int64; ordinal: int, specialCase: BOOL): PVOID =
+proc get_function_address*(hLibrary: HMODULE; fhash: string; ordinal: int, specialCase: BOOL): PVOID =
   var dos: PIMAGE_DOS_HEADER
   var nt: PIMAGE_NT_HEADERS
   #var data: PIMAGE_DATA_DIRECTORY
@@ -455,7 +441,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: int64; ordinal: int, specia
 
   when not defined(release): echo "\r\n[*] Checking DLL's Export Directory for the target function\r\n"
 
-  if fhash != 0:
+  if fhash != "":
     ##  iterate over all the exports
     var i: DWORD = 0
 
@@ -478,9 +464,9 @@ proc get_function_address*(hLibrary: HMODULE; fhash: int64; ordinal: int, specia
       #when not defined(release): echo "Relative Address: ", toHex(functions[])
       names += cast[DWORD](len(funcname) + 1)
       #when not defined(release): echo "Function: ", funcname
-      if fhash == getHash(funcname):
+      if fhash == funcname:
         
-        # So many edge cases, maybe also due to the not REAL Hash and colissions?
+        # So many edge cases, have to investigate
         if (funcname == obf("CreateFileW")):
           functions = functions - 1
         if (funcname == obf("SetFileInformationByHandle")):
@@ -493,20 +479,18 @@ proc get_function_address*(hLibrary: HMODULE; fhash: int64; ordinal: int, specia
         when not defined(release): echo "\r\n[+] Found API call: ",funcname
         when not defined(release): echo "\r\n"
         
-        # GetFileInformationByHandle and SetFileInformationByHandle produce the same Hash -.- Have to change the algorithm.
-        if (funcname != obf("GetFileInformationByHandle")):
-          # Strange. For ntdll functions the following is needed, but for kernel32 functions it's not. Don't ask me why. This is a workaround for the moment. Need to troubleshoot.
-          if (specialCase):
-            # Why?
-            when not defined(release): echo "This is a special case, subtract one function"
-            finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
-          when not defined(release): echo "Relative Address: ", toHex(functions[])
-          functions = functions - 1
-          when not defined(release): echo "Relative Address one before: ", toHex(functions[])
-          functions = functions + 2
-          when not defined(release): echo "Relative Address one after: ", toHex(functions[])
-          functionAddress = finalfunctionAddress
-          break
+        # Strange. For ntdll functions the following is needed, but for kernel32 functions it's not. Don't ask me why. This is a workaround for the moment. Need to troubleshoot.
+        if (specialCase):
+          # Why?
+          when not defined(release): echo "This is a special case, subtract one function"
+          finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
+        when not defined(release): echo "Relative Address: ", toHex(functions[])
+        functions = functions - 1
+        when not defined(release): echo "Relative Address one before: ", toHex(functions[])
+        functions = functions + 2
+        when not defined(release): echo "Relative Address one after: ", toHex(functions[])
+        functionAddress = finalfunctionAddress
+        break
   else:
     # Add the ordinal number e.g. 1034 for OpenProcess and - the EXP Base address
     when not defined(release): echo fmt"Getting address via ordinal: {ordinal}"
@@ -528,7 +512,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: int64; ordinal: int, specia
 ##
 
 # Not verified working yet
-proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: DWORD): PVOID =
+proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: string): PVOID =
   var functionAddress: PVOID
   var Peb: PPEB = GetPPEB(PEB_OFFSET)
   #var Peb: PPEB = GetPEB()

