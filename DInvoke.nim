@@ -256,7 +256,6 @@ proc GetPEB*(): PPEB {.asmNoStackFrame.} =
 
 proc is_dll*(hLibrary: PVOID): BOOL
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE
-proc resolve_reference*(hOriginalLibrary: HMODULE; functionAddress: PVOID): PVOID
 proc get_function_address*(hLibrary: HMODULE; fhash: string; ordinal: int, specialCase: BOOL): PVOID
 proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: string): PVOID
 
@@ -350,53 +349,6 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   when not defined(release): echo fmt"[+] Loaded {LibName} at {hLibrary}"
   return hLibrary
 
-##
-##  Follow the reference and return the real address of the function
-##
-
-#proc charseqtoString(bytes: seq[char]): string =
-#  result = newString(bytes.len)
-#  copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
-
-# This will not work yet, did not do any tests for this function yet!
-proc resolve_reference*(hOriginalLibrary: HMODULE; functionAddress: PVOID): PVOID =
-  var hLibrary: HANDLE
-  var new_addr: PVOID
-  var api: LPCSTR
-  ##  addr points to a string like: NewLibrary.NewFunctionName
-  
-  # strrchr cannot be found, search for alternatives
-  #api = addr(strrchr(functionAddress, '.')[1])
-
-  # For the moment we will just print the actual value and take it
-  #echo repr(functionAddress)
-  api = cast[LPCSTR](unsafeAddr functionAddress)
-  #echo api
-  var dll_length: DWORD = cast[DWORD](cast[ULONG_PTR](api) - cast[ULONG_PTR](functionAddress))
-  var length = MAX_PATH + 1
-  var dll: seq[char] # this looked the following before var dll: array[MAX_PATH + 1, char]
-  #old
-  #strncpy(dll, cast[LPCSTR](functionAddress), dll_length)
-  copyMem(dll[0].addr, cast[LPCSTR](functionAddress), dll_length)
-  #old
-  #strncat(dll, "dll", MAX_PATH)
-  dll.add("dll")
-
-  var wc_dll: seq[wchar_t] # this looked the following before - array[MAX_PATH, wchar_t] = [0]
-  #old
-  #mbstowcs(wc_dll, dll, MAX_PATH)
-  copyMem(wc_dll[0].addr,dll[0].addr,MAX_PATH)
-  #var dllString = charseqtoString(dll)
-  #wc_dll.add(dllString)
-  
-  ##  try to find the library NewLibrary
-  hLibrary = get_library_address(cast[LPWSTR](wc_dll), FALSE)
-  if (cast[PVOID](hLibrary) == nil):
-    ##  the library is not loaded, meaning it is a legacy DLL
-    new_addr = find_legacy_export(hOriginalLibrary, cast[string](api))
-    return new_addr
-  new_addr = get_function_address(hLibrary, cast[string](api), 0, FALSE)
-  return new_addr
 
 ##
 ##  Find an export in a DLL
@@ -501,11 +453,8 @@ proc get_function_address*(hLibrary: HMODULE; fhash: string; ordinal: int, speci
     #echo repr(functionAddress)
   if functionAddress == nil:
     return nil
-  if functionAddress >= cast[PVOID](exp) and functionAddress < RVA(PVOID, exp, exp_size):
-    when not defined(release): echo "this is the case"
-    ##  the function seems to be defined somewhere else
-    functionAddress = resolve_reference(cast[HMODULE](hLibrary), functionAddress)
-  return functionAddress
+  else:
+    return functionAddress
 
 ##
 ##  Look among all loaded DLLs for an export with certain function hash
