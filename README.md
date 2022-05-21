@@ -134,6 +134,7 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 - [ ] C# and/or Powershell output files
 - [X] More syscalls and or D/Invoke for win32 functions
 - [X] Cobalt Strike integration - CNA
+- [ ] Passing parameters via e.g. manipulation of the PEB field (Command line spoofing like)
 
 ## CREDITS
 
