@@ -135,6 +135,7 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 - [X] More syscalls and or D/Invoke for win32 functions
 - [X] Cobalt Strike integration - CNA
 - [ ] Passing parameters via e.g. manipulation of the PEB field (Command line spoofing like)
+- [ ] Shellcode memory encryption via Sleep Hook [ShellcodeFluctuation like](https://github.com/mgeeky/ShellcodeFluctuation)
 
 ## CREDITS
 
