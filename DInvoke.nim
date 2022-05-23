@@ -256,8 +256,8 @@ proc GetPEB*(): PPEB {.asmNoStackFrame.} =
 
 proc is_dll*(hLibrary: PVOID): BOOL
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE
-proc get_function_address*(hLibrary: HMODULE; fhash: string; ordinal: int, specialCase: BOOL): PVOID
-proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: string): PVOID
+proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, specialCase: BOOL): PVOID
+proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: cstring): PVOID
 
 proc is_dll*(hLibrary: PVOID): BOOL =
   #echo "IS_DLL start"
@@ -354,7 +354,7 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
 ##  Find an export in a DLL
 ##
 
-proc get_function_address*(hLibrary: HMODULE; fhash: string; ordinal: int, specialCase: BOOL): PVOID =
+proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, specialCase: BOOL): PVOID =
   var dos: PIMAGE_DOS_HEADER
   var nt: PIMAGE_NT_HEADERS
   #var data: PIMAGE_DATA_DIRECTORY
@@ -399,7 +399,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: string; ordinal: int, speci
 
     for i in 0 .. numofnames:
       # Getting the function name value
-      var funcname = RVA2VA(PCHAR, cast[PVOID](hLibrary), names)
+      var funcname = RVA2VA(cstring, cast[PVOID](hLibrary), names)
       #echo funcname
 
       var finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
@@ -461,7 +461,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: string; ordinal: int, speci
 ##
 
 # Not verified working yet
-proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: string): PVOID =
+proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: cstring): PVOID =
   var functionAddress: PVOID
   var Peb: PPEB = GetPPEB(PEB_OFFSET)
   #var Peb: PPEB = GetPEB()
