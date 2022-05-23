@@ -800,7 +800,7 @@ if (peload):
 if (shellcode):
     if ("PS_ATTR_UNION" in stub) == false:
         stub.add(GetSyscallStub)
-    if (AMSI or ETW):
+    if (AMSI or ETW or remoteETWpatch or remoteAMSIpatch):
         if ("myNtProtectVirtM = pro" in stub) == false:
             stub.add(NtProtectVirtualMemoryDelegate)
             stub.add(NtProtectSyscallStart)

