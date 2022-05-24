@@ -10,6 +10,8 @@ Make sure you use an up to date Nim version. It works fine for me with Nim versi
 
 Hellsgate currently doesn't compile correctly with the newest GCC versions. To make this work you have to use GCC v10.2.1 with MinGW-w64 v7.0.0 (https://github.com/brechtsanders/winlibs_mingw/releases/tag/10.2.1-snapshot20200912), and GCC v10.2.0 with MinGW-w64 v8.0.0 r5 (https://github.com/brechtsanders/winlibs_mingw/releases/tag/10.2.0-11.0.0-8.0.0-r5). See https://github.com/S3cur3Th1sSh1t-Sponsors/NimSyscallPacker/issues/2
 
+On linux `gcc version 10-win32 20210110 (GCC) ` should work. You can look it up via `x86_64-w64-mingw32-gcc -v`.
+
 If you're using NimSyscallPacker from Windows you should download the latest [donut](https://github.com/TheWover/donut) release and [denim](https://github.com/moloch--/denim) for full functionality. `donut.exe` has to be dropped into the current working directory. Denim should be installed via `denim setup`.
 
 For Unix systems install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here.
