@@ -931,7 +931,10 @@ else:
     basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
 # for e.g. CNA Scripts
-basicCompileFlags.add(fmt"-p:{packerPath} ")
+when system.hostOS == "windows":
+    basicCompileFlags.add(fmt"-p:""{packerPath}"" ")
+else:
+    basicCompileFlags.add(fmt"-p:'{packerPath}' ")
 
 basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
 
