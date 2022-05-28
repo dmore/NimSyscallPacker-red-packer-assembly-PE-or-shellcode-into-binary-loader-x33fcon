@@ -987,9 +987,11 @@ echo "\n" & msg
 
 if (callobfs):
     when system.hostOS == "windows":
+        var outfileonlyname = outfile.replace(packerPath, "")
+        echo "Outputting to: ", outfileonlyname
         echo "\r\nObfuscating some Windows API's via CallObfuscator:\r\n"
-        echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfile} cobf\config.ini")
+        echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfileonlyname} cobf\config.ini")
         echo "\r\n"
-        echo fmt"Obfuscated binary saved to: cobf\{outfile}"
+        echo fmt"Obfuscated binary saved to: cobf\{outfileonlyname}"
     else:
-        echo "Only usable from a Windows OS, sorry!"    
+        echo "Only usable from a Windows OS, sorry!"
