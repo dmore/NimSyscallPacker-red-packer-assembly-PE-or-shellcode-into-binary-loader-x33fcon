@@ -988,7 +988,6 @@ echo "\n" & msg
 if (callobfs):
     when system.hostOS == "windows":
         var outfileonlyname = outfile.replace(packerPath, "")
-        echo "Outputting to: ", outfileonlyname
         echo "\r\nObfuscating some Windows API's via CallObfuscator:\r\n"
         echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfileonlyname} cobf\config.ini")
         echo "\r\n"
