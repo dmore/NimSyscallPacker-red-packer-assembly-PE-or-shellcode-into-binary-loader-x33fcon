@@ -178,9 +178,8 @@ if args["--peload"]:
 
 if args["--dll"]:
   dll_out = true
-  if csharp == true or peload == true:
-    echo "Error: DLL output not supported with CSharp or PE"
-    quit()
+  if peload == true:
+    echo "Warning: Argument passing to the PE will fail as the first argument is rundll32.exe or regsvr32.exe"
 
 if args["--dllexportfunc"]:
   let dllfuncstring = args["--dllexportfunc"]
@@ -348,10 +347,20 @@ from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 let LoadAssemblyStub = """
 var assembly = load(dectext)
 
+when defined(lib_only):
+    # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
+    # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
+    AttachConsole(-1)
+
 var cmd: seq[string]
 var i = 1
 while i <= paramCount():
-    cmd.add(paramStr(i))
+    when defined(lib_only):
+        if (i != 1):
+            # first parameter is rundll32.exe,Funcname (skip that)
+            cmd.add(paramStr(i))
+    else:
+        cmd.add(paramStr(i))
     inc(i)
 """
 
@@ -929,14 +938,15 @@ when system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:all:off --warning:all:off -d:danger -d:strip --opt:size "
 
+
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")
 
 if (dll_out):
     if (processname == ""):
-        basicCompileFlags.add("--app=lib --nomain ")
+        basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
     else:
-        basicCompileFlags.add("--app=lib ")
+        basicCompileFlags.add("--app=lib -d:lib_only ")
 else:
     if(hide):
         basicCompileFlags.add("--app=gui ")
