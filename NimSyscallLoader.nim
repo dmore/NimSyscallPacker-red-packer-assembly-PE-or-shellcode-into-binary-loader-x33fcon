@@ -43,7 +43,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.3                                            
+                                                                 v1.4                                            
 
 """
 
@@ -52,7 +52,7 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.3
+NimSyscall_Loader v 1.4
 
 Usage:
   NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
@@ -152,7 +152,7 @@ when system.hostOS == "windows":
 else:
     outfile.add("/Loader.exe")
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.3")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.4")
 
 if args["--file"]:
   let fname = args["--file"]

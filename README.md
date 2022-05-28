@@ -17,10 +17,10 @@ If you're using NimSyscallPacker from Windows you should download the latest [do
 For Unix systems install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here.
 
 ```
-NimSyscall_Loader v 1.3
+NimSyscall_Loader v 1.4
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -61,6 +61,8 @@ Options:
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
+  --debug    Compiles the binary in debug mode (More DInvoke output)
+  --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
 ```
 
 
