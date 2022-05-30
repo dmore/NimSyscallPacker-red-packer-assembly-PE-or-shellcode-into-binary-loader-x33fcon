@@ -145,4 +145,4 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 
 - [X] [@WhyDee86](https://twitter.com/WhyDee86) - Sleep function + remote process Library module
 - [X] [@chvancooten](https://twitter.com/chvancooten) - Custom strenc + Inspiration from his Nim Packer
-- [X] [@lefayjey](https://github.com/lefayjey) - S3cur3Th1sSh1t Discord Channel
+- [X] [@lefayjey](https://github.com/lefayjey) - DLL output, CNA file contribution, code cleanup
