@@ -1,9 +1,6 @@
 {.passC:"-masm=intel".}
 
 import winim/lean
-
-
-
 # Additional typedefs
 type
   PS_ATTR_UNION* {.pure, union.} = object
@@ -36,7 +33,7 @@ type
 
 #include <windows.h>
 
-#define SW3_SEED 0x6BE5F2CD
+#define SW3_SEED 0xFFF3C187
 #define SW3_ROL8(v) (v << 8 | v >> 24)
 #define SW3_ROR8(v) (v >> 8 | v << 24)
 #define SW3_ROX8(v) ((SW3_SEED % 2) ? SW3_ROL8(v) : SW3_ROR8(v))
@@ -85,6 +82,7 @@ EXTERN_C DWORD SW3_GetSyscallNumber(DWORD FunctionHash);
 EXTERN_C PVOID SW3_GetSyscallAddress(DWORD FunctionHash);
 EXTERN_C PVOID internal_cleancall_wow64_gate(VOID);
 #endif
+#define JUMPER
 
 #include <stdio.h>
 
@@ -177,7 +175,7 @@ PVOID SC_Address(PVOID NtApiAddress)
 
     for (ULONG32 num_jumps = 1; num_jumps < searchLimit; num_jumps++)
     {
-
+        // let's try with an Nt* API below our syscall
         SyscallAddress = SW3_RVA2VA(
             PVOID,
             NtApiAddress,
@@ -190,7 +188,7 @@ PVOID SC_Address(PVOID NtApiAddress)
             return SyscallAddress;
         }
 
-
+        // let's try with an Nt* API above our syscall
         SyscallAddress = SW3_RVA2VA(
             PVOID,
             NtApiAddress,
@@ -327,7 +325,7 @@ EXTERN_C PVOID SW3_GetSyscallAddress(DWORD FunctionHash)
 
     for (DWORD i = 0; i < SW3_SyscallList.Count; i++)
     {
-        if (FunctionHash == SW3_SyscallList.Entries[i].Hash)NtPVM
+        if (FunctionHash == SW3_SyscallList.Entries[i].Hash)
         {
             return SW3_SyscallList.Entries[i].SyscallAddress;
         }
@@ -354,6 +352,9 @@ EXTERN_C PVOID SW3_GetRandomSyscallAddress(DWORD FunctionHash)
 
 
 
+
+
+
 #NtProtectVirtualMemory
 proc NtPVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
@@ -362,7 +363,10 @@ proc NtPVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewP
 	mov [rsp+24], r8
 	mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x0B131CBD3
+	mov ecx, 0x005A90F1B
+	call SW3_GetRandomSyscallAddress        
+	mov r15, rax                           
+	mov ecx, 0x005A90F1B
 	call SW3_GetSyscallNumber              
 	add rsp, 0x28
 	mov rcx, [rsp+8]                      
@@ -370,8 +374,7 @@ proc NtPVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewP
 	mov r8, [rsp+24]
 	mov r9, [rsp+32]
 	mov r10, rcx
-	syscall                    
-	ret
+	jmp r15                                
     """
 #NtWriteVirtualMemory
 proc NtWVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.asmNoStackFrame.} =
@@ -381,7 +384,10 @@ proc NtWVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBy
 	mov [rsp+24], r8
 	mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x0FC9FE831
+	mov ecx, 0x0262FD121
+	call SW3_GetRandomSyscallAddress        
+	mov r15, rax                           
+	mov ecx, 0x0262FD121
 	call SW3_GetSyscallNumber              
 	add rsp, 0x28
 	mov rcx, [rsp+8]                      
@@ -389,8 +395,7 @@ proc NtWVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBy
 	mov r8, [rsp+24]
 	mov r9, [rsp+32]
 	mov r10, rcx
-	syscall                    
-	ret
+	jmp r15                                
     """
 #NtCreateThreadEx
 proc NtCTE*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
@@ -400,7 +405,31 @@ proc NtCTE*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes:
 	mov [rsp+24], r8
 	mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x096BECC7C
+	mov ecx, 0x082B8C644
+	call SW3_GetRandomSyscallAddress        
+	mov r15, rax                           
+	mov ecx, 0x082B8C644
+	call SW3_GetSyscallNumber              
+	add rsp, 0x28
+	mov rcx, [rsp+8]                      
+	mov rdx, [rsp+16]
+	mov r8, [rsp+24]
+	mov r9, [rsp+32]
+	mov r10, rcxNtCl
+	jmp r15                                
+    """
+#NtClose
+proc NtCl*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+    asm """
+	mov [rsp +8], rcx          
+	mov [rsp+16], rdx
+	mov [rsp+24], r8
+	mov [rsp+32], r9
+	sub rsp, 0x28
+	mov ecx, 0x002A2130F
+	call SW3_GetRandomSyscallAddress        
+	mov r15, rax                           
+	mov ecx, 0x002A2130F
 	call SW3_GetSyscallNumber              
 	add rsp, 0x28
 	mov rcx, [rsp+8]                      
@@ -408,8 +437,7 @@ proc NtCTE*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes:
 	mov r8, [rsp+24]
 	mov r9, [rsp+32]
 	mov r10, rcx
-	syscall                    
-	ret
+	jmp r15                                
     """
 #NtAllocateVirtualMemory
 proc NtAVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
@@ -419,7 +447,10 @@ proc NtAVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSi
 	mov [rsp+24], r8
 	mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x0CE55C4D1
+	mov ecx, 0x0C89CFC21
+	call SW3_GetRandomSyscallAddress        
+	mov r15, rax                           
+	mov ecx, 0x0C89CFC21
 	call SW3_GetSyscallNumber              
 	add rsp, 0x28
 	mov rcx, [rsp+8]                      
@@ -427,8 +458,7 @@ proc NtAVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSi
 	mov r8, [rsp+24]
 	mov r9, [rsp+32]
 	mov r10, rcx
-	syscall                    
-	ret
+	jmp r15                                
     """
 #NtOpenProcess
 proc NtOP*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
@@ -438,7 +468,10 @@ proc NtOP*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes:
 	mov [rsp+24], r8
 	mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x001DF2A40
+	mov ecx, 0x0C5BCDC30
+	call SW3_GetRandomSyscallAddress        
+	mov r15, rax                           
+	mov ecx, 0x0C5BCDC30
 	call SW3_GetSyscallNumber              
 	add rsp, 0x28
 	mov rcx, [rsp+8]                      
@@ -446,26 +479,7 @@ proc NtOP*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes:
 	mov r8, [rsp+24]
 	mov r9, [rsp+32]
 	mov r10, rcx
-	syscall                    
-	ret
+	jmp r15                                
     """
-#NtClose
-proc NtCl*(ProcessHandle: PHANDLE): NTSTATUS {.asmNoStackFrame.} =
-    asm """
-	mov [rsp +8], rcx          
-	mov [rsp+16], rdx
-	mov [rsp+24], r8
-	mov [rsp+32], r9
-	sub rsp, 0x28
-	mov ecx, 0x001DF2A40
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
-	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
-	syscall                    
-	ret
-    """
+
 

