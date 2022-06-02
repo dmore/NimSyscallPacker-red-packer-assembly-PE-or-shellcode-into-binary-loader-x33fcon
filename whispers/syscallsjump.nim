@@ -415,7 +415,7 @@ proc NtCTE*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes:
 	mov rdx, [rsp+16]
 	mov r8, [rsp+24]
 	mov r9, [rsp+32]
-	mov r10, rcxNtCl
+	mov r10, rcx
 	jmp r15                                
     """
 #NtClose

@@ -327,7 +327,7 @@ EXTERN_C PVOID SW3_GetSyscallAddress(DWORD FunctionHash)
 
     for (DWORD i = 0; i < SW3_SyscallList.Count; i++)
     {
-        if (FunctionHash == SW3_SyscallList.Entries[i].Hash)NtPVM
+        if (FunctionHash == SW3_SyscallList.Entries[i].Hash)
         {
             return SW3_SyscallList.Entries[i].SyscallAddress;
         }
