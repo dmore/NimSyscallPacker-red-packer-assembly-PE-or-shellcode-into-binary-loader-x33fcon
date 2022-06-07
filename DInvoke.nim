@@ -295,7 +295,7 @@ proc is_dll*(hLibrary: PVOID): BOOL =
 ##  Get the base address of a DLL
 ##
 
-proc LdrLoadDll(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.stdcall, dynlib: "ntdll", importc.}
+#proc LdrLoadDll(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.stdcall, dynlib: "ntdll", importc.}
 
 
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
@@ -386,8 +386,8 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
 
   var numofnames = cast[DWORD](exp.NumberOfNames)
   var functions = RVA2VA(PDWORD, cast[PVOID](hLibrary), exp.AddressOfFunctions)
-  var ordinalbase: DWORD = exp.AddressOfFunctions + 0x10
-  var ordinalsRVA: DWORD = exp.AddressOfFunctions + 0x24
+  #var ordinalbase: DWORD = exp.AddressOfFunctions + 0x10
+  #var ordinalsRVA: DWORD = exp.AddressOfFunctions + 0x24
   var addressOfFunctionsvalue = RVA2VA(PDWORD, cast[PVOID](hLibrary), exp.AddressOfFunctions)[]
   var names = RVA2VA(PDWORD, cast[PVOID](hLibrary), exp.AddressOfNames)[]
 
@@ -395,7 +395,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
 
   if fhash != "":
     ##  iterate over all the exports
-    var i: DWORD = 0
+    #var i: DWORD = 0
 
     for i in 0 .. numofnames:
       # Getting the function name value
