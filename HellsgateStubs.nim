@@ -1261,6 +1261,7 @@ when isMainModule:
 
 let HellsgateStub*  = """
 
+from os import paramStr
 
 {.passC:"-masm=intel".}
 
