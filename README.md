@@ -4,7 +4,7 @@ For some this might be self explanatory - but please don't upload the resulting 
 
 This Packer can be used to pack any C# Assembly, PE-File or Shellcode into a Nim binary. It will encrypt the target payload, build the corresponding Nim source code according to the given arguments and compiles it to an Nim binary.
 
-In addition you'll need `nimble install nimcrypto docopt ptr_math strenc` plus `donut.exe` and `denim.exe` in the CWD depending on what you want to do.
+In addition you'll need `nimble install nimcrypto docopt ptr_math strenc winim` plus `donut.exe` and `denim.exe` in the CWD depending on what you want to do.
 
 Make sure you use the specified Nim Version. I'm actually always testing with 1.6.2.
 
