@@ -4,17 +4,40 @@ For some this might be self explanatory - but please don't upload the resulting 
 
 This Packer can be used to pack any C# Assembly, PE-File or Shellcode into a Nim binary. It will encrypt the target payload, build the corresponding Nim source code according to the given arguments and compiles it to an Nim binary.
 
-In addition you'll need `nimble install nimcrypto docopt ptr_math strenc winim` plus `donut.exe` and `denim.exe` in the CWD depending on what you want to do.
 
-Make sure you use the specified Nim Version. I'm actually always testing with 1.6.2.
+### Setup
 
-Hellsgate currently doesn't compile correctly with all GCC versions. I did test with 8.1.0,10.2.0,10.2.1.
+A Video - if you prefer that - can be found here:
+[https://youtu.be/0PwIn3Nxmgo](https://youtu.be/0PwIn3Nxmgo)
 
-On linux `gcc version 10-win32 20210110 (GCC) ` should work. You can look it up via `x86_64-w64-mingw32-gcc -v`.
+#### Windows
 
-If you're using NimSyscallPacker from Windows you should download the latest [donut](https://github.com/TheWover/donut) release and [denim](https://github.com/moloch--/denim) for full functionality. `donut.exe` has to be dropped into the current working directory. Denim should be installed via `denim setup`.
+Download and install [Nim 1.6.2](https://nim-lang.org/download/nim-1.6.2_x64.zip) and [Mingw64](https://sourceforge.net/projects/mingw-w64/files/) version 8.1.0 `x86_64-posix-seh`. You can either just use this GCC version or in addition install [GCC 12.1.0](https://sourceforge.net/projects/gcc-win64/files/12.1.0/). Don't use other GCC versions, as that breaks some functionality. But you need to place the Mingw64 DLL's around `libwinpthread-1.dll` into some `%PATH%` environment variable folder. Login/logout for the `%PATH%` changes to take effect.
 
-For Unix systems install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here.
+Install dependencies:
+`nimble install nimcrypto docopt ptr_math strenc winim`
+
+`denim.exe` needs to be in the CWD if you want to use LLVM obfuscator. It can be found [here]([denim](https://github.com/moloch--/denim)). Install it via `denim setup`.
+
+Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
+
+#### Linux
+`apt-get install nim=1.6.2`
+`apt-get install mingw-64=8.0.0-1`
+`nimble install nimcrypto docopt ptr_math strenc winim`
+
+If you cannot downgrade mingw-64 to 8.0.0-1 `--hellsgate` won't work.
+
+Install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here. Same for Callobfuscator.
+
+Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
+
+
+
+### Usage
+
+A Video - if you prefer that - can be found here:
+[https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
 NimSyscall_Loader v 1.5
