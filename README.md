@@ -22,8 +22,13 @@ Install dependencies:
 Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
 
 #### Linux
+
+E.g. on Kali:
+
 `apt-get install nim=1.6.2`
+
 `apt-get install mingw-64=8.0.0-1`
+
 `nimble install nimcrypto docopt ptr_math strenc winim`
 
 If you cannot downgrade mingw-64 to 8.0.0-1 `--hellsgate` won't work.
