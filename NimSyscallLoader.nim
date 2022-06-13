@@ -14,6 +14,9 @@ import os
 import osproc
 import docopt
 import random
+import winim
+import streams
+import winim/clr except `[]`
 
 import HellsgateStubs
 import CustomEvasionStubs
@@ -156,6 +159,7 @@ var
     pumpargs: seq[string]
     debugMode: bool = false
     compileX86: bool = false
+    noassembly: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
 
@@ -306,6 +310,55 @@ if args["--x86"]:
   compileX86 = true
 
 var blob: string
+
+if (peinject and peload):
+    echo "Error: Cannot use both --peinject and --peload"
+    quit(1)
+
+if (syswhispers and hellsgate):
+    echo "Error: Cannot use both --syswhispers and --hellsgate"
+    quit(1)
+
+if (hellsgate and jump):
+    echo "Error: Cannot use both --hellsgate and --jump! --jump can only be used with --syswhispers"
+    quit(1)
+
+if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peinject and shellcode) or (peload and shellcode)):
+    echo "Error: You can only use one of --csharp, --shellcode, --peload, or --peinject!"
+    quit(1)
+
+if (peload or peinject):
+    let stream = newFileStream(filename, mode = fmRead)
+    defer: stream.close()
+    # Check magic string
+    var magic_string: array[2, char]
+    discard stream.readData(magic_string.addr, 2)
+    if magic_string != "MZ":
+        echo "[-] No Magic bytes found, file is not a PE"
+        quit(1)
+
+if (csharp):
+    blob = readFile(filename)
+    var blobbytes = toByteSeq(blob)
+    var code = fmt"""
+    using System;
+    public class Check {{
+      public void ifAssembly() {{
+        object asd = System.Reflection.AssemblyName.GetAssemblyName(@"{filename}");
+      }}
+    }}
+    """
+    try:
+        var res = compile(code)
+        var o = res.CompiledAssembly.new("Check")
+        o.ifAssembly()
+    except:
+        echo "[-] Error - you didn't specify a C# assembly!"
+        noassembly = true
+
+if (noassembly):
+    quit(1)
+
 #Read file and if PE convert to shellcode before
 if (peinject):
     when system.hostOS == "windows":
