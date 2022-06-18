@@ -4,17 +4,58 @@ For some this might be self explanatory - but please don't upload the resulting 
 
 This Packer can be used to pack any C# Assembly, PE-File or Shellcode into a Nim binary. It will encrypt the target payload, build the corresponding Nim source code according to the given arguments and compiles it to an Nim binary.
 
-In addition you'll need `nimble install nimcrypto docopt ptr_math strenc` plus `donut.exe` and `denim.exe` in the CWD depending on what you want to do.
 
-Make sure you use the specified Nim Version. I'm actually always testing with 1.6.2.
+### Setup
 
-Hellsgate currently doesn't compile correctly with all GCC versions. I did test with 8.1.0,10.2.0,10.2.1.
+A Video - if you prefer that - can be found here:
+[https://youtu.be/0PwIn3Nxmgo](https://youtu.be/0PwIn3Nxmgo)
 
-On linux `gcc version 10-win32 20210110 (GCC) ` should work. You can look it up via `x86_64-w64-mingw32-gcc -v`.
+#### Windows
 
-If you're using NimSyscallPacker from Windows you should download the latest [donut](https://github.com/TheWover/donut) release and [denim](https://github.com/moloch--/denim) for full functionality. `donut.exe` has to be dropped into the current working directory. Denim should be installed via `denim setup`.
+Download and install [Nim 1.6.2](https://nim-lang.org/download/nim-1.6.2_x64.zip) and [Mingw64](https://sourceforge.net/projects/mingw-w64/files/) version 8.1.0 `x86_64-posix-seh`. You can either just use this GCC version or in addition install [GCC 12.1.0](https://sourceforge.net/projects/gcc-win64/files/12.1.0/). Don't use other GCC versions, as that breaks some functionality. But you need to place the Mingw64 DLL's around `libwinpthread-1.dll` into some `%PATH%` environment variable folder. Login/logout for the `%PATH%` changes to take effect.
 
-For Unix systems install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here.
+Install dependencies:
+`nimble install nimcrypto docopt ptr_math strenc winim`
+
+`denim.exe` needs to be in the CWD if you want to use LLVM obfuscator. It can be found [here]([denim](https://github.com/moloch--/denim)). Install it via `denim setup`.
+
+Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
+
+#### Linux
+
+E.g. on Kali:
+
+`apt-get install nim=1.6.2`
+
+`apt-get install mingw-64=8.0.0-1`
+
+`nimble install nimcrypto docopt ptr_math strenc winim`
+
+If you cannot downgrade mingw-64 to 8.0.0-1 `--hellsgate` won't work.
+
+Install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here. Same for Callobfuscator.
+
+Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
+
+#### Third party deps
+
+If you want to make use of Code Signing certificates via LimeLighter you'll also need the following things installed and in your %PATH%:
+openssl - (for Windows) for example from [here](https://slproweb.com/products/Win32OpenSSL.html)
+osslsigncode - for example from [here](https://github.com/mtrojnar/osslsigncode/releases/tag/2.3)
+
+##### Third party tool support
+
+I will not give Support for issues in the third party tools which are used here. So please open up an issue in the corresponsing repositories if you're facing problems with them. Third party tools in use:
+- [Donut](https://github.com/TheWover/donut)
+- [Denim](https://github.com/moloch--/denim)
+- [LimeLighter](https://github.com/Tylous/Limelighter)
+- [Callobfuscator](https://github.com/d35ha/CallObfuscator)
+- [NimlineWhispers3](https://github.com/klezVirus/NimlineWhispers3)
+
+### Usage
+
+A Video - if you prefer that - can be found here:
+[https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
 NimSyscall_Loader v 1.5
@@ -177,6 +218,10 @@ amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 - [X] Cobalt Strike integration - CNA
 - [ ] Passing parameters via e.g. manipulation of the PEB field (Command line spoofing like)
 - [ ] Shellcode memory encryption via Sleep Hook [ShellcodeFluctuation like](https://github.com/mgeeky/ShellcodeFluctuation)
+- [ ] Calling the ‘GetConsoleWindow’ and ‘ShowWindow’ Windows function after the process is created and the EDR’s hooks are loaded, and then changes the windows attributes to hidden instead of GUI compile flags
+- [ ] More sleeps in between some potentially critical stubs
+- [ ] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
+- [ ] PPID Spoofing for newly created processes
 
 ## CREDITS
 
@@ -186,4 +231,5 @@ amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 - [X] [@d35ha](https://github.com/d35ha/CallObfuscator) - CallObfuscator
 - [X] [@klezVirus](https://github.com/klezVirus/NimlineWhispers3) - NimlineWhispers3
 - [X] [@TheWover](https://github.com/TheWover/donut) - Donut 
-- [X] [@icyguider](https://github.com/icyguider) - Inspiration 
+- [X] [@icyguider](https://github.com/icyguider) - Inspiration
+- [X] [Tylous](https://github.com/Tylous/) - LimeLighter

