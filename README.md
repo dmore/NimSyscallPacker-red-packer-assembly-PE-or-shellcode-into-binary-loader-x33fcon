@@ -208,6 +208,7 @@ amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 - [ ] Calling the ‘GetConsoleWindow’ and ‘ShowWindow’ Windows function after the process is created and the EDR’s hooks are loaded, and then changes the windows attributes to hidden instead of GUI compile flags
 - [ ] More sleeps in between some potentially critical stubs
 - [ ] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
+- [ ] PPID Spoofing for newly created processes
 
 ## CREDITS
 
