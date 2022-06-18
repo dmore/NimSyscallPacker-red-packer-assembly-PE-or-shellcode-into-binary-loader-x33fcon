@@ -37,6 +37,11 @@ Install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Un
 
 Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
 
+#### Third party deps
+
+If you want to make use of Code Signing certificates via LimeLighter you'll also need the following things installed and in your %PATH%:
+openssl - (for Windows) for example from [here](https://slproweb.com/products/Win32OpenSSL.html)
+osslsigncode - for example from [here](https://github.com/mtrojnar/osslsigncode/releases/tag/2.3)
 
 
 ### Usage
@@ -218,4 +223,5 @@ amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 - [X] [@d35ha](https://github.com/d35ha/CallObfuscator) - CallObfuscator
 - [X] [@klezVirus](https://github.com/klezVirus/NimlineWhispers3) - NimlineWhispers3
 - [X] [@TheWover](https://github.com/TheWover/donut) - Donut 
-- [X] [@icyguider](https://github.com/icyguider) - Inspiration 
+- [X] [@icyguider](https://github.com/icyguider) - Inspiration
+- [X] [Tylous](https://github.com/Tylous/) - LimeLighter

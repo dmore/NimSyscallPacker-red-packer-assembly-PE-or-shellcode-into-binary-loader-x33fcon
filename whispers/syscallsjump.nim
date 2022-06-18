@@ -138,7 +138,7 @@ PVOID SC_Address(PVOID NtApiAddress)
 
    #ifdef _WIN64
     // If the process is 64-bit on a 64-bit OS, we need to search for syscall
-    BYTE syscall_code[] = { 0x0f, 0x05, 0xc3 };
+    BYTE syscall_code[] = { 0x0f,0x05, 0xc3 };
     ULONG distance_to_syscall = 0x12;
    #else
     // If the process is 32-bit on a 32-bit OS, we need to search for sysenter
