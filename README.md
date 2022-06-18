@@ -43,6 +43,14 @@ If you want to make use of Code Signing certificates via LimeLighter you'll also
 openssl - (for Windows) for example from [here](https://slproweb.com/products/Win32OpenSSL.html)
 osslsigncode - for example from [here](https://github.com/mtrojnar/osslsigncode/releases/tag/2.3)
 
+##### Third party tool support
+
+I will not give Support for issues in the third party tools which are used here. So please open up an issue in the corresponsing repositories if you're facing problems with them. Third party tools in use:
+- [Donut](https://github.com/TheWover/donut)
+- [Denim](https://github.com/moloch--/denim)
+- [LimeLighter](https://github.com/Tylous/Limelighter)
+- [Callobfuscator](https://github.com/d35ha/CallObfuscator)
+- [NimlineWhispers3](https://github.com/klezVirus/NimlineWhispers3)
 
 ### Usage
 
