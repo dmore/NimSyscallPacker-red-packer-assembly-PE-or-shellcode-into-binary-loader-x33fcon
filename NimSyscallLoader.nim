@@ -1109,9 +1109,9 @@ if (llvm):
             echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
             quit()
 elif system.hostOS == "windows":
-    basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
+    basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes "
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size "
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes "
 
 
 if (compileX86):
