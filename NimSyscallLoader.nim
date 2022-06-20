@@ -16,7 +16,8 @@ import docopt
 import random
 import winim
 import streams
-import winim/clr except `[]`
+when system.hostOS == "windows":
+    import winim/clr except `[]`
 
 import HellsgateStubs
 import CustomEvasionStubs
@@ -371,28 +372,28 @@ if (peload or peinject):
     if magic_string != "MZ":
         echo "[-] No Magic bytes found, file is not a PE"
         quit(1)
+when system.hostOS == "windows":
+    if (csharp):
+        blob = readFile(filename)
+        var blobbytes = toByteSeq(blob)
+        var code = fmt"""
+        using System;
+        public class Check {{
+          public void ifAssembly() {{
+            object asd = System.Reflection.AssemblyName.GetAssemblyName(@"{filename}");
+          }}
+        }}
+        """
+        try:
+            var res = compile(code)
+            var o = res.CompiledAssembly.new("Check")
+            o.ifAssembly()
+        except:
+            echo "[-] Error - you didn't specify a C# assembly!"
+            noassembly = true
 
-if (csharp):
-    blob = readFile(filename)
-    var blobbytes = toByteSeq(blob)
-    var code = fmt"""
-    using System;
-    public class Check {{
-      public void ifAssembly() {{
-        object asd = System.Reflection.AssemblyName.GetAssemblyName(@"{filename}");
-      }}
-    }}
-    """
-    try:
-        var res = compile(code)
-        var o = res.CompiledAssembly.new("Check")
-        o.ifAssembly()
-    except:
-        echo "[-] Error - you didn't specify a C# assembly!"
-        noassembly = true
-
-if (noassembly):
-    quit(1)
+    if (noassembly):
+        quit(1)
 
 #Read file and if PE convert to shellcode before
 if (peinject):
@@ -728,7 +729,7 @@ proc genEnglishwords (nuofWords: int): string =
     when system.hostOS == "windows":
         dictionary = fmt"{packerPath}\\Dicts\\englishwords.txt"
     else:
-        dictionary = fmt"{packerPath}\\Dicts/englishwords.txt"
+        dictionary = fmt"{packerPath}/Dicts/englishwords.txt"
     for line in lines dictionary:
       englishdicts.add(line)
     for i in 1 .. numberofWords:
@@ -1164,7 +1165,8 @@ if (hellsgate):
     echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
     discard exec_cmd_ex("nimgrep === --replace \\\"\\\"\\\" Loader.nim")
 elif(syswhispers != true):
-    basicCompileFlags.add("--passc=-flto --passl=-flto ")
+    if system.hostOS == "windows":
+        basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
 # for e.g. CNA Scripts
 when system.hostOS == "windows":
