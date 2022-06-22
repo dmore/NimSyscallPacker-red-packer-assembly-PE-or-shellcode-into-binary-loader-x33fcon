@@ -205,9 +205,11 @@ amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 
 ### Custom Images or meta data
 
-If you want to use custom Icons for your loader executables or custom metadata, you should change the `icores.rc` file in the resources folder.
+If you want to use custom Icons for your loader executables or custom metadata, you should change the `cmd.rc` file in the resources folder.
 
-That can be compiled to an `icores.o` file via `windres icores.rc -o icores.o`. You can also just replace the `demo.ico` file with any other ICON file you want to use.
+That can be compiled to an `cmd.o` file via `windres cmd.rc -o cmd.o`. You can also just replace the `demo.ico` file with any other ICON file you want to use.
+
+For DLL metadata you can change `DLL.rc`.
 
 
 ## TO-DO
