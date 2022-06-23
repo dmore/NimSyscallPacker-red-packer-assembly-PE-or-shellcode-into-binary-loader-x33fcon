@@ -103,7 +103,7 @@ Options:
                      MemorySpace -> Only execute if more than 4GB RAM available
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
-                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
+                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others (https://practicalsecurityanalytics.com/file-entropy/)
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
