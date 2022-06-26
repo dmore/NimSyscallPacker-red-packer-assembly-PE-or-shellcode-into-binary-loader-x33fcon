@@ -222,6 +222,7 @@ amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 - [ ] More sleeps in between some potentially critical stubs
 - [ ] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
 - [ ] PPID Spoofing for newly created processes
+- [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 
 ## CREDITS
 
