@@ -203,6 +203,10 @@ amd64.windows.clang.cpp.exe = "x86_64-w64-mingw32-clang++"
 amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 ```
 
+## ProtectMyTooling embedded
+
+[mgeeky](https://github.com/mgeeky) also wrote a wrapper script for this Packer in his private ProtectMyTooling repository to automate the process of packing binaries with my packer. No need to choose options there for you. Also consider sponsoring him, as his private tool collection is worth it. :+1:
+
 ## TO-DO
 - [x] PELoader via syscalls
 - [x] Hellsgate support
