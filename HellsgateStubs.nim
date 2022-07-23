@@ -1134,6 +1134,7 @@ proc fixIAT*(modulePtr: PVOID): bool =
       var offsetField: csize_t = 0
       var offsetThunk: csize_t = 0
       var hmodule: HMODULE = MyLoadLibraryA(libname)
+
       when defined(args):
         var commandStr: string
         var exeArgsPassed = false
@@ -1142,16 +1143,17 @@ proc fixIAT*(modulePtr: PVOID): bool =
             exeArgsPassed = true
         if exeArgsPassed:
             # patch _wcmdln and _acmdln if they are present in the import to make arguments working for some C++ binaries
-            var wcmdlenaddr = GetProcAddress(hmodule,"_wcmdln") 
+            var wcmdlenaddr = MyGetProcAddress(hmodule,"_wcmdln") 
             if wcmdlenaddr != NULL:
-                echo "        Found _wcmdln -> patching with arguments"
+                echo obf("Found _wcmdln -> patching with arguments")
                 var newCmd = newWideCString(commandStr) # we have to prepend 
                 patchMemory(wcmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
-            var acmdlenaddr = GetProcAddress(hmodule,"_acmdln") 
+            var acmdlenaddr = MyGetProcAddress(hmodule,"_acmdln") 
             if acmdlenaddr != NULL:
-                echo "        Found _wcmdln -> patching with arguments"
+                echo obf("Found _wcmdln -> patching with arguments")
                 var newCmd = &(commandStr)
                 patchMemory(acmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
+                
       while true:
         var fieldThunk: PIMAGE_THUNK_DATA = cast[PIMAGE_THUNK_DATA]((
             cast[csize_t](modulePtr) + offsetField + call_via))
@@ -1170,8 +1172,7 @@ proc fixIAT*(modulePtr: PVOID): bool =
         if fieldThunk.u1.Function == orginThunk.u1.Function:
           var nameData: PIMAGE_IMPORT_BY_NAME = cast[PIMAGE_IMPORT_BY_NAME](orginThunk.u1.AddressOfData)
           var byname: PIMAGE_IMPORT_BY_NAME = cast[PIMAGE_IMPORT_BY_NAME](cast[ULONGLONG](modulePtr) + cast[DWORD](nameData))
-          
-    
+
           var func_name: LPCSTR = cast[LPCSTR](addr byname.Name)
           
           let asd = byname.Name
@@ -1180,6 +1181,13 @@ proc fixIAT*(modulePtr: PVOID): bool =
           
     
           fieldThunk.u1.Function = ULONGLONG(libaddr)
+          when defined(args):
+            if exeArgsPassed and "GetCommandLineW" == $$func_name:
+              echo obf("[>] Patching function to pass exeArgs: "), func_name
+              patchArgFunctionMemory(cast[pointer](libaddr), cast[pointer](newWideCString(commandStr)))
+            if exeArgsPassed and $$"GetCommandLineA" == func_name:
+              echo obf("[>] Patching function to pass exeArgs: "), func_name
+              patchArgFunctionMemory(cast[pointer](libaddr), cast[pointer](&commandStr))
     
         inc(offsetField, sizeof((IMAGE_THUNK_DATA)))
         inc(offsetThunk, sizeof((IMAGE_THUNK_DATA)))

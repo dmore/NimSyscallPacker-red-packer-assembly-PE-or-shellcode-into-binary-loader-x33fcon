@@ -987,13 +987,14 @@ if(dll_out):
             stub = stub.replace("FUNC_EXPORT", f)
 
 if (peload):
+    if (embeddedArguments):
+        stub.add(PatchargsFuncs)
     if (localinject):
         if (hellsgate):
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsPELoadStub)
         elif(getfreshstub):
             stub.add(NtAllocateVirtualMemoryDelegate)
-            stub.add(PatchargsFuncs)
             stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
         elif(syswhispers):

@@ -1246,6 +1246,7 @@ proc fixIAT*(modulePtr: PVOID): bool =
         thunk_addr = csize_t(lib_desc.FirstThunk)
       var offsetField: csize_t = 0
       var offsetThunk: csize_t = 0
+
       var hmodule: HMODULE = MyLoadLibraryA(libname)
       when defined(args):
         var commandStr: string
@@ -1257,14 +1258,15 @@ proc fixIAT*(modulePtr: PVOID): bool =
             # patch _wcmdln and _acmdln if they are present in the import to make arguments working for some C++ binaries
             var wcmdlenaddr = MyGetProcAddress(hmodule,"_wcmdln") 
             if wcmdlenaddr != NULL:
-                echo "        Found _wcmdln -> patching with arguments"
+                echo obf("Found _wcmdln -> patching with arguments")
                 var newCmd = newWideCString(commandStr) # we have to prepend 
                 patchMemory(wcmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
             var acmdlenaddr = MyGetProcAddress(hmodule,"_acmdln") 
             if acmdlenaddr != NULL:
-                echo "        Found _wcmdln -> patching with arguments"
+                echo obf("Found _wcmdln -> patching with arguments")
                 var newCmd = &(commandStr)
                 patchMemory(acmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
+                
       while true:
         var fieldThunk: PIMAGE_THUNK_DATA = cast[PIMAGE_THUNK_DATA]((
             cast[csize_t](modulePtr) + offsetField + call_via))
@@ -1294,10 +1296,10 @@ proc fixIAT*(modulePtr: PVOID): bool =
           when defined(args):
             # patch common Win32 functions to get the command line
             if exeArgsPassed and "GetCommandLineW" == $$func_name:
-                echo "           [>] Patching function to pass exeArgs: ", func_name
+                echo obf("[>] Patching function to pass exeArgs: "), func_name
                 patchArgFunctionMemory(cast[pointer](libaddr), cast[pointer](newWideCString(commandStr)))
             if exeArgsPassed and $$"GetCommandLineA" == func_name:
-                echo "           [>] Patching function to pass exeArgs: ", func_name
+                echo obf("[>] Patching function to pass exeArgs: "), func_name
                 patchArgFunctionMemory(cast[pointer](libaddr), cast[pointer](&commandStr))
     
         inc(offsetField, sizeof((IMAGE_THUNK_DATA)))
