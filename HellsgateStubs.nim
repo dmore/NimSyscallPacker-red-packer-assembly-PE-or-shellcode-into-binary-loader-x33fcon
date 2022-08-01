@@ -1150,7 +1150,7 @@ proc fixIAT*(modulePtr: PVOID): bool =
                 patchMemory(wcmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
             var acmdlenaddr = MyGetProcAddress(hmodule,"_acmdln") 
             if acmdlenaddr != NULL:
-                echo obf("Found _wcmdln -> patching with arguments")
+                echo obf("Found _acmdln -> patching with arguments")
                 var newCmd = &(commandStr)
                 patchMemory(acmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
                 
