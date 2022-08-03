@@ -880,7 +880,7 @@ when isMainModule:
 
 
 let NotepadProcIDStub * = """
-
+import osproc
 # Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
 let tProcess = startProcess(obf("notepad.exe"))
 tProcess.suspend() # That's handy!
