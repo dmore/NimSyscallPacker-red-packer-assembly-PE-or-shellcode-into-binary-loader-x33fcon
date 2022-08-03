@@ -208,6 +208,14 @@ amd64.windows.clang.cpp.exe = "x86_64-w64-mingw32-clang++"
 amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 ```
 
+### Custom Images or meta data
+
+If you want to use custom Icons for your loader executables or custom metadata, you should change the `cmd.rc` file in the resources folder.
+
+That can be compiled to an `cmd.o` file via `windres cmd.rc -o cmd.o`. You can also just replace the `demo.ico` file with any other ICON file you want to use.
+
+For DLL metadata you can change `DLL.rc`.
+
 ## ProtectMyTooling embedded
 
 [mgeeky](https://github.com/mgeeky) also wrote a wrapper script for this Packer in his private ProtectMyTooling repository to automate the process of packing binaries with my packer. No need to choose options there for you. Also consider sponsoring him, as his private tool collection is worth it. :+1:
@@ -227,11 +235,12 @@ amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 - [X] Cobalt Strike integration - CNA
 - [ ] Passing parameters via e.g. manipulation of the PEB field (Command line spoofing like)
 - [ ] Shellcode memory encryption via Sleep Hook [ShellcodeFluctuation like](https://github.com/mgeeky/ShellcodeFluctuation)
-- [ ] Calling the ‘GetConsoleWindow’ and ‘ShowWindow’ Windows function after the process is created and the EDR’s hooks are loaded, and then changes the windows attributes to hidden instead of GUI compile flags
+- [X] Calling the ‘GetConsoleWindow’ and ‘ShowWindow’ Windows function after the process is created and the EDR’s hooks are loaded, and then changes the windows attributes to hidden instead of GUI compile flags
 - [ ] More sleeps in between some potentially critical stubs
 - [ ] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
 - [ ] PPID Spoofing for newly created processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
+- [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
 
 ## CREDITS
 

