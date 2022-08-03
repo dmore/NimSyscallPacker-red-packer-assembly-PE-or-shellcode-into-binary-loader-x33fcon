@@ -306,10 +306,8 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   var FirstEntry: PVOID = addr(Ldr.InMemoryOrderModuleList.Flink)
   var Entry: PND_LDR_DATA_TABLE_ENTRY = cast[PND_LDR_DATA_TABLE_ENTRY](Ldr.InMemoryOrderModuleList.Flink)
   while true:
-    # lstrcmpiW is not case sensitive, lstrcmpW is case sensitive
     var compare: int = lstrcmpiW(LibName,cast[LPWSTR](Entry.BaseDllName.Buffer))
     if(compare == 0):
-      #echo "DLL names equal"
       when not defined(release):
           echo "\r\n[+] Found the DLL!\r\n"
       return cast[HANDLE](Entry.DllBase)
@@ -427,7 +425,10 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
           functions = functions - 1
         if (funcname == obf("GetModuleFileNameW")):
           functions = functions - 1
-
+        if (funcname == obf("GetConsoleWindow")):
+          functions = functions - 1
+        if (funcname == obf("ShowWindow")):
+          functions = functions + 4
         when not defined(release): echo "\r\n[+] Found API call: ",funcname
         when not defined(release): echo "\r\n"
         

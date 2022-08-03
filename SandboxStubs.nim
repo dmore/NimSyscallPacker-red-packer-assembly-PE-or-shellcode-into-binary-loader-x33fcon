@@ -49,8 +49,10 @@ proc getDomain*(): string =
   result = newString(size)
   when defined(windows):
     var resultLen: DWORD = DWORD(size)
-    let success = MyGetComputerNameExA(ComputerNameDnsDomain,
-                                     result.cstring, resultLen.addr) != 0
+    when defined(DInvoke):
+        let success = MyGetComputerNameExA(ComputerNameDnsDomain,result.cstring, resultLen.addr) != 0
+    else:
+        let success = GetComputerNameExA(ComputerNameDnsDomain,result.cstring, resultLen.addr) != 0
   if not success:
       echo obf("Failed to get Domain")
   result.setLen(resultLen)
@@ -68,7 +70,10 @@ proc MemoryCheck*(): bool =
     var gofurther: bool = false
 
     statex.dwLength = cast[DWORD](sizeof(statex))
-    discard MyGlobalMemoryStatusEx(addr statex)
+    when defined(DInvoke):
+        discard MyGlobalMemoryStatusEx(addr statex)
+    else:
+        discard GlobalMemoryStatusEx(addr statex)
     var totalPhys = float(statex.ullTotalPhys) / float(1024*1024*1024)
     # If more than 4GB RAM available return true
     if(totalPhys >= 3.8):
@@ -100,7 +105,10 @@ proc DiskSizeCheck*(): bool =
         result: float
         gofurther: bool
 
-    success = MyGetDiskFreeSpaceExA("C:\\",addr uliUserFree, addr uliTotal, addr uliRealFree)
+    when defined(DInvoke):
+        success = MyGetDiskFreeSpaceExA("C:\\",addr uliUserFree, addr uliTotal, addr uliRealFree)
+    else:
+        success = GetDiskFreeSpaceEx("C:\\",addr uliUserFree, addr uliTotal, addr uliRealFree)
     result = float(uliTotal.QuadPart) / float((1024*1024*1024))
     #echo "Size in GB: " & $result
     if(result >= 200):

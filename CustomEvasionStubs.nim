@@ -112,6 +112,7 @@ let DInvokeSelfDeleteStubs * = """
 const
   SHLWAPI_DLL* = obf("shlwapi.dll")
 
+
 type
   CreateFileW_t* = proc (lpFileName: LPCWSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE): HANDLE {.stdcall.}
   SetFileInformationByHandle_t* = proc (hFile: HANDLE, FileInformationClass: FILE_INFO_BY_HANDLE_CLASS, lpFileInformation: LPVOID, dwBufferSize: DWORD): WINBOOL {.stdcall.}
@@ -179,7 +180,10 @@ template RtlCopyMemory*(Destination: PVOID, Source: PVOID, Length: SIZE_T) = cop
 var DS_STREAM_RENAME = newWideCString(obf(":thiswontexist"))
 
 proc ds_open_handle(pwPath: PWCHAR): HANDLE =
-    return MyCreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
+    when defined(DInvoke): 
+        return MyCreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
+    else:
+        return CreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
 
 proc ds_rename_handle(hHandle: HANDLE): WINBOOL =
     var fRename: FILE_RENAME_INFO
@@ -189,7 +193,10 @@ proc ds_rename_handle(hHandle: HANDLE): WINBOOL =
     fRename.FileNameLength = sizeof(lpwStream).DWORD
     RtlCopyMemory(addr fRename.FileName, lpwStream, sizeof(lpwStream))
 
-    return MySetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
+    when defined(DInvoke):
+        return MySetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
+    else:
+        return SetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
 
 proc ds_deposite_handle(hHandle: HANDLE): WINBOOL =
     var fDelete: FILE_DISPOSITION_INFO
@@ -197,7 +204,10 @@ proc ds_deposite_handle(hHandle: HANDLE): WINBOOL =
 
     fDelete.DeleteFile = TRUE
 
-    return MySetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
+    when defined(DInvoke):
+        return MySetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
+    else:
+        return SetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
 
 when isMainModule:
     var
@@ -206,9 +216,14 @@ when isMainModule:
 
     RtlSecureZeroMemory(addr wcPath[0], sizeof(wcPath))
 
-    if MyGetModuleFileNameW(0, addr wcPath[0], MAX_PATH) == 0:
-        echo obf("[-] Failed to get the current module handle")
-        quit(QuitFailure)
+    when defined(DInvoke):
+        if MyGetModuleFileNameW(0, addr wcPath[0], MAX_PATH) == 0:
+            echo obf("[-] Failed to get the current module handle")
+            quit(QuitFailure)
+    else:
+        if GetModuleFileNameW(0, addr wcPath[0], MAX_PATH) == 0:
+            echo obf("[-] Failed to get the current module handle")
+            quit(QuitFailure)
 
     hCurrent = ds_open_handle(addr wcPath[0])
     if hCurrent == INVALID_HANDLE_VALUE:
@@ -221,7 +236,10 @@ when isMainModule:
         quit(QuitFailure)
 
     echo obf("[*] Successfully renamed file primary :$DATA ADS to specified stream, closing initial handle")
-    discard MyCloseHandle(hCurrent)
+    when defined(DInvoke):
+        discard MyCloseHandle(hCurrent)
+    else:
+        discard CloseHandle(hCurrent)
 
     hCurrent = ds_open_handle(addr wcPath[0])
     if hCurrent == INVALID_HANDLE_VALUE:
@@ -233,10 +251,17 @@ when isMainModule:
         quit(QuitFailure)
 
     echo obf("[*] Closing handle to trigger deletion deposition")
-    discard MyCloseHandle(hCurrent)
+    when defined(DInvoke):
+        discard MyCloseHandle(hCurrent)
+    else:
+        discard CloseHandle(hCurrent)
 
-    if not MyPathFileExistsW(addr wcPath[0]).bool:
-        echo obf("[*] File deleted successfully")
+    when defined(DInvoke):
+        if not MyPathFileExistsW(addr wcPath[0]).bool:
+            echo obf("[*] File deleted successfully")
+    else:
+        if not PathFileExistsW(addr wcPath[0]).bool:
+            echo obf("[*] File deleted successfully")
 
 """
 
