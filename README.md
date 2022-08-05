@@ -234,10 +234,11 @@ For DLL metadata you can change `DLL.rc`.
 - [X] More syscalls and or D/Invoke for win32 functions
 - [X] Cobalt Strike integration - CNA
 - [ ] Passing parameters via e.g. manipulation of the PEB field (Command line spoofing like)
-- [ ] Shellcode memory encryption via Sleep Hook [ShellcodeFluctuation like](https://github.com/mgeeky/ShellcodeFluctuation)
+- [X] Passing parameters via API import function patching
+- [X] Shellcode memory encryption via Sleep Hook [ShellcodeFluctuation like](https://github.com/mgeeky/ShellcodeFluctuation)
 - [X] Calling the ‘GetConsoleWindow’ and ‘ShowWindow’ Windows function after the process is created and the EDR’s hooks are loaded, and then changes the windows attributes to hidden instead of GUI compile flags
 - [ ] More sleeps in between some potentially critical stubs
-- [ ] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
+- [X] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
 - [ ] PPID Spoofing for newly created processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
