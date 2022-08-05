@@ -122,13 +122,19 @@ proc fixIAT*(modulePtr: PVOID): bool =
             exeArgsPassed = true
         if exeArgsPassed:
             # patch _wcmdln and _acmdln if they are present in the import to make arguments working for some C++ binaries
-            var wcmdlenaddr = MyGetProcAddress(hmodule,"_wcmdln") 
-            if wcmdlenaddr != NULL:
+            when defined(DInvoke):
+                var wcmdlenaddr = MyGetProcAddress(hmodule,"_wcmdln")
+            else:
+                var wcmdlenaddr = GetProcAddress(hmodule,"_wcmdln") 
+            if wcmdlenaddr != nil:
                 echo obf("Found _wcmdln -> patching with arguments")
                 var newCmd = newWideCString(commandStr) # we have to prepend 
                 patchMemory(wcmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
-            var acmdlenaddr = MyGetProcAddress(hmodule,"_acmdln") 
-            if acmdlenaddr != NULL:
+            when defined(DInvoke):
+                var acmdlenaddr = MyGetProcAddress(hmodule,"_acmdln")
+            else:
+                var acmdlenaddr = GetProcAddress(hmodule,"_acmdln") 
+            if acmdlenaddr != nil:
                 echo obf("Found _acmdln -> patching with arguments")
                 var newCmd = &(commandStr)
                 patchMemory(acmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
