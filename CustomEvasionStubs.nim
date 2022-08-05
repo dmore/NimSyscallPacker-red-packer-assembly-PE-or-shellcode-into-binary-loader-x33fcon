@@ -78,7 +78,10 @@ proc ntdllunhook(): bool =
                   else:
                       echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                       return false
-              status = NtProtectVirtualMemory(processH, addr ds, addr pSize, 0x04, addr oldProtection)
+                  # We need to use RWX here, as with RW the Syscall it'self (retrieved via HellsGate from memory ntdll) cannot execute anymore and the process crashes.
+                  status = NtProtectVirtualMemory(processH, addr ds, addr pSize, 0x40, addr oldProtection)    
+              when defined(GetSyscallStub):
+                  status = NtProtectVirtualMemory(processH, addr ds, addr pSize, 0x04, addr oldProtection)
               if status != 0:
                 echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{status}."
                 return false

