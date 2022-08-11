@@ -585,6 +585,8 @@ from winim import fileDispositionInfo,MAX_PATH,WCHAR,INVALID_HANDLE_VALUE
 template RtlSecureZeroMemory*(Destination: PVOID, Length: SIZE_T) = zeroMem(Destination, Length)
 template RtlCopyMemory*(Destination: PVOID, Source: PVOID, Length: SIZE_T) = copyMem(Destination, Source, Length)
 
+proc PathFileExistsW*(pszPath: LPCWSTR): WINBOOL {.winapi, stdcall, dynlib: "shlwapi", importc.}
+
 var DS_STREAM_RENAME = newWideCString(obf(":thiswontexist"))
 
 proc ds_open_handle(pwPath: PWCHAR): HANDLE =
