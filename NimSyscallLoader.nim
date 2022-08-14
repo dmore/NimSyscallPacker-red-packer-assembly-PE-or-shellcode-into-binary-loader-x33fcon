@@ -94,7 +94,7 @@ Options:
   --sleep 10    Sleep 10 seconds before decryption to evade in memory scanners
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --unhook    Unhook ntdll.dll before doing anything else for the current process
-  --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation (not possible in combination with --reflective)
+  --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --sandbox value    Include Sandbox Checks of your choice into the loader:
@@ -1292,24 +1292,9 @@ echo "Written Loader.nim, compiling -> \n\n"
 
 var basicCompileFlags: string = ""
 
-when system.hostOS == "windows":
-    if (denim):
-        var exist: bool = fileExists("denim.exe")
-        if (exist):
-            stub = stub.replace("import strenc", "")
-            writeFile("Loader.nim", stub)
-            discard os.execShellCmd(fmt".\denim.exe compile Loader.nim")
-            let msg = fmt"[!] Encrypted file saved to Loader.exe"
-            echo "\n" & msg
-            if(replace):
-                var randstring: string = rndStr(2)
-                echo fmt"[!] ---> replacing nim with {randstring} "
-                discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
-            quit()
-elif system.hostOS == "linux":
-    if (denim):
-        echo "No Denim support for Linux systems, sorry!"
-
+if (hellsgate):
+    echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
+    discard exec_cmd_ex("nimgrep === --replace \\\"\\\"\\\" Loader.nim")
 
 if (llvm):
     echo "[+] Using LLVM-Obfuscator to compile"
@@ -1335,16 +1320,49 @@ if (llvm):
             echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
             quit()
 elif system.hostOS == "windows":
-    basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+    # there's a bug in my modified denim, which makes "--" out of "-d" for the first argument when using multiple arguments, so only one can be accepted at the moment
+    if (denim):
+        basicCompileFlags = "" 
+        #"-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
+    else:
+        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
 if(hellsgate):
-    basicCompileFlags.add("-d:Hellsgate ")
+    if(denim):
+        basicCompileFlags.add("-d:Hellsgate")    
+    else:
+        basicCompileFlags.add("-d:Hellsgate ")
 elif(getfreshstub):
-    basicCompileFlags.add("-d:GetSyscallStub ")
+    if(denim):
+        basicCompileFlags.add("-d:GetSyscallStub")
+    else:
+        basicCompileFlags.add("-d:GetSyscallStub ")
 elif(syswhispers):
-    basicCompileFlags.add("-d:SysWhispers ")
+    if(denim):
+        basicCompileFlags.add("-d:SysWhispers")
+    else:
+        basicCompileFlags.add("-d:SysWhispers ")
+
+
+when system.hostOS == "windows":
+    if (denim):
+        var exist: bool = fileExists("denim.exe")
+        if (exist):
+            stub = stub.replace("import strenc", "")
+            writeFile("Loader.nim", stub)
+            discard os.execShellCmd(fmt"denim.exe compile Loader.nim -A ""{basicCompileFlags}""")
+            let msg = fmt"[!] Encrypted file saved to Loader.exe"
+            echo "\n" & msg
+            if(replace):
+                var randstring: string = rndStr(2)
+                echo fmt"[!] ---> replacing nim with {randstring} "
+                discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
+            quit()
+elif system.hostOS == "linux":
+    if (denim):
+        echo "No Denim support for Linux systems, sorry!"
 
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
@@ -1386,10 +1404,7 @@ else:
     if (reflective):
         basicCompileFlags.add("--app=gui --passL:-Wl,--dynamicbase,--export-all-symbols ")
 
-if (hellsgate):
-    echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
-    discard exec_cmd_ex("nimgrep === --replace \\\"\\\"\\\" Loader.nim")
-elif(syswhispers != true):
+if((syswhispers != true) and (hellsgate != true)):
     if system.hostOS == "windows":
         basicCompileFlags.add("--passc=-flto --passl=-flto ")
 
@@ -1399,8 +1414,8 @@ when system.hostOS == "windows":
 else:
     basicCompileFlags.add(fmt"-p:'{packerPath}' ")
 
-basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
-
+if(not denim):
+    basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
 
 if debugMode:
     basicCompileFlags = basicCompileFlags.replace("-d:release", "")
