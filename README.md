@@ -229,7 +229,7 @@ For DLL metadata you can change `DLL.rc`.
 - [X] Remotely load the "to patch" DLL (ntdll or amsi.dll) into the remote process before patching (otherwise it won't help us)
 - [x] Hellsgate support for remote shellcode injection + PELoading
 - [X] DLL output
-- [ ] DLL Sideloading capabilities
+- [X] DLL Sideloading capabilities
 - [ ] C# and/or Powershell output files
 - [X] More syscalls and or D/Invoke for win32 functions
 - [X] Cobalt Strike integration - CNA
@@ -241,6 +241,11 @@ For DLL metadata you can change `DLL.rc`.
 - [ ] PPID Spoofing for newly created processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
+- [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
+- [ ] DLL hijacking switch for DLLMain with process attach
+- [ ] Fix x86 bugs, mostly casting but some other strange behaviours
+
+
 
 ## CREDITS
 
