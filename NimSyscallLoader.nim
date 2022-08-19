@@ -1418,7 +1418,7 @@ when system.hostOS == "windows":
     if (denim):
         var exist: bool = fileExists(".\\denim\\denim.exe")
         # cause some compile problems
-        basicCompileFlags = basicCompileFlags.replace("--passc=-flto --passl=-flto", "")
+        basicCompileFlags = basicCompileFlags.replace("--passc=-flto --passl=-flto ", "")
         if (exist):
             # An additional whitespace at the end causes an compiler error here, so we'll remove it
             basicCompileFlags = basicCompileFlags.replace(" \r\n", "")
