@@ -64,7 +64,7 @@ A Video - if you prefer that - can be found here:
 NimSyscall_Loader v 1.6
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -87,10 +87,11 @@ Options:
   --hide    Compile with --app:gui flag, so that the console won't pop up
   --APIhide    Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
-  --debug    Compiles the binary in debug mode (More DInvoke output)
+  --debug    Compiles the binary in debug mode
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
+  --verbose    Prints output to the console (for troubleshooting purposes)
 
 [evasion]
 
@@ -105,6 +106,7 @@ Options:
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
                      DiskSpace -> Only execute if c:\ disk space >= 200GB
                      MemorySpace -> Only execute if more than 4GB RAM available
+                     Emulated -> VirtualAllocExNuma API call (Some sandboxes do not emulate that)
         --domain targetdomain    Specify a domain for SandBox Evasion
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
