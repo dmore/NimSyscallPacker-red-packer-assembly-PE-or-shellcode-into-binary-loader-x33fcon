@@ -295,6 +295,7 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [ ] More sleeps in between some potentially critical stubs
 - [X] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
 - [ ] PPID Spoofing for newly created processes
+- [ ] BlockDLLs for new processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
 - [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
