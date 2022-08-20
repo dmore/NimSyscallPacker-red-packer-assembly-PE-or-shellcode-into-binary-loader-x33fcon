@@ -482,7 +482,8 @@ when defined(Hellsgate):
                 continue
     
             if not getExportTable(currModule, pExportTable):
-                echo obf("[-] Failed to get export table...")
+                when defined(verbose):
+                    echo obf("[-] Failed to get export table...")
                 return false
     
             if getTableEntry(currModule.DLLBase, pExportTable, tableEntry):

