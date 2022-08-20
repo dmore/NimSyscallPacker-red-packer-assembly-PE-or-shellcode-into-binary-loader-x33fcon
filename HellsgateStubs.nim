@@ -223,38 +223,6 @@ when defined(Hellsgate):
             Struct*      : LDR_DATA_TABLE_ENTRY_STRUCT_ONE            
         PLDR_DATA_TABLE_ENTRY_UNION_TWO* = ptr LDR_DATA_TABLE_ENTRY_UNION_TWO
         
-        LDR_DATA_TABLE_ENTRY* {.pure.} = object
-            InLoadOrderLinks*               : LIST_ENTRY
-            InMemoryOrderLinks*             : LIST_ENTRY
-            Union_1*                        : LDR_DATA_TABLE_ENTRY_UNION_ONE
-            DLLBase*                        : PVOID
-            EntryPoint*                     : PVOID
-            SizeOfImage*                    : ULONG
-            FullDllName*                    : UNICODE_STRING
-            BaseDllName*                    : UNICODE_STRING
-            Union_2*                        : LDR_DATA_TABLE_ENTRY_UNION_TWO
-            ObsoleteLoadCount               : USHORT
-            TlsIndex*                       : USHORT
-            HashLinks*                      : LIST_ENTRY
-            TimeDateStamp*                  : ULONG
-            EntryPointActivationContext*    : PVOID
-            Lock*                           : PVOID
-            DdgagNode*                      : PVOID       # PLDR_DDAG_NODE
-            NodeModuleLink*                 : LIST_ENTRY
-            LoadContext*                    : PVOID       # PLDRP_LOAD_CONTEXT
-            ParentDllBase                   : PVOID
-            SwitchBackContext*              : PVOID
-            BaseAddressIndexNode*           : RTL_BALANCED_NODE
-            MappingInfoIndexNode*           : RTL_BALANCED_NODE
-            OriginalBase*                   : ULONG_PTR
-            LoadTime*                       : LARGE_INTEGER
-            BaseNameHashValue*              : ULONG
-            LoadReason*                     : LDR_DLL_LOAD_REASON
-            ImplicitPathOptions*            : ULONG
-            ReferenceCount*                 : ULONG
-            DependentLoadFlags*             : ULONG
-            SigningLevel*                   : UCHAR
-        PLDR_DATA_TABLE_ENTRY* = ptr LDR_DATA_TABLE_ENTRY
     
         PEB_LDR_DATA* {.pure.} = object
             Length*                             : ULONG

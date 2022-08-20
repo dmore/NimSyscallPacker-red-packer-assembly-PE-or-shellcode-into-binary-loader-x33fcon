@@ -12,4 +12,3 @@ let WhispersJumpStub * = """
 import whispers/syscallsjump
 
 """
-
