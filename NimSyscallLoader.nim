@@ -104,6 +104,7 @@ Options:
                      DiskSpace -> Only execute if c:\ disk space >= 200GB
                      MemorySpace -> Only execute if more than 4GB RAM available
                      Emulated -> VirtualAllocExNuma API call (Some sandboxes do not emulate that)
+                     WindowChanges -> Checks, if the current Window has changed 7 or more times before executing the payload
         --domain targetdomain    Specify a domain for SandBox Evasion
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
@@ -1101,7 +1102,8 @@ if(sandbox):
             stub.add(MemorySpaceStub)
         if (m == "Emulated"):
             stub.add(VirtualAlloxExNumaCheckStub)
-
+        if (m == "WindowChanges"):
+            stub.add(WindowChangeStub)
 if (apihide):
     stub.add(APIHideStub)
 
