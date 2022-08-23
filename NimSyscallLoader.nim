@@ -258,17 +258,23 @@ if args["--dllexportfunc"]:
   let dllfuncstring = args["--dllexportfunc"]
   dllfunc = fmt"{dllfuncstring}"
   dllexportfunctions = dllfunc.split(',')
-  
+
+proc rndStr: string =
+    for _ in 0.. 10:
+      add(result, char(rand(int('a') .. int('z'))))
+
+var customLoaderName: string = rndStr()
+
 when system.hostOS == "windows":
     if(dll_out):
-        outfile.add("\\Loader.dll")
+        outfile.add(fmt"\\{customLoaderName}.dll")
     else:
-        outfile.add("\\Loader.exe")
+        outfile.add(fmt"\\{customLoaderName}.exe")
 else:
     if(dll_out):
-        outfile.add("/Loader.dll")
+        outfile.add(fmt"/{customLoaderName}.dll")
     else:
-        outfile.add("/Loader.exe")
+        outfile.add(fmt"/{customLoaderName}.exe")
 
 if args["--output"]:
   let outname = args["--output"]
@@ -945,10 +951,6 @@ proc genTrustedwords (nuofWords: int): string =
     for i in 1 .. numberofWords:
       output.add(sample(trusteddicts))
     return output
-
-  proc rndStr: string =
-    for _ in 0.. 10:
-      add(result, char(rand(int('a') .. int('z'))))
     
   var rand1: seq[string] = pumpTrustedwords(nuofWords)
   var rand2: string = rndStr()
@@ -1507,7 +1509,7 @@ when system.hostOS == "windows":
             stub = stub.replace("import strenc", "")
             writeFile("Loader.nim", stub)
             discard os.execShellCmd(fmt".\\denim\\denim.exe compile Loader.nim -A ""{basicCompileFlags}""")
-            let msg = fmt"[!] Encrypted file saved to Loader.exe"
+            let msg = fmt"[!] Encrypted file saved to {outfile}"
             echo "\n" & msg
             if(replace):
                 var randstring: string = rndStr(2)
@@ -1561,8 +1563,14 @@ if (sign):
     echo "[*] Using Limelighter to generate a fake code signing certificate for the binary"
     echo fmt"[*] The domain to spoof the certificate from will be {signdomain}"
     if system.hostOS == "linux":
-        discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed.exe")
+        if(dll_out):
+            discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed.dll")
+        else:
+            discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed.exe")
     when system.hostOS == "windows":
         #var command = fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {packerPath}\{outfile} -O {packerPath}\{outfile}.Signed.exe"
         #echo command
-        discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed.exe")
+        if(dll_out):
+            discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed.dll")
+        else:
+            discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed.exe")
