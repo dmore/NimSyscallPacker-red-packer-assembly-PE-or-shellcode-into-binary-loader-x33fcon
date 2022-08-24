@@ -36,10 +36,12 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-
 proc rndStr(length: int): string =
-  for _ in 0.. length:
+  for _ in .. length:
     add(result, char(rand(int('a') .. int('z'))))
+
+# When this function isn't called, all random functions are not random. (https://nim-lang.org/docs/random.html)
+randomize()
 
 
 let banner = """
@@ -163,7 +165,7 @@ var
     filename: string = ""
     packerPath = os.getAppDir()
     outfile: string = packerPath
-    envkey: string = rndStr()
+    envkey: string = rndStr(rand(10..35))
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
@@ -265,7 +267,7 @@ if args["--dllexportfunc"]:
   dllfunc = fmt"{dllfuncstring}"
   dllexportfunctions = dllfunc.split(',')
 
-var customLoaderName: string = rndStr()
+var customLoaderName: string = rndStr(rand(5..15))
 
 when system.hostOS == "windows":
     if(dll_out):
