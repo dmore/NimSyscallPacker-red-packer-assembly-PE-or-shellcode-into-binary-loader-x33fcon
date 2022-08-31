@@ -301,6 +301,8 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
 - [ ] DLL hijacking switch for DLLMain with process attach
 - [ ] Fix x86 bugs, mostly casting but some other strange behaviours
+- [ ] Add `--pump` null bytes in between like https://gitlab.com/ORCA000/entropyfix (Have to test, may cause crashes)
+- [ ] CPL Output files
 
 
 
