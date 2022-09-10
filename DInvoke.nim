@@ -1,55 +1,42 @@
+
+import strformat
+import random
+
+# When this function isn't called, all random functions are not random. (https://nim-lang.org/docs/random.html)
+randomize()
+
+proc rndStr(length: int): string =
+  for _ in .. length:
+    add(result, char(rand(int('a') .. int('z'))))
+
+proc getRandStub (): string =
+  var randName: string = rndStr(rand(10..25))
+  var randValues: string = rndStr(rand(50..250))
+  let randstub = fmt"""
+
+var {randName}: string = obf("{randValues}")
+
+"""
+  return randstub
+
+proc getRandStubInFunc(): string =
+  var randName: string = rndStr(rand(10..25))
+  var randValues: string = rndStr(rand(50..250))
+  let randstub = fmt"""
+
+  var {randName}: string = obf("{randValues}")
+
+"""
+  return randstub
+
+
+let DInvokeStubfirst * = """
+
 from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
 from winim import PWCHAR,PUNICODE_STRING,UNICODE_STRING,PHANDLE,LIST_ENTRY,UCHAR,BYTE,P_PEB,LPWSTR,IMAGE_NT_SIGNATURE,USHORT,IMAGE_FILE_DLL,lstrcmpiW,LPWSTR,PWSTR,RtlInitUnicodeString,ULONG_PTR,MAX_PATH,wchar_t,IMAGE_DATA_DIRECTORY,PCHAR,StrRStrIA
 import winim/utils
 import winim/winstr
-import tables
-import strformat
-import algorithm
 
-### Modified code from Nim-Strenc to avoid XORing of long strings -> Modified by @chvancooten, credit to him
-### Original source: https://github.com/Yardanico/nim-strenc
-import macros, hashes
-
-type
-    estring = distinct string
-
-proc calcTheThings(s: estring, key: int): string {.noinline.} =
-    var k = key
-    result = string(s)
-    for i in 0 ..< result.len:
-        for f in [0, 8, 16, 24]:
-            result[i] = chr(uint8(result[i]) xor uint8((k shr f) and 0xFF))
-    k = k +% 1
-
-var eCtr {.compileTime.} = hash(CompileTime & CompileDate) and 0x7FFFFFFF
-
-macro obf*(s: untyped): untyped =
-    if len($s) < 10000:
-        var encodedStr = calcTheThings(estring($s), eCtr)
-        result = quote do:
-            calcTheThings(estring(`encodedStr`), `eCtr`)
-        eCtr = (eCtr *% 16777619) and 0x7FFFFFFF
-    else:
-        result = s
-
-when defined(WIN64):
-  const
-    PEB_OFFSET* = 0x30
-else:
-  const
-    PEB_OFFSET* = 0x60
-
-
-const
-  LdrLoadDll_SW2_HASH * = obf("LdrLoadDll")
-  MZ* = 0x5A4D
-
-const
-  NTDLL_DLL* = "ntdll.dll"
-
-type
-  LdrLoadDll_t* = proc (PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.stdcall.}
-  
 type
   ND_LDR_DATA_TABLE_ENTRY* {.bycopy.} = object
     InMemoryOrderLinks*: LIST_ENTRY
@@ -79,19 +66,55 @@ type
 
   PND_PEB* = ptr ND_PEB
 
+type
+  LdrLoadDll_t* = proc (PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.stdcall.}
 
+# toDo: Syscall
+proc RtlGetCurrentPeb*(): pointer 
+  {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
+
+#[ This was the older alternative, which was the trigger for ESET to flag the resulting binaries, therefore I replaced that with RtlGetCurrentPeb.
 proc GetPPEB(p: culong): P_PEB {. 
     header: 
-        """#include <windows.h>
-           #include <winnt.h>""", 
+        '''#include <windows.h>
+           #include <winnt.h>''', 
     importc: "__readgsqword"
 .}
+]#
 
+"""
 
+let DInvokeGetPEB * = fmt"""
+
+proc GetPPEB * (p: culong): P_PEB = 
+  # We need to put any stuff before and after this function, to avoid an ESET detection. It flags any Nim binary that uses this function alone.
+  {getRandStubInFunc()}
+  return cast[P_PEB](RtlGetCurrentPeb())
+  {getRandStubInFunc()}
+
+"""
+
+let DInvokeStubSecond * = fmt"""
+
+when defined(WIN64):
+  const
+    PEB_OFFSET* = 0x30
+else:
+  const
+    PEB_OFFSET* = 0x60
+
+{getRandStub()}
+
+const
+  LdrLoadDll_SW2_HASH * = obf("LdrLoadDll")
+  MZ* = 0x5A4D
+
+const
+  NTDLL_DLL* = obf("ntdll.dll")
+
+{getRandStub()}
 
 template RVA*(atype: untyped, base_addr: untyped, rva: untyped): untyped = cast[atype](cast[ULONG_PTR](cast[ULONG_PTR](base_addr) + cast[ULONG_PTR](rva)))
-
-template RVASub*(atype: untyped, base_addr: untyped, rva: untyped): untyped = cast[atype](cast[ULONG_PTR](cast[ULONG_PTR](base_addr) - cast[ULONG_PTR](rva)))
 
 template RVA2VA(casttype, dllbase, rva: untyped): untyped =
   cast[casttype](cast[ULONG_PTR](dllbase) + rva)
@@ -102,162 +125,13 @@ proc `+`[T](a: ptr T, b: int): ptr T =
 proc `-`[T](a: ptr T, b: int): ptr T =
     cast[ptr T](cast[uint](a) - cast[uint](b * a[].sizeof))
 
-# A pointer cannot be used with "+" in Nim, therefore its 
-template PointerAdd*(atype: untyped, first: untyped, seccond: untyped): untyped = cast[atype](cast[uint](first) + cast[uint](seccond))
-
-# A pointer cannot be used with "-" in Nim, therefore its 
-template PointerSubstract*(atype: untyped, first: untyped, seccond: untyped): untyped = cast[atype](cast[int](first) - cast[int](seccond))
-
-### Alternative for PEB x64 only
-
-#[
-
-type
-  LDR_DATA_TABLE_ENTRY* {.bycopy.} = object
-    InLoadOrderModuleList*: LIST_ENTRY
-    InMemoryOrderModuleList*: LIST_ENTRY
-    InInitializationOrderModuleList*: LIST_ENTRY
-    DllBase*: PVOID
-    EntryPoint*: PVOID
-    SizeOfImage*: ULONG        ##  in bytes
-    FullDllName*: UNICODE_STRING
-    BaseDllName*: UNICODE_STRING
-    Flags*: ULONG              ##  LDR_*
-    LoadCount*: USHORT
-    TlsIndex*: USHORT
-    HashLinks*: LIST_ENTRY
-    SectionPointer*: PVOID
-    CheckSum*: ULONG
-    TimeDateStamp*: ULONG ##     PVOID			LoadedImports;					// seems they are exist only on XP !!!
-                        ##     PVOID			EntryPointActivationContext;	// -same-
-  PLDR_DATA_TABLE_ENTRY* = ptr LDR_DATA_TABLE_ENTRY
-
-  PEB_LDR_DATA* {.bycopy.} = object
-    Length*: ULONG
-    Initialized*: BOOLEAN
-    SsHandle*: PVOID
-    InLoadOrderModuleList*: LIST_ENTRY
-    InMemoryOrderModuleList*: LIST_ENTRY
-    InInitializationOrderModuleList*: LIST_ENTRY
-
-  PPEB_LDR_DATA* = ptr PEB_LDR_DATA
-
-  RTL_DRIVE_LETTER_CURDIR* {.bycopy.} = object
-    Flags*: USHORT
-    Length*: USHORT
-    TimeStamp*: ULONG
-    DosPath*: UNICODE_STRING
-
-  RTL_USER_PROCESS_PARAMETERS* {.bycopy.} = object
-    MaximumLength*: ULONG
-    Length*: ULONG
-    Flags*: ULONG
-    DebugFlags*: ULONG
-    ConsoleHandle*: PVOID
-    ConsoleFlags*: ULONG
-    StdInputHandle*: HANDLE
-    StdOutputHandle*: HANDLE
-    StdErrorHandle*: HANDLE
-    CurrentDirectoryPath*: UNICODE_STRING
-    CurrentDirectoryHandle*: HANDLE
-    DllPath*: UNICODE_STRING
-    ImagePathName*: UNICODE_STRING
-    CommandLine*: UNICODE_STRING
-    Environment*: PVOID
-    StartingPositionLeft*: ULONG
-    StartingPositionTop*: ULONG
-    Width*: ULONG
-    Height*: ULONG
-    CharWidth*: ULONG
-    CharHeight*: ULONG
-    ConsoleTextAttributes*: ULONG
-    WindowFlags*: ULONG
-    ShowWindowFlags*: ULONG
-    WindowTitle*: UNICODE_STRING
-    DesktopName*: UNICODE_STRING
-    ShellInfo*: UNICODE_STRING
-    RuntimeData*: UNICODE_STRING
-    DLCurrentDirectory*: array[0x20, RTL_DRIVE_LETTER_CURDIR]
-
-  PEB* {.bycopy.} = object
-    InheritedAddressSpace*: BOOLEAN
-    ReadImageFileExecOptions*: BOOLEAN
-    BeingDebugged*: BOOLEAN
-    Spare*: BOOLEAN
-    Mutant*: HANDLE
-    ImageBaseAddress*: PVOID
-    Ldr*: PPEB_LDR_DATA
-    ProcessParameters*: PRTL_USER_PROCESS_PARAMETERS
-    SubSystemData*: PVOID
-    ProcessHeap*: PVOID
-    FastPebLock*: PVOID
-    FastPebLockRoutine*: PVOID
-    FastPebUnlockRoutine*: PVOID
-    EnvironmentUpdateCount*: ULONG
-    KernelCallbackTable*: PVOID
-    EventLogSection*: PVOID
-    EventLog*: PVOID
-    FreeList*: PVOID
-    TlsExpansionCounter*: ULONG
-    TlsBitmap*: PVOID
-    TlsBitmapBits*: array[0x2, ULONG]
-    ReadOnlySharedMemoryBase*: PVOID
-    ReadOnlySharedMemoryHeap*: PVOID
-    ReadOnlyStaticServerData*: PVOID
-    AnsiCodePageData*: PVOID
-    OemCodePageData*: PVOID
-    UnicodeCaseTableData*: PVOID
-    NumberOfProcessors*: ULONG
-    NtGlobalFlag*: ULONG
-    Spare2*: array[0x4, BYTE]
-    CriticalSectionTimeout*: LARGE_INTEGER
-    HeapSegmentReserve*: ULONG
-    HeapSegmentCommit*: ULONG
-    HeapDeCommitTotalFreeThreshold*: ULONG
-    HeapDeCommitFreeBlockThreshold*: ULONG
-    NumberOfHeaps*: ULONG
-    MaximumNumberOfHeaps*: ULONG
-    ProcessHeaps*: ptr PVOID
-    GdiSharedHandleTable*: PVOID
-    ProcessStarterHelper*: PVOID
-    GdiDCAttributeList*: PVOID
-    LoaderLock*: PVOID
-    OSMajorVersion*: ULONG
-    OSMinorVersion*: ULONG
-    OSBuildNumber*: ULONG
-    OSPlatformId*: ULONG
-    ImageSubSystem*: ULONG
-    ImageSubSystemMajorVersion*: ULONG
-    ImageSubSystemMinorVersion*: ULONG
-    GdiHandleBuffer*: array[0x22, ULONG]
-    PostProcessInitRoutine*: ULONG
-    TlsExpansionBitmap*: ULONG
-    TlsExpansionBitmapBits*: array[0x80, BYTE]
-    SessionId*: ULONG
-
-  PPEB* = ptr PEB
-
-{.passC:"-masm=intel".}
-
-proc GetPEB*(): PPEB {.asmNoStackFrame.} =
-    # GetPEBAsm64 proc
-    asm """
-        push rbx
-        xor rbx,rbx
-        xor rax,rax
-        mov rbx, qword ptr gs:[0x30]
-        mov rax, rbx
-        pop rbx
-        ret
-    """
-    # GetPEBAsm64 endp
-]#
-## Alternative end
 
 proc is_dll*(hLibrary: PVOID): BOOL
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE
 proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, specialCase: BOOL): PVOID
 proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: cstring): PVOID
+
+{getRandStub()}
 
 proc is_dll*(hLibrary: PVOID): BOOL =
   #echo "IS_DLL start"
@@ -294,8 +168,7 @@ proc is_dll*(hLibrary: PVOID): BOOL =
 ##
 ##  Get the base address of a DLL
 ##
-
-#proc LdrLoadDll(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.stdcall, dynlib: "ntdll", importc.}
+{getRandStub()}
 
 
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
@@ -319,7 +192,7 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   if (DoLoad == FALSE):
     when defined(verbose): echo "Exit, loading is not appreciated"
     return 0
-  
+  {getRandStubInFunc()}
   var MyLdrLoadDll: LdrLoadDll_t = cast[LdrLoadDll_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), LdrLoadDll_SW2_HASH, 0, TRUE)))
   
   if MyLdrLoadDll == nil:
@@ -329,7 +202,12 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   var ModuleFileName: UNICODE_STRING
   
   var hLibrary: HANDLE = 0
-  
+
+"""
+
+let DInvokeStubThird * = """
+
+
   RtlInitUnicodeString(&ModuleFileName, LibName)
   #echo fmt"Copyied {LibName} into {ModuleFileName} "
   #echo "Error after:", $GetLastError()
@@ -347,10 +225,13 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   when defined(verbose): echo fmt"[+] Loaded {LibName} at {hLibrary}"
   return hLibrary
 
+"""
 
+let DInvokeStubFourth * = fmt"""
 ##
 ##  Find an export in a DLL
 ##
+{getRandStub()}
 
 proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, specialCase: BOOL): PVOID =
   var dos: PIMAGE_DOS_HEADER
@@ -381,7 +262,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
   ord = RVA2VA(PDWORD, cast[DWORD_PTR](hLibrary), exp.AddressOfNameOrdinals)
   
   functionAddress = nil
-
+  {getRandStubInFunc()}
   var numofnames = cast[DWORD](exp.NumberOfNames)
   var functions = RVA2VA(PDWORD, cast[PVOID](hLibrary), exp.AddressOfFunctions)
   #var ordinalbase: DWORD = exp.AddressOfFunctions + 0x10
@@ -399,7 +280,6 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
       # Getting the function name value
       var funcname = RVA2VA(cstring, cast[PVOID](hLibrary), names)
       #echo funcname
-
       var finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
       
       # We are comparing against function names, which include "." because for some reason all function names in this loop also contain references to other DLLs, e.g. "api-ms-win-core-libraryloader-l1-1-0.AddDllDirectory" in kernel32.dll
@@ -431,7 +311,6 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
           functions = functions + 4
         when defined(verbose): echo "\r\n[+] Found API call: ",funcname
         when defined(verbose): echo "\r\n"
-        
         # Strange. For ntdll functions the following is needed, but for kernel32 functions it's not. Don't ask me why. This is a workaround for the moment. Need to troubleshoot.
         if (specialCase):
           # Why?
@@ -446,12 +325,13 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
         break
   else:
     # Add the ordinal number e.g. 1034 for OpenProcess and - the EXP Base address
-    when defined(verbose): echo fmt"Getting address via ordinal: {ordinal}"
+    when defined(verbose): echo fmt"Getting address via ordinal"
     functions = functions + ordinal - 1
     functionAddress = RVA(PVOID, hLibrary, functions[])
     when defined(verbose): echo "Relative Address: ", toHex(functions[])
     #echo "Function address via ordinal:"
     #echo repr(functionAddress)
+    {getRandStubInFunc()}
   if functionAddress == nil:
     return nil
   else:
@@ -464,8 +344,10 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
 # Not verified working yet
 proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: cstring): PVOID =
   var functionAddress: PVOID
+  {getRandStubInFunc()}
   var Peb: PPEB = GetPPEB(PEB_OFFSET)
   #var Peb: PPEB = GetPEB()
+  {getRandStubInFunc()}
   var Ldr = Peb.Ldr
   var FirstEntry: PVOID = addr(Ldr.InMemoryOrderModuleList.Flink)
   var Entry: PND_LDR_DATA_TABLE_ENTRY = cast[PND_LDR_DATA_TABLE_ENTRY](Ldr.InMemoryOrderModuleList.Flink)
@@ -481,3 +363,5 @@ proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: cstring): PVOID =
     return functionAddress
     Entry = cast[PND_LDR_DATA_TABLE_ENTRY](Entry.InMemoryOrderLinks.Flink)
   return nil
+
+"""
