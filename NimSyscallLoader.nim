@@ -817,9 +817,6 @@ import strenc
 when defined(Fluctuate):
     import Fluctuation
 
-when defined(DInvoke):
-    import GetPEB
-
 var success: BOOL
 
 proc toString(bytes: openarray[byte]): string =
