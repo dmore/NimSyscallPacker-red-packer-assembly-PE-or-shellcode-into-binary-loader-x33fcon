@@ -323,6 +323,8 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [ ] Fix x86 bugs, mostly casting but some other strange behaviours
 - [X] Add `--pump` null bytes in between like https://gitlab.com/ORCA000/entropyfix (Have to test, may cause crashes)
 - [ ] CPL Output files
+- [ ] Decoy HTTP requests option
+- [ ] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
 
 
 ## CREDITS
