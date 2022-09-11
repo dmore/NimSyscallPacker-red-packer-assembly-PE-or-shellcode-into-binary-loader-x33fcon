@@ -586,7 +586,10 @@ if ((len(expandedkey) mod (aes256.sizeBlock * 2)) != 0):
     echo "[*] Length: " & $len(expandedkey)
     echo "[*] Padding Key..."
     expandedkey = expandedkey & newSeq[byte]((aes256.sizeBlock * 2) - (len(expandedkey) mod (aes256.sizeBlock * 2)))
-    echo "[*] New Length: " & $len(expandedkey)
+    # Length cannot be > 32 bytes
+    if (len(expandedkey) > (aes256.sizeBlock * 2)):
+        expandedkey = expandedkey[0..(aes256.sizeBlock * 2) - 1]
+        echo "[*] New New Length: " & $len(expandedkey)
 
 copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
 ectx.init(key)
