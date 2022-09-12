@@ -37,7 +37,12 @@ If you cannot downgrade mingw-64 to 8.0.0-1 `--hellsgate` won't work.
 
 Install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here. Same for Callobfuscator.
 
-Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
+Compile the Packer via `nim c -d:noRES NimSyscallLoader.nim`. Ready to go. If you don't use -d:noRES you might get the following error:
+```
+/username/.nimble/pkgs/winim-3.7.1/winim/lib/winim64.res:(.rsrc+0x48): dangerous relocation: collect2: fatal error: ld terminated with signal 11 [Speicherzugriffsfehler]
+compilation terminated.
+
+```
 
 #### Third party deps
 
