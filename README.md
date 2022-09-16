@@ -276,6 +276,12 @@ ShellcodeFluctuation can currently only be used for C2-Payloads, that use Win32 
 
 SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning all sections of it. The downside is, that the encryption is independent of your implant and will take place in a fixed time value, e.g. 10 secconds encryption and one seccond execution time. This may lead to problems with execution for some C2-Frameworks.
 
+## Known Bugs
+
+- Using `--hellsgate` on Linux systems with a never mingw-gcc version will fail to compile
+- Compile the Packer on Linux/Debian with `-d:noRES` to avoid compiler errors
+- `--syswhispers --jump` in combination with `--peload` results in a crash. For the moment I can only recommend to not use this option as I have no clue where this sideeffect comes from
+
 ## ProtectMyTooling embedded
 
 [mgeeky](https://github.com/mgeeky) also wrote a wrapper script for this Packer in his private ProtectMyTooling repository to automate the process of packing binaries with my packer. No need to choose options there for you. Also consider sponsoring him, as his private tool collection is worth it. :+1:
