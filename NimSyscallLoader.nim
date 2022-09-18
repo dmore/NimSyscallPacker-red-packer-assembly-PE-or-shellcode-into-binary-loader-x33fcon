@@ -521,7 +521,10 @@ if (peinject):
         var exist: bool = true
     if (exist):
         when system.hostOS == "windows":
-            discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -o tmpshellcode.bin --input:{filename}")
+            if (embeddedArguments):
+                discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -p {arguments} -o tmpshellcode.bin --input:{filename}")
+            else:
+                discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -o tmpshellcode.bin --input:{filename}")
             if (sgn):
                 if (compileX86):
                     discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 3  -o tmpshellcode.bin tmpshellcode.bin")
