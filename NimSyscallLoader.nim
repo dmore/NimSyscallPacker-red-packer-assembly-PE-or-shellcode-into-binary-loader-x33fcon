@@ -866,15 +866,11 @@ var ectx: ECB[aes256]
 
 let Cryptstub2 = fmt"""
 var enctext: seq[byte] = toByteSeq(encstring)
-{getRandStub()}
 var key: array[aes256.sizeKey, byte]
-{getRandStub()}
 var envkey: string = obf("{envkey}")
-{getRandStub()}
 """
 
 let Cryptstub3 = fmt"""
-{getRandStub()}
     
 var expandedkey = toByteSeq(envkey)
 if ((len(expandedkey) mod aes256.sizeBlock) != 0):
@@ -887,14 +883,10 @@ if ((len(expandedkey) mod aes256.sizeBlock) != 0):
         echo "[*] New Length: " & $len(expandedkey)
 
 copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
-{getRandStub()}
 var dectext = newSeq[byte](len(enctext))
-{getRandStub()}
 # Decrypt
 ectx.init(key)
-{getRandStub()}
 ectx.decrypt(enctext, dectext)
-{getRandStub()}
 ectx.clear()
 
 """
