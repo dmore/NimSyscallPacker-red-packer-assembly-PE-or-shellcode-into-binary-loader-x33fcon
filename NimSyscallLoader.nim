@@ -1550,8 +1550,6 @@ if(denim):
     basicCompileFlags.add("-d:denim ")
 
 
-basicCompileFlags.add("--hint[all]:off ")
-
 if(hellsgate):
     basicCompileFlags.add("-d:Hellsgate ")
 elif(getfreshstub):
@@ -1629,8 +1627,8 @@ if debugMode:
     basicCompileFlags = basicCompileFlags.replace("--hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size", "")
     basicCompileFlags = basicCompileFlags.replace("--app=console --passc=-flto --passl=-flto", "")
 
-#echo "Compile command:"
-#echo basicCompileFlags
+echo "Compile command:"
+echo basicCompileFlags
 echo "\n\n"
 
 when system.hostOS == "windows":
