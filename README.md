@@ -128,7 +128,7 @@ Options:
                      MemorySpace -> Only execute if more than 4GB RAM available
                      Emulated -> VirtualAllocExNuma API call (Some sandboxes do not emulate that)
                      WindowChanges -> Checks, if the current Window has changed 7 or more times before executing the payload
-        --domain targetdomain    Specify a domain for SandBox Evasion
+      --domain targetdomain    Specify a domain for SandBox Evasion
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
                   reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
@@ -334,6 +334,12 @@ ShellcodeFluctuation can currently only be used for C2-Payloads, that use Win32 
 
 SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning all sections of it. The downside is, that the encryption is independent of your implant and will take place in a fixed time value, e.g. 10 secconds encryption and one seccond execution time. This may lead to problems with execution for some C2-Frameworks.
 
+## Known Bugs
+
+- Using `--hellsgate` on Linux systems with a never mingw-gcc version will fail to compile
+- Compile the Packer on Linux/Debian with `-d:noRES` to avoid compiler errors
+- `--syswhispers --jump` in combination with `--peload` results in a crash. For the moment I can only recommend to not use this option as I have no clue where this sideeffect comes from
+
 ## ProtectMyTooling embedded
 
 [mgeeky](https://github.com/mgeeky) also wrote a wrapper script for this Packer in his private ProtectMyTooling repository to automate the process of packing binaries with my packer. No need to choose options there for you. Also consider sponsoring him, as his private tool collection is worth it. :+1:
@@ -358,6 +364,7 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [ ] More sleeps in between some potentially critical stubs
 - [X] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
 - [ ] PPID Spoofing for newly created processes
+- [ ] BlockDLLs for new processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [ ] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
