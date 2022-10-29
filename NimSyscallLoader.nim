@@ -578,12 +578,12 @@ if (peinject):
                     discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
                 sgn = false
         elif system.hostOS == "linux":
-            discard os.execShellCmd(fmt"donut {filename} -b 1 -o tmpshellcode.bin")
+            discard os.execShellCmd(fmt"donut --input:{filename} -b 1 -o tmpshellcode.bin")
             if (sgn):
                 if (compileX86):
-                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                    discard os.execShellCmd(fmt"{packerPath}/sgn/sgn -c 3  -o tmpshellcode.bin tmpshellcode.bin")
                 else:
-                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                    discard os.execShellCmd(fmt"{packerPath}/sgn/sgn -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
                 sgn = false
         blob = readFile("tmpshellcode.bin")
         shellcode = true

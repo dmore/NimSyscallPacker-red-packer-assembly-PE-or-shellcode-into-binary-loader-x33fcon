@@ -334,11 +334,17 @@ ShellcodeFluctuation can currently only be used for C2-Payloads, that use Win32 
 
 SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning all sections of it. The downside is, that the encryption is independent of your implant and will take place in a fixed time value, e.g. 10 secconds encryption and one seccond execution time. This may lead to problems with execution for some C2-Frameworks.
 
+### Why is my MSF- or CobaltStrike or XxX still flagged?
+
+Read this:
+[https://s3cur3th1ssh1t.github.io/Signature_vs_Behaviour/](https://s3cur3th1ssh1t.github.io/Signature_vs_Behaviour/)
+
 ## Known Bugs
 
 - Using `--hellsgate` on Linux systems with a never mingw-gcc version will fail to compile
 - Compile the Packer on Linux/Debian with `-d:noRES` to avoid compiler errors
 - `--syswhispers --jump` in combination with `--peload` results in a crash. For the moment I can only recommend to not use this option as I have no clue where this sideeffect comes from
+- `--obfuscate` cannot handle ASM-Stubs well and therefore cannot compile binaries with `--hellsgate` or `--syswhispers`
 
 ## ProtectMyTooling embedded
 
@@ -375,6 +381,7 @@ SleepyCrypt will not only encrypt the Shellcode but the whole PE-Stack, meaning 
 - [X] CPL Output files
 - [ ] Decoy HTTP requests option
 - [ ] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
+- [ ] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
 
 
 ## CREDITS
