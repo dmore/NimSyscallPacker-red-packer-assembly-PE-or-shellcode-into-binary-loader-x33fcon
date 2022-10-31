@@ -501,6 +501,22 @@ if args["--noDInvoke"]:
 
 var blob: string
 
+if ((compileX86 or wow64) and hellsgate):
+    echo "Error: Hellsgate is not supported for x86 yet"
+    if (wow64):
+        echo "Only syswhispers (without Jump) supports wow64 till now"
+    quit(1)
+
+if (wow64 and syswhispers and jump):
+    echo "Error: Syswhispers (Jump) cannot be used in combination with wow64"
+    quit(1)
+
+if (wow64 and getfreshstub):
+    echo "Error: GetSyscallStub cannot be used in combination with wow64 yet"
+    if (wow64):
+        echo "Only Syswhispers (without Jump) supports wow64 till now"
+    quit(1)
+
 if (noArgs and embeddedArguments):
     echo "Error: Cannot use both --noArgs and --arguments"
     quit(1)

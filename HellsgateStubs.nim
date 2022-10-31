@@ -413,10 +413,30 @@ when defined(Hellsgate):
             if funcHash == tableEntry.dwHash:
     
                 tableEntry.pAddress = pFuncAddr
+                # Not hooked API
                 if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3)[] == 0xB8:
                     tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4)[]
-    
-                return true
+                    return true
+                # Classic hook API 
+                # Check the the first byte is 0xe9
+                elif cast[PBYTE](cast[ByteAddress](pFuncAddr))[] == 0xE9:
+                    for idx in countup(1,500):
+                        if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 + idx * UP)[] == 0xB8:
+                            tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4 + (idx * UP))[] + cast[WORD](idx)
+                            return true
+                        if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 + idx * DOWN)[] == 0xB8:
+                            tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4 + (idx * DOWN))[] - cast[WORD](idx)
+                            return true 
+                # Tartarus gate from Nim
+                # Check the the third is 0xe9
+                elif cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 )[] == 0xE9:
+                    for idx in countup(1,500):
+                        if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 + idx * UP)[] == 0xB8:
+                            tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4 + (idx * UP))[] + cast[WORD](idx)
+                            return true
+                        if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 + idx * DOWN)[] == 0xB8:
+                            tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4 + (idx * DOWN))[] - cast[WORD](idx)
+                            return true
             inc cx
         return false
     
