@@ -372,15 +372,16 @@ Read this:
 - [ ] PPID Spoofing for newly created processes
 - [ ] BlockDLLs for new processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
-- [ ] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
+- [X] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
 - [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
 - [X] DLL hijacking switch for DLLMain with process attach
-- [ ] Fix x86 bugs, mostly casting but some other strange behaviours
+- [X] Fix x86 casting bugs
+- [ ] Wow64 Support
 - [X] Add `--pump` null bytes in between like https://gitlab.com/ORCA000/entropyfix (Have to test, may cause crashes)
 - [X] CPL Output files
 - [ ] Decoy HTTP requests option
-- [ ] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
+- [X] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
 - [ ] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
 
 
