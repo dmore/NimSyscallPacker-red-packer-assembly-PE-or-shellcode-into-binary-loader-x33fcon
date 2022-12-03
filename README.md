@@ -326,6 +326,10 @@ That can be compiled to an `cmd.o` file via `windres cmd.rc -o cmd.o`. You can a
 
 For DLL metadata you can change `DLL.rc`.
 
+### Other Entropy detections or alternative SandBox Evasion
+
+Some vendors, such as ESET flag binaries/dlls due to the encrypted Payload being in the binary as blob with high entropy. Theese kind of detections and or SandBox checks can get bypassed with the flags `--shellcodeFile` or `--shellcodeURL`, as the Payload is than not embedded in the resulting binary anymore but loaded from a separate file or from a remote Webserver.
+
 ### Memory encryption
 
 Currently, the Packer has two memory encryption techniques embedded. It's either `--fluctuate` for ShellcodeFluctuation or `--sleepycrypt` for SleepyCrypt.
