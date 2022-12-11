@@ -622,6 +622,10 @@ else:
         var newPath = packerPath & "/pwnPowershell/RunSpace.exe"
         blob = readFile(newPath)
 
+if (AMSICreateSectionHook):
+    echo "Not fully working yet, sorry!"
+    quit(0)
+
 #Read file and if PE convert to shellcode before
 if (peinject):
     when system.hostOS == "windows":
