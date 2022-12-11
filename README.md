@@ -69,7 +69,7 @@ A Video - if you prefer that - can be found here:
 [https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
-NimSyscall_Loader v 1.7
+NimSyscall_Loader v 1.75
 
 Usage:
   NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
