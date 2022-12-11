@@ -51,7 +51,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.8                                            
+                                                                 v1.75                                            
 
 """
 
@@ -60,7 +60,7 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.8
+NimSyscall_Loader v 1.75
 
 Usage:
   NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
@@ -269,7 +269,7 @@ var
     antidebug: bool = false
     remoteMapSection: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.8")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.75")
 
 if args["--file"]:
   let fname = args["--file"]
