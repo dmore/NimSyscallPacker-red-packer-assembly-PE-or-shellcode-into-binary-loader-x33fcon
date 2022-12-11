@@ -325,6 +325,10 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
       #echo funcname
       var finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
       
+      #var charArray: array[1,char] = [char(0x2E)] 
+      # We are comparing against function names, which include "." because for some reason all function names in this loop also contain references to other DLLs, e.g. "api-ms-win-core-libraryloader-l1-1-0.AddDllDirectory" in kernel32.dll
+      #var test = StrRStrIA(cast[LPCSTR](funcname),nil,cast[LPCSTR](charArray[0].addr))
+
       # We are comparing against function names, which include "." because for some reason all function names in this loop also contain references to other DLLs, e.g. "api-ms-win-core-libraryloader-l1-1-0.AddDllDirectory" in kernel32.dll
       var test = StrRStrIA(cast[LPCSTR](funcname),nil,cast[LPCSTR]("."))
 
