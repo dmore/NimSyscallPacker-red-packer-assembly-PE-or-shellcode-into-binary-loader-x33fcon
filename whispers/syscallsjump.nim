@@ -514,7 +514,7 @@ proc zuq8aztsdztausdgbh*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
     mov r10, rcx
 	jmp r15                                
     """
-#zuatzuastdiasyyose
+# NtClose
 proc zuatzuastdiasyy*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
@@ -614,7 +614,7 @@ proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG,
 	mov r10, rcx
 	jmp r15                                
     """
-#opqiwepoausdasdjlenProcess
+# NtOpenProcess
 proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          

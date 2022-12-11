@@ -1,0 +1,5 @@
+Wtf?? 9 MB executable for < 15 lines of Python code??
+
+Yeah, I know. I was lazy and don't want to have Python as dependency on Windows ;-)
+
+Feel free to port the Code to Nim and I'll accept a Pull-Request.

@@ -69,7 +69,7 @@ A Video - if you prefer that - can be found here:
 [https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
-NimSyscall_Loader v 1.7
+NimSyscall_Loader v 1.75
 
 Usage:
   NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
@@ -326,6 +326,10 @@ That can be compiled to an `cmd.o` file via `windres cmd.rc -o cmd.o`. You can a
 
 For DLL metadata you can change `DLL.rc`.
 
+### Other Entropy detections or alternative SandBox Evasion
+
+Some vendors, such as ESET flag binaries/dlls due to the encrypted Payload being in the binary as blob with high entropy. Theese kind of detections and or SandBox checks can get bypassed with the flags `--shellcodeFile` or `--shellcodeURL`, as the Payload is than not embedded in the resulting binary anymore but loaded from a separate file or from a remote Webserver.
+
 ### Memory encryption
 
 Currently, the Packer has two memory encryption techniques embedded. It's either `--fluctuate` for ShellcodeFluctuation or `--sleepycrypt` for SleepyCrypt.
@@ -372,15 +376,17 @@ Read this:
 - [ ] PPID Spoofing for newly created processes
 - [ ] BlockDLLs for new processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
-- [ ] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
+- [X] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
 - [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
 - [X] DLL hijacking switch for DLLMain with process attach
-- [ ] Fix x86 bugs, mostly casting but some other strange behaviours
+- [X] Fix x86 casting bugs
+- [ ] Wow64 Support
 - [X] Add `--pump` null bytes in between like https://gitlab.com/ORCA000/entropyfix (Have to test, may cause crashes)
 - [X] CPL Output files
 - [ ] Decoy HTTP requests option
-- [ ] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
+- [X] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
+- [ ] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
 
 
 ## CREDITS
