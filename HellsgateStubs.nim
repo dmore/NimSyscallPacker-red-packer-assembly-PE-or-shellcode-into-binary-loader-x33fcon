@@ -1,15 +1,15 @@
 
 let DInvokeGetModuleHandleADelegate* = """
 
-type
-    GetModuleHandleA_t = proc(lpModuleName: LPCSTR): HMODULE {.stdcall.}
+    type
+        GetModuleHandleA_t = proc(lpModuleName: LPCSTR): HMODULE {.stdcall.}
 
-const
-    GetModuleHandleA_HASH  = obf("GetModuleHandleA")
+    const
+        GetModuleHandleA_HASH  = obf("GetModuleHandleA")
 
-var MyGetModuleHandleA: GetModuleHandleA_t
+    var MyGetModuleHandleA: GetModuleHandleA_t
 
-MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
+    MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
 
 """
 
@@ -463,7 +463,7 @@ when defined(Hellsgate):
         when defined(verbose):
             echo obf("[*] Resolving syscall...")
         when defined(verbose):
-            echo obf("[*] NTDDL Base: ") & $cast[int](ntdllModuleBaseAddr).toHex
+            echo obf("[*] NTDLL Base: ") & $cast[int](ntdllModuleBaseAddr).toHex
         #var
         #    num = rand(75)
         #    count: int = 0

