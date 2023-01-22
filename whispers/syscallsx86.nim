@@ -580,4 +580,58 @@ proc zuatzuastdiasyy*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
 		ret
     """
 
+# NtCreateSection
+proc iuhqdihasduiahsdaksdhak*(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+    asm """
+		push ebp
+		mov ebp, esp
+		push 0E44DE8AFh                  
+		call SW3_GetSyscallNumber
+		lea esp, [esp+4]
+		mov ecx, 0x07
+	push_argument:
+		dec ecx
+		push [ebp + 8 + ecx * 4]
+		jnz push_argument
+		mov ecx, eax
+		mov eax, ecx
+		push ret_address_epilog
+		call do_sysenter_interrupt
+		lea esp, [esp+4]
+	ret_address_epilog:
+		mov esp, ebp
+		pop ebp
+		ret
+	do_sysenter_interrupt:
+		mov edx, esp
+		sysenter
+		ret
+    """
 
+# NtMapViewOfSection
+proc uihzasdbnqlpoasdlykxc*(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
+    asm """
+		push ebp
+		mov ebp, esp
+		push 00C8A2E1Bh                  
+		call SW3_GetSyscallNumber
+		lea esp, [esp+4]
+		mov ecx, 0x0a
+	push_argument:
+		dec ecx
+		push [ebp + 8 + ecx * 4]
+		jnz push_argument
+		mov ecx, eax
+		mov eax, ecx
+		push ret_address_epilog
+		call do_sysenter_interrupt
+		lea esp, [esp+4]
+	ret_address_epilog:
+		mov esp, ebp
+		pop ebp
+		ret
+	do_sysenter_interrupt:
+		mov edx, esp
+		sysenter
+		ret
+    """

