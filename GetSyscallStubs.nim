@@ -160,7 +160,7 @@ when defined(GetSyscallStub):
             var functionVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 1], textSection))
             var functionNameResolved: cstring = cast[cstring](functionNameVA)
             if (functionNameResolved == functionName):
-                copyMem(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
+                moveMemory(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
                 stubFound = 1
         return stubFound
 

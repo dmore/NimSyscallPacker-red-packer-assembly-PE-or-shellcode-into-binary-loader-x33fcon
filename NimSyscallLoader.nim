@@ -1143,9 +1143,16 @@ when not defined(proxy):
 when defined(Fluctuate):
     import Fluctuation
 
+# We use a custom memCopy/copyMem function here, which takes two pointers and a size as input and copies the seccond pointer content into the first
+proc moveMemory(dest: pointer, src: pointer, size: int) =
+    var csrc: ptr char = cast[ptr char](src)
+    var cdest: ptr char = cast[ptr char](dest)
+    for i in 0 ..< size:
+        cdest[i] = csrc[i]
+
 proc toString(bytes: openarray[byte]): string =
   result = newString(bytes.len)
-  copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
+  moveMemory(result[0].addr, bytes[0].unsafeAddr, bytes.len)
 
 ### Modified code from Nim-Strenc to avoid XORing of long strings -> Modified by @chvancooten, credit to him
 ### Original source: https://github.com/Yardanico/nim-strenc
@@ -1214,7 +1221,7 @@ let Cryptstub3 = fmt"""
         when defined(verbose):
             echo "[*] New Length: " & $len(expandedkey)
 
-    copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
+    moveMemory(addr key[0], addr expandedkey[0], len(expandedkey))
     discard calcHard()
     var dectext = newSeq[byte](len(enctext))
 

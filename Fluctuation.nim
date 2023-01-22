@@ -174,14 +174,14 @@ proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOI
             byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
         ]
         var tempjumpaddr: uint64 = cast[uint64](jumpAddress)
-        copyMem(&trampoline[2] , &tempjumpaddr, 6)
+        moveMemory(&trampoline[2] , &tempjumpaddr, 6)
     elif defined(i386):
         trampoline = @[
             byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
             byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
         ]
         var tempjumpaddr: uint32 = cast[uint32](jumpAddress)
-        copyMem(&trampoline[1] , &tempjumpaddr, 3)
+        moveMemory(&trampoline[1] , &tempjumpaddr, 3)
     
     var dwSize: DWORD = DWORD(len(trampoline))
     var dwOldProtect: DWORD = 0
@@ -194,12 +194,12 @@ proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOI
                 when defined(verbose):
                     echo obf("Previous Bytes == 0")
                 return false
-            copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
+            moveMemory(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
 
         if (VirtualProtect(addressToHook, dwSize, PAGE_EXECUTE_READWRITE, &dwOldProtect)):
             #echo "Virtual Protect to RWX success!"
             #echo toHex((&trampoline[0]))
-            copyMem(addressToHook, addr trampoline[0], dwSize)
+            moveMemory(addressToHook, addr trampoline[0], dwSize)
             output = true
     else:
         #echo "Restoring old Sleep!"
@@ -214,7 +214,7 @@ proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOI
             dwSize = buffers.originalBytesSize
 
             if (VirtualProtect(addressToHook, dwSize, PAGE_EXECUTE_READWRITE, &dwOldProtect)):
-                copyMem(addressToHook, cast[LPVOID](buffers.originalBytes), dwSize)
+                moveMemory(addressToHook, cast[LPVOID](buffers.originalBytes), dwSize)
                 output = true
     
     var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwSize)
@@ -241,7 +241,7 @@ proc hookSleep(): bool =
     buffers.previousBytesSize = DWORD(sizeof(addressToHook))
     g_hookedSleep.origSleep = cast[typeSleep](addressToHook)
     var PointerToOrigBytes: LPVOID = addr g_hookedSleep.sleepStub
-    copyMem(PointerToOrigBytes, addressToHook, 16)
+    moveMemory(PointerToOrigBytes, addressToHook, 16)
     #echo "Sleep Stub original bytes:\r\n"
     #echo g_hookedSleep.sleepStub
     #g_hookedSleep.sleepStub = addressToHook

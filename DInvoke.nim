@@ -271,6 +271,26 @@ let DInvokeStubThird * = """
 """
 
 let DInvokeStubFourth * = fmt"""
+
+# We need a function here, that does the same than StrStrIA but manually without Windows APIs
+# It has to compare two char arrays and return true if the first one contains the second one
+proc manualStrStrIA*(haystack: cstring; needle: cstring): int32 =
+  var i: int = 0
+  var j: int = 0
+  var k: int = 0
+  var found: bool = false
+  while (i < haystack.len):
+    if (haystack[i].toLowerAscii() == needle[j].toLowerAscii()):
+      j += 1
+      if (j == needle.len):
+        found = true
+        break
+    else:
+      j = 0
+    i += 1
+  return found
+
+
 ##
 ##  Find an export in a DLL
 ##
@@ -325,14 +345,13 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
       #echo funcname
       var finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
       
-      #var charArray: array[1,char] = [char(0x2E)] 
-      # We are comparing against function names, which include "." because for some reason all function names in this loop also contain references to other DLLs, e.g. "api-ms-win-core-libraryloader-l1-1-0.AddDllDirectory" in kernel32.dll
-      #var test = StrRStrIA(cast[LPCSTR](funcname),nil,cast[LPCSTR](charArray[0].addr))
+      var checkpoint: cstring = obf(".")
 
       # We are comparing against function names, which include "." because for some reason all function names in this loop also contain references to other DLLs, e.g. "api-ms-win-core-libraryloader-l1-1-0.AddDllDirectory" in kernel32.dll
-      var test = StrRStrIA(cast[LPCSTR](funcname),nil,cast[LPCSTR]("."))
+      #var test = StrRStrIA(cast[LPCSTR](funcname),nil,cast[LPCSTR]("."))
+      var test = manualStrStrIA(funcname,checkpoint)
 
-      if test != nil:
+      if test != 0:
         # As we found a trash (indirect reference, normally this is in the address field and not in the names field) function, we have to increase this value -> Not an official function
         numofnames = numofnames + 1
       else:
