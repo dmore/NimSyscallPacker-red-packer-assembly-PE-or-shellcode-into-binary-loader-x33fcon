@@ -332,4 +332,6 @@ const
 
 when not defined(lib_only):
     discard main(nil)
+when defined(defaultMain):
+    discard main(nil)
 """

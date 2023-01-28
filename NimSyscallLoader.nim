@@ -891,6 +891,9 @@ let LoadAssemblyStubArgs = """
 
 when not defined(lib_only):
     discard main(nil)
+
+when defined(defaultMain):
+    discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
@@ -900,6 +903,9 @@ let LoadAssemblyStubNoArgs = """
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 
 when not defined(lib_only):
+    discard main(nil)
+
+when defined(defaultMain):
     discard main(nil)
 """
 
@@ -1382,7 +1388,7 @@ proc genEnglishwords (nuofWords: int): string =
 
   let englishwordsstub = fmt"""
 
-    var {rand2} = {rand1}
+var {rand2} = {rand1}
 
 """
   return englishwordsstub
@@ -1410,7 +1416,7 @@ proc genTrustedwords (nuofWords: int): string =
 
   let trustedwordsstub = fmt"""
 
-    var {rand2} = {rand1}
+var {rand2} = {rand1}
 
 """
 
@@ -1664,7 +1670,8 @@ if (not noDInvoke):
 
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
-    stub =  stub.replace("import strenc", "")
+    stub =  stub.replace("    import strenc", "")
+    stub = stub.replace("when not defined(proxy):", "")
     for m in pumpargs:
         if(m == "words"):
             echo "[*] Adding words"
@@ -2112,6 +2119,9 @@ if (dllClone == false):
 
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
+
+if ((dllProxy == false) and (dllClone == false)):
+    basicCompileFlags.add("-d:defaultMain ")
 
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
