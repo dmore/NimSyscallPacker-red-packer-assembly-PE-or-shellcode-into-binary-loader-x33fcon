@@ -179,7 +179,7 @@ let LocalInjectStub*  = """
     pwndem(enctext)
     return 0
 
-when not defined(lib_only):
+when not defined(proxy):
     discard main(nil)
 
 when defined(defaultMain):

@@ -922,7 +922,7 @@ let LoadAssemblyStubArgs = """
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
     discard calcHard()
 
-when not defined(lib_only):
+when not defined(proxy):
     discard main(nil)
 
 when defined(defaultMain):
@@ -935,7 +935,7 @@ let LoadAssemblyStubNoArgs = """
     discard calcHard()
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 
-when not defined(lib_only):
+when not defined(proxy):
     discard main(nil)
 
 when defined(defaultMain):
@@ -2116,7 +2116,7 @@ elif system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
-if (dllProxy or dllClone):
+if (dllProxy):
     basicCompileFlags.add("--mm:orc --threads:on ")
     basicCompileFlags.add("-d:proxy ")
 
