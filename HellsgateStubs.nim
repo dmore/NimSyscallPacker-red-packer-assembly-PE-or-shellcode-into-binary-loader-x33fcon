@@ -172,7 +172,6 @@ var
 
 """
 
-
 let HellsgateStub*  = """
 
 when defined(Hellsgate):
