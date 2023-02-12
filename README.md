@@ -69,10 +69,10 @@ A Video - if you prefer that - can be found here:
 [https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
-NimSyscall_Loader v 1.75
+NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --noRES --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --clone=<dllToClone> --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --sleep=<10> --shellcode --localCreateThread --COMVARETW --remoteinject --customprocess=<processname> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -86,7 +86,7 @@ Options:
   --key key     Key to encrypt with
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
-  --noRES    Don't set custom resource file information (cmd icon, CMD description by default)
+  --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
   --noETW    Don't use ETW Patch
   --noAMSI    Don't patch AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
@@ -94,33 +94,42 @@ Options:
   --APIhide    Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode
-  --x86    (Compiles an x86 binary - have to cast some more function values before this works smoothly)
+  --x86    Compiles an x86 binary
+  --wow64    (Compiles a x86 binary that can be by x64 CPUs)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
+  --psout    Powershell Output format, reflectively loading the packed binary
+    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
+    --pslyrics    Add Lyrics as comments to avoid some more detections
 
-[Shellcode retrieval options]
+[Payload retrieval options]
 
-  By default, the Loader will embed the Shellcode into the output file. There are two alternatives to this:  
-  --shellcodeFile shellcodefile    Filename to retrieve shellcode from - on Runtime (No embedding)
-  --shellcodeURL shellcodeURL    URL to retrieve shellcode from
+  By default, the Loader will embed the Payload into the output file. There are two alternatives to this:  
+  --shellcodeFile shellcodefileLocation(s)    Filename to retrieve Payload from - on Runtime (No embedding). The first location will also be the output file location. You can specify multiple locations, separated by a comma.
+  --shellcodeURL shellcodeURL    URL to retrieve Payload from
 
 [DLL options]
 
   --dll     Generate DLL instead of an executable
       --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions for e.g. DLL-Sideloading
       --dllhijack    Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking
-      --clone value    Specify a local DLL to clone the API-Exports from
+      --noNimMain    Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")
+      --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
+      --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
+      --cpl    Generate a CPL file (Control Panel Applet) instead of an executable
 
 [evasion]
 
-  --sleep 10    Sleep 10 seconds before decryption to evade in memory scanners
+  --sleep 10    Sleep 10 seconds before decryption to evade memory scanners
+  --sleep-in-between 10    Sleep 10 seconds at some potentially critical steps in between to evade memory scanners
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --unhook    Unhook ntdll.dll before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
+  --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/) -> Prevent Loading works, but C# Loading fails for some reason
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
@@ -128,7 +137,7 @@ Options:
                      MemorySpace -> Only execute if more than 4GB RAM available
                      Emulated -> VirtualAllocExNuma API call (Some sandboxes do not emulate that)
                      WindowChanges -> Checks, if the current Window has changed 7 or more times before executing the payload
-      --domain targetdomain    Specify a domain for SandBox Evasion
+        --domain targetdomain    Specify a domain for SandBox Evasion
   --pump value    Pump the file with:
                   words -> english dictionary words to increase the reputation for "mashine learning" evasion (https://twitter.com/hardwaterhacker/status/1502425183331799043)
                   reputation -> Pump reputation with strings from well known binaries e.g. Chrome,Cortana,Discord and some others
@@ -151,14 +160,20 @@ Options:
 [shellcode specific]
 
   --shellcode    Encrypt shellcode to load it on runtime
+  --CallbackExecute    Execute shellcode via a custom Callback function
   --localCreateThread    Use NtCreateThreadEx for local injection instead of a direct pointer to the shellcode
+  --noWait    Don't use 'WaitForSingleObject(-1,-1)' after local Injection but exit the process instead afterwards. If your Shellcode exits the Thread/Process itself, this will not have any effect.
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
+      --spoofArgs ArgstoSpoof    Spoof the arguments of the process to inject into
+      --parentProcess parentProcName    Name of the parent Process to spoof (PPID Spoofing)
+      --blockDLLs    Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
-  
+      --remoteMapSection    Map the shellcode into the remote process via MapViewOfSection -> decryption will happen AFTER writing the Shellcode into the remote process
+
 [PE Packing]
 
   --peinject    Encrypt a PE to decrypt and run it on runtime as shellcode via donut
@@ -364,17 +379,18 @@ Read this:
 - [x] Hellsgate support for remote shellcode injection + PELoading
 - [X] DLL output
 - [X] DLL Sideloading capabilities
-- [ ] C# and/or Powershell output files
+- [X] Powershell output
+- [ ] C# output
 - [X] More syscalls and or D/Invoke for win32 functions
 - [X] Cobalt Strike integration - CNA
 - [ ] Passing parameters via e.g. manipulation of the PEB field (Command line spoofing like)
 - [X] Passing parameters via API import function patching
 - [X] Shellcode memory encryption via Sleep Hook [ShellcodeFluctuation like](https://github.com/mgeeky/ShellcodeFluctuation)
 - [X] Calling the ‘GetConsoleWindow’ and ‘ShowWindow’ Windows function after the process is created and the EDR’s hooks are loaded, and then changes the windows attributes to hidden instead of GUI compile flags
-- [ ] More sleeps in between some potentially critical stubs
+- [X] More sleeps in between some potentially critical stubs
 - [X] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
-- [ ] PPID Spoofing for newly created processes
-- [ ] BlockDLLs for new processes
+- [X] PPID Spoofing for newly created processes
+- [X] BlockDLLs for new processes
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
@@ -404,3 +420,4 @@ Read this:
 - [X] [moloch--](https://github.com/moloch--) - Denim
 - [X] [EdgeBalci](https://github.com/EgeBalci) - SGN
 - [X] [monoxgas](https://github.com/monoxgas) - Koppeling
+- [X] [eversinc33](https://github.com/eversinc33) - BouncyGate, Docker File
