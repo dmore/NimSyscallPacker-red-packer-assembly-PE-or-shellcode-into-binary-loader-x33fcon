@@ -2025,6 +2025,10 @@ if (shellcode):
             stub.add(ShellcoderemoteinjectStub)
         stub.add(getRandStub())
 
+if(dll_out or cpl):
+    if ((hide == false) and (apiHide == false)):
+        stub.add(DLLNoHideStub)
+
 if (csharp):
     stub.add(getRandStub())
     if (noArgs):
@@ -2037,7 +2041,6 @@ if (csharp):
         stub.add(LoadAssemblyStub)
         stub.add(getRandStub())
         stub.add(LoadAssemblyStubArgs)
-        stub.add(getRandStub())
 
 if (pump):
     for m in pumpargs:
@@ -2049,8 +2052,6 @@ if (sleepycrypt):
     #stub.add(SleepyCryptLoopExecute)
 
 if(dll_out or cpl):
-    if ((hide == false) and (apiHide == false)):
-        stub.add(DLLNoHideStub)
     if (dllProxy):
         stub.add(DLLProxyStub)
     else:
