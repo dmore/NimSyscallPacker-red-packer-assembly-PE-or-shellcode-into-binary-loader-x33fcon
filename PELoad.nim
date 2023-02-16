@@ -330,7 +330,9 @@ let PELoadStub * = """
 
 
 when not defined(lib_only):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 when defined(defaultMain):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 """

