@@ -1084,10 +1084,20 @@ when isMainModule:
     proc serviceMain(gSvcStatus: SERVICE_STATUS) =
         ## a service main
         ## use gScvStatus to check if we should stop periodically!
+        #reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
         discard main(nil)
-        while gSvcStatus.dwCurrentState == SERVICE_RUNNING:
-            reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
-        # reportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0) # we have to report back when we stopped!
+        #var onlyOnce: bool = true
+        #sleep(5000)
+        reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
+        #sleep(5000)
+        while gSvcStatus.dwCurrentState != SERVICE_STOP_PENDING:
+            sleep(1000)
+        #[    reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
+            if(onlyOnce):
+                onlyOnce = false
+                discard main(nil)
+        ]#
+        #reportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0) # we have to report back when we stopped!
 
     var wrapped = wrapServiceMain(serviceMain)
     var dispatchTable = [
@@ -1097,7 +1107,9 @@ when isMainModule:
     ]
 
     echo StartServiceCtrlDispatcher( (addr dispatchTable[0]).LPSERVICE_TABLE_ENTRY)
-    #WaitForSingleObject(-1,-1)
+    while gSvcStatus.dwCurrentState == SERVICE_RUNNING:
+        reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
+        sleep(1000)
 
 
 """
@@ -2279,6 +2291,9 @@ if(remoteinject):
 
 if(COMVARETW):
     basicCompileFlags.add("-d:COMVARETW ")
+
+if(service):
+    basicCompileFlags.add("--mm:none ")
 
 if (noNimMain):
     when system.hostOS == "windows":

