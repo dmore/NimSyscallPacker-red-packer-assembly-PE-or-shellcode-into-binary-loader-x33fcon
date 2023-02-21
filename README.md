@@ -394,7 +394,7 @@ Read this:
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
-- [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
+- [X] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
 - [X] DLL hijacking switch for DLLMain with process attach
 - [X] Fix x86 casting bugs
 - [ ] Wow64 Support
