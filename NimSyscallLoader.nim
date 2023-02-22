@@ -92,7 +92,7 @@ Options:
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
   --psout    Powershell Output format, reflectively loading the packed binary
-    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
+    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation.
     --pslyrics    Add Lyrics as comments to avoid some more detections
   --sourceonly    Dont compile but just create the source code and compile command
   --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
@@ -2558,6 +2558,12 @@ proc WritePS1() =
         var words: seq[string] = @["VAR", "FUN", "CONST", "ERROR", "LYRICS"]
         var wordlength: int = len(words) - 1
         var maxWords: int = 999
+        if(psobfs):
+            words[1] = "XXXXXX" # we don't want to replace any names, as that breaks functionality.
+            words[2] = "XXXXXX"
+            words[3] = "XXXXXX"
+            words[0] = "XXXXXX"
+            
         for i in 0..wordlength:
             if (words[i] == "VAR"):
                 maxWords = 380
