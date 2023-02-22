@@ -113,7 +113,7 @@ Options:
   --psout    Powershell Output format, reflectively loading the packed binary
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
     --pslyrics    Add Lyrics as comments to avoid some more detections
-  --service    Create a Service binary, which can be used for Lateral Movement or Persistence
+  --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
 
 [Payload retrieval options]
 
@@ -304,6 +304,26 @@ amd64.windows.clang.linkerexe = "x86_64-w64-mingw32-clang"
 amd64.windows.clang.cpp.exe = "x86_64-w64-mingw32-clang++"
 amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 ```
+
+### Service binaries
+
+Service binaries don't run on the fly. They can just be used for Windows Services. So if you're compiling a Service binary with `--service` you will need to create a new service with that binaries location. This can be done for example like this:
+
+```batch
+sc.exe create Updater binpath="C:\windows\system32\service.exe"
+sc.exe start Updater
+```
+
+Service DLLs need additional configurations. You can read [the following blog](https://www.ired.team/offensive-security/persistence/persisting-in-svchost.exe-with-a-service-dll-servicemain) and need some Registry changes:
+
+```batch
+sc.exe create Updater binPath= "c:\windows\System32\svchost.exe -k DcomLaunch" type= share start= auto
+reg add HKLM\SYSTEM\CurrentControlSet\services\Updater\Parameters /v ServiceDll /t REG_EXPAND_SZ /d C:\windows\system32\service.dll /f
+```
+
+In addition the `Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost` - `DcomLaunch` value needs to be adjusted to also contain your Service name.
+
+If you're receiving ERROR 1053 on Service start you will most likely have forgotten the last entry.
 
 ### Handling Golang binaries with the Packer
 
