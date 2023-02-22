@@ -44,6 +44,17 @@ compilation terminated.
 
 ```
 
+#### Docker Setup
+
+Needs to be built once (takes some time the first time, subsequent builds will be cached).
+
+`sudo docker build . -t nimsyscallloader`
+
+Then run the packer with:
+
+`sudo docker run -v $(pwd):/shared nimsyscallloader <ARGUMENTS> --output=/shared/packed.exe`
+where `$(pwd)` is the directory on the host system that is shared with the container, i.e. the directory where the files to encrypt should be and where the output will be saved to.
+
 #### Third party deps
 
 If you want to make use of Code Signing certificates via LimeLighter you'll also need the following things installed and in your %PATH%:
@@ -102,6 +113,7 @@ Options:
   --psout    Powershell Output format, reflectively loading the packed binary
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
     --pslyrics    Add Lyrics as comments to avoid some more detections
+  --service    Create a Service binary, which can be used for Lateral Movement or Persistence
 
 [Payload retrieval options]
 

