@@ -229,13 +229,15 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
           echo "DLL not found for the current proc, loading."
       break
   if (DoLoad == FALSE):
-    when defined(verbose): echo "Exit, loading is not appreciated"
+    when defined(verbose):
+        echo "Exit, loading is not appreciated"
     return 0
   {getRandStubInFunc()}
   var MyLdrLoadDll: LdrLoadDll_t = cast[LdrLoadDll_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), LdrLoadDll_SW2_HASH, 0, TRUE)))
   
   if MyLdrLoadDll == nil:
-    when defined(verbose): echo "[-] Address of LdrLoadDll not found"
+    when defined(verbose):
+        echo "[-] Address of LdrLoadDll not found"
     return 0
 
   var ModuleFileName: UNICODE_STRING
@@ -259,13 +261,17 @@ let DInvokeStubThird * = """
   var status: NTSTATUS = MyLdrLoadDll(nil, 0, &ModuleFileName, &hLibrary)
   
   if (status != 0):
-    when defined(verbose): echo fmt"[-] Failed to load {Libname}, status: {status}\n"
+    when defined(verbose):
+        echo fmt"[-] Failed to load {Libname}, status: {status}\n"
     if (hLibrary == 0):
-        when defined(verbose): echo "HLibrary still null"
+        when defined(verbose):
+            echo "HLibrary still null"
     return 0
   else:
-    when defined(verbose): echo fmt"Loaded {LibName} successfully!"
-  when defined(verbose): echo fmt"[+] Loaded {LibName} at {hLibrary}"
+    when defined(verbose):
+        echo fmt"Loaded {LibName} successfully!"
+  when defined(verbose):
+      echo fmt"[+] Loaded {LibName} at {hLibrary}"
   return hLibrary
 
 """
@@ -308,7 +314,8 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
   var functionAddress: PVOID
   var toCheckLibrary: PVOID = cast[PVOID](hLibrary)
   if (is_dll(toCheckLibrary) == FALSE):
-    when defined(verbose): echo "[-] Exiting, not a DLL"
+    when defined(verbose):
+        echo "[-] Exiting, not a DLL"
     return nil
   dos = cast[PIMAGE_DOS_HEADER](hLibrary)
   nt = RVA(PIMAGE_NT_HEADERS, cast[PVOID](hLibrary), dos.e_lfanew)
@@ -316,7 +323,8 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
   data = nt.OptionalHeader.DataDirectory
   
   if (data[0].Size == 0 or data[0].VirtualAddress == 0):
-    when defined(verbose): echo "[-] Data size == 0 or no VirtualAddress"
+    when defined(verbose):
+        echo "[-] Data size == 0 or no VirtualAddress"
     return nil
   exp = RVA(PIMAGE_EXPORT_DIRECTORY, hLibrary, data[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress)
   exp_size = data[0].Size
@@ -333,7 +341,8 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
   var addressOfFunctionsvalue = RVA2VA(PDWORD, cast[PVOID](hLibrary), exp.AddressOfFunctions)[]
   var names = RVA2VA(PDWORD, cast[PVOID](hLibrary), exp.AddressOfNames)[]
 
-  when defined(verbose): echo "\r\n[*] Checking DLL's Export Directory for the target function\r\n"
+  when defined(verbose):
+      echo "\r\n[*] Checking DLL's Export Directory for the target function\r\n"
 
   if fhash != "":
     ##  iterate over all the exports
@@ -375,26 +384,34 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
           functions = functions - 1
         if (funcname == obf("ShowWindow")):
           functions = functions + 4
-        when defined(verbose): echo "\r\n[+] Found API call: ",funcname
-        when defined(verbose): echo "\r\n"
+        when defined(verbose):
+            echo "\r\n[+] Found API call: ",funcname
+        when defined(verbose):
+            echo "\r\n"
         # Strange. For ntdll functions the following is needed, but for kernel32 functions it's not. Don't ask me why. This is a workaround for the moment. Need to troubleshoot.
         if (specialCase):
           # Why?
-          when defined(verbose): echo "This is a special case, subtract one function"
+          when defined(verbose):
+              echo "This is a special case, subtract one function"
           finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
-        when defined(verbose): echo "Relative Address: ", toHex(functions[])
+        when defined(verbose):
+            echo "Relative Address: ", toHex(functions[])
         functions = functions - 1
-        when defined(verbose): echo "Relative Address one before: ", toHex(functions[])
+        when defined(verbose):
+            echo "Relative Address one before: ", toHex(functions[])
         functions = functions + 2
-        when defined(verbose): echo "Relative Address one after: ", toHex(functions[])
+        when defined(verbose):
+            echo "Relative Address one after: ", toHex(functions[])
         functionAddress = finalfunctionAddress
         break
   else:
     # Add the ordinal number e.g. 1034 for OpenProcess and - the EXP Base address
-    when defined(verbose): echo fmt"Getting address via ordinal"
+    when defined(verbose):
+        echo fmt"Getting address via ordinal"
     functions = functions + ordinal - 1
     functionAddress = RVA(PVOID, hLibrary, functions[])
-    when defined(verbose): echo "Relative Address: ", toHex(functions[])
+    when defined(verbose):
+        echo "Relative Address: ", toHex(functions[])
     #echo "Function address via ordinal:"
     #echo repr(functionAddress)
     {getRandStubInFunc()}

