@@ -2252,8 +2252,7 @@ if(service):
         stub.add(ServiceStub)
 
 if (debugMode):
-    stub = stub.replace("import strenc", "")
-    stub = stub.replace("when not defined(proxy):", "")
+    stub = stub.replace("import strenc", "from winim import MODULEENTRY32A")
 
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim -> \n\n"
