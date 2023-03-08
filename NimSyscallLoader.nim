@@ -1930,8 +1930,7 @@ if (not noDInvoke):
 
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
-    stub =  stub.replace("    import strenc", "")
-    stub = stub.replace("when not defined(proxy):", "")
+    stub =  stub.replace("    import strenc", "    from winim import MODULEENTRY32A")
     for m in pumpargs:
         if(m == "words"):
             echo "[*] Adding words"
