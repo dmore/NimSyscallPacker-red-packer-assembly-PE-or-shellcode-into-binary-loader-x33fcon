@@ -1345,7 +1345,6 @@ import ptr_math
 #from winim import winstr,winimbase,windef
 
 when defined(csharp):
-    import winim/clr
     from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
     from os import paramCount,paramStr
 
