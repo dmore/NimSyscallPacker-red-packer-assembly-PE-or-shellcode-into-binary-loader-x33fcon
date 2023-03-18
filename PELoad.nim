@@ -10,13 +10,8 @@ let PELoadStub * = """
     const
         RELOC_32BIT_FIELD = 3
 
-    when defined(DInvoke):
-        let curProc = MyGetCurrentProcessId()
-        var curProcHandle: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, curProc)
-    else:
-        let curProc = GetCurrentProcessId()
-        var curProcHandle: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, curProc)
-
+    var curProcHandle: HANDLE = -1
+    
     proc getNtHdrs(pe_buffer: ptr BYTE): ptr BYTE =
         if pe_buffer == nil:
           return nil

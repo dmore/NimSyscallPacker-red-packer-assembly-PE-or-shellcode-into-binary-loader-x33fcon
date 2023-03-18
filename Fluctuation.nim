@@ -27,6 +27,13 @@ macro obf*(s: untyped): untyped =
     else:
         result = s
 
+# We use a custom memCopy/copyMem function here, which takes two pointers and a size as input and copies the seccond pointer content into the first
+proc moveMemory(dest: pointer, src: pointer, size: int) =
+    var csrc: ptr char = cast[ptr char](src)
+    var cdest: ptr char = cast[ptr char](dest)
+    for i in 0 ..< size:
+        cdest[i] = csrc[i]
+
 type
     typeSleep* = proc (dwMilliseconds: DWORD): void {.stdcall.}
 
@@ -217,7 +224,7 @@ proc fastTrampoline(installHook: bool; addressToHook: LPVOID; jumpAddress: LPVOI
                 moveMemory(addressToHook, cast[LPVOID](buffers.originalBytes), dwSize)
                 output = true
     
-    var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwSize)
+    var status = NtFlushInstructionCache(-1, addressToHook, dwSize)
     if (status == 0):
         when defined(verbose):
             echo obf("NtFlushInstructionCache success")
