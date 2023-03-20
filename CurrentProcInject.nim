@@ -232,8 +232,12 @@ let LocalInjectStub*  = """
     return 0
 
 when not defined(proxy):
-    discard main(nil)
+    when not defined(service):
+        when not defined(cloned):
+            discard main(nil)
 
 when defined(defaultMain):
-    discard main(nil)
+    when not defined(service):
+        when not defined(cloned):
+            discard main(nil)
 """

