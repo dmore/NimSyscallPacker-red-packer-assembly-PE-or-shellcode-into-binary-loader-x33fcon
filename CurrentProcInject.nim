@@ -152,7 +152,7 @@ let LocalInjectStub*  = """
                     echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
             if (status != 0):
                 when defined(verbose):
-                    echo obf("[-] Failed to change permissions to PAGE_EXECUTE_READ"
+                    echo obf("[-] Failed to change permissions to PAGE_EXECUTE_READ")
                     quit(1)
 
         when defined(LocalCreateThread):
