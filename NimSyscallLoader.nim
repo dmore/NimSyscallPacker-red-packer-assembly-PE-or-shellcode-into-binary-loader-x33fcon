@@ -1911,6 +1911,10 @@ let NotepadProcIDStub * = fmt"""
 """
 let MainStub * = """
 
+when not defined(DInvoke):
+    when defined(unhook):
+        from winim import GetModuleInformation,MODULEINFO,LPMODULEINFO
+
 proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
 
 """
@@ -2334,6 +2338,9 @@ if (dllProxy):
 
 if(service):
     basicCompileFlags.add("-d:service ")
+
+if(unhook):
+    basicCompileFlags.add("-d:unhook ")
 
 if(dllProxy):
     when system.hostOS == "windows":
