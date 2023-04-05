@@ -153,7 +153,7 @@ let LocalInjectStub*  = """
             if (status != 0):
                 when defined(verbose):
                     echo obf("[-] Failed to change permissions to PAGE_EXECUTE_READ")
-                    quit(1)
+                quit(1)
 
         when defined(LocalCreateThread):
             var tHandle: HANDLE
