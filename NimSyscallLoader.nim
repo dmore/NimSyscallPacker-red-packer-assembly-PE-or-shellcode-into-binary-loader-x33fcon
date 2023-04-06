@@ -2513,7 +2513,7 @@ else:
     else:
         basicCompileFlags.add("--app=console ")
     if (reflective):
-        basicCompileFlags.add("--app=gui --passL:-Wl,--dynamicbase,--export-all-symbols ")
+        basicCompileFlags.add("--passL:-Wl,--dynamicbase,--export-all-symbols ")
 
 if((syswhispers != true) and (hellsgate != true)):
     if system.hostOS == "windows":
