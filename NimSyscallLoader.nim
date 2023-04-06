@@ -2054,6 +2054,9 @@ stub.add(MainStub)
 
 stub.add(getRandStub())
 
+if(getfreshstub):
+    stub.add(RetrieveSyscallStubs)
+
 if(unhook):
     if(hellsgate):
         if (not noDInvoke): stub.add(DInvokeUnhookStubs)
@@ -2103,11 +2106,11 @@ if (localinject):
         stub.add(AMSIProviderPatchStub)
     elif(AMSICreateSectionHook):
         stub.add(AMSINtCreateSectionHookStub)
+    if(ETWPatch):
+        stub.add(ETWPatchStub)
     if (ETW):
         if (COMVARETW):
             stub.add(ETWCOMVARStub)
-        elif(ETWPatch):
-            stub.add(ETWPatchStub)
         else:
             stub.add(ETWStub)
 stub.add(getRandStub())
@@ -2415,6 +2418,9 @@ if(gosleep):
 
 if(remoteinject):
     basicCompileFlags.add("-d:remoteinject ")
+
+if(remoteMapSection):
+    basicCompileFlags.add("-d:remoteMapSection ")
 
 if(COMVARETW):
     basicCompileFlags.add("-d:COMVARETW ")
