@@ -1361,6 +1361,9 @@ import ptr_math
 #import winim/utils
 #from winim import winstr,winimbase,windef
 
+when defined(HardwareETW):
+  from winim/clr import load,clrVariantToString,new,`.`,VT_BSTR,invoke
+
 when defined(csharp):
     from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR,clrVariantToString,new
     from os import paramCount,paramStr
