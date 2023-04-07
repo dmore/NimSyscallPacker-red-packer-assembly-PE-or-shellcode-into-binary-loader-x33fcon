@@ -208,6 +208,16 @@ proc is_dll*(hLibrary: PVOID): BOOL =
 ##
 {getRandStub()}
 
+var MyLdrLoadDll: LdrLoadDll_t = cast[LdrLoadDll_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), LdrLoadDll_SW2_HASH, 0, TRUE)))
+
+if MyLdrLoadDll == nil:
+  when defined(verbose):
+      echo obf("[-] Address of LdrLoadDll not found")
+
+MyRtlInitUnicodeString = cast[RtlInitUnicodeString_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlInitUnicodeString_HASH, 0, TRUE)))
+if MyRtlInitUnicodeString == nil:
+  when defined(verbose):
+      echo obf("[-] Address of RtlInitUnicodeString not found")
 
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   when defined(verbose):
@@ -233,12 +243,6 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
         echo "Exit, loading is not appreciated"
     return 0
   {getRandStubInFunc()}
-  var MyLdrLoadDll: LdrLoadDll_t = cast[LdrLoadDll_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), LdrLoadDll_SW2_HASH, 0, TRUE)))
-  
-  if MyLdrLoadDll == nil:
-    when defined(verbose):
-        echo "[-] Address of LdrLoadDll not found"
-    return 0
 
   var ModuleFileName: UNICODE_STRING
   
@@ -248,7 +252,6 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
 
 let DInvokeStubThird * = """
   when defined(DInvoke):
-    var MyRtlInitUnicodeString: RtlInitUnicodeString_t = cast[RtlInitUnicodeString_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlInitUnicodeString_HASH, 0, TRUE)))
     MyRtlInitUnicodeString(addr(ModuleFileName), LibName)
   else:
     RtlInitUnicodeString(addr(ModuleFileName), LibName)

