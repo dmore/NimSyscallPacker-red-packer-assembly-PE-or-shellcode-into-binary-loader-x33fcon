@@ -1365,7 +1365,8 @@ when defined(ProviderPatch):
     from winregistry/winregistry import RegHandle,open,enumSubkeys,readString,samRead,enumValueNames
 
 when not defined(DInvoke):
-    from winim import LdrLoadDll
+    proc LdrLoadDll*(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.
+        importc: "LdrLoadDll", dynlib: "ntdll", stdcall, discardable.} 
 
 when defined(HardwareETW):
   from winim/clr import load,clrVariantToString,new,`.`,VT_BSTR,invoke
