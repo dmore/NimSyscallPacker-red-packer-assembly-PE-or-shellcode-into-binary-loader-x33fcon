@@ -140,10 +140,12 @@ let DInvokeStubSecond * = fmt"""
 
 when defined(WIN64):
   const
-    PEB_OFFSET* = 0x30
+    PEB_OFFSET_1* = 0x15
+    PEB_OFFSET* = PEB_OFFSET_1 + 0x15
 else:
   const
-    PEB_OFFSET* = 0x60
+    PEB_OFFSET_1* = 0x30
+    PEB_OFFSET* = PEB_OFFSET_1 + 0x30
 
 {getRandStub()}
 
