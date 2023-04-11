@@ -1,50 +1,55 @@
-from winim import LIST_ENTRY,PVOID,ULONG,UNICODE_STRING,UCHAR,BYTE,P_PEB
+let AntiDebugPEBStub* = """
 
-when defined(WIN64):
-  const
-    PEB_OFF* = 0x30
-else:
-  const
-    PEB_OFF* = 0x60
+when not defined(DInvoke):
+  when defined(WIN64):
+    const
+      PEB_OFFSET_1* = 0x15
+      PEB_OFFSET* = PEB_OFFSET_1 + 0x15
+  else:
+    const
+      PEB_OFFSET_1* = 0x30
+      PEB_OFFSET* = PEB_OFFSET_1 + 0x30
 
-type
-  ND_LDR_DATA_TABLE_ENTRY* {.bycopy.} = object
-    InMemoryOrderLinks*: LIST_ENTRY
-    InInitializationOrderLinks*: LIST_ENTRY
-    DllBase*: PVOID
-    EntryPoint*: PVOID
-    SizeOfImage*: ULONG
-    FullDllName*: UNICODE_STRING
-    BaseDllName*: UNICODE_STRING
+  type
+    ND_LDR_DATA_TABLE_ENTRY* {.bycopy.} = object
+      InMemoryOrderLinks*: LIST_ENTRY
+      InInitializationOrderLinks*: LIST_ENTRY
+      DllBase*: PVOID
+      EntryPoint*: PVOID
+      SizeOfImage*: ULONG
+      FullDllName*: UNICODE_STRING
+      BaseDllName*: UNICODE_STRING
 
-  PND_LDR_DATA_TABLE_ENTRY* = ptr ND_LDR_DATA_TABLE_ENTRY
-  ND_PEB_LDR_DATA* {.bycopy.} = object
-    Length*: ULONG
-    Initialized*: UCHAR
-    SsHandle*: PVOID
-    InLoadOrderModuleList*: LIST_ENTRY
-    InMemoryOrderModuleList*: LIST_ENTRY
-    InInitializationOrderModuleList*: LIST_ENTRY
+    PND_LDR_DATA_TABLE_ENTRY* = ptr ND_LDR_DATA_TABLE_ENTRY
+    ND_PEB_LDR_DATA* {.bycopy.} = object
+      Length*: ULONG
+      Initialized*: UCHAR
+      SsHandle*: PVOID
+      InLoadOrderModuleList*: LIST_ENTRY
+      InMemoryOrderModuleList*: LIST_ENTRY
+      InInitializationOrderModuleList*: LIST_ENTRY
 
-  PND_PEB_LDR_DATA* = ptr ND_PEB_LDR_DATA
-  ND_PEB* {.bycopy.} = object
-    Reserved1*: array[2, BYTE]
-    BeingDebugged*: bool
-    Reserved2*: array[1, BYTE]
-    Reserved3*: array[2, PVOID]
-    Ldr*: PND_PEB_LDR_DATA
+    PND_PEB_LDR_DATA* = ptr ND_PEB_LDR_DATA
+    ND_PEB* {.bycopy.} = object
+      Reserved1*: array[2, BYTE]
+      BeingDebugged*: BYTE
+      Reserved2*: array[1, BYTE]
+      Reserved3*: array[2, PVOID]
+      Ldr*: PND_PEB_LDR_DATA
 
-  PND_PEB* = ptr ND_PEB
+    PND_PEB* = ptr ND_PEB
 
-proc GetPEBPointer(p: culong): P_PEB {. 
-    header: 
-        """#include <windows.h>
-           #include <winnt.h>""", 
-    importc: "__readgsqword"
-.}
+  proc RtlGetCurrentPeb*(): pointer 
+      {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
+
+  proc GetPPEB * (p: culong): P_PEB = 
+    return cast[P_PEB](RtlGetCurrentPeb())
+"""
+
+let IsDebuggerPresentStub* = """
 
 proc AmIDebugged*(): bool =
-    var Peb: PPEB = GetPEBPointer(PEB_OFF)
+    var Peb: PPEB = GetPPEB(PEB_OFFSET)
     var BeingDebugged = bool(Peb.BeingDebugged)
     if (BeingDebugged):
       echo "Hello world!"
@@ -52,6 +57,23 @@ proc AmIDebugged*(): bool =
     else:
       return false
 
+# this function should do the following
+#[
+PDWORD pHeapFlags = (PDWORD)((PBYTE)GetProcessHeap() + 0x70);
+PDWORD pHeapForceFlags = (PDWORD)((PBYTE)GetProcessHeap() + 0x74);
+if (*pHeapFlags ^ HEAP_GROWABLE || *pHeapForceFlags != 0) return false;
+]#
+proc isHeapGrowable*(): bool =
+  var pHeapFlags = cast[ptr DWORD](cast[ptr BYTE](GetProcessHeap()) + 0x70)
+  var pHeapForceFlags = cast[ptr DWORD](cast[ptr BYTE](GetProcessHeap()) + 0x74)
+  if (pHeapFlags[] != HEAP_GROWABLE) or (pHeapForceFlags[] != 0):
+    when defined(verbose):
+      echo obf("[-] Heap is not growable")
+    return false
+  else:
+    return true
+
+"""
 #[
    More to come - https://0xpat.github.io/Malware_development_part_3/
 
