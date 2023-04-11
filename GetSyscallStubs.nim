@@ -20,6 +20,7 @@ type
   OpenThread_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwThreadId: DWORD): HANDLE {.stdcall.}
   GetCurrentThreadId_t* = proc (): DWORD {.stdcall.}
   WaitForSingleObject_t* = proc (hHandle: HANDLE, dwMilliseconds: DWORD): DWORD {.stdcall.}
+  MultiByteToWideChar_t* = proc (CodePage: UINT, dwFlags: DWORD, lpMultiByteStr: LPCSTR, cbMultiByte: cint, lpWideCharStr: LPWSTR, cchWideChar: cint): cint {.cdecl,stdcall.}
 when not defined(SkipDefaultSandBoxChecks):
   type  Sleep_t* = proc (dwMilliseconds: DWORD): DWORD {.stdcall.}
   type  GetTickCount_t* = proc (): DWORD {.stdcall.}
@@ -40,6 +41,7 @@ const
   OpenThread_HASH * = obf("OpenThread")
   GetCurrentThreadId_HASH * = obf("GetCurrentThreadId")
   WaitForSingleObject_HASH * = obf("WaitForSingleObject")
+  MultiByteToWideChar_HASH * = obf("MultiByteToWideChar")
 when not defined(SkipDefaultSandBoxChecks):
   const  Sleep_HASH * = obf("Sleep")
   const  GetTickCount_HASH * = obf("GetTickCount")
@@ -59,6 +61,7 @@ var MyCloseHandle*: CloseHandle_t
 var MyOpenThread*: OpenThread_t
 var MyGetCurrentThreadId*: GetCurrentThreadId_t
 var MyWaitForSingleObject*: WaitForSingleObject_t
+var MultiByteToWideChar*: MultiByteToWideChar_t
 when not defined(SkipDefaultSandBoxChecks):
   var MySleep*: Sleep_t
   var MyGetTickCount*: GetTickCount_t
@@ -91,6 +94,8 @@ MyOpenThread = cast[OpenThread_t](cast[LPVOID](get_function_address(cast[HMODULE
 MyGetCurrentThreadId = cast[GetCurrentThreadId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentThreadId_HASH, 0, FALSE)))
 
 MyWaitForSingleObject = cast[WaitForSingleObject_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), WaitForSingleObject_HASH, 0, FALSE)))
+
+MultiByteToWideChar = cast[MultiByteToWideChar_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), MultiByteToWideChar_HASH, 0, FALSE)))
 
 when not defined(SkipDefaultSandBoxChecks):
   MySleep = cast[Sleep_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), Sleep_HASH, 0, FALSE)))

@@ -1380,7 +1380,8 @@ import ptr_math
 #import winim/winstr
 #import winim/utils
 #from winim import winstr,winimbase,windef
-
+when defined(DInvoke):
+    from packerutils import MyRtlGetCurrentPeb
 when defined(AntiDebug):
     from winim import LIST_ENTRY,PVOID,ULONG,UNICODE_STRING,UCHAR,BYTE,P_PEB
 

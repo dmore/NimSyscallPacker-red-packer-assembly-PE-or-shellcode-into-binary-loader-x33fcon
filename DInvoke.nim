@@ -83,25 +83,18 @@ when defined(DInvoke):
     RtlGetCurrentPeb_HASH * = obf("RtlGetCurrentPeb")
     RtlInitUnicodeString_HASH * = obf("RtlInitUnicodeString")
 
-  var MyRtlGetCurrentPeb*: RtlGetCurrentPeb_t
   var MyRtlInitUnicodeString*: RtlInitUnicodeString_t
   # temporary - to fix later
-  proc RtlGetCurrentPeb*(): pointer 
-    {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
+  #proc RtlGetCurrentPeb*(): pointer 
+  #  {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
 
 else:
   proc RtlGetCurrentPeb*(): pointer 
     {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
 
 
-#[ This was the older alternative, which was the trigger for ESET to flag the resulting binaries, therefore I replaced that with RtlGetCurrentPeb.
-proc GetPPEB(p: culong): P_PEB {. 
-    header: 
-        '''#include <windows.h>
-           #include <winnt.h>''', 
-    importc: "__readgsqword"
-.}
-]#
+
+
 
 
 # we need our own custom lstrcmpiW function here, as that cannot be used when getting rid of dynlib
@@ -169,8 +162,8 @@ proc GetPPEB * (p: culong): P_PEB =
   discard calcSomething()
   when defined(DInvoke):
     #MyRtlGetCurrentPeb = cast[RtlGetCurrentPeb_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, TRUE)), RtlGetCurrentPeb_HASH, 0, FALSE)))
-    #return cast[P_PEB](MyRtlGetCurrentPeb())
-    return cast[P_PEB](RtlGetCurrentPeb())
+    return cast[P_PEB](MyRtlGetCurrentPeb(p))
+    #return cast[P_PEB](RtlGetCurrentPeb())
   else:
     return cast[P_PEB](RtlGetCurrentPeb())
   discard calcSomething()
