@@ -57,12 +57,6 @@ proc AmIDebugged*(): bool =
     else:
       return false
 
-# this function should do the following
-#[
-PDWORD pHeapFlags = (PDWORD)((PBYTE)GetProcessHeap() + 0x70);
-PDWORD pHeapForceFlags = (PDWORD)((PBYTE)GetProcessHeap() + 0x74);
-if (*pHeapFlags ^ HEAP_GROWABLE || *pHeapForceFlags != 0) return false;
-]#
 proc isHeapGrowable*(): bool =
   var pHeapFlags = cast[ptr DWORD](cast[ptr BYTE](GetProcessHeap()) + 0x70)
   var pHeapForceFlags = cast[ptr DWORD](cast[ptr BYTE](GetProcessHeap()) + 0x74)
@@ -84,13 +78,6 @@ proc isHeapGrowable*(): bool =
    PDWORD pNtGlobalFlag = (PDWORD)(__readgsqword(0x60) + 0xBC);
    if ((*pNtGlobalFlag) & NT_GLOBAL_FLAG_DEBUGGED) return false;
 
-
-and
-
-
-PDWORD pHeapFlags = (PDWORD)((PBYTE)GetProcessHeap() + 0x70);
-PDWORD pHeapForceFlags = (PDWORD)((PBYTE)GetProcessHeap() + 0x74);
-if (*pHeapFlags ^ HEAP_GROWABLE || *pHeapForceFlags != 0) return false;
 
 +
 
