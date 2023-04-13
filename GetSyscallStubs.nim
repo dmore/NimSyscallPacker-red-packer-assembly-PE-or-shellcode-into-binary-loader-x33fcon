@@ -21,8 +21,8 @@ type
   GetCurrentThreadId_t* = proc (): DWORD {.stdcall.}
   WaitForSingleObject_t* = proc (hHandle: HANDLE, dwMilliseconds: DWORD): DWORD {.stdcall.}
   MultiByteToWideChar_t* = proc (CodePage: UINT, dwFlags: DWORD, lpMultiByteStr: LPCSTR, cbMultiByte: cint, lpWideCharStr: LPWSTR, cchWideChar: cint): cint {.cdecl,stdcall.}
+  Sleep_t* = proc (dwMilliseconds: DWORD): DWORD {.stdcall.}
 when not defined(SkipDefaultSandBoxChecks):
-  type  Sleep_t* = proc (dwMilliseconds: DWORD): DWORD {.stdcall.}
   type  GetTickCount_t* = proc (): DWORD {.stdcall.}
 
 const
@@ -42,8 +42,8 @@ const
   GetCurrentThreadId_HASH * = obf("GetCurrentThreadId")
   WaitForSingleObject_HASH * = obf("WaitForSingleObject")
   MultiByteToWideChar_HASH * = obf("MultiByteToWideChar")
+  Sleep_HASH * = obf("Sleep")
 when not defined(SkipDefaultSandBoxChecks):
-  const  Sleep_HASH * = obf("Sleep")
   const  GetTickCount_HASH * = obf("GetTickCount")
 
 #var MyGetCurrentProcess*: GetCurrentProcess_t
@@ -62,8 +62,8 @@ var MyOpenThread*: OpenThread_t
 var MyGetCurrentThreadId*: GetCurrentThreadId_t
 var MyWaitForSingleObject*: WaitForSingleObject_t
 var MultiByteToWideChar*: MultiByteToWideChar_t
+var MySleep*: Sleep_t
 when not defined(SkipDefaultSandBoxChecks):
-  var MySleep*: Sleep_t
   var MyGetTickCount*: GetTickCount_t
 
 
@@ -106,20 +106,20 @@ when not defined(SkipDefaultSandBoxChecks):
 
 let DInvokeLoadLibraryAGetProcAddress * = """
 
-    type
-      LoadLibraryA_t = proc (lpLibFileName: LPCSTR): HMODULE {.stdcall.}
-      #GetProcAddress_t = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
-      
-    const
-      LoadLibraryA_HASH  = obf("LoadLibraryA")
-      #GetProcAddress_HASH  = obf("GetProcAddress")
-      
-    var MyLoadLibraryA: LoadLibraryA_t
-    #var MyGetProcAddress: GetProcAddress_t
+type
+  LoadLibraryA_t = proc (lpLibFileName: LPCSTR): HMODULE {.stdcall.}
+  #GetProcAddress_t = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
+  
+const
+  LoadLibraryA_HASH  = obf("LoadLibraryA")
+  #GetProcAddress_HASH  = obf("GetProcAddress")
+  
+var MyLoadLibraryA: LoadLibraryA_t
+#var MyGetProcAddress: GetProcAddress_t
 
-    MyLoadLibraryA = cast[LoadLibraryA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE)))
+MyLoadLibraryA = cast[LoadLibraryA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE)))
 
-    #MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
+#MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
 
 
 
