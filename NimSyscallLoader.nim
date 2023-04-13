@@ -2033,13 +2033,7 @@ let MainStub * = """
 
 when not defined(DInvoke):
     when defined(unhook):
-        from winim import GetModuleInformation
-        type
-          MODULEINFO {.pure.} = object
-            lpBaseOfDll: LPVOID
-            SizeOfImage: DWORD
-            EntryPoint: LPVOID
-          LPMODULEINFO = ptr MODULEINFO
+        from winim import GetModuleInformation,MODULEINFO,LPMODULEINFO
 
 
 proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
@@ -2483,6 +2477,9 @@ else:
 
 if(antidebug):
     basicCompileFlags.add("-d:AntiDebug ")
+
+if(unhook):
+    basicCompileFlags.add("-d:unhook ")
 
 if(not defaultSandBoxChecks):
     basicCompileFlags.add("-d:SkipDefaultSandBoxChecks ")

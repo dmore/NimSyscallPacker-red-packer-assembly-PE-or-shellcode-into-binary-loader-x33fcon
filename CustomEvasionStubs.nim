@@ -25,7 +25,7 @@ let UnhookNtdllStub * = """
         when defined(DInvoke):
             discard MyGetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
         else:
-            discard GetModuleInformation(processH, ntdllModule, addr mi, cast[DWORD](sizeof(mi)))
+            discard GetModuleInformation(processH, ntdllModule, cast[LPMODULEINFO](addr mi), cast[DWORD](sizeof(mi)))
         ntdllBase = mi.lpBaseOfDll
         ntdllFile = getOsFileHandle(open(obf("C:\\windows\\system32\\ntdll.dll"),fmRead))
         when defined(DInvoke):
