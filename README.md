@@ -430,7 +430,7 @@ Read this:
 - [X] Define custom remote process to spawn before injecting into it (atm it's hardcoded notepad)
 - [X] PPID Spoofing for newly created processes
 - [X] BlockDLLs for new processes
-- [ ] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
+- [X] Patchless AMSI bypass (e.g. https://gist.github.com/CCob/fe3b63d80890fafeca982f76c8a3efdf)
 - [X] AMSI bypass via NtCreateSection Hook (e.g. https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
 - [X] More ETW Patching for EtwNotificationRegister, EtwEventRegister, EtwEventWriteFull
 - [X] Service binary support, like https://github.com/enthus1ast/nimWindowsService/
@@ -442,7 +442,7 @@ Read this:
 - [ ] Decoy HTTP requests option
 - [X] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
 - [ ] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
-
+- [ ] Use cloned Handles instead of OpenProcess (Handlekatz like) for remote process injection or as alternative Handle Elevation
 
 ## CREDITS
 

@@ -121,8 +121,7 @@ let UnhookNtdllStub * = """
         return true
 
 
-    when defined(GetSyscallStub):
-        GetUnhookStubs()
+
     var result = ntdllunhook()
     when defined(verbose):
         echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}"
