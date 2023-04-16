@@ -993,7 +993,7 @@ let LoadAssemblyStubArgs = """
 
 when defined(defaultMain):
     when not defined(service):
-        when not defined(cloned):
+        when defined(notcloned):
             when not defined(proxy):
                 discard main(nil)
 """
@@ -1011,7 +1011,7 @@ when not defined(proxy):
 
 when defined(defaultMain):
     when not defined(service):
-        when not defined(cloned):
+        when defined(notcloned):
             discard main(nil)
 """
 
@@ -2803,8 +2803,12 @@ if(dll_out):
     if(dllclone):
         echo fmt"[!] Cloning the DLL {dllToClone} API imports via NetClone/PyClone:"
         when system.hostOS == "windows":
+            echo "[*] Using NetClone with command:"
+            echo fmt"{packerPath}\NetClone\NetClone.exe --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}"
             discard os.execShellCmd(fmt"{packerPath}\NetClone\NetClone.exe --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
         else:
+            echo "[*] Using PyClone with command:"
+            echo fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}"
             discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
 
 
