@@ -53,7 +53,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.8                                            
+                                                                 v1.9                                            
 
 """
 
@@ -62,7 +62,7 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.8
+NimSyscall_Loader v 1.9
 
 Usage:
   NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
@@ -88,7 +88,7 @@ Options:
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode
   --x86    Compiles an x86 binary
-  --wow64    (Compiles a x86 binary that can be by x64 CPUs)
+  --wow64    (Compiles a x86 binary that can be used by x64 CPUs)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
@@ -153,7 +153,7 @@ Options:
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
-  --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
+  --hellsgate    Retrieve Syscalls via Hellsgate technique
   --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
         --jump    When using Syswhispers3, use the jumper_randomized technique
 
@@ -293,7 +293,7 @@ var
     remoteMapSection: bool = false
     remoteinject: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.8")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.9")
 
 if args["--file"]:
   let fname = args["--file"]

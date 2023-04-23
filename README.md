@@ -80,10 +80,10 @@ A Video - if you prefer that - can be found here:
 [https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
-NimSyscall_Loader v 1.8
+NimSyscall_Loader v 1.9
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -106,13 +106,15 @@ Options:
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode
   --x86    Compiles an x86 binary
-  --wow64    (Compiles a x86 binary that can be by x64 CPUs)
+  --wow64    (Compiles a x86 binary that can be used by x64 CPUs)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
   --psout    Powershell Output format, reflectively loading the packed binary
-    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation
+    --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation.
     --pslyrics    Add Lyrics as comments to avoid some more detections
+  --sourceonly    Dont compile but just create the source code and compile command
+  --RWX    Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX)
   --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
 
 [Payload retrieval options]
@@ -140,6 +142,9 @@ Options:
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
+  --noOneShot    By default the Packer uses Hardware Breakpoints to bypass AMSI, but disables it after the payload has been executed. If you want to keep it enabled for the current Thread, use this option.
+  --PatchAMSI    Bypass AMSI by patching an offset of amsi.dll/AmsiScanBuffer via Syscalls
+  --PatchETW    Bypass ETW by patching ntdll.dll/NtTraceEvent via Syscalls
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
   --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
@@ -161,11 +166,12 @@ Options:
   --sleepycrypt    Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager)
   --fluctuate    Enable ShellcodeFluctuation for local shellcode injection and PE-Loading (Alpha) - no support for remote injection
                  This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
-  --antidebug    Checks the BeingDebugged flag of the current process and if it is set, it will quit
+  --noAntidebug    Leave out AntiDebugger Checks
+  --noDefaultSandBox    Leave out default Sandbox Checks
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
-  --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
+  --hellsgate    Retrieve Syscalls via Hellsgate technique 
   --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
         --jump    When using Syswhispers3, use the jumper_randomized technique
 
@@ -198,8 +204,19 @@ Options:
 
 ```
 
+By default, the Packer uses SandBox evasion and AntiDebug functionalities for every Payload. If you don't want them to be enabled (e.G. to remove their IoCs) or for any other reason you can use the flags `--noAntidebug` or `--noDefaultSandBox´. Every other SandBox check from the options will be added in addition to the existing ones and not as replacement.
 
-To pack Mimikatz for example with unhooking before execution and without patching AMSI use the following:
+All Payloads are by default executed in an `RX` memory region. Some Payloads won't work with `READ_EXECUTE` only. To use `RWX` instead you can enable that with the flag `--RWX`.
+
+Also by default, Payloads are embedded in the resulting binary as encrypted array. This leads to high entropy and can also lead to detections by some AV/EDR vendors due to that. I recommend to instead use `--shellcodeFile` or `--shellcodeURL` to retrieve the Payload from a different file or Webserver on runtime. This also leads to SandBox Evasion as side-effect. For example when using:
+
+```batch
+NimSyscallLoader --file calc.bin --shellcodeFile test.txt --output test.exe
+```, the encrypted Payload will be retrieved from `test.txt` on runtime. So this second file also needs to be placed onto the target system.
+
+If you`re not in a hurry, I can also recommend using the options `--sleep numberOfSeconds` and or `--sleep-in-between numberOfSeconds` for any Payload, as that will lead to memory Scan and or behaviour based detection bypasses.
+
+To pack Mimikatz for example with unhooking before execution and without bypassing AMSI use the following:
 
 ```batch
 NimSyscallLoader --file=mimikatz.exe --unhook --noAMSI --peinject
@@ -246,9 +263,9 @@ To load a C# assembly:
 ```batch
 NimSyscallLoader --file=Seatbelt.exe --csharp
 ```
-To load a C# assembly with flags:
+To load a C# assembly with arguments:
 ```batch
-NimSyscallLoader --file=Rubeus.exe --csharp --flags='hash /password:Aa1234'
+NimSyscallLoader --file=Rubeus.exe --csharp --arguments='hash /password:Aa1234'
 ```
 
 To load a C# assembly and use hellsgate for Syscall retrieval :
@@ -443,6 +460,8 @@ Read this:
 - [X] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
 - [ ] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
 - [ ] Use cloned Handles instead of OpenProcess (Handlekatz like) for remote process injection or as alternative Handle Elevation
+- [ ] Add ThreadlessInject for Remote Injection
+- [ ] Add Callback execution primitives for remote injection via a Nim Port of https://github.com/lem0nSec/CreateRemoteThreadPlus
 
 ## CREDITS
 

