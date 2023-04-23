@@ -462,6 +462,8 @@ Read this:
 - [ ] Use cloned Handles instead of OpenProcess (Handlekatz like) for remote process injection or as alternative Handle Elevation
 - [ ] Add ThreadlessInject for Remote Injection
 - [ ] Add Callback execution primitives for remote injection via a Nim Port of https://github.com/lem0nSec/CreateRemoteThreadPlus
+- [ ] Store Payloads as MAC or IP-Adresses and retrieve the encrypted Payload on runtime to decrease entropy
+- [ ] Add multiple Jumps for different regions in the Thread start address (DripLoader like) to avoid memory scan detections
 
 ## CREDITS
 
