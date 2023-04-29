@@ -1317,7 +1317,9 @@ let ETWStub * = """
       ## Create a CLR object (aka. C# instance) and call the method
       var mscor = load(obf("mscorlib"))
       var rand = mscor.new(obf("System.Random"))
-      echo rand.Next()
+      var randomNumber = rand.Next()
+      when defined(verbose):
+        echo randomNumber
     Decoy()
     when defined(DInvoke):
         discard MySleep(1500)
