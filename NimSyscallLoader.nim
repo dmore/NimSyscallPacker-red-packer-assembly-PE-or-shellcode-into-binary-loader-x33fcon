@@ -654,6 +654,13 @@ if (dllclone and dllProxy):
     echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
     quit(1)
 
+if (psout and dll_out):
+    # Reflective DLL PE-Loading only works, when DLLMain is exposed, otherwise it won't work
+    dllhijack = true
+
+
+
+
 #echo "Key: " & envkey
 # Lets save the last 4 characters of the string in a new variable
 var lastTwo = envkey[^2..^1]
@@ -2556,6 +2563,9 @@ if(macPayload):
 
 if(unhook):
     basicCompileFlags.add("-d:unhook ")
+
+if(psout):
+    basicCompileFlags.add("-d:powershell ")
 
 if(not defaultSandBoxChecks):
     basicCompileFlags.add("-d:SkipDefaultSandBoxChecks ")

