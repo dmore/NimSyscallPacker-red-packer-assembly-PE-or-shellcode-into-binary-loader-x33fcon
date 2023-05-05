@@ -658,7 +658,9 @@ if (psout and dll_out):
     # Reflective DLL PE-Loading only works, when DLLMain is exposed, otherwise it won't work
     dllhijack = true
 
-
+if(service):
+    # For some reason, started services have the being debugged flag set or this check breaks the service, so we disable it
+    antidebug = false
 
 
 #echo "Key: " & envkey
