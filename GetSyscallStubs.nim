@@ -142,11 +142,7 @@ when defined(GetSyscallStub):
         TotalLength*: SIZE_T
         Attributes*: array[2, PS_ATTRIBUTE]
       PPS_ATTRIBUTE_LIST* = ptr PS_ATTRIBUTE_LIST
-      KNORMAL_ROUTINE* {.pure.} = object
-        NormalContext*: PVOID
-        SystemArgument1*: PVOID
-        SystemArgument2*: PVOID
-      PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
+
     
     var 
         SYSCALL_STUB_SIZE: int = 23

