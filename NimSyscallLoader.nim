@@ -1590,11 +1590,24 @@ echo rtlGetVersion(versionInfo)
 if(versionInfo.dwMajorVersion == 6 and versionInfo.dwMinorVersion == 2):
     ws2k12 = 1
     when defined verbose:
-        echo obf("Windows Server 2012 detected\n")
+        echo obf("Windows Server 2012/Win8 detected\n")
 if(versionInfo.dwMajorVersion == 6 and versionInfo.dwMinorVersion == 3):
     ws2k12 = 1
     when defined verbose:
-        echo ("Windows Server 2012 R2 detected\n")
+        echo ("Windows Server 2012 R2/Win8 detected\n")
+if(versionInfo.dwMajorVersion == 6 and versionInfo.dwMinorVersion == 0):
+    ws2k12 = 1
+    when defined verbose:
+        echo obf("Windows Server 2008/Win7 detected\n")
+if(versionInfo.dwMajorVersion == 6 and versionInfo.dwMinorVersion == 1):
+    ws2k12 = 1
+    when defined verbose:
+        echo ("Windows Server 2008 R2/Win7 detected\n")
+
+if(versionInfo.dwMajorVersion <= 5):
+    ws2k12 = 1
+    when defined verbose:
+        echo ("XP/Server 2003 or old as fuck system detected, may have troubles here! \n")
 
 
 """

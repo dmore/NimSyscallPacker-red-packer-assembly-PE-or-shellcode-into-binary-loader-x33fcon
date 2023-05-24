@@ -420,6 +420,7 @@ Read this:
 - Compile the Packer on Linux/Debian with `-d:noRES` to avoid compiler errors
 - `--syswhispers --jump` in combination with `--peload` results in a crash. For the moment I can only recommend to not use this option as I have no clue where this sideeffect comes from
 - `--obfuscate` cannot handle ASM-Stubs well and therefore cannot compile binaries with `--hellsgate` or `--syswhispers`
+- XP/WS2k3 will only work with the flags `--syswhispers --noAntidebug --noDInvoke`
 
 ## ProtectMyTooling embedded
 
