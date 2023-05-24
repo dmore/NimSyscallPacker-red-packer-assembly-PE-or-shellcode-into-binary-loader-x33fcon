@@ -1573,6 +1573,30 @@ when defined(QueueAPC):
         SystemArgument2*: PVOID
       PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
 
+
+# Check, if OS is Windows Server 2012, as that is different with ntdll.dll on disk and memory
+var ws2k12: BOOL = 0
+
+
+proc `$`(a: array[128, WCHAR]): string = $cast[WideCString](unsafeAddr a[0])
+
+proc rtlGetVersion(lpVersionInformation: var OSVersionInfoExW): NTSTATUS
+    {.cdecl, importc: "RtlGetVersion", dynlib: "ntdll.dll".}
+
+var versionInfo: OSVersionInfoExW
+echo rtlGetVersion(versionInfo)
+#echo versionInfo
+
+if(versionInfo.dwMajorVersion == 6 and versionInfo.dwMinorVersion == 2):
+    ws2k12 = 1
+    when defined verbose:
+        echo obf("Windows Server 2012 detected\n")
+if(versionInfo.dwMajorVersion == 6 and versionInfo.dwMinorVersion == 3):
+    ws2k12 = 1
+    when defined verbose:
+        echo ("Windows Server 2012 R2 detected\n")
+
+
 """
 
 let macPayloadStub = fmt"""

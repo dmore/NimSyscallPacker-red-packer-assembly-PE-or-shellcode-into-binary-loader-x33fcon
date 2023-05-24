@@ -117,6 +117,15 @@ int MyLstrcmpiW(const wchar_t* str1, const wchar_t* str2) {
 }
 ]#
 
+# this function takes an ptr LPWSTR as input and converts all uppercase characters to lowercase
+proc LPWSTRtoLowercase(str: LPWSTR): LPWSTR =
+    var ptr1: LPWSTR = str
+    while (ptr1[] != 0):
+        if (ptr1[] >= wchar_t('A') and ptr1[] <= wchar_t('Z')):
+            ptr1[] += (wchar_t('a') - wchar_t('A'))
+        ptr1 += 1
+    return str
+
 proc lstrcmpiW(str1: ptr wchar_t, str2: ptr wchar_t): int =
   var c1: wchar_t
   var c2: wchar_t
@@ -265,7 +274,7 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   var FirstEntry: PVOID = addr(Ldr.InMemoryOrderModuleList.Flink)
   var Entry: PND_LDR_DATA_TABLE_ENTRY = cast[PND_LDR_DATA_TABLE_ENTRY](Ldr.InMemoryOrderModuleList.Flink)
   while true:
-    var compare: int = lstrcmpiW(LibName,cast[LPWSTR](Entry.BaseDllName.Buffer))
+    var compare: int = lstrcmpiW(LPWSTRtoLowercase(LibName),LPWSTRtoLowercase(cast[LPWSTR](Entry.BaseDllName.Buffer)))
     if(compare == 0):
       when defined(verbose):
           echo "\r\n[+] Found the DLL!\r\n"
@@ -410,7 +419,12 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
       names += cast[DWORD](len(funcname) + 1)
       #when defined(verbose): echo "Function: ", funcname
       if fhash == funcname:
-        
+        if (specialCase): # ntdll.dll function
+            if(ws2k12):
+                functions = functions + 7 # for some reason, WS2k12 has strange addidional ntdll.dll functions in memory which are not counted here
+        else: # kernel32.dll function
+            if(ws2k12):
+                functions = functions - 1 # for other DLLs, we have to decrease the value by 1
         # So many edge cases, have to investigate
         if (funcname == obf("CreateFileW")):
           functions = functions - 1
