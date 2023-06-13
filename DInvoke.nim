@@ -121,8 +121,8 @@ int MyLstrcmpiW(const wchar_t* str1, const wchar_t* str2) {
 proc LPWSTRtoLowercase(str: LPWSTR): LPWSTR =
     var ptr1: LPWSTR = str
     while (ptr1[] != 0):
-        if (ptr1[] >= cast[wchar_t](obf("A")) and ptr1[] <= cast[wchar_t](obf("Z"))):
-            ptr1[] += (cast[wchar_t](obf("a")) - cast[wchar_t](obf("A")))
+        if (ptr1[] >= wchar_t('A') and ptr1[] <= wchar_t('Z')):
+            ptr1[] += (wchar_t('a') - wchar_t('A'))
         ptr1 += 1
     return str
 
@@ -135,10 +135,10 @@ proc lstrcmpiW(str1: ptr wchar_t, str2: ptr wchar_t): int =
   while (ptr1[] != 0 and ptr2[] != 0):
     c1 = ptr1[]
     c2 = ptr2[]
-    if (c1 >= cast[wchar_t](obf("A")) and c1 <= cast[wchar_t]('Z')):
-      c1 += (wchar_t('a') - cast[wchar_t](obf("A")))
-    if (c2 >= cast[wchar_t](obf("A")) and c2 <= cast[wchar_t]('Z')):
-      c2 += (wchar_t('a') - cast[wchar_t](obf("A")))
+    if (c1 >= wchar_t('A') and c1 <= wchar_t('Z')):
+      c1 += (wchar_t('a') - wchar_t('A'))
+    if (c2 >= wchar_t('A') and c2 <= wchar_t('Z')):
+      c2 += (wchar_t('a') - wchar_t('A'))
     if (c1 != c2):
       return int(c1 - c2)
     ptr1 += 1

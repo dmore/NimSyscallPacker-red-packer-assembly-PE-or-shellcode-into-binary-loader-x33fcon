@@ -2122,9 +2122,9 @@ let NotepadProcIDStub * = fmt"""
 
 
         when defined spoof_args:
-            tProcPath = newWideCString(obf("{customspawnprocess}") & " " & obf("{spoofArgs}"))
+            tProcPath = newWideCString(obf(r"{customspawnprocess}") & " " & obf("{spoofArgs}"))
         else:
-            tProcPath = newWideCString(obf("{customspawnprocess}"))
+            tProcPath = newWideCString(obf(r"{customspawnprocess}"))
 
         when defined(blockDLLs) or (obf("{parentProcess}") != ""):
             InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
