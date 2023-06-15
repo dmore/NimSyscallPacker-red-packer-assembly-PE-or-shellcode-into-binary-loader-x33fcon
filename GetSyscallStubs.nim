@@ -235,23 +235,23 @@ when defined(GetSyscallStub):
         when defined(DInvoke):
             file = MyCreateFileA(ntdllString, cast[DWORD](GENERIC_READ), cast[DWORD](FILE_SHARE_READ), cast[LPSECURITY_ATTRIBUTES](NULL), cast[DWORD](OPEN_EXISTING), cast[DWORD](FILE_ATTRIBUTE_NORMAL), nullHandle)
             when defined(verbose):
-                echo obf("CreateFileA Error Code: ") & $[GetLastError()]
+                echo obf("[*] CreateFileA Error Code: ") & $[GetLastError()]
             fileSize = MyGetFileSize(file, nil)
             when defined(verbose):
-                echo obf("MyGetFileSize Error Code: ") & $[GetLastError()]
+                echo obf("[*] MyGetFileSize Error Code: ") & $[GetLastError()]
             if (ws2k12):
                 fileData = HeapAlloc(GetProcessHeap(), 0, fileSize)
             else:
                 fileData = MyRtlAllocateHeap(cast[PVOID](MyGetProcessHeap()), 0, cast[SIZE_T](fileSize))
             when defined(verbose):
-                echo obf("MyRtlAllocateHeap Error Code: ") & $[GetLastError()]
+                echo obf("[*] MyRtlAllocateHeap Error Code: ") & $[GetLastError()]
             let success = MyReadFile(file, fileData, fileSize, addr bytesRead, nil)
             when defined(verbose):
-                echo obf("MyReadFile Error Code: ") & $[GetLastError()]
+                echo obf("[*] MyReadFile Error Code: ") & $[GetLastError()]
                 if (success):
-                    echo obf("MyReadFile Success")
+                    echo obf("[*] MyReadFile Success")
                 else:
-                    echo obf("MyReadFile Failed")
+                    echo obf("[*] MyReadFile Failed")
         else:
             file = CreateFileA(ntdllString, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullHandle)
             fileSize = GetFileSize(file, nil)
