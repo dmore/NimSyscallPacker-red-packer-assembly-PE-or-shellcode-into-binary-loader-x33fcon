@@ -1522,7 +1522,7 @@ import macros, hashes
 type
     estring = distinct string
 
-proc calcTheThings(s: estring, key: int): string {.inline.} =
+proc calcTheThings(s: estring, key: int): string {.noinline.} =
     var k = key
     var whatup: char
     var testString : string = " "
