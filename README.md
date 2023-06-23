@@ -482,3 +482,4 @@ Read this:
 - [X] [EdgeBalci](https://github.com/EgeBalci) - SGN
 - [X] [monoxgas](https://github.com/monoxgas) - Koppeling
 - [X] [eversinc33](https://github.com/eversinc33) - BouncyGate, Docker File
+- [X] [OffenseTeacher](https://github.com/OffenseTeacher) - Steganim
