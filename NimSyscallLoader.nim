@@ -1761,7 +1761,7 @@ let Cryptstub3 = fmt"""
     proc decryptLate(): void =
         var expandedkey = toByteSeq(envkey2)
         discard calcHard()
-        if ((len(expandedkey) mod aes256.sizeBlock) != 0):
+        if ((int(len(expandedkey)) mod int(aes256.sizeBlock)) != 0):
             when defined(verbose):
                 echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
                 echo "[*] Length: " & $len(expandedkey)
@@ -1785,7 +1785,7 @@ let Cryptstub3 = fmt"""
         discard calcHard()
         dctx.init(ptrKey)
         discard calcHard()
-        dctx.decrypt(ptrEncText, ptrDecText, dataLen)
+        dctx.decrypt(cast[ptr byte](ptrEncText), cast[ptr byte](ptrDecText), dataLen)
         discard calcHard()
         dctx.clear()
 
