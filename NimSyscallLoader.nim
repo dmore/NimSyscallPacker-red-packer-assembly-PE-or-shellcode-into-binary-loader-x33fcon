@@ -596,6 +596,7 @@ if args["--jump"]:
 
 if args["--sgn"]:
   sgn = true
+  RWX = true
 
 if args["--replace"]:
   replace = true
@@ -729,6 +730,33 @@ var firstwithoutlast4 = envkey.replace(lastFour, "")
 if (peload and embeddedArguments):
     verbose = true # workaround, something in DInvoke+NoVerbose breaks the arguments
 
+when system.hostOS == "windows":
+    proc isUserElevated(): bool =
+        var
+            tokenHandle: HANDLE
+            elevation = TOKEN_ELEVATION()
+            cbsize: DWORD = 0
+        
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, cast[PHANDLE](addr(tokenHandle))) == 0:
+            echo "DEBUG: Cannot query tokens: " & $GetLastError()
+            return false
+        
+        if GetTokenInformation(tokenHandle, tokenElevation, cast[LPVOID](addr(elevation)), cast[DWORD](sizeOf(elevation)), cast[PDWORD](addr(cbsize))) == 0:
+            echo "DEBUG: Cannot retrieve token information: " & $GetLastError()
+            discard CloseHandle(tokenHandle)
+            return false
+        
+        result = elevation.TokenIsElevated != 0
+
+when system.hostOS == "windows":
+    let isElevated = isUserElevated()
+    if (isElevated == false):
+        echo "[-] Process is not elevated, exiting. Restart the Packer as Administrator."
+        quit(1)
+    else:
+        discard os.execShellCmd("powershell.exe $mpPreference = Get-MpPreference; if ($mpPreference.SubmitSamplesConsent -in 0, 1, 3) { Set-MpPreference -SubmitSamplesConsent 2 }")
+
+
 if (peload or peinject):
     let stream = newFileStream(filename, mode = fmRead)
     defer: stream.close()
@@ -794,9 +822,9 @@ if (peinject):
                 discard os.execShellCmd(fmt"{packerPath}\donut\donut -b 1 -o tmpshellcode.bin --input:{filename}")
             if (sgn):
                 if (compileX86):
-                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 8  -o tmpshellcode.bin tmpshellcode.bin")
                 else:
-                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin tmpshellcode.bin")
+                    discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 8  -o tmpshellcode.bin tmpshellcode.bin")
                 sgn = false
         elif system.hostOS == "linux":
             if(embeddedArguments):
@@ -821,9 +849,9 @@ if (peinject):
         quit()
 elif(sgn):
     if (compileX86):
-        discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 3  -o tmpshellcode.bin {filename}")
+        discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -c 8  -o tmpshellcode.bin {filename}")
     else:
-        discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 3  -o tmpshellcode.bin {filename}")
+        discard os.execShellCmd(fmt"{packerPath}\sgn\sgn.exe -a 64 -c 8  -o tmpshellcode.bin {filename}")
     blob = readFile("tmpshellcode.bin")
 elif(csharp == false):
     blob = readFile(filename)
