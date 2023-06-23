@@ -1623,10 +1623,10 @@ when defined(ProviderPatch):
     from winregistry/winregistry import RegHandle,open,enumSubkeys,readString,samRead,enumValueNames
 
 when defined(HardwareETW):
-  from winim/clr import load,clrVariantToString,new,`.`,VT_BSTR,invoke
+  from winim/clr import load,clrVariantToString,new,`.`,VT_BSTR,invoke,clrStart
 
 when defined(csharp):
-    from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR,clrVariantToString,new
+    from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR,clrVariantToString,new,clrStart
     from os import paramCount,paramStr
 
 when defined(sleep):

