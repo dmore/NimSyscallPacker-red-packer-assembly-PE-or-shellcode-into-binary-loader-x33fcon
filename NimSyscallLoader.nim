@@ -751,6 +751,7 @@ when system.hostOS == "windows":
     echo "[*] Windows Defender Sample Submission is: " & sampleSubmissionValue[0]
     if (sampleSubmissionValue[0].contains("Enabled")):
         echo "[-] Windows Defender Sample Submission is enabled. Please disable it!"
+        echo "[*] You can fully disable it with the following Powershell command: \r\nSet-MpPreference -SubmitSamplesConsent 2"
         quit(1)
 
 
