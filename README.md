@@ -80,10 +80,10 @@ A Video - if you prefer that - can be found here:
 [https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
-NimSyscall_Loader v 1.9
+NimSyscall_Loader v 2.0
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --remoteMapSection --unhook --reflective --obfuscate --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -116,6 +116,7 @@ Options:
   --sourceonly    Dont compile but just create the source code and compile command
   --RWX    Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX)
   --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
+  --stegofile filepath    Path to a .bmp or jpeg file in which the encrypted payload will be embedded
 
 [Payload retrieval options]
 
@@ -140,7 +141,8 @@ Options:
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
   --unhook    Unhook ntdll.dll before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
-  --sgn    Encode shellcode via SGN before encrypting it´
+  --macPayload    Convert the encrypted Shellcode to MAC-Adresses to reduce entropy (for embedded Payloads only)
+  --sgn    Encode shellcode via SGN before encrypting it
   --replace    Replace common nim IoC's in the loader like the string 'nim'
   --noOneShot    By default the Packer uses Hardware Breakpoints to bypass AMSI, but disables it after the payload has been executed. If you want to keep it enabled for the current Thread, use this option.
   --PatchAMSI    Bypass AMSI by patching an offset of amsi.dll/AmsiScanBuffer via Syscalls
@@ -168,21 +170,29 @@ Options:
                  This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
   --noAntidebug    Leave out AntiDebugger Checks
   --noDefaultSandBox    Leave out default Sandbox Checks
+  --jmpEntry    This option will enable a custom Shellcode Entrypoint from a DLL backed function to avoid unbacked memory as Thread/APC start address. The target function will be hooked with a JMP to the Shellcode
+    --jmpEntryDLL value    Specify a DLL to use for the custom Shellcode Entrypoint
+    --jmpEntryFunc value    Specify a function to use for the custom Shellcode Entrypoint
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
-  --hellsgate    Retrieve Syscalls via Hellsgate technique 
+  --hellsgate    Retrieve Syscalls via Hellsgate technique
   --syswhispers    Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique
         --jump    When using Syswhispers3, use the jumper_randomized technique
 
 [shellcode specific]
 
   --shellcode    Encrypt shellcode to load it on runtime
+  --dripallocate    Allocate memory Driploader style (multiple small memory chunks after another to avoid memory scans after ETWti/Kernel Callback triggers)
+      --dripsleep 500    Sleep time in ms between each memory allocation (e.G. 500 milisec)
   --CallbackExecute    Execute shellcode via a custom Callback function
   --localCreateThread    Use NtCreateThreadEx for local injection instead of a direct pointer to the shellcode
+  --QueueApc    Instead of a direct Pointer or Thread Creation execute the Shellcode via NtQueueApcThread
   --noWait    Don't use 'WaitForSingleObject(-1,-1)' after local Injection but exit the process instead afterwards. If your Shellcode exits the Thread/Process itself, this will not have any effect.
+  --mapSection    Map the shellcode into via NtCreateSection/NtMapViewOfSection . For remote injection decryption will happen AFTER writing the Shellcode into the remote process
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
+          --ruy-lopez    Use Ruy-Lopez to prevent AV/EDR DLLs from being loadied into the newly spawned process.
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
       --spoofArgs ArgstoSpoof    Spoof the arguments of the process to inject into
@@ -190,7 +200,6 @@ Options:
       --blockDLLs    Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
-      --remoteMapSection    Map the shellcode into the remote process via MapViewOfSection -> decryption will happen AFTER writing the Shellcode into the remote process
 
 [PE Packing]
 
