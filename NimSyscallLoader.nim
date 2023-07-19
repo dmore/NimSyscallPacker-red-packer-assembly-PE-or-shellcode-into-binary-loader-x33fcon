@@ -1985,12 +1985,15 @@ let Cryptstub3 = fmt"""
         var expandedkey = toByteSeq(toHex(envkey2))
         #expandedkey = toOpenArray(expandedkey).reverse()
         discard calcHard()
-        if ((int(len(expandedkey)) mod int(aes256.sizeBlock)) != 0):
+        if ((int(len(expandedkey)) mod int(aes256.sizeBlock * 2)) != 0):
             when defined(verbose):
                 echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
                 echo "[*] Length: " & $len(expandedkey)
                 echo "[*] Padding Key with null bytes"
-            expandedkey = expandedkey & newSeq[byte](aes256.sizeBlock - (len(expandedkey) mod aes256.sizeBlock))
+            expandedkey = expandedkey & newSeq[byte]((aes256.sizeBlock * 2) - (len(expandedkey) mod (aes256.sizeBlock * 2)))
+            # Length cannot be > 32 bytes
+            if (len(expandedkey) > (aes256.sizeBlock * 2)):
+                expandedkey = expandedkey[0..(aes256.sizeBlock * 2) - 1]
             when defined(verbose):
                 echo "[*] New Length: " & $len(expandedkey)
 
@@ -2058,16 +2061,19 @@ let AmsiNtCreateSectionDecryptStub = fmt"""
 var dctx2: ECB[aes256]
 var key2: array[aes256.sizeKey, byte]
 discard calcHard()
-var envkey2: string = obf("{envkey}")
+#envkey2 = obf("{envkey}")
 
-var expandedkey2 = toByteSeq(envkey2)
+var expandedkey2 = toByteSeq(toHex(envkey2))
 discard calcHard()
 if ((len(expandedkey2) mod aes256.sizeBlock) != 0):
     when defined(verbose):
         echo "[*] Key length not a multiple of KeySize: ", aes256.sizeBlock
         echo "[*] Length: " & $len(expandedkey2)
         echo "[*] Padding Key with null bytes"
-    expandedkey2 = expandedkey2 & newSeq[byte](aes256.sizeBlock - (len(expandedkey2) mod aes256.sizeBlock))
+    expandedkey2 = expandedkey2 & newSeq[byte]((aes256.sizeBlock * 2) - (len(expandedkey2) mod (aes256.sizeBlock * 2)))
+    # Length cannot be > 32 bytes
+    if (len(expandedkey2) > (aes256.sizeBlock * 2)):
+        expandedkey2 = expandedkey2[0..(aes256.sizeBlock * 2) - 1]
     when defined(verbose):
         echo "[*] New Length: " & $len(expandedkey2)
 
