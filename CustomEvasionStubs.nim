@@ -2245,7 +2245,6 @@ else:
 if not NT_SUCCESS(shlstatus):
     when defined(verbose):
         echo obf("[X] Failed to load: shlwapi.dll")
-        return disabled
 else:
     when defined(verbose):
         echo obf("[+] Loaded: shlwapi.dll")

