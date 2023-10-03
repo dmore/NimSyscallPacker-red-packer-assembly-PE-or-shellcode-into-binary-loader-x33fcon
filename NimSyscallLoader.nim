@@ -2626,7 +2626,7 @@ let NotepadProcIDStub * = fmt"""
         
         when defined(suspended): 
             flags = flags or CREATE_SUSPENDED
-        #[
+        
         when defined(threadless): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
             
             InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
@@ -2645,7 +2645,7 @@ let NotepadProcIDStub * = fmt"""
                 sizeof(policy),
                 NULL,
                 NULL)
-            ]#
+            
 
         status = CreateProcess(
             NULL,

