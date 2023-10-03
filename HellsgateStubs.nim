@@ -29,6 +29,41 @@ var
     ntAllocTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntAllocfuncHash)
 """
 
+let HellsgateNtReadVirtualMemoryDelegate*  = """
+
+proc NtReadVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToRead: SIZE_T, NumberOfBytesRead: PSIZE_T): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntReadfuncHash        : uint64            = djb2_hash(obf("NtReadVirtualMemory"))
+    ntReadTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntReadfuncHash)
+
+"""
+
+let HellsgateNtFreeVirtualMemoryDelegate*  = """
+
+proc NtFreeVirtualMemory(ProcessHandle: HANDLE, BaseAddress: PVOID, RegionSize: PSIZE_T, FreeType: ULONG): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall`
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntFreefuncHash        : uint64            = djb2_hash(obf("NtFreeVirtualMemory"))
+    ntFreeTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntFreefuncHash)
+
+
+"""
+
 let HellsgateNtOpenProcessDelegate*  = """
 
 proc NtOpenProcess(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.asmNoStackFrame.} =
