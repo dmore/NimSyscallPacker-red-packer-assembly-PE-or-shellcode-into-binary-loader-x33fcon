@@ -1,6 +1,8 @@
 import winim/lean
 import strutils
-from winim import MODULEENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+import winim/winstr
+from winim import wchar_t
+from winim import MODULEENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA,Module32First,LPMODULEENTRY32W
 import ptr_math
 
 ### Modified code from Nim-Strenc to avoid XORing of long strings -> Modified by @chvancooten, credit to him
@@ -48,12 +50,250 @@ proc NtAllocateVirtualMemory*(processHandle: HANDLE, baseAddress: PVOID, zeroBit
 
 #proc NtFlushInstructionCache*(hProcess: HANDLE, lpBaseAddress: LPVOID, dwSize: SIZE_T): WINBOOL {.importc, dynlib: "ntdll.dll".}
 
+# type definition for PROCESS_BASIC_INFORMATION
+
 
 proc ConvertToString*(CharArr :array[256,char]): string =
     var index = 0
     while CharArr[index] != '\x00':
         result.add(CharArr[index])
         index += 1
+
+proc toString(bytes: openarray[byte]): string =
+    result = newString(bytes.len)
+    copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
+
+type
+    PROCESS_BASIC_INFORMATION* = object
+        ExitStatus: NTSTATUS
+        PebBaseAddress: LPVOID
+        AffinityMask: ULONG_PTR
+        BasePriority: KPRIORITY
+        UniqueProcessId: ULONG_PTR
+        InheritedFromUniqueProcessId: ULONG_PTR
+
+type
+  ND_LDR_DATA_TABLE_ENTRY* {.bycopy.} = object
+    InMemoryOrderLinks*: LIST_ENTRY
+    InInitializationOrderLinks*: LIST_ENTRY
+    DllBase*: PVOID
+    EntryPoint*: PVOID
+    SizeOfImage*: ULONG
+    FullDllName*: UNICODE_STRING
+    BaseDllName*: UNICODE_STRING
+
+  PND_LDR_DATA_TABLE_ENTRY* = ptr ND_LDR_DATA_TABLE_ENTRY
+  ND_PEB_LDR_DATA* {.bycopy.} = object
+    Length*: ULONG
+    Initialized*: UCHAR
+    SsHandle*: PVOID
+    InLoadOrderModuleList*: LIST_ENTRY
+    InMemoryOrderModuleList*: LIST_ENTRY
+    InInitializationOrderModuleList*: LIST_ENTRY
+
+  PND_PEB_LDR_DATA* = ptr ND_PEB_LDR_DATA
+  ND_PEB* {.bycopy.} = object
+    Reserved1*: array[2, BYTE]
+    BeingDebugged*: BYTE
+    Reserved2*: array[1, BYTE]
+    Reserved3*: array[2, PVOID]
+    Ldr*: PND_PEB_LDR_DATA
+
+  PND_PEB* = ptr ND_PEB
+
+proc NtQueryInformationProcess*(ProcessHandle: HANDLE, ProcessInformationClass: DWORD, ProcessInformation: PVOID, ProcessInformationLength: ULONG, ReturnLength: PULONG): NTSTATUS {.importc: "NtQueryInformationProcess", dynlib: "ntdll.dll".}
+
+proc NtReadVirtualMemory*(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, BufferSize: SIZE_T, BytesRead: PSIZE_T): NTSTATUS {.importc: "NtReadVirtualMemory", dynlib: "ntdll.dll".}
+
+
+# this function takes an ptr LPWSTR as input and converts all uppercase characters to lowercase
+proc LPWSTRtoLowercase(str: LPWSTR): LPWSTR =
+    var ptr1: LPWSTR = str
+    while (ptr1[] != 0):
+        if (ptr1[] >= wchar_t('A') and ptr1[] <= wchar_t('Z')):
+            ptr1[] += (wchar_t('a') - wchar_t('A'))
+        ptr1 += 1
+    return str
+
+proc lstrcmpiW(str1: ptr wchar_t, str2: ptr wchar_t): int =
+  var c1: wchar_t
+  var c2: wchar_t
+  # Pointers in Nim are immutable by default and cannot be modified. But if we use the var keyword, we can still modify the pointer (to increase in this case).
+  var ptr1: ptr wchar_t = str1
+  var ptr2: ptr wchar_t = str2
+  while (ptr1[] != 0 and ptr2[] != 0):
+    c1 = ptr1[]
+    c2 = ptr2[]
+    if (c1 >= wchar_t('A') and c1 <= wchar_t('Z')):
+      c1 += (wchar_t('a') - wchar_t('A'))
+    if (c2 >= wchar_t('A') and c2 <= wchar_t('Z')):
+      c2 += (wchar_t('a') - wchar_t('A'))
+    if (c1 != c2):
+      return int(c1 - c2)
+    ptr1 += 1
+    ptr2 += 1
+    
+  return int(str1[] - str2[])
+
+# this function retrieves the remote module handle but via calling NtQueryInformationProcess and parsing the PEB
+proc GetRemoteModuleHandleNtQueryInformationProcess*(hProcess: HANDLE, ModuleName: string): HMODULE =
+    var pebAddress: LPVOID
+    var processBasicInfos: PROCESS_BASIC_INFORMATION
+    var status: NTSTATUS
+    var size: ULONG = cast[ULONG](sizeof(PROCESS_BASIC_INFORMATION))
+    status = NtQueryInformationProcess(hProcess, 0, addr processBasicInfos, size, nil)
+    if status != STATUS_SUCCESS:
+        when defined(verbose):
+            echo obf("[-] NtQueryInformationProcess failed: "), toHex(status)
+        return 0
+    else:
+        when defined(verbose):
+            echo obf("[+] NtQueryInformationProcess succeeded")
+            pebAddress = processBasicInfos.PebBaseAddress
+            echo obf("[*] PEB address: "), repr(pebAddress)
+    var peb: PEB
+    var pebLdrData: PEB_LDR_DATA
+    var ldrList: LIST_ENTRY
+    var ldrEntry: PND_LDR_DATA_TABLE_ENTRY
+    var moduleBase: LPVOID
+    var moduleHandle: HMODULE
+    var moduleName: string
+    
+    status = NtReadVirtualMemory(hProcess, pebAddress, addr peb, sizeof(PEB), nil)
+    if status != STATUS_SUCCESS:
+        when defined(verbose):
+            echo obf("[-] NtReadVirtualMemory1 failed: "), toHex(status)
+        return 0
+    else:
+        when defined(verbose):
+            echo obf("[+] NtReadVirtualMemory succeeded")
+            #echo obf("[*] PEB_LDR_DATA address: "), repr(peb.Ldr)
+    
+    #var Ldr: PPEB_LDR_DATA = peb.Ldr
+    
+    status = NtReadVirtualMemory(hProcess, peb.Ldr, addr pebLdrData, sizeof(PEB_LDR_DATA), nil)
+    if status != STATUS_SUCCESS:
+        when defined(verbose):
+            echo obf("[-] NtReadVirtualMemory2 failed: "), toHex(status)
+        return 0
+    else:
+        when defined(verbose):
+            echo obf("[+] NtReadVirtualMemory succeeded")
+            #echo obf("[*] InMemoryOrderModuleList address: "), repr(pebLdrData.InMemoryOrderModuleList)
+    
+    var FirstEntry: PVOID = addr(pebLdrData.InMemoryOrderModuleList.Flink)
+    #status = NtReadVirtualMemory(hProcess, pebLdrData.InMemoryOrderModuleList.Flink, addr FirstEntry, sizeof(PVOID), nil)
+    #when defined(verbose):
+    #    echo obf("[*] FirstEntry address: "), repr(FirstEntry)
+    
+    var Entry: PND_LDR_DATA_TABLE_ENTRY = cast[PND_LDR_DATA_TABLE_ENTRY](pebLdrData.InMemoryOrderModuleList.Flink)
+    
+    #echo pebLdrData.InMemoryOrderModuleList
+    
+    
+
+    #var Entry: PND_LDR_DATA_TABLE_ENTRY 
+    #status = NtReadVirtualMemory(hProcess, pebLdrData.InMemoryOrderModuleList.Flink, addr Entry, sizeof(PVOID), nil)
+    #echo repr(Entry)
+    
+    echo "Asd"
+    #const NTDLL_DLL = "ntdll.dll"
+    #var testCompare: cstring = "ntdll.dll"
+    while true:
+        # Read the Entry structure from the remote process
+        #[
+        status = NtReadVirtualMemory(hProcess, Entry, addr ldrEntry, sizeof(LDR_DATA_TABLE_ENTRY), nil)
+        if status != STATUS_SUCCESS:
+            when defined(verbose):
+                echo obf("[-] NtReadVirtualMemory (Entry) failed: "), toHex(status)
+            return 0
+        ]#
+        echo "Comparing: ", Entry.BaseDllName, " with: ", ModuleName
+        var compare: int = 1
+        if (Entry.BaseDllName.Buffer != nil):
+            compare = lstrcmpiW(LPWSTRtoLowercase(cast[LPWSTR](ModuleName)),LPWSTRtoLowercase(cast[LPWSTR](Entry.BaseDllName.Buffer)))
+        #var compare: int = lstrcmpiW(cast[LPWSTR](NTDLL_DLL),cast[LPWSTR](Entry.BaseDllName.Buffer))
+        echo "Compare: ", Entry.BaseDllName
+        if(compare == 0):
+            #echo "DLL names equal"
+            when defined(verbose):
+                echo obf("[+] DLL found")
+            return cast[HANDLE](Entry.DllBase)
+        #Entry = cast[PND_LDR_DATA_TABLE_ENTRY](Entry.InMemoryOrderLinks.Flink)
+        # Fetch the next Entry from the remote process
+        status = NtReadVirtualMemory(hProcess, Entry.InMemoryOrderLinks.Flink, addr Entry, sizeof(PND_LDR_DATA_TABLE_ENTRY), nil)
+        if status != STATUS_SUCCESS:
+            when defined(verbose):
+                echo obf("[-] NtReadVirtualMemory (Next Entry) failed: "), toHex(status)
+            return 0
+
+        if Entry == pebLdrData.InMemoryOrderModuleList.Flink:
+            break
+    
+    #[
+    while true:
+        var Entryretrieved: PND_LDR_DATA_TABLE_ENTRY
+        status = NtReadVirtualMemory(hProcess, Entry, addr Entryretrieved, sizeof(PND_LDR_DATA_TABLE_ENTRY), nil)
+        if status != STATUS_SUCCESS:
+            when defined(verbose):
+                echo obf("[-] NtReadVirtualMemory for Entry failed: "), toHex(status)
+                quit(1)
+            #return 0
+        else:
+            when defined(verbose):
+                echo obf("[+] NtReadVirtualMemory for Entry succeeded")
+                echo obf("[*] Next entry address: "), repr(Entryretrieved)
+                #moduleName = toString(Entryretrieved.BaseDllName.Buffer)
+                #echo obf("[*] Module name: "), cast[LPWSTR](Entry.BaseDllName.Buffer)
+                quit(1)
+        
+        var compare: int = lstrcmpiW(cast[LPWSTR](ModuleName),cast[LPWSTR](Entry.BaseDllName.Buffer))
+        if(compare == 0):
+            #echo "DLL names equal"
+            when defined(verbose):
+                echo obf("[+] DLL found")
+            return cast[HANDLE](Entry.DllBase)
+        #Entry = cast[PND_LDR_DATA_TABLE_ENTRY](Entry.InMemoryOrderLinks.Flink)
+        
+        status = NtReadVirtualMemory(hProcess, Entry.InMemoryOrderLinks.Flink, addr Entry, sizeof(PND_LDR_DATA_TABLE_ENTRY), nil)
+        if status != STATUS_SUCCESS:
+            when defined(verbose):
+                echo obf("[-] NtReadVirtualMemory for next Entry failed: "), toHex(status)
+            #return 0
+        else:
+            when defined(verbose):
+                echo obf("[+] NtReadVirtualMemory for next Entry succeeded")
+        ]#
+        #[
+        if toLowerAscii(moduleName) == toLowerAscii(ModuleName):
+            moduleBase = Entry.DllBase
+            moduleHandle = cast[HMODULE](moduleBase)
+            return moduleHandle
+        Entry = cast[PND_LDR_DATA_TABLE_ENTRY](Entry.InMemoryOrderLinks.Flink)
+        ]#
+        #if &Entry == pebLdrData.InMemoryOrderModuleList.Flink:
+        #    break
+    #[
+    ldrList = pebLdrData.InMemoryOrderModuleList
+    ldrEntry = cast[LDR_DATA_TABLE_ENTRY](ldrList.Flink)
+    var ldrEntryretrieved: LDR_DATA_TABLE_ENTRY
+    while ldrEntry.InMemoryOrderLinks.Flink != pebLdrData.InMemoryOrderModuleList:
+        status = NtReadVirtualMemory(hProcess, addr ldrEntry, addr ldrEntryretrieved, sizeof(LDR_DATA_TABLE_ENTRY), nil)
+        if status != STATUS_SUCCESS:
+            when defined(verbose):
+                echo obf("[-] NtReadVirtualMemory3 failed: "), toHex(status)
+            return 0
+        else:
+            when defined(verbose):
+                echo obf("[+] NtReadVirtualMemory succeeded")
+                moduleName = toString(ldrEntryretrieved.Reserved4)
+                echo obf("[*] Module name: "), moduleName
+        if toLowerAscii(moduleName) == toLowerAscii(ModuleName):
+            moduleBase = ldrEntry.DllBase
+            moduleHandle = cast[HMODULE](moduleBase)
+            return moduleHandle
+        ldrEntry = cast[LDR_DATA_TABLE_ENTRY](ldrEntry.InMemoryOrderLinks.Flink)
+]#
 
 proc GetRemoteModuleHandle*(hProcess:HANDLE, ModuleName: string): HMODULE =
     var 
@@ -63,13 +303,24 @@ proc GetRemoteModuleHandle*(hProcess:HANDLE, ModuleName: string): HMODULE =
         echo obf("[*] Looking for remote process DLL: "), ModuleName
     snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE,GetProcessId(hProcess))
     if snapshot != INVALID_HANDLE_VALUE:
+        when defined(verbose):
+            echo obf("[+] Created snapshot of remote process")
         modEntry.dwSize = DWORD(sizeof(MODULEENTRY32A))
         if Module32FirstA(snapshot, addr modEntry):
+            when defined(verbose):
+                echo obf("[*] Module32FirstA succeeded")
             while Module32NextA(snapshot, addr modEntry):
                 when defined(verbose):
                     echo obf("[*] Found remote process DLL: "), ConvertToString(modEntry.szModule)
                 if toLowerAscii(ConvertToString(modEntry.szModule)) == toLowerAscii(ModuleName):
                     return modEntry.hModule
+        else:
+            when defined(verbose):
+                echo obf("[-] Module32FirstA failed "), GetLastError()
+                quit(1)
+    else:
+        when defined(verbose):
+            echo obf("[-] Failed to create snapshot of remote process: "), GetlastError()
     CloseHandle(snapshot)
     return 0
 

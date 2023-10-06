@@ -80,10 +80,10 @@ A Video - if you prefer that - can be found here:
 [https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
 ```
-NimSyscall_Loader v 2.0
+NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -200,6 +200,15 @@ Options:
       --blockDLLs    Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
+  --threadless    Use Threadless inject for shellcode execution (https://github.com/CCob/ThreadlessInject)
+      --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
+      --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
+  --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
+  --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
+      --stombDll dllname    Specify a DLL to use for the Module Stomping (default is 'chakra.dll')
+      --stombFunc dllfunc    Specify a function to use for the Module Stomping
+      --stombFunc2 dllfunc2    Specify a second function to use for the Module Stomping. Only needed if you combine Caro-Kann with Module Stomping as there are two shellcodes than
+      --restore    Using this option will restore the .text section of the stomped DLL after executing the shellcode. That way, you get rid of Module Stomp IoCs. But this option only works with Payloads, that are reflective DLLs or which create a new thread.
 
 [PE Packing]
 
@@ -410,6 +419,33 @@ For DLL metadata you can change `DLL.rc`.
 
 Some vendors, such as ESET flag binaries/dlls due to the encrypted Payload being in the binary as blob with high entropy. Theese kind of detections and or SandBox checks can get bypassed with the flags `--shellcodeFile` or `--shellcodeURL`, as the Payload is than not embedded in the resulting binary anymore but loaded from a separate file or from a remote Webserver.
 
+### ThreadlessInject - stuff to care for
+
+If you want to use ThreadlessInject - you should know what youre doing. As its hooking an API in the remote process, this technique needs to be adjusted for each different remote process. You first need to know, which APIs are typically called regularly by the remote process to know what to hook. You can for example monitor this for common windows processes via  (API Monitor)[http://www.rohitab.com/apimonitor]. Adjust the hook to your target process, or the Payload won't execute.
+
+The default values are only useful for the builtin spawn/inject `rundll32.exe` target, as this process regularly calls `NtWaitForMultipleObjects` from `ntdll.dll`. Other processes also call this function, but the recommendation here is to adjust the options to your target process.
+
+### Module Stomping - stuff to care for
+
+Module stomping gives us the advantage of not allocating memory for shellcode injection anymore, as we overwrite (a part) of the `.text` section from an already loaded DLL. If the DLL was not loaded already in the remote target process, it will get force loaded first over Creating a remote Thread on `LoadLibrary` or when using ThreadlessInject over an hook pointing to custom LoadLibrary-Shellcode. By default, the DLL `chakra.dll` is used for Stomping, which is in the most cases suitable due to it`s size. However, you can change the DLL via Packer parameters however you like.
+
+I personally faced issues with CFG (Control Flow Guard) when overwriting the `.text` section at "random" offsets. To avoid CFG, the current implementation overwrites one (or with Caro-Kann enabled two) DLL entrypoints:
+
+- `DLLCanUnloadNow`
+- `MemProtectHeapUnprotectCurrentThread`
+
+If you change the DLL, you will also need to change the target function names, as they might not exist on other DLLs. Also, it could be a problem if there is either
+1. Not enough space in the `.text` section of the target DLL for your Shellcode
+2. Not enough space between the two functions in the `.text` section, so that the first is overwritten by the second
+
+My code does not handle this situations and currently doesn`t check for them. So you should check the sizes and offsets before using it in production to be sure.
+
+Also, might be obvious for some of you but servers use different DLLs than clients. The Loader/Tool therefore need to be adjusted when targeting Servers.
+
+This Module Stomping implementation also does **not** load the DLL via `LoadLibraryEx` with `DONT_RESOLVE_DLL_REFERENCES`. This is the more unstable way of doing it, but I still implemented it this way to get rid of EDR detections for specific IoCs from this API usage.
+For more information read this blog post:
+- [https://bruteratel.com/release/2023/03/19/Release-Nightmare/](https://bruteratel.com/release/2023/03/19/Release-Nightmare/)
+
 ### Memory encryption
 
 Currently, the Packer has two memory encryption techniques embedded. It's either `--fluctuate` for ShellcodeFluctuation or `--sleepycrypt` for SleepyCrypt.
@@ -470,10 +506,10 @@ Read this:
 - [X] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
 - [ ] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
 - [ ] Use cloned Handles instead of OpenProcess (Handlekatz like) for remote process injection or as alternative Handle Elevation
-- [ ] Add ThreadlessInject for Remote Injection
+- [X] Add ThreadlessInject for Remote Injection
 - [ ] Add Callback execution primitives for remote injection via a Nim Port of https://github.com/lem0nSec/CreateRemoteThreadPlus
 - [X] Store Payloads as MAC or IP-Adresses and retrieve the encrypted Payload on runtime to decrease entropy
-- [ ] Add multiple Jumps for different regions in the Thread start address (DripLoader like) to avoid memory scan detections (https://web.archive.org/web/20220319032617/https://blog.redbluepurple.io/offensive-research/bypassing-injection-detection)
+- [X] Add multiple Jumps for different regions in the Thread start address (DripLoader like) to avoid memory scan detections (https://web.archive.org/web/20220319032617/https://blog.redbluepurple.io/offensive-research/bypassing-injection-detection)
 
 ## CREDITS
 
@@ -492,3 +528,4 @@ Read this:
 - [X] [monoxgas](https://github.com/monoxgas) - Koppeling
 - [X] [eversinc33](https://github.com/eversinc33) - BouncyGate, Docker File
 - [X] [OffenseTeacher](https://github.com/OffenseTeacher) - Steganim
+- [X] [OtterHacker](https://github.com/OtterHacker/Conferences/tree/main/Defcon31) - Stomb+Threadless inject idea
