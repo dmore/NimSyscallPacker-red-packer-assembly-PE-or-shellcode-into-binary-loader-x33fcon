@@ -79,6 +79,36 @@ You can either use my precompiled binaries or of course compile them your own fr
 A Video - if you prefer that - can be found here:
 [https://youtu.be/UHaIgdzqHDA](https://youtu.be/UHaIgdzqHDA)
 
+I also added short videos for some features as this was requested:
+
+**Caro-Kann:**
+
+https://youtu.be/etAFZrIyb44
+
+**ThreadlessInject Feature:**
+
+https://youtu.be/eRS-4AywrHI
+
+**Module Stomping Feature:**
+
+https://youtu.be/l-TmqqQ49UI
+
+**shellcodeURL Feature:**
+
+https://youtu.be/OYxcL4D7K0c
+
+**stegoFile Feature:**
+
+https://youtu.be/Vr58_R4rYDA
+
+**shellcodeFile Feature:**
+
+https://youtu.be/Oj55uilxEF4
+
+**And I made a public Video showcasing how to customize ThreadlessInject technique to other processes than the default one:**
+
+https://youtu.be/BYuAUYQcI-E
+
 ```
 NimSyscall_Loader v 2.1
 
