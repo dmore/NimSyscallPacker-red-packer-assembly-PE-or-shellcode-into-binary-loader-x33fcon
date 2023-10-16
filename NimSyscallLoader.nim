@@ -837,11 +837,6 @@ if (((remoteinject == false) and carokann and (useQueueAPC == false and localCre
     echo "But this is not a problem at all, because the shellcode will be encrypted at the time of the execute primitive ;-)"
     quit(1)
 
-# InteractivePS cannot be used with --dll
-if (interactivePS and dll_out):
-    echo "Error: Cannot use --interactivePS with --dll!"
-    quit(1)
-
 # InteractivePS cannot be used with --remoteinject
 if (interactivePS and remoteinject):
     echo "Error: Cannot use --interactivePS with --remoteinject!"
