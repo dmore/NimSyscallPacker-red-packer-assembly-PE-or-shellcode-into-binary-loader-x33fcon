@@ -3660,7 +3660,7 @@ if(AMSI and oneShot):
     basicCompileFlags.add("-d:oneshot ")
 
 if (dllProxy):
-    basicCompileFlags.add("--mm:orc --threads:on ")
+    basicCompileFlags.add("--mm:none --threads:on ") # ORC breaks compilation with new anti Emulation checks
     basicCompileFlags.add("-d:proxy ")
 
 if(service):
