@@ -837,10 +837,6 @@ if (((remoteinject == false) and carokann and (useQueueAPC == false and localCre
     echo "But this is not a problem at all, because the shellcode will be encrypted at the time of the execute primitive ;-)"
     quit(1)
 
-# InteractivePS cannot be used with --dll
-if (interactivePS and dll_out):
-    echo "Error: Cannot use --interactivePS with --dll!"
-    quit(1)
 
 # InteractivePS cannot be used with --remoteinject
 if (interactivePS and remoteinject):
@@ -880,6 +876,8 @@ if (peload and (dripallocate or remoteMapSection or carokann)):
 if (syswhispers and (threadless or carokann)):
     echo "Error: Cannot use --syswhispers with --threadless/--Caro-Kann (yet)!"
     quit(1)
+
+
 
 #echo "Key: " & envkey
 # Lets save the last 4 characters of the string in a new variable
@@ -1039,6 +1037,41 @@ proc xorFunc*(buf: ptr uint32; bufSize: size_t; xorKey: uint32) =
     inc(i)
 ]#
 
+# if shellcodelength bigger than 5 MB and stomb is used, interrupt the user and ask if he really wants to continue as the RX size of chakra.dll is only that size it may cause a crash
+if((stomb) and (data.len > 5242880)):
+    echo "Warning: The shellcode is bigger than 5 MB and you are using Module Stomping. This may cause a crash, because the RX size of chakra.dll is only that size. Do you want to continue? (y/n)"
+    var answer = readLine(stdin)
+    if (answer == "y"):
+        echo "Continuing..."
+    else:
+        echo "Aborting..."
+        quit(1)
+
+# remoteinject and localcreatethread cannot be used in combination
+if (remoteinject and localCreateThread):
+    echo "Error: Cannot use --remoteinject with --localCreateThread, makes no sense!"
+    quit(1)
+
+# sgn and caro-kann cannot be used together as caro-kann cannot decrypt properly than
+if (sgn and carokann):
+    echo "Error: Cannot use --sgn with --Caro-Kann, will lead to crash!"
+    quit(1)
+
+# Payload bigger than 0.5 MB and DripAllocate give a warning, that it may takes ages to start or even crash the system
+if((dripallocate) and (data.len > 524288)):
+    echo "Warning: The shellcode is bigger than 0.5 MB and you are using DripAllocate. This may take ages to start or even crash the system. Do you want to continue? (y/n)"
+    var answer = readLine(stdin)
+    if (answer == "y"):
+        echo "Continuing..."
+    else:
+        echo "Aborting..."
+        quit(1)
+
+# QueueApc and ThreadLessInject with remoteinject makes no sense
+if ((remoteinject) and (useQueueAPC and threadless)):
+    echo "Error: Cannot use --remoteinject with --QueueApc/--threadless, makes no sense!"
+    quit(1)
+
 var originalScLength: int = data.len
 
 if(carokann):
@@ -1046,7 +1079,10 @@ if(carokann):
     # 0x14, 0xFF, 0x13, 0xDE | we want to search for this egg and replace it with a random different key.
     # The egg is 4 bytes long, so we need to generate a random 4 byte key
     
+    # when Caro-Kann, Stomb and ThreadlessInject are used, decryptprotectfull.bin should be used. Otherwise decryptprotect.bin
     const hookShellcode = slurp"decryptprotect.bin"
+    
+    
     var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
 
     var randomKey = newSeq[byte](4)
@@ -3665,7 +3701,7 @@ if(AMSI and oneShot):
     basicCompileFlags.add("-d:oneshot ")
 
 if (dllProxy):
-    basicCompileFlags.add("--mm:orc --threads:on ")
+    basicCompileFlags.add("--mm:none --threads:on ")
     basicCompileFlags.add("-d:proxy ")
 
 if(service):

