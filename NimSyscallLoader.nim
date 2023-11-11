@@ -3253,6 +3253,8 @@ if(hellsgate):
     stub.add(HellsgateProtectDelegate)
     stub.add(HellsgateWriteDelegate)
     stub.add(HellsgateNtCloseDelegate)
+    stub.add(HellsgateNtReadVirtualMemoryDelegate)
+    stub.add(HellsgateNtFreeVirtualMemoryDelegate)
     if(remoteMapSection):
         stub.add(HellsgateNtMapViewOfSectionDelegate)
         stub.add(HellsgateNtCreateSectionDelegate)
