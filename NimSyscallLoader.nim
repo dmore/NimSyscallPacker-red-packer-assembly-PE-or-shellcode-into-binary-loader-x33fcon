@@ -1977,6 +1977,10 @@ when defined(csharp):
     from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR,clrVariantToString,new,clrStart
     from os import paramCount,paramStr
 
+when defined(localinject):
+    when defined(ruylopez):
+        from os import paramCount,paramStr
+
 when defined(sleep):
     import random
     import times
@@ -2802,17 +2806,7 @@ var {rand2} = {rand1}
 
 let DLLNoHideStub = """
 
-    when defined(lib_only):
-        # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
-        # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-        when defined(ruylopez):
-            if(amISpawned()):
-                when defined(lib_only):
-                    AttachConsole(DWORD(paramStr(2).parseInt()))
-                else:
-                    AttachConsole(-1)
-        else:
-            AttachConsole(-1)
+   
 
 """
 
