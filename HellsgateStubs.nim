@@ -81,6 +81,23 @@ var
 
 """
 
+let HellsgateNtDuplicateObjectDelegate* = """
+
+proc NtDuplicateObject(SourceProcessHandle: HANDLE, SourceHandle: HANDLE, TargetProcessHandle: HANDLE, TargetHandle: PHANDLE, DesiredAccess: ACCESS_MASK, HandleAttributes: ULONG, Options: ULONG): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall` 
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntDuplicatefuncHash        : uint64            = djb2_hash(obf("NtDuplicateObject"))
+    ntDuplicateTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntDuplicatefuncHash)
+
+"""
+
 let HellsgateWriteDelegate*  = """
 
 

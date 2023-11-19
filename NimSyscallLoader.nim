@@ -3645,6 +3645,7 @@ if(hellsgate):
         stub.add(HellsgateNtCreateThreadExDelegate)
     if(not localinject or remoteETWpatch or remoteAMSIpatch):
         stub.add(HellsgateNtOpenProcessDelegate)
+        stub.add(HellsgateNtDuplicateObjectDelegate)
         stub.add(HellsgateNtCreateThreadExDelegate)
     if(localinject and useQueueAPC):
         stub.add(HellsgateNtTestAlertDelegate)

