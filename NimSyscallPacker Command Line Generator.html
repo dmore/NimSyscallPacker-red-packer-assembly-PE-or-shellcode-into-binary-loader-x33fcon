@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+	<!-- This HTML is in version 0.2 -->
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>NimSyscallLoader Command Line Generator</title>
+	
+		<style>
+			body {
+			font-family: Arial, sans-serif;
+			margin: 20px;
+			background-color: #2e3440; /* Dark background color */
+			color: #d8dee9; /* Light text color */
+			}
+			
+			h1, h2 {
+			color: #88c0d0; /* Blue accent color */
+			}
+			
+			table {
+			border-collapse: collapse;
+			margin-bottom: 20px;
+			color: #d8dee9; /* Light text color */
+			}
+			
+			th, td {
+			border: 1px solid #4c566a; /* Dark border color */
+			padding: 6px;
+			text-align: left;
+			}
+			
+			th {
+			background-color: #434c5e; /* Dark blue background color */
+			color: #d8dee9; /* Light text color */
+			}
+			
+			label {
+			display: block;
+			margin-bottom: 5px;
+			color: #d8dee9; /* Light text color */
+			}
+			
+			.toggle-cell {
+			width: 20px;
+			}
+			
+			.toggle {
+			position: relative;
+			display: inline-block;
+			width: 40px;
+			height: 20px;
+			border-radius: 10px;
+			overflow: hidden;
+			}
+			
+			.toggle input {
+			opacity: 0;
+			width: 0;
+			height: 0;
+			}
+			
+			.slider {
+			position: absolute;
+			cursor: pointer;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: #81a1c1; /* Light blue background color */
+			transition: .4s;
+			}
+			
+			.slider:before {
+			position: absolute;
+			content: "";
+			height: 16px;
+			width: 16px;
+			left: 2px;
+			bottom: 2px;
+			background-color: #d8dee9; /* Light text color */
+			border-radius: 50%;
+			transition: .4s;
+			}
+			
+			input:checked + .slider {
+			background-color: green; /* Dark gray background color */
+			}
+			
+			input:checked + .slider:before {
+			transform: translateX(20px);
+			}
+			
+			button {
+			padding: 8px 15px;
+			background-color: #5e81ac; /* Blue accent color */
+			color: white;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+			}
+			
+			textarea {
+			width: 100%;
+			height: 100px;
+			margin-top: 10px;
+			font-size: 16px;
+			}
+			
+			#fileInput, #fileOutput {
+			width: 40%;
+			height: 30px;
+			margin-top: 10px;
+			font-size: 18px;
+			}
+			
+			.section-title {
+			font-size: 1.5em;
+			color: #88c0d0; /* Blue accent color */
+			margin-bottom: 10px;
+			}
+			
+			.userInput {
+				width: 140px;
+				margin-left: 5px;
+				padding: 3px;
+				border: 1px solid #ccc;
+				border-radius: 4px;
+				margin-left: 5px;
+
+			}
+			
+			.userInput:disabled {
+				cursor: default;
+				background-color: #d9d9d9;
+			}
+			
+			/* Dropdown styling */
+			select {
+				padding: 8px;
+				font-size: 16px;
+				border: none;
+				border-radius: 4px;
+				background-color: #434c5e; /* Dark blue background color */
+				color: #d8dee9; /* Light text color */
+				margin-bottom: 10px;
+			}
+			
+			/* Dark mode for dropdown arrow */
+			select::-ms-expand {
+				display: none;
+			}
+			
+			select option {
+				background-color: #2e3440; /* Dark background color */
+			}
+			
+			/* Hyperlink color */
+			a {
+				color: #2c8fca;
+			}
+			/* Hyperlink color when clicked */
+			a:active {
+				color: #2c8fca;
+			}
+			
+
+			/* Nested option indentation */
+			.nested-option {
+				padding-left: 20px;
+			}
+			.double-nested-option {
+				padding-left: 40px;
+			}
+			
+			code {
+			  background-color: #343434;
+			  border-radius: 3px;
+			  font-family: courier, monospace;
+			  padding: 0 3px;
+			}
+			
+
+		</style>
+		
+	</head>
+	<body>
+		
+		<!-- <h1>NimSyscallLoader Command Line Generator</h1><h5>by DrDv.</h5> -->
+		<h1 style="display: inline; margin-right: 10px;">NimSyscallLoader Command Line Generator</h1><h5 style="display: inline;">&copy; Created by <a href="https://github.com/DrorDvash" target="_blank">DrDv</a></h5>
+
+
+		<!-- File Input -->
+		<h3><label for="fileInput">Path to file to encrypt:</label>
+		<input type="text" id="fileInput"  placeholder="Enter input file path" autocomplete="on"></h3>
+
+		<!-- File Output -->
+		<h3><label for="fileOutput">Path to Output:</label>
+		<input type="text" id="fileOutput"  placeholder="Enter output file path" autocomplete="on"></h3>
+
+		
+		<!--#################################################################-->
+		<!--###                        PROFILE                             ##-->
+		<!--#################################################################-->
+		
+		<h3><label for="fileOutput">Profile: Save and load configurations for easily reusing preferred tool settings in json format (Optional).</label>
+		<button onclick="exportProfile()">Export Profile</button>
+		<input type="file" id="hiddenFileInput" accept=".json" style="display: none;">
+		<!--<input type="file" id="profileFile" onchange="importProfile()"> -->
+		<button onclick="importProfile()">Import Profile</button></h3>
+
+		
+				
+		<!-- Dropdown Menu for Section Selection -->
+		<h3><label for="sectionSelection">Choose Type:</label>
+		<select id="sectionSelection" onchange="updateSectionVisibility()" style="width: 150px;">
+			<option value="shellcode">Shellcode</option>
+			<option value="pe">PE</option>
+			<option value="dll">DLL</option>
+			<option value="csharp">C#</option>
+		</select></h3>
+		
+		<!--#################################################################-->
+		<!--###                        SECTIONS                            ##-->
+		<!--#################################################################-->
+		
+		<!-- Options Section - DLL options -->
+		<div id="dllSection">
+			<h2 class="section-title">DLL options</h2>
+			<table>
+				<tr>
+					<th class="toggle-cell">Toggle</th>
+					<th>Option</th>
+					<th>Description</th>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllToggle"><span class="slider"></span></label></td>
+					<td>--dll</td>
+					<td>Generate DLL instead of an executable</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllexportfuncToggle" onchange="toggleInput('dllexportfuncInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--dllexportfunc <input type="text" class="userInput" id="dllexportfuncInput" placeholder="exportfuncname" disabled></td>
+					<td>Comma separated names of DLL custom export functions for e.g. DLL-Sideloading</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllhijackToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--dllhijack</td>
+					<td>Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noNimMainToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--noNimMain</td>
+					<td>Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="cloneToggle" onchange="toggleInput('cloneInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--clone <input type="text" class="userInput" id="cloneInput" placeholder="value" disabled></td>
+					<td>Specify a local DLL to clone the API-Exports from via Koppeling</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllProxyToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--dllProxy</td>
+					<td>Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - <a href="https://github.com/byt3bl33d3r/NimDllSideload" target="_blank">Github Link</a>)</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="cplToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--cpl</td>
+					<td>Generate a CPL file (Control Panel Applet) instead of an executable</td>
+				</tr>
+			</table>
+		</div>
+		
+		<!--  Shellcode Specific Options -->
+		<div id="shellcodeSection">
+			<h2 class="section-title">Shellcode Specific Options</h2>
+			<table>
+				<tr>
+					<th class="toggle-cell">Toggle</th>
+					<th>Option</th>
+					<th>Description</th>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="shellcodeToggle"><span class="slider"></span></label></td>
+					<td>--shellcode</td>
+					<td>Encrypt shellcode to load it on runtime</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dripallocateToggle"><span class="slider"></span></label></td>
+					<td>--dripallocate</td>
+					<td>Allocate memory Driploader style</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dripsleepToggle" onchange="toggleInput('dripsleepInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--dripsleep <input type="text" class="userInput" id="dripsleepInput" placeholder="500" disabled></td>
+					<td>Sleep time in ms between each memory allocation (e.g. 500 milliseconds)</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="CallbackExecuteToggle"><span class="slider"></span></label></td>
+					<td>--CallbackExecute</td>
+					<td>Execute shellcode via a custom Callback function</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="localCreateThreadToggle"><span class="slider"></span></label></td>
+					<td>--localCreateThread</td>
+					<td>Use NtCreateThreadEx for local injection instead of a direct pointer to the shellcode</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="QueueApcToggle"><span class="slider"></span></label></td>
+					<td>--QueueApc</td>
+					<td>Instead of a direct Pointer or Thread Creation execute the Shellcode via NtQueueApcThread</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noWaitToggle"><span class="slider"></span></label></td>
+					<td>--noWait</td>
+					<td>Don't use 'WaitForSingleObject(-1,-1)' after local Injection but exit the process instead afterwards. If your Shellcode exits the Thread/Process itself, this will not have any effect.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="mapSectionToggle"><span class="slider"></span></label></td>
+					<td>--mapSection</td>
+					<td>Map the shellcode into via NtCreateSection/NtMapViewOfSection . For remote injection decryption will happen AFTER writing the Shellcode into the remote process</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="remoteinjectToggle"><span class="slider"></span></label></td>
+					<td>--remoteinject</td>
+					<td>Inject shellcode into a newly spawned process (default notepad) / otherwise it's self-injection</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="customprocessToggle" onchange="toggleInput('customprocessInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--customprocess <input type="text" class="userInput" id="customprocessInput" placeholder="procname" disabled></td>
+					<td>Spawn a custom process (instead of notepad) for remote injection</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="ruylopezToggle"><span class="slider"></span></label></td>
+					<td class="double-nested-option">--ruy-lopez</td>
+					<td>Use Ruy-Lopez to prevent AV/EDR DLLs from being loaded into the newly spawned process</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="remoteprocessToggle" onchange="toggleInput('remoteprocessInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--remoteprocess <input type="text" class="userInput" id="remoteprocessInput" placeholder="procname" disabled></td>
+				<td>Injects into the specified (existing) remote process name. The loader searches for the first process with that name.<br> Can be used for multiple process names, e.g., --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="spoofArgsToggle" onchange="toggleInput('spoofArgsInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--spoofArgs <input type="text" class="userInput" id="spoofArgsInput" placeholder="ArgsToSpoof" disabled></td>
+					<td>Spoof the arguments of the process to inject into</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="parentProcessToggle" onchange="toggleInput('parentProcessInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--parentProcess <input type="text" class="userInput" id="parentProcessInput" placeholder="parentProcName" disabled></td>
+					<td>Name of the parent Process to spoof (PPID Spoofing)</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="blockDLLsToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--blockDLLs</td>
+					<td>Set the DllBlocklistPolicy to 1 to prevent DLLs from being loaded</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="remotepatchAMSIToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--remotepatchAMSI</td>
+					<td>Patch AMSI in the remote process before shellcode execution</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="remotepatchETWToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--remotepatchETW</td>
+					<td>Patch ETW in the remote process before shellcode execution</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="threadlessToggle"><span class="slider"></span></label></td>
+					<td>--threadless</td>
+					<td>Use Threadless inject for shellcode execution (<a href="https://github.com/CCob/ThreadlessInject" target="_blank">Threadless Inject</a>)</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="threadlessDllToggle" onchange="toggleInput('threadlessDllInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--threadlessDll <input type="text" class="userInput" id="threadlessDllInput" placeholder="dllname" disabled></td>
+					<td>Specify a DLL to use for the Threadless inject hook</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="threadlessFuncToggle" onchange="toggleInput('threadlessFuncInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--threadlessFunc <input type="text" class="userInput" id="threadlessFuncInput" placeholder="dllfunc" disabled></td>
+					<td>Specify a function to use for the Threadless inject hook</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="caroKannToggle"><span class="slider"></span></label></td>
+					<td>--Caro-Kann</td>
+					<td>Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (<a href="https://github.com/S3cur3Th1sSh1t/Caro-Kann" target="_blank">Caro-Kann</a>)</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="stombToggle"><span class="slider"></span></label></td>
+					<td>--stomb</td>
+					<td>Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="stombDllToggle" onchange="toggleInput('stombDllInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--stombDll <input type="text" class="userInput" id="stombDllInput" placeholder="dllname" disabled></td>
+					<td>Specify a DLL to use for the Module Stomping (default is 'chakra.dll')</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="stombFuncToggle" onchange="toggleInput('stombFuncInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--stombFunc <input type="text" class="userInput" id="stombFuncInput" placeholder="dllfunc" disabled></td>
+					<td>Specify a function to use for the Module Stomping</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="stombFunc2Toggle" onchange="toggleInput('stombFunc2Input', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--stombFunc2 <input type="text" class="userInput" id="stombFunc2Input" placeholder="dllfunc2" disabled></td>
+					<td>Specify a second function to use for the Module Stomping. Only needed if you combine Caro-Kann with Module Stomping as there are two shellcodes than</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="restoreToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--restore</td>
+					<td>Using this option will restore the .text section of the stomped DLL after executing the shellcode. That way, you get rid of Module Stomp IoCs. But this option only works with Payloads, that are reflective DLLs or which create a new thread.</td>
+				</tr>
+			</table>
+		</div>
+		
+		<!-- Options Section - PE Packing -->
+		<div id="peSection">
+			<h2 class="section-title">PE Packing Options</h2>
+			<table>
+				<tr>
+					<th class="toggle-cell">Toggle</th>
+					<th>Option</th>
+					<th>Description</th>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="peinjectToggle"><span class="slider"></span></label></td>
+					<td>--peinject</td>
+					<td>Encrypt a PE to decrypt and run it on runtime as shellcode via donut.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="peloadToggle"><span class="slider"></span></label></td>
+					<td>--peload</td>
+					<td>Encrypt a PE to decrypt it on runtime and execute it via a syscall variant of Run-PE.</td>
+				</tr>
+			</table>
+		</div>
+		
+		<!-- Options Section - C# Assembly Packing -->
+		<div id="csharpSection">
+			<h2 class="section-title">C# Assembly Packing Options</h2>
+			<table>
+				<tr>
+					<th class="toggle-cell">Toggle</th>
+					<th>Option</th>
+					<th>Description</th>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="csharpToggle"><span class="slider"></span></label></td>
+					<td>--csharp</td>
+					<td>Encrypt a C# assembly to load it on runtime.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="interactivePSToggle"><span class="slider"></span></label></td>
+					<td>--interactivePS</td>
+					<td>Load an interactive unmanaged Powershell Runspace (<a href="https://github.com/S3cur3Th1sSh1t-Sponsors/PwnPowershell" target="_blank">PwnPowershell Github</a>).</td>
+				</tr>
+			</table>
+		</div>
+		
+		<!-- Options Section - General -->
+		<h2 class="section-title">General</h2>
+		<table>
+			<tr>
+				<th class="toggle-cell">Toggle</th>
+				<th>Option</th>
+				<th>Description</th>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="helpToggle"><span class="slider"></span></label></td>
+				<td>-h --help</td>
+				<td>Show this screen.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="versionToggle"><span class="slider"></span></label></td>
+				<td>--version</td>
+				<td>Show version.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="keyToggle" onchange="toggleInput('keyInput', this)"><span class="slider"></span></label></td>
+				<td>--key <input type="text" class="userInput" id="keyInput" placeholder="key" disabled></td>
+				<td>Key to encrypt with.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="keyfileToggle" onchange="toggleInput('keyfileInput', this)"><span class="slider"></span></label></td>
+				<td class="nested-option">--keyfile<input type="text" class="userInput" id="keyfileInput" placeholder="keyfile" disabled></td>
+				<td>File to read key from.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dnsKeyToggle"><span class="slider"></span></label></td>
+				<td class="nested-option">--dnsKey</td>
+				<td>Use remote DNS TXT Record as key which is retrieved on runtime.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dnsdomainToggle" onchange="toggleInput('dnsdomainInput', this)"><span class="slider"></span></label></td>
+				<td class="double-nested-option">--dnsdomain <input type="text" class="userInput" id="dnsdomainInput" placeholder="sub.example.com" disabled></td>
+				<td>Specify a subdomain to use for the DNS TXT Record.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="argumentsToggle" onchange="toggleInput('argumentsInput', this)"><span class="slider"></span></label></td>
+				<td>--arguments <input type="text" class="userInput" id="argumentsInput" placeholder="hardcodedArgs" disabled></td>
+				<td>Compile the following arguments to the encrypted exe/dll.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="metadataToggle"><span class="slider"></span></label></td>
+				<td>--metadata</td>
+				<td>Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default).</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noETWToggle"><span class="slider"></span></label></td>
+				<td>--noETW</td>
+				<td>Don't use ETW Patch.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noAMSIToggle"><span class="slider"></span></label></td>
+				<td>--noAMSI</td>
+				<td>Don't patch AMSI.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noArgsToggle"><span class="slider"></span></label></td>
+				<td>--noArgs</td>
+				<td>Don't provide any arguments to the assembly (some can only run without args).</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="hideToggle"><span class="slider"></span></label></td>
+				<td>--hide</td>
+				<td>Compile with --app:gui flag, so that the console won't pop up.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="APIhideToggle"><span class="slider"></span></label></td>
+				<td>--APIhide</td>
+				<td>Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="reflectiveToggle"><span class="slider"></span></label></td>
+				<td>--reflective</td>
+				<td>Set compiler flags, so that the Loader Nim binary can be reflectively loaded.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="debugToggle"><span class="slider"></span></label></td>
+				<td>--debug</td>
+				<td>Compiles the binary in debug mode.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="x86Toggle"><span class="slider"></span></label></td>
+				<td>--x86</td>
+				<td>Compiles an x86 binary.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="wow64Toggle"><span class="slider"></span></label></td>
+				<td>--wow64</td>
+				<td>(Compiles a x86 binary that can be used by x64 CPUs).</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="largeToggle"><span class="slider"></span></label></td>
+				<td>--large</td>
+				<td>Use this for large payloads (bigger than 5MB) as you will get an error "interpretation requires too many iterations" without it.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noDInvokeToggle"><span class="slider"></span></label></td>
+				<td>--noDInvoke</td>
+				<td>Don't use DInvoke - some older Windows OS Versions may crash when DInvoke is in use, e.g. Windows Server 2012. If you get "SIGSEGV: iilegal storage access. (Attempt to read from nil?)" try to use this option.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="verboseToggle"><span class="slider"></span></label></td>
+				<td>--verbose</td>
+				<td>Prints output to the console (for troubleshooting purposes).</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="psoutToggle"><span class="slider"></span></label></td>
+				<td>--psout</td>
+				<td>Powershell Output format, reflectively loading the packed binary.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="psobfsToggle"><span class="slider"></span></label></td>
+				<td class="nested-option">--psobfs</td>
+				<td>Pre-obfuscated Powershell Template with Invoke-obfuscation.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="pslyricsToggle"><span class="slider"></span></label></td>
+				<td class="nested-option">--pslyrics</td>
+				<td>Add Lyrics as comments to avoid some more detections.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="sourceonlyToggle"><span class="slider"></span></label></td>
+				<td>--sourceonly</td>
+				<td>Dont compile but just create the source code and compile command.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="RWXToggle"><span class="slider"></span></label></td>
+				<td>--RWX</td>
+				<td>Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX).</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="serviceToggle"><span class="slider"></span></label></td>
+				<td>--service</td>
+				<td>Create a Service binary or DLL, which can be used for Lateral Movement or Persistence.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="stegofileToggle" onchange="toggleInput('stegofileInput', this)"><span class="slider"></span></label></td>
+				<td>--stegofile <input type="text" class="userInput" id="stegofileInput" placeholder="filepath" disabled></td>
+				<td>Path to a .bmp or jpeg file in which the encrypted payload will be embedded.</td>
+			</tr>
+		</table>
+		
+		<!-- Options Section - Evasion -->
+		<div id="evasionSection">
+			<h2 class="section-title">Evasion Options</h2>
+			<table>
+				<tr>
+					<th class="toggle-cell">Toggle</th>
+					<th>Option</th>
+					<th>Description</th>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="sleepToggle" onchange="toggleInput('sleepInput', this)"><span class="slider"></span></label></td>
+					<td>--sleep <input type="text" class="userInput" id="sleepInput" placeholder="10" disabled></td>
+					<td>Sleep 10 seconds before decryption to evade memory scanners.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="sleepInBetweenToggle" onchange="toggleInput('sleepInBetweenInput', this)"><span class="slider"></span></label></td>
+					<td>--sleep-in-between <input type="text" class="userInput" id="sleepInBetweenInput" placeholder="10" disabled></td>
+					<td>Sleep 10 seconds at some potentially critical steps in between to evade memory scanners.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="comvaretwToggle"><span class="slider"></span></label></td>
+					<td>--COMVARETW</td>
+					<td>Block ETW by setting COMPlus_ETWEnabled to 0.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="unhookToggle"><span class="slider"></span></label></td>
+					<td>--unhook</td>
+					<td>Unhook ntdll.dll before doing anything else for the current process.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="obfuscateToggle"><span class="slider"></span></label></td>
+					<td>--obfuscate</td>
+					<td>Compile the Nim binary via Denim to make use of LLVM obfuscation.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="macPayloadToggle"><span class="slider"></span></label></td>
+					<td>--macPayload</td>
+					<td>Convert the encrypted Shellcode to MAC-Addresses to reduce entropy (for embedded Payloads only).</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="sgnToggle"><span class="slider"></span></label></td>
+					<td>--sgn</td>
+					<td>Encode shellcode via SGN before encrypting it.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="replaceToggle"><span class="slider"></span></label></td>
+					<td>--replace</td>
+					<td>Replace common nim IoC's in the loader like the string 'nim'.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noOneShotToggle"><span class="slider"></span></label></td>
+					<td>--noOneShot</td>
+					<td>By default, the Packer uses Hardware Breakpoints to bypass AMSI, but disables it after the payload has been executed. If you want to keep it enabled for the current Thread, use this option.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="patchAMSIToggle"><span class="slider"></span></label></td>
+					<td>--PatchAMSI</td>
+					<td>Bypass AMSI by patching an offset of amsi.dll/AmsiScanBuffer via Syscalls.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="patchETWToggle"><span class="slider"></span></label></td>
+					<td>--PatchETW</td>
+					<td>Bypass ETW by patching ntdll.dll/NtTraceEvent via Syscalls.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="amsiProviderPatchToggle"><span class="slider"></span></label></td>
+					<td>--AMSIProviderPatch</td>
+					<td>Patch all AMSI Providers instead of 'amsi.dll' (<a href="https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf" target="_blank">AS-22-Korkos-AMSI-and-Bypass.pdf</a>).</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="amsiNtCreateSectionHookToggle"><span class="slider"></span></label></td>
+					<td>--AMSINtCreateSectionHook</td>
+				<td>Hook NtCreateSection to prevent 'amsi.dll' from being loaded (<a href="https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/" target="_blank">Read more</a>).</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="sandboxToggle" onchange="toggleInput('sandboxInput', this)"><span class="slider"></span></label></td>
+					<td>--sandbox <input type="text" class="userInput" id="sandboxInput" placeholder="value" disabled></td>
+					<td>Include Sandbox Checks of your choice into the loader. Options include:<br>
+							<b> - Domain:</b> Only execute if the target domain is == the --domain parameter's domain. If --domain is not set, it will only execute on non-domain joined systems.<br>
+							<b> - DomainJoined:</b> Only execute if the target is connected to ANY domain - you don't need to know the target's domain for this one.<br>
+							<b> - DiskSpace:</b> Only execute if c:\ disk space >= 200GB.<br>
+							<b> - MemorySpace:</b> Only execute if more than 4GB RAM available.<br>
+							<b> - Emulated:</b> VirtualAllocExNuma API call (Some sandboxes do not emulate that).<br>
+							<b> - WindowChanges:</b> Checks if the current Window has changed 7 or more times before executing the payload.<br>
+					</td>
+				</tr>	
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="domainToggle" onchange="toggleInput('domainInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--domain <input type="text" class="userInput" id="domainInput" placeholder="targetdomain" disabled></td>
+					<td>Specify a domain for SandBox Evasion.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="pumpToggle" onchange="toggleInput('pumpInput', this)"><span class="slider"></span></label></td>
+					<td>--pump <input type="text" class="userInput" id="pumpInput" placeholder="value" disabled></td>
+					<td>Pump the file with:
+						<ul>
+							<li><b>words:</b> English dictionary words to increase the
+							reputation for "machine learning" evasion (<a href="https://twitter.com/hardwaterhacker/status/1502425183331799043" target="_blank">Read more</a>).</li>
+							<li><b>reputation:</b> Pump reputation with strings from well-known binaries e.g., Chrome, Cortana, Discord, and some others.</li>
+						</ul>
+					</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="selfDeleteToggle"><span class="slider"></span></label></td>
+					<td>--self-delete</td>
+				<td>The loader deletes its own executable on runtime (Credit to @byt3bl33d3r and @jonasLyk).</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="obfuscateFunctionsToggle"><span class="slider"></span></label></td>
+					<td>--obfuscatefunctions</td>
+				<td>Obfuscate some Nim-specific Windows APIs from the IAT via CallObfuscator (<a href="https://github.com/d35ha/CallObfuscator" target="_blank">Github Link</a>) - only possible from a Windows OS.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="signToggle"><span class="slider"></span></label></td>
+					<td>--sign</td>
+					<td>Sign the binary with a spoofed certificate.</td>
+				</tr>				
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="signdomainToggle" onchange="toggleInput('signdomainInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--signdomain <input type="text" class="userInput" id="signdomainInput" placeholder="www.example.com" disabled></td>
+					<td>The domain to use for the certificate (default is www.microsoft.com).</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="llvmToggle"><span class="slider"></span></label></td>
+					<td>--llvm</td>
+					<td>Add compiler flags for LLVM obfuscation, you have to set it up by yourself.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="sleepyCryptToggle"><span class="slider"></span></label></td>
+					<td>--sleepycrypt</td>
+					<td>Encrypt the memory of the loader with SleepyCrypt # experimental (Pre-Alpha, not working yet for C2-Stager).</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="fluctuateToggle"><span class="slider"></span></label></td>
+					<td>--fluctuate</td>
+					<td>Enable ShellcodeFluctuation for local shellcode injection and PE-Loading (Alpha) - no support for remote injection. This will only work for C2-Payloads that use Win32 Sleep in between connection attempts, as that is hooked.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noAntidebugToggle"><span class="slider"></span></label></td>
+					<td>--noAntidebug</td>
+					<td>Leave out AntiDebugger Checks.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noDefaultSandBoxToggle"><span class="slider"></span></label></td>
+					<td>--noDefaultSandBox</td>
+					<td>Leave out default Sandbox Checks.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noAntiEmulateToggle"><span class="slider"></span></label></td>
+					<td>--noAntiEmulate</td>
+					<td>Leave out AntiEmulation Checks.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="jmpEntryToggle"><span class="slider"></span></label></td>
+					<td>--jmpEntry</td>
+					<td>This option will enable a custom Shellcode Entrypoint from a DLL-backed function to avoid unbacked memory as Thread/APC start address. The target function will be hooked with a JMP to the Shellcode.
+					</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="jmpEntryDLLToggle" onchange="toggleInput('jmpEntryDLLInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--jmpEntryDLL <input type="text" class="userInput" id="jmpEntryDLLInput" placeholder="value" disabled></td>
+					<td>Specify a DLL to use for the custom Shellcode Entrypoint.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="jmpEntryFuncToggle" onchange="toggleInput('jmpEntryFuncInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--jmpEntryFunc <input type="text" class="userInput" id="jmpEntryFuncInput" placeholder="value" disabled></td>
+					<td>Specify a function to use for the custom Shellcode Entrypoint.</td>
+				</tr>
+			</table>
+		</div>
+
+		<!-- Syscall Retrieval Section -->
+		<h2 class="section-title">Syscall Retrieval</h2>
+		<p>Default is GetSyscallStub to retrieve the stubs from disk</p>
+		<table>
+			<!-- Hellsgate -->
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="hellsgateToggle"><span class="slider"></span></label></td>
+				<td>--hellsgate</td>
+				<td>Retrieve Syscalls via Hellsgate technique.</td>
+			</tr>
+			<!-- Syswhispers -->
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="syswhispersToggle"><span class="slider"></span></label></td>
+				<td>--syswhispers</td>
+				<td>Embed Syscalls via Syswhispers3 (NimLineWhispers3) technique.</td>
+			</tr>
+			<!-- Syswhispers Jump -->
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="jumpToggle"><span class="slider"></td>
+				<td class="nested-option">--jump</td>
+				<td>When using Syswhispers3, use the jumper_randomized technique.</td>
+			</tr>
+		</table>
+		
+		
+		<!-- Options Section - Payload retrieval options -->
+		<h2 class="section-title">Payload Retrieval Options</h2>
+		<p>By default, the Loader will embed the Payload into the output file. There are two alternatives to this:</p>
+		<table>
+			<tr>
+				<th class="toggle-cell">Toggle</th>
+				<th>Option</th>
+				<th>Description</th>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="shellcodeFileToggle" onchange="toggleInput('shellcodeFileInput', this)"><span class="slider"></span></label></td>
+				<td>--shellcodeFile <input type="text" class="userInput" id="shellcodeFileInput" placeholder="shellcodefileLocation(s)" disabled></td>
+				<td>Filename to retrieve Payload from - on Runtime (No embedding). The first location will also be the output file location. You can specify multiple locations, separated by a comma.</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="shellcodeURLToggle" onchange="toggleInput('shellcodeURLInput', this)"><span class="slider"></span></label></td>
+				<td>--shellcodeURL <input type="text" class="userInput" id="shellcodeURLInput" placeholder="shellcodeURL" disabled></td>
+				<td>URL to retrieve Payload from</td>
+			</tr>
+		</table>
+		
+		
+		
+		<!--#################################################################-->
+		<!--###                        GENERATE CMD                        ##-->
+		<!--#################################################################-->
+		
+		<!-- Command Execution Button -->
+		<button onclick="generateCommandLine()">Generate Command Line</button>
+		
+		<!-- Command Line Output -->
+		<h2>Command Line
+		<textarea id="commandLineOutput" readonly></textarea></h2>
+		
+		<button onclick="copyToClipboard()">Copy to Clipboard</button>
+		
+		<!-- Placeholder for Toast Message -->
+		<div id="toastMessage"></div>
+		
+		
+		
+		<!--#################################################################-->
+		<!--###                        JAVASCRIPT                          ##-->
+		<!--#################################################################-->		
+		
+		<script>
+			/* ################################### */
+			/* ###     Sections Display        ### */
+			/* ################################### */
+			
+			// Show the relevent section for the one choosen in the dropdown menu.
+			function updateSectionVisibility() {
+				const sectionSelection = document.getElementById('sectionSelection').value;
+				
+				// Array of all section IDs
+				const allSections = ['dllSection', 'shellcodeSection', 'peSection', 'csharpSection'];
+				
+				// Hide all sections
+				allSections.forEach(sectionId => {
+					const section = document.getElementById(sectionId);
+					if (section) {
+						section.style.display = 'none';
+					}
+				});
+				
+				// Show the selected section
+				const selectedSection = document.getElementById(`${sectionSelection}Section`);
+				if (selectedSection) {
+					selectedSection.style.display = 'block';
+				}
+			}
+			
+			// Call the function on page load to initialize visibility
+			updateSectionVisibility();
+			
+			// Toggle handling
+			function toggleInput(inputId, checkbox) {
+				const input = document.getElementById(inputId);
+				input.disabled = !checkbox.checked;
+			}
+
+
+			/* ################################### */
+			/* ###     Input & Output Path     ### */
+			/* ################################### */
+
+			// Get the current URL
+			const currentURL = window.location.href;
+			// Extract the path from the URL (assumes the path is after the last '/')
+			const lastSlashIndex = currentURL.lastIndexOf('/');
+			const filePath = currentURL.substring(8, lastSlashIndex + 1); // Skip 'file:///' and include the last '/'
+			
+			// CHANGE ME IF YOU WANT OTHER DEFAULT PATH //
+			let inputFilePath = filePath + "Input/";
+			let outputFilePath = filePath + "Output/";
+
+			// Set the file input value
+			document.getElementById('fileInput').value = inputFilePath;
+			
+			// Set the file output value
+			document.getElementById('fileOutput').value = outputFilePath;
+			
+			
+			
+			/* ################################### */
+			/* ###   Command Line Generation   ### */
+			/* ################################### */
+  
+			function generateCommandLine() {
+				const fileInput = document.getElementById('fileInput');
+				const fileOutput = document.getElementById('fileOutput');
+				const filePath = fileInput.value ? ` --file ${fileInput.value}` : '';
+				const outputFilePath = fileOutput.value ? ` --output ${fileOutput.value}` : '';
+				const commandOptions = [filePath + outputFilePath] ;
+				
+				function addOption(toggleId, option) {
+					const toggle = document.getElementById(toggleId);
+					if (toggle.checked) {
+						commandOptions.push(option);
+					}
+				}
+				
+
+				/* ################################### */
+				/* ###      Arguments Flags        ### */
+				/* ################################### */
+				
+				// General Options
+				addOption('helpToggle', '-h --help');
+				addOption('versionToggle', '--version');
+				addOption('keyToggle', '--key' + getValueIfExists('keyToggle', 'keyInput', ''));
+				addOption('keyfileToggle', '--keyfile' + getValueIfExists('keyfileToggle', 'keyfileInput', ''));
+				addOption('dnsKeyToggle', '--dnsKey');
+				addOption('dnsdomainToggle', '--dnsdomain' + getValueIfExists('dnsdomainToggle', 'dnsdomainInput', ''));
+				addOption('argumentsToggle', '--arguments' + getValueIfExists('argumentsToggle', 'argumentsInput', ''));
+				addOption('metadataToggle', '--metadata');
+				addOption('noETWToggle', '--noETW');
+				addOption('noAMSIToggle', '--noAMSI');
+				addOption('noArgsToggle', '--noArgs');
+				addOption('hideToggle', '--hide');
+				addOption('APIhideToggle', '--APIhide');
+				addOption('reflectiveToggle', '--reflective');
+				addOption('debugToggle', '--debug');
+				addOption('x86Toggle', '--x86');
+				addOption('wow64Toggle', '--wow64');
+				addOption('largeToggle', '--large');
+				addOption('noDInvokeToggle', '--noDInvoke');
+				addOption('verboseToggle', '--verbose');
+				addOption('psoutToggle', '--psout');
+				addOption('psobfsToggle', '--psobfs');
+				addOption('pslyricsToggle', '--pslyrics');
+				addOption('sourceonlyToggle', '--sourceonly');
+				addOption('RWXToggle', '--RWX');
+				addOption('serviceToggle', '--service');
+				addOption('stegofileToggle', '--stegofile' + getValueIfExists('stegofileToggle', 'stegofileInput', ''));
+				
+				// Payload retrieval options
+				addOption('shellcodeFileToggle', '--shellcodeFile' + getValueIfExists('shellcodeFileToggle', 'shellcodeFileInput', ''));
+				addOption('shellcodeURLToggle', '--shellcodeURL' + getValueIfExists('shellcodeURLToggle', 'shellcodeURLInput', ''));
+				
+				// DLL Options
+				addOption('dllToggle', '--dll');
+				addOption('dllexportfuncToggle', '--dllexportfunc' + getValueIfExists('dllexportfuncToggle', 'dllexportfuncInput', ''));
+				addOption('dllhijackToggle', '--dllhijack');
+				addOption('noNimMainToggle', '--noNimMain');
+				addOption('cloneToggle', '--clone' + getValueIfExists('cloneToggle', 'cloneInput', ''));
+				addOption('dllProxyToggle', '--dllProxy');
+				addOption('cplToggle', '--cpl');
+				
+				// PE Packing Options
+				addOption('peinjectToggle', '--peinject');
+				addOption('peloadToggle', '--peload');
+				
+				// C# Assembly Packing Options
+				addOption('csharpToggle', '--csharp');
+				addOption('interactivePSToggle', '--interactivePS');
+				
+				// Evasion Section
+				addOption('sleepToggle', '--sleep' + getValueIfExists('sleepToggle', 'sleepInput', ''));
+				addOption('sleepInBetweenToggle', '--sleep-in-between' + getValueIfExists('sleepInBetweenToggle', 'sleepInBetweenInput', ''));
+				addOption('comvaretwToggle', '--COMVARETW');
+				addOption('unhookToggle', '--unhook');
+				addOption('obfuscateToggle', '--obfuscate');
+				addOption('macPayloadToggle', '--macPayload');
+				addOption('sgnToggle', '--sgn');
+				addOption('replaceToggle', '--replace');
+				addOption('noOneShotToggle', '--noOneShot');
+				addOption('patchAMSIToggle', '--PatchAMSI');
+				addOption('patchETWToggle', '--PatchETW');
+				addOption('amsiProviderPatchToggle', '--AMSIProviderPatch');
+				addOption('amsiNtCreateSectionHookToggle', '--AMSINtCreateSectionHook');
+				addOption('sandboxToggle', '--sandbox' + getValueIfExists('sandboxToggle', 'sandboxInput', ''));
+				addOption('domainToggle', '--domain' + getValueIfExists('domainToggle', 'domainInput', ''));
+				addOption('pumpToggle', '--pump' + getValueIfExists('pumpToggle', 'pumpInput', ''));
+				addOption('selfDeleteToggle', '--self-delete');
+				addOption('obfuscateFunctionsToggle', '--obfuscatefunctions');
+				addOption('signToggle', '--sign');
+				addOption('signdomainToggle', '--signdomain' + getValueIfExists('signdomainToggle', 'signdomainInput', ''));
+				addOption('llvmToggle', '--llvm');
+				addOption('sleepyCryptToggle', '--sleepycrypt');
+				addOption('fluctuateToggle', '--fluctuate');
+				addOption('noAntidebugToggle', '--noAntidebug');
+				addOption('noDefaultSandBoxToggle', '--noDefaultSandBox');
+				addOption('noAntiEmulateToggle', '--noAntiEmulate');
+				addOption('jmpEntryToggle', '--jmpEntry');
+				addOption('jmpEntryDLLToggle', '--jmpEntryDLL' + getValueIfExists('jmpEntryToggle', 'jmpEntryDLLInput', ''));
+				addOption('jmpEntryFuncToggle', '--jmpEntryFunc' + getValueIfExists('jmpEntryToggle', 'jmpEntryFuncInput', ''));
+				
+				// Syscall Retrieval Section
+				addOption('hellsgateToggle', '--hellsgate');
+				addOption('syswhispersToggle', '--syswhispers');
+				addOption('jumpToggle', '--jump');
+				
+				// Shellcode Section
+				addOption('shellcodeToggle', '--shellcode');
+				addOption('dripallocateToggle', '--dripallocate');
+				addOption('dripsleepToggle', '--dripsleep' + getValueIfExists('dripsleepToggle', 'dripsleepInput', ''));
+				addOption('CallbackExecuteToggle', '--CallbackExecute');
+				addOption('localCreateThreadToggle', '--localCreateThread');
+				addOption('QueueApcToggle', '--QueueApc');
+				addOption('noWaitToggle', '--noWait');
+				addOption('mapSectionToggle', '--mapSection');
+				addOption('remoteinjectToggle', '--remoteinject');
+				addOption('customprocessToggle', '--customprocess' + getValueIfExists('customprocessToggle', 'customprocessInput', ''));
+				addOption('ruylopezToggle', '--ruy-lopez');
+				addOption('remoteprocessToggle', '--remoteprocess' + getValueIfExists('remoteprocessToggle', 'remoteprocessInput', ''));
+				addOption('spoofArgsToggle', '--spoofArgs' + getValueIfExists('spoofArgsToggle', 'spoofArgsInput', ''));
+				addOption('parentProcessToggle', '--parentProcess' + getValueIfExists('parentProcessToggle', 'parentProcessInput', ''));
+				addOption('blockDLLsToggle', '--blockDLLs');
+				addOption('remotepatchAMSIToggle', '--remotepatchAMSI');
+				addOption('remotepatchETWToggle', '--remotepatchETW');
+				addOption('threadlessToggle', '--threadless');
+				addOption('threadlessDllToggle', '--threadlessDll' + getValueIfExists('threadlessDllToggle', 'threadlessDllInput', ''));
+				addOption('threadlessFuncToggle', '--threadlessFunc' + getValueIfExists('threadlessFuncToggle', 'threadlessFuncInput', ''));
+				addOption('caroKannToggle', '--Caro-Kann');
+				addOption('stombToggle', '--stomb');
+				addOption('stombDllToggle', '--stombDll' + getValueIfExists('stombDllToggle', 'stombDllInput', ''));
+				addOption('stombFuncToggle', '--stombFunc' + getValueIfExists('stombFuncToggle', 'stombFuncInput', ''));
+				addOption('stombFunc2Toggle', '--stombFunc2' + getValueIfExists('stombFunc2Toggle', 'stombFunc2Input', ''));
+				addOption('restoreToggle', '--restore');
+				
+				
+				/* ################################### */
+				/* ###      Command Generation     ### */
+				/* ################################### */
+				// Display the generated command line
+				let nimSyscallLoader_filename = "NimSyscallLoader.exe";
+				let commandLine = `${nimSyscallLoader_filename}${commandOptions.join(' ')}`;
+				commandLineOutput.value = commandLine;
+			}
+			
+			// Get value from text box when the argument gets a value
+			function getValueIfExists(toggleId, inputId, option) {
+				const toggle = document.getElementById(toggleId);
+				const input = document.getElementById(inputId);
+				return toggle.checked && input.value ? `${option} ${input.value}` : '';
+			}
+			
+			// Copy the final command to clipboard
+			function copyToClipboard() {
+				const commandLineOutput = document.getElementById("commandLineOutput");
+				commandLineOutput.select();
+				commandLineOutput.setSelectionRange(0, 99999);
+				document.execCommand("copy");
+				showToast("Command line copied to clipboard");
+			}
+			
+			// Show toast message
+			function showToast(message) {
+				const toastMessage = document.getElementById("toastMessage");
+				toastMessage.innerHTML = message;
+				toastMessage.style.visibility = "visible";
+				
+				// Hide after 3 second
+				setTimeout(() => {
+				toastMessage.style.visibility = "hidden";
+				}, 3000);
+			}
+			
+			
+			
+			/* ################################### */
+			/* ### Profile Export/Import stuff ### */
+			/* ################################### */
+			
+			// Define an array to store toggle elements
+			const toggleElements = Array.from(document.querySelectorAll('.toggle-cell input[type="checkbox"]'));
+
+			// Define an array to store input elements
+			const inputElements = Array.from(document.querySelectorAll('.userInput'));
+
+			// Function to export the current configuration as a profile
+			function exportProfile() {
+				const profile = {};
+
+				// Iterate over toggle/input elements
+				toggleElements.forEach((toggle) => {
+					profile[toggle.id] = toggle.checked;
+				});
+				inputElements.forEach((input) => {
+					profile[input.id] = input.value;
+				});
+				
+				// Save the Type (PE/DLL/C#/Shellcode)
+				const selectedType = document.getElementById('sectionSelection').value;
+				profile['selectedType'] = selectedType;
+				const jsonString = JSON.stringify(profile);
+				
+				// Print the JSON string to console
+				console.log(jsonString);
+				// Download file
+				const blob = new Blob([jsonString], { type: 'application/json' });
+				const downloadLink = document.createElement('a');
+				downloadLink.href = URL.createObjectURL(blob);
+				downloadLink.download = 'profile.json';
+				document.body.appendChild(downloadLink);
+				downloadLink.click();
+				document.body.removeChild(downloadLink);
+
+			}
+			
+			// Import profile
+			function importProfile() {
+				// Trigger a click on the hidden file input
+				document.getElementById('hiddenFileInput').click();
+
+				// Listen for the change event on the hidden file input
+				document.getElementById('hiddenFileInput').addEventListener('change', function (e) {
+					var file = e.target.files[0];
+					if (file) {
+						var reader = new FileReader();
+						reader.onload = function (event) {
+							try {
+								var profileData = JSON.parse(event.target.result);
+								applyProfile(profileData);
+							} catch (error) {
+								console.error('Error parsing the profile JSON:', error);
+							}
+						};
+						reader.readAsText(file);
+					}
+				});
+			}
+
+			// Apply changes in the HTML page after importing profile
+			function applyProfile(profileData) {
+				console.log('Profile data loaded:', profileData);
+				
+				var typeDropdown = document.getElementById('sectionSelection');
+				typeDropdown.value = profileData['selectedType'];
+				
+				for (var key in profileData) {
+					var element = document.getElementById(key);
+					if (element) {
+						if (element.type === 'checkbox') {
+							element.checked = profileData[key];
+							// Generate the ID for the associated text input
+							var textInputId = key.replace('Toggle', 'Input');
+							var textInput = document.getElementById(textInputId);
+
+							if (textInput && textInput.type === 'text') {
+								if (element.checked) {
+									textInput.removeAttribute('disabled');
+								} else {
+									textInput.setAttribute('disabled', 'disabled');
+								}
+							}
+						} else if (element.type === 'text') {
+							element.value = profileData[key];
+						}
+					} else {
+						console.log('Element not found for key:', key);
+					}
+				}
+				updateSectionVisibility();
+				console.log('Profile applied successfully.');
+			}
+		</script>
+		
+		<!-- Footer section -->
+		<footer style="text-align: center; margin-top: 20px;">
+			<p>&copy; Created by <a href="https://github.com/DrorDvash" target="_blank">DrDv</a></p>
+		</footer>
+</body>
+</html>
