@@ -3189,7 +3189,7 @@ let NotepadProcIDStub * = fmt"""
         
         when defined(suspended): 
             flags = flags or CREATE_SUSPENDED
-        
+        #[
         if(cfgspawn): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
             
             var policy: DWORD64
@@ -3205,7 +3205,7 @@ let NotepadProcIDStub * = fmt"""
                 sizeof(policy),
                 NULL,
                 NULL)
-            
+        ]#  
 
         status = CreateProcess(
             NULL,
