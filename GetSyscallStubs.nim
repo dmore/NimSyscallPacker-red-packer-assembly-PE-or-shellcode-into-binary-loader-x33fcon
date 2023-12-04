@@ -486,6 +486,8 @@ let DInvokeUnhookStubs * = """
       CreateFileMappingA_t = proc(hFile: HANDLE, lpFileMappingAttributes: LPSECURITY_ATTRIBUTES, flProtect: DWORD, dwMaximumSizeHigh: DWORD, dwMaximumSizeLow: DWORD, lpName: LPCWSTR): HANDLE {.stdcall.}
       MapViewOfFile_t = proc(hFileMappingObject: HANDLE, dwDesiredAccess: DWORD, dwFileOffsetHigh: DWORD, dwFileOffsetLow: DWORD, dwNumberOfBytesToMap: SIZE_T): LPVOID {.stdcall.}
       FreeLibrary_t = proc(hLibModule: HMODULE): WINBOOL {.stdcall.}
+      MyLoadLibraryA_t = proc(lpLibFileName: LPCSTR): HMODULE {.stdcall.}
+      GetModuleFileNameA_t = proc(hModule: HMODULE, lpFilename: LPCSTR, nSize: DWORD): DWORD {.stdcall.}
 
     const
       GetModuleHandleA_HASH  = obf("GetModuleHandleA")
@@ -493,12 +495,16 @@ let DInvokeUnhookStubs * = """
       CreateFileMappingA_HASH  = obf("CreateFileMappingA")
       MapViewOfFile_HASH  = obf("MapViewOfFile")
       FreeLibrary_HASH  = obf("FreeLibrary")
+      LoadLibraryA_HASH  = obf("LoadLibraryA")
+      GetModuleFileNameA_HASH  = obf("GetModuleFileNameA")
 
     var MyGetModuleHandleA: GetModuleHandleA_t
     var MyGetModuleInformation: GetModuleInformation_t
     var MyCreateFileMappingA: CreateFileMappingA_t
     var MyMapViewOfFile: MapViewOfFile_t
     var MyFreeLibrary: FreeLibrary_t
+    var MyLoadLibraryA: MyLoadLibraryA_t
+    var MyGetModuleFileNameA: GetModuleFileNameA_t
 
     MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
 
@@ -509,6 +515,10 @@ let DInvokeUnhookStubs * = """
     MyMapViewOfFile = cast[MapViewOfFile_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), MapViewOfFile_HASH, 0, FALSE))
 
     MyFreeLibrary = cast[FreeLibrary_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), FreeLibrary_HASH, 0, FALSE))
+
+    MyLoadLibraryA = cast[MyLoadLibraryA_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE))
+
+    MyGetModuleFileNameA = cast[GetModuleFileNameA_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleFileNameA_HASH, 0, FALSE))
 """
 
 let SyscallStubSizeStub * = """
