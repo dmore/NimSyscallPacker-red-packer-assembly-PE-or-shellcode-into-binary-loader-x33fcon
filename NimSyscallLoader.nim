@@ -4436,9 +4436,26 @@ proc WriteCS() =
         script = script.replace("QWERQWERQWER", byteList)
         writeFile(fmt"{outfile}.cs", script)
         echo fmt"[!] Loader saved to {outfile}.cs"
+        # Read Packer.csproj and replace TOREPLACE.cs with the new filename
+        var exists: bool = true
+        try:
+            var fileCheck = readFile(fmt"{packerPath}\cstemplate")
+        except:
+            exists = false
+        if(exists):
+            var file = open(fmt"{packerPath}\cstemplate", fmRead)
+            var filecontent: string = file.readAll()
+            file.close()
+            filecontent = filecontent.replace("TOREPLACE.cs", fmt"{outfile}.cs")
+            writeFile(fmt"{packerPath}\Packer.csproj", filecontent)
+            echo fmt"[!] Packer.csproj saved to {packerPath}\Packer.csproj"
+        else:
+            echo fmt"[!] File {packerPath}\cstemplate not found, skipping replacement of TOREPLACE.cs"
+
         # Print, that this can be compiled with csc.exe but add the unsafe code option. Give the exact command to compile it.
-        echo "[!] You can compile this with csc.exe but you need to add the unsafe code option. The command to compile it is:"
-        echo fmt"csc.exe /unsafe {outfile}.cs"
+        echo "\r\n"
+        echo fmt"[!] You can compile the C# Loader with the following command:"
+        echo fmt"dotnet build --configuration Release Packer.csproj"
 
     else:
         echo fmt"[!] File {outfile} not found, skipping byte list creation"

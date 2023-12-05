@@ -33,9 +33,12 @@ namespace SyscallPELoader
                     Console.WriteLine("\n[-] Process is not 64-bit, this version of run-exe won't work !\n");
                     return -1;
                 }
-                else
 
-                
+                // If args are empty, pass an arbitrary value into args[0]
+                if (args.Length == 0)
+                {
+                    args = new string[] { "QWERQWERQWER" };
+                }
 
                 var peRunDetails = ParseArgs(args.ToList());
 
@@ -83,6 +86,8 @@ namespace SyscallPELoader
                 }
 
                 fileDescriptorRedirector.StartReadFromPipe();
+
+                StartExecution(peRunDetails.args, pe, currentBase);
 
 
                 // Revert changes
@@ -139,7 +144,7 @@ namespace SyscallPELoader
 
         private static PeRunDetails ParseArgs(List<string> args)
         {
-            string filename;
+            string filename = "";
             string[] binaryArgs;
             byte[] binaryBytes;
 
@@ -161,6 +166,7 @@ namespace SyscallPELoader
             }
             else
             {
+                filename = args[0];
                 string byteString = "QWERQWERQWER";
                 
                 string[] byteValues = byteString.Split(',');
