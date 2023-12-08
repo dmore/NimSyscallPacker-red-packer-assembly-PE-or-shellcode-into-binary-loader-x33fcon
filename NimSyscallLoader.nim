@@ -227,6 +227,10 @@ proc rndStr: string =
     for _ in 0.. 10:
       add(result, char(rand(int('a') .. int('z'))))
 
+proc rndSpecial(no: int): string =
+    for _ in 0.. no:
+      add(result, char(rand(int('!') .. int('/'))))
+
 var 
     filename: string = ""
     packerPath = os.getAppDir()
@@ -4569,10 +4573,23 @@ if(exists):
             var length: int = len(bytes) - 1
             var byteList: string = ""
             for i in 0..length:
-                byteList.add(fmt"{bytes[i]}")
-            
+                byteList.add(fmt"{bytes[i]}_")
+            byteList = byteList[0..^2]
             var script: string = CSPSTemplate
             script = script.replace("QWERQWER", byteList)
+            # Replace the following variables with random Variable names: PEstring, Pummel,byteValues, pestring, byteArray, byteValues, RAS, Entry, Zack. "_" should be replaced with a random value out of #+~*§%&/()=?<>
+            var words: seq[string] = @["PEstring", "Pummel", "byteValues", "byteArray", "byteValues", "RAS", "Zack", "_"]
+            var randSpecial: seq[string] = @["#", "+", "~", "*", "§", "%", "&", "/", "=", "?", "<", ">"]
+            var wordlength: int = len(words) - 1
+            for i in 0..wordlength:
+                var randstring: string
+                if (words[i] == "_"):
+                    randstring = randSpecial[rand(0..11)]
+                else:
+                    randstring = rndStr(rand(3..10))
+                    
+                #echo "Replacing " & fmt"{words[i]}" & " with " & randstring
+                script = script.replace(fmt"{words[i]}", randstring)
             writeFile(fmt"{outfile}.ps1", script)
             echo fmt"[!] Powershell script saved to {outfile}.ps1"
             psout = false
