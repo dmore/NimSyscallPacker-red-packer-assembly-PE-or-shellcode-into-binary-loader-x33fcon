@@ -4087,6 +4087,10 @@ if(useStego):
 if(macPayload):
     basicCompileFlags.add("-d:macPayload ")
 
+# if dllNames contains clr.dll, add -d:unhookclr
+if (dllNames.contains("clr.dll")):
+    basicCompileFlags.add("-d:unhookclr ")
+
 if(unhook):
     basicCompileFlags.add("-d:unhook ")
 
