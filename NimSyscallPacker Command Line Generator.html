@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-	<!-- This HTML is in version 0.2 -->
+	<!-- This HTML is in version 0.3 -->
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -189,7 +189,6 @@
 		<!-- <h1>NimSyscallLoader Command Line Generator</h1><h5>by DrDv.</h5> -->
 		<h1 style="display: inline; margin-right: 10px;">NimSyscallLoader Command Line Generator</h1><h5 style="display: inline;">&copy; Created by <a href="https://github.com/DrorDvash" target="_blank">DrDv</a></h5>
 
-
 		<!-- File Input -->
 		<h3><label for="fileInput">Path to file to encrypt:</label>
 		<input type="text" id="fileInput"  placeholder="Enter input file path" autocomplete="on"></h3>
@@ -216,7 +215,6 @@
 		<select id="sectionSelection" onchange="updateSectionVisibility()" style="width: 150px;">
 			<option value="shellcode">Shellcode</option>
 			<option value="pe">PE</option>
-			<option value="dll">DLL</option>
 			<option value="csharp">C#</option>
 		</select></h3>
 		
@@ -224,52 +222,6 @@
 		<!--###                        SECTIONS                            ##-->
 		<!--#################################################################-->
 		
-		<!-- Options Section - DLL options -->
-		<div id="dllSection">
-			<h2 class="section-title">DLL options</h2>
-			<table>
-				<tr>
-					<th class="toggle-cell">Toggle</th>
-					<th>Option</th>
-					<th>Description</th>
-				</tr>
-				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllToggle"><span class="slider"></span></label></td>
-					<td>--dll</td>
-					<td>Generate DLL instead of an executable</td>
-				</tr>
-				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllexportfuncToggle" onchange="toggleInput('dllexportfuncInput', this)"><span class="slider"></span></label></td>
-					<td class="nested-option">--dllexportfunc <input type="text" class="userInput" id="dllexportfuncInput" placeholder="exportfuncname" disabled></td>
-					<td>Comma separated names of DLL custom export functions for e.g. DLL-Sideloading</td>
-				</tr>
-				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllhijackToggle"><span class="slider"></span></label></td>
-					<td class="nested-option">--dllhijack</td>
-					<td>Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking</td>
-				</tr>
-				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noNimMainToggle"><span class="slider"></span></label></td>
-					<td class="nested-option">--noNimMain</td>
-					<td>Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")</td>
-				</tr>
-				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="cloneToggle" onchange="toggleInput('cloneInput', this)"><span class="slider"></span></label></td>
-					<td class="nested-option">--clone <input type="text" class="userInput" id="cloneInput" placeholder="value" disabled></td>
-					<td>Specify a local DLL to clone the API-Exports from via Koppeling</td>
-				</tr>
-				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllProxyToggle"><span class="slider"></span></label></td>
-					<td class="nested-option">--dllProxy</td>
-					<td>Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - <a href="https://github.com/byt3bl33d3r/NimDllSideload" target="_blank">Github Link</a>)</td>
-				</tr>
-				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="cplToggle"><span class="slider"></span></label></td>
-					<td class="nested-option">--cpl</td>
-					<td>Generate a CPL file (Control Panel Applet) instead of an executable</td>
-				</tr>
-			</table>
-		</div>
 		
 		<!--  Shellcode Specific Options -->
 		<div id="shellcodeSection">
@@ -381,6 +333,11 @@
 					<td>Specify a function to use for the Threadless inject hook</td>
 				</tr>
 				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="poolpartyToggle" onchange="toggleInput('poolpartyInput', this)"><span class="slider"></span></label></td>
+					<td>--poolparty <input type="text" class="userInput" id="poolpartyInput" placeholder="number" disabled></td>
+					<td>Use Poolparty technique 1,2,3,4 for execution.</td>
+				</tr>				
+				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="caroKannToggle"><span class="slider"></span></label></td>
 					<td>--Caro-Kann</td>
 					<td>Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (<a href="https://github.com/S3cur3Th1sSh1t/Caro-Kann" target="_blank">Caro-Kann</a>)</td>
@@ -457,6 +414,54 @@
 			</table>
 		</div>
 		
+		
+		<!-- DLL options -->
+		<div id="dllSection">
+			<h2 class="section-title">DLL Outout Options</h2>
+			<table>
+				<tr>
+					<th class="toggle-cell">Toggle</th>
+					<th>Option</th>
+					<th>Description</th>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllToggle"><span class="slider"></span></label></td>
+					<td>--dll</td>
+					<td>Generate DLL instead of an executable</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllexportfuncToggle" onchange="toggleInput('dllexportfuncInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--dllexportfunc <input type="text" class="userInput" id="dllexportfuncInput" placeholder="exportfuncname" disabled></td>
+					<td>Comma separated names of DLL custom export functions for e.g. DLL-Sideloading</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllhijackToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--dllhijack</td>
+					<td>Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noNimMainToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--noNimMain</td>
+					<td>Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="cloneToggle" onchange="toggleInput('cloneInput', this)"><span class="slider"></span></label></td>
+					<td class="nested-option">--clone <input type="text" class="userInput" id="cloneInput" placeholder="value" disabled></td>
+					<td>Specify a local DLL to clone the API-Exports from via Koppeling</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllProxyToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--dllProxy</td>
+					<td>Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - <a href="https://github.com/byt3bl33d3r/NimDllSideload" target="_blank">Github Link</a>)</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="cplToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--cpl</td>
+					<td>Generate a CPL file (Control Panel Applet) instead of an executable</td>
+				</tr>
+			</table>
+		</div>
+		
 		<!-- Options Section - General -->
 		<h2 class="section-title">General</h2>
 		<table>
@@ -495,6 +500,14 @@
 				<td class="double-nested-option">--dnsdomain <input type="text" class="userInput" id="dnsdomainInput" placeholder="sub.example.com" disabled></td>
 				<td>Specify a subdomain to use for the DNS TXT Record.</td>
 			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="environmentalKeyToggle" onchange="toggleInput('environmentalKeyInput', this)"><span class="slider"></span></label></td>
+				<td>--environmentalKey <input type="text" class="userInput" id="environmentalKeyInput" placeholder="value" disabled></td>
+				<td>Use environmental key (domain,username) to encrypt with.<br>
+					<b> - domain:</b> Enumerate the current domain on runtime and use that as key<br>
+					<b> - username:</b> Enumerate the current username on runtime and use that as key
+				</td>
+			</tr>			
 			<tr>
 				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="argumentsToggle" onchange="toggleInput('argumentsInput', this)"><span class="slider"></span></label></td>
 				<td>--arguments <input type="text" class="userInput" id="argumentsInput" placeholder="hardcodedArgs" disabled></td>
@@ -627,9 +640,9 @@
 					<td>Block ETW by setting COMPlus_ETWEnabled to 0.</td>
 				</tr>
 				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="unhookToggle"><span class="slider"></span></label></td>
-					<td>--unhook</td>
-					<td>Unhook ntdll.dll before doing anything else for the current process.</td>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="unhookToggle" onchange="toggleInput('unhookInput', this)"><span class="slider"></span></label></td>
+					<td>--unhook <input type="text" class="userInput" id="unhookInput" placeholder="ntdll.dll" disabled></td>
+					<td>Unhook the specified DLL(s) before doing anything else for the current process (can be separated by comma).</td>
 				</tr>
 				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="obfuscateToggle"><span class="slider"></span></label></td>
@@ -853,7 +866,7 @@
 				const sectionSelection = document.getElementById('sectionSelection').value;
 				
 				// Array of all section IDs
-				const allSections = ['dllSection', 'shellcodeSection', 'peSection', 'csharpSection'];
+				const allSections = ['shellcodeSection', 'peSection', 'csharpSection'];
 				
 				// Hide all sections
 				allSections.forEach(sectionId => {
@@ -888,7 +901,10 @@
 			const currentURL = window.location.href;
 			// Extract the path from the URL (assumes the path is after the last '/')
 			const lastSlashIndex = currentURL.lastIndexOf('/');
-			const filePath = currentURL.substring(8, lastSlashIndex + 1); // Skip 'file:///' and include the last '/'
+			let filePath = currentURL.substring(8, lastSlashIndex + 1); // Skip 'file:///' and include the last '/'
+			if (filePath[1] != ':'){
+				filePath = '/' + filePath
+			}
 			
 			// CHANGE ME IF YOU WANT OTHER DEFAULT PATH //
 			let inputFilePath = filePath + "Input/";
@@ -932,6 +948,7 @@
 				addOption('keyfileToggle', '--keyfile' + getValueIfExists('keyfileToggle', 'keyfileInput', ''));
 				addOption('dnsKeyToggle', '--dnsKey');
 				addOption('dnsdomainToggle', '--dnsdomain' + getValueIfExists('dnsdomainToggle', 'dnsdomainInput', ''));
+				addOption('environmentalKeyToggle', '--environmentalKey' + getValueIfExists('environmentalKeyToggle', 'environmentalKeyInput', ''));
 				addOption('argumentsToggle', '--arguments' + getValueIfExists('argumentsToggle', 'argumentsInput', ''));
 				addOption('metadataToggle', '--metadata');
 				addOption('noETWToggle', '--noETW');
@@ -979,7 +996,7 @@
 				addOption('sleepToggle', '--sleep' + getValueIfExists('sleepToggle', 'sleepInput', ''));
 				addOption('sleepInBetweenToggle', '--sleep-in-between' + getValueIfExists('sleepInBetweenToggle', 'sleepInBetweenInput', ''));
 				addOption('comvaretwToggle', '--COMVARETW');
-				addOption('unhookToggle', '--unhook');
+				addOption('unhookToggle', '--unhook' + getValueIfExists('unhookToggle', 'unhookInput', ''));
 				addOption('obfuscateToggle', '--obfuscate');
 				addOption('macPayloadToggle', '--macPayload');
 				addOption('sgnToggle', '--sgn');
@@ -1032,6 +1049,7 @@
 				addOption('threadlessToggle', '--threadless');
 				addOption('threadlessDllToggle', '--threadlessDll' + getValueIfExists('threadlessDllToggle', 'threadlessDllInput', ''));
 				addOption('threadlessFuncToggle', '--threadlessFunc' + getValueIfExists('threadlessFuncToggle', 'threadlessFuncInput', ''));
+				addOption('poolpartyToggle', '--poolparty' + getValueIfExists('poolpartyToggle', 'poolpartyInput', ''));
 				addOption('caroKannToggle', '--Caro-Kann');
 				addOption('stombToggle', '--stomb');
 				addOption('stombDllToggle', '--stombDll' + getValueIfExists('stombDllToggle', 'stombDllInput', ''));
