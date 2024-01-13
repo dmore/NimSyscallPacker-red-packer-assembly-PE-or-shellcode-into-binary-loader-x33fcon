@@ -865,6 +865,23 @@ if((existingprocessInjection == false) and (remoteinject) and jmpEntry):
         echo "Error: You can only use ntdll.dll functions for SpawnInject, because the Process is suspended and only ntdll.dll is loaded. Other DLLs can only be used when using --remoteprocess for Processes, that already have the target DLL loaded!"
         quit(1)
 
+# poolparty can only be used with remoteinject
+if (usepoolparty and remoteinject == false):
+    echo "Error: You can only use --poolparty with --remoteinject!"
+    quit(1)
+
+# poolparty 1 fails in combination with Caro-Kann
+if (usepoolparty and carokann and poolparty == 1):
+    echo "Error: You cannot use --poolparty 1 with --Caro-Kann!"
+    quit(1)
+
+# cannot use poolparty in combination with threadlessinject
+if (usepoolparty and threadless):
+    echo "Error: You cannot use --poolparty with --threadless!"
+    quit(1)
+
+
+
 if (psout and dll_out):
     # Reflective DLL PE-Loading only works, when DLLMain is exposed, otherwise it won't work
     dllhijack = true
@@ -3683,6 +3700,11 @@ if(hellsgate):
     stub.add(HellsgateNtCloseDelegate)
     stub.add(HellsgateNtReadVirtualMemoryDelegate)
     stub.add(HellsgateNtFreeVirtualMemoryDelegate)
+    # if use poolparty add hellsgate poolparty stubs
+    if (usepoolparty):
+        stub.add(HellsgateZwAssociateWaitCompletionPacketDelegate)
+        stub.add(HellsgateNtSetInformationWorkerFactoryDelegate)
+        stub.add(HellsgateZwSetIoCompletionDelegate)
     if(remoteMapSection):
         stub.add(HellsgateNtMapViewOfSectionDelegate)
         stub.add(HellsgateNtCreateSectionDelegate)
