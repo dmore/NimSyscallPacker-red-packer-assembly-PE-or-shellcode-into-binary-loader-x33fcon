@@ -3976,7 +3976,7 @@ if(dll_out or cpl):
     if ((hide == false) and (apiHide == false)):
         stub.add(DLLNoHideStub)
 
-if (csharp):
+if (csharp and not peinject):
     stub.add(getRandStub())
     if (noArgs):
         stub.add(LoadAssemblyStub)
