@@ -932,7 +932,7 @@ if (peload and shellcode):
     quit(1)
 
 # DripAllocate, CallbackExecute, localCreateThread, QueueApc, MapSection, Caro-Kann are shellcode specific. They cannot be used in combination with csharp, interactivePS or peload
-if((csharp or interactivePS) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann)):
+if(((csharp or interactivePS) and not peinject) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann)):
     echo "Error: Cannot use --csharp/--interactivePS with --dripallocate/--CallbackExecute/--localCreateThread/--QueueApc/--mapSection/--Caro-Kann!"
     echo "This is Shellcode specific options."
     quit(1)
