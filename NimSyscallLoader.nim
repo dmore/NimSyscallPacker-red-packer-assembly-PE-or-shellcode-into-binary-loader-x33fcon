@@ -852,7 +852,7 @@ if (hellsgate and jump):
     echo "Error: Cannot use both --hellsgate and --jump! --jump can only be used with --syswhispers"
     quit(1)
 
-if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peload and shellcode)):
+if ((csharp and shellcode) or (csharp and peload) or (peload and shellcode)):
     echo "Error: You can only use one of --csharp, --shellcode, --peload, or --peinject!"
     quit(1)
 
