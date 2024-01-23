@@ -14,7 +14,7 @@ A Video - if you prefer that - can be found here:
 
 Git needs to be installed for Nim/Nimble to work properly.
 
-Download and install [Nim 1.6.2](https://nim-lang.org/download/nim-1.6.2_x64.zip) and [Mingw64](https://sourceforge.net/projects/mingw-w64/files/) version 8.1.0 `x86_64-posix-seh`. You can either just use this GCC version or in addition install [GCC 12.1.0](https://sourceforge.net/projects/gcc-win64/files/12.1.0/). Don't use other GCC versions, as that breaks some functionality. But you need to place the Mingw64 DLL's around `libwinpthread-1.dll` into some `%PATH%` environment variable folder. Login/logout for the `%PATH%` changes to take effect.
+Download and install [Nim 1.6.8](https://nim-lang.org/download/nim-1.6.8_x64.zip) and [Mingw64](https://sourceforge.net/projects/mingw-w64/files/) version 8.1.0 `x86_64-posix-seh`. You can either just use this GCC version or in addition install [GCC 12.1.0](https://sourceforge.net/projects/gcc-win64/files/12.1.0/). Don't use other GCC versions, as that breaks some functionality. But you need to place the Mingw64 DLL's around `libwinpthread-1.dll` into some `%PATH%` environment variable folder. Login/logout for the `%PATH%` changes to take effect.
 
 Install dependencies:
 `nimble install nimcrypto docopt ptr_math strenc winim`
@@ -27,7 +27,7 @@ Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
 
 E.g. on Kali:
 
-`apt-get install nim=1.6.2`
+`apt-get install nim=1.6.8`
 
 `apt-get install mingw-64=8.0.0-1`
 
