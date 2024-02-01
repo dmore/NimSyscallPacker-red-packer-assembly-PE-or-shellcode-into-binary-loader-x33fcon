@@ -748,6 +748,16 @@ if args["--Caro-Kann"]:
 if args["--stomb"]:
     stomb = true
 
+
+# retrieve --stombFunc and --stombFunc2
+if args["--stombFunc"]:
+    let stombFuncarg = args["--stombFunc"]
+    stombFunc = fmt"{stombFuncarg}"
+
+if args["--stombFunc2"]:
+    let stombFunc2arg = args["--stombFunc2"]
+    stombFunc2 = fmt"{stombFunc2arg}"
+
 if args["--restore"]:
     restore = true
 
