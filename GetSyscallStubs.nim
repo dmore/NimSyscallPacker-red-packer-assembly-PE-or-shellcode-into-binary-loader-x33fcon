@@ -261,7 +261,7 @@ when defined(GetSyscallStub):
             ntdllString: LPCSTR
             nullHandle: HANDLE
         
-        let indirect_syscall = @[
+        var indirect_syscall: seq[byte] = @[
           byte(0x4C), byte(0x8B), byte(0xD1), # mov r10, rcx
           byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, 0x00 (syscall)
           byte(0x49), byte(0xBB), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r11, 0x00 (syscallJumpAddress)
