@@ -568,3 +568,4 @@ Read this:
 - [X] [eversinc33](https://github.com/eversinc33) - BouncyGate, Docker File
 - [X] [OffenseTeacher](https://github.com/OffenseTeacher) - Steganim
 - [X] [OtterHacker](https://github.com/OtterHacker/Conferences/tree/main/Defcon31) - Stomb+Threadless inject idea
+- [X] [DrDv](https://github.com/DrorDvash) - CommandLine Generator
