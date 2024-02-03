@@ -31,7 +31,7 @@ import CurrentProcInject
 import RemoteProcInject
 import DInvoke
 import Powershell
-import CSharp
+import Csharp
 import AntiDebug
 
 
