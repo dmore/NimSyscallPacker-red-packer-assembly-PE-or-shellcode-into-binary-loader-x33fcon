@@ -2245,7 +2245,7 @@ proc rtlGetVersion(lpVersionInformation: var OSVersionInfoExW): NTSTATUS
     {.cdecl, importc: obf("RtlGetVersion"), dynlib: obf("ntdll.dll").}
 
 var versionInfo: OSVersionInfoExW
-echo rtlGetVersion(versionInfo)
+discard rtlGetVersion(versionInfo)
 #echo versionInfo
 
 if(versionInfo.dwMajorVersion == 6 and versionInfo.dwMinorVersion == 2):
@@ -2474,7 +2474,7 @@ when defined(noKey):
         echo ""
     when defined(webKey):
         # Todo: Implement Web Key
-        echo ""
+        var testVar = 1
     when defined(environmentalKey):
         var envkey: string = ""
         var envkey2: string = ""

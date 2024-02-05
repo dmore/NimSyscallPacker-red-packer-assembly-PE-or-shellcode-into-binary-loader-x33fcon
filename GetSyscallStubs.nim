@@ -231,6 +231,7 @@ when defined(GetSyscallStub):
       GetFileSize_HASH * = obf("GetFileSize")
       RtlAllocateHeap_HASH * = obf("RtlAllocateHeap")
       ReadFile_HASH * = obf("ReadFile")
+    
     when defined(DInvoke):  
         var MyCreateFileA*: CreateFileA_t
         var MyGetFileSize*: GetFileSize_t
@@ -341,24 +342,26 @@ when defined(GetSyscallStub):
                 when defined(DInvoke):
                   var hModule: HMODULE = cast[HMODULE](MyGetModuleHandleA(ntdllString))
                 else:
-                  var hModule: HMODULE = MyGetModuleHandleA(ntdllString)
+                  var hModule: HMODULE = GetModuleHandleA(ntdllString)
 
                 when defined(verbose):
                     if (hModule == 0):
-                        echo obf("[*] MyGetModuleHandleA Error Code: ") & $[GetLastError()]
+                        echo obf("[*] GetModuleHandleA Error Code: ") & $[GetLastError()]
                         return 0
                     else:
-                        echo obf("[*] MyGetModuleHandleA Success")
+                        echo obf("[*] GetModuleHandleA Success")
                 
                 # GetProcAddress for functionName
-                var functionAddress: FARPROC = MyGetProcAddress(hModule, functionName)
-
+                when defined(DInvoke):
+                    var functionAddress: FARPROC = MyGetProcAddress(hModule, functionName)
+                else:
+                    var functionAddress: FARPROC = GetProcAddress(hModule, functionName)
                 when defined(verbose):
                     if (functionAddress == nil):
-                        echo obf("[*] MyGetProcAddress Error Code: ") & $[GetLastError()]
+                        echo obf("[*] GetProcAddress Error Code: ") & $[GetLastError()]
                         return 0
                     else:
-                        echo obf("[*] MyGetProcAddress Success")
+                        echo obf("[*] GetProcAddress Success")
 
                 # get the syscallJumpAddress from the functionAddress
                 var syscallJumpAddress: LPVOID = find_syscall_address(cast[ptr byte](functionAddress), 40)
