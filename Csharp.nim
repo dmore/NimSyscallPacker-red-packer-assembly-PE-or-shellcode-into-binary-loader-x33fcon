@@ -343,7 +343,7 @@ namespace SyscallPELoader
                 MemMapViewAccessor.WriteArray(0, bSyscallStub, 0, FuncSize);
                 byte* pSyscallStub = null;
                 MemMapViewAccessor.SafeMemoryMappedViewHandle.AcquirePointer(ref pSyscallStub);
-                Console.WriteLine("[+] Got fresh Syscall stub for {0} from disk!", FuncName[i]);
+                //Console.WriteLine("[+] Got fresh Syscall stub for {0} from disk!", FuncName[i]);
                 output = (IntPtr)pSyscallStub;
                 this.StubAddressTable.Add(FuncName[i], output);
                 this.GuidTable.Add(FuncName[i], NewGuid);
