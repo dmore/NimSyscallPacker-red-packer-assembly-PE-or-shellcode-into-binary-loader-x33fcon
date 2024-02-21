@@ -899,9 +899,9 @@ if((existingprocessInjection == false) and (remoteinject) and jmpEntry):
         quit(1)
 
 # poolparty can only be used with remoteinject
-if (usepoolparty and remoteinject == false):
-    echo "Error: You can only use --poolparty with --remoteinject!"
-    quit(1)
+#if (usepoolparty and remoteinject == false):
+#    echo "Error: You can only use --poolparty with --remoteinject!"
+#    quit(1)
 
 # poolparty 1 fails in combination with Caro-Kann
 if (usepoolparty and carokann and poolparty == 1):
