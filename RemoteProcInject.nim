@@ -251,7 +251,8 @@ when not defined(proxy):
     when defined(defaultMain):
         when not defined(service):
             when not defined(cloned):
-                discard main(nil)
+                when not defined(perfecthijack):
+                    discard main(nil)
 
 """
 
@@ -1007,7 +1008,8 @@ when not defined(proxy):
     when defined(defaultMain):
         when not defined(service):
             when not defined(cloned):
-                discard main(nil)
+                when not defined(perfecthijack):
+                    discard main(nil)
 
 """
 
