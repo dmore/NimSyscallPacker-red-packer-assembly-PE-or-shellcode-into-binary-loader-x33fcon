@@ -85,10 +85,10 @@ proc evadeCFG*(handle: HANDLE,address: PVOID): BOOl =
 
   if status != 0x0:
     when defined(verbose):
-        echo "NtSetInformationVirtualMemory Failed"
+        echo "[-] NtSetInformationVirtualMemory Failed"
     echo toHex(status)
     return false
   
   when defined(verbose):
-    echo "NtSetInformationVirtualMemory Succeeded, CFG Disabled"
+    echo "[+] NtSetInformationVirtualMemory Succeeded, CFG Disabled"
   return true
