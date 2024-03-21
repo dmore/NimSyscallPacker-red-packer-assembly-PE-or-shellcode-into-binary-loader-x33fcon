@@ -370,7 +370,7 @@ var
     carokannthread: bool = false
     stomb: bool = false
     stombDll: string = "chakra.dll"
-    stombFunc: string = "JsRunScript" # this combi works for client and server
+    stombFunc: string = "DllCanUnloadNow" # 
     stombFunc2: string = "MemProtectHeapUnprotectCurrentThread" # this combi works for client and server
     restore: bool = false
     noAntiEmulate: bool = false
