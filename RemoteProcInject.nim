@@ -1520,7 +1520,7 @@ let RemoteLoadDllStub* = """
                     logVerbose(obf("[*] ThreadlessInject success: ") & cast[string](toHex(threadSuccess)) & "\r\n")
                 
 
-                status = NtFreeVirtualMemory(tProcess, &loadLibraryAddress, &pageSize, MEM_DECOMMIT or MEM_RELEASE)
+                status = NtFreeVirtualMemory(tProcess, &loadLibraryAddress, &pageSize, MEM_RELEASE)
                 if (status == 0):
                     when defined(verbose):
                         echo "[+] Free memory success"
