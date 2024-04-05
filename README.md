@@ -105,6 +105,18 @@ https://youtu.be/Vr58_R4rYDA
 
 https://youtu.be/Oj55uilxEF4
 
+**Ruy Lopez for local processes**
+
+https://youtu.be/8fBkRo1zlIM
+
+**Shellcode output format**
+
+https://youtu.be/ZTiZA2fg3WM
+
+**Assembly output feature**
+
+https://youtu.be/TDEJ-U18UIk
+
 **And I made a public Video showcasing how to customize ThreadlessInject technique to other processes than the default one:**
 
 https://youtu.be/BYuAUYQcI-E
