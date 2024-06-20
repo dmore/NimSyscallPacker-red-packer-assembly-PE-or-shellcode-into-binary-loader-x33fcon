@@ -2296,7 +2296,7 @@ let ETWStub * = """
                         when defined(verbose):
                             echo obf("[-] Failed to set thread context")
                         return
-                var randblup6: string = obf("iasduasdm")
+                
                 when defined(verbose):
                     echo obf("[+] Attached Hardware Breakpoint to Thread: ") & $threads[i]
             when defined(DInvoke):

