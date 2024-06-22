@@ -4872,8 +4872,8 @@ if(dll_out):
             discard os.execShellCmd(fmt"{packerPath}\NetClone\NetClone.exe --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
         else:
             echo "[*] Using PyClone with command:"
-            echo fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}"
-            discard os.execShellCmd(fmt"{packerPath}\NetClone\PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
+            echo fmt"{packerPath}/NetClone/PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}"
+            discard os.execShellCmd(fmt"{packerPath}/NetClone/PyClone.py --target {outfile} --reference {dllToClone} --reference-path {dllToClone} -o {outfile}")
 
 
 var exists: bool = false
