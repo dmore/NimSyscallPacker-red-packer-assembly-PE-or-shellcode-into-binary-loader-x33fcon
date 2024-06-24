@@ -1104,7 +1104,10 @@ else:
     # Temporary fix for error using --csharp in linux (and Docker image).
     # We get an IndexDefect error because 'blob' is never set, so we set it here when in linux
     # Probably need to the linux way of checking the C# assembly in here, somehow.
-    blob = readFile(filename)
+    if (filename == ""):
+        blob = ""
+    else:
+        blob = readFile(filename)
     # End temp fix
     if (interactivePS):
         var newPath = packerPath & "/pwnPowershell/RunSpace.exe"
