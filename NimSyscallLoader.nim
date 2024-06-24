@@ -3862,7 +3862,7 @@ if (getfreshstub):
 
 if(pump):
     # makes no sense to import nimstrenc when strings should be visible in the binary.
-    stub =  stub.replace("    import nimstrenc", "    from winim import MODULEENTRY32A")
+    stub =  stub.replace("    import nimstrenc", "")
     for m in pumpargs:
         if(m == "words"):
             echo "[*] Adding words"
