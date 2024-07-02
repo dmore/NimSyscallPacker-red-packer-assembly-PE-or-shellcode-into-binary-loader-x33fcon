@@ -1707,7 +1707,7 @@ let LoadAssemblyStubNoArgs = """
     discard calcHard()
     var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
     discard calcHard()
-    assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    discard assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 
 when not defined(proxy):
     when not defined(service):
