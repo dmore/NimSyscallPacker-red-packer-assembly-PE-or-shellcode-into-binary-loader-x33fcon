@@ -1109,7 +1109,10 @@ else:
     # Temporary fix for error using --csharp in linux (and Docker image).
     # We get an IndexDefect error because 'blob' is never set, so we set it here when in linux
     # Probably need to the linux way of checking the C# assembly in here, somehow.
-    blob = readFile(filename)
+    if (filename == ""):
+        blob = ""
+    else:
+        blob = readFile(filename)
     # End temp fix
     if (interactivePS):
         var newPath = packerPath & "/pwnPowershell/RunSpace.exe"
@@ -1709,7 +1712,7 @@ let LoadAssemblyStubNoArgs = """
     discard calcHard()
     var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
     discard calcHard()
-    assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    discard assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 
 when not defined(proxy):
     when not defined(service):
@@ -3921,6 +3924,8 @@ if (getfreshstub):
 if(pump):
     # makes no sense to import nimstrenc when strings should be visible in the binary.
     stub =  stub.replace("    import nimstrenc", "")
+    stub = stub.replace("when not defined(proxy):","")
+    stub = stub.replace("    when defined(notcloned):","")
     for m in pumpargs:
         if(m == "words"):
             echo "[*] Adding words"

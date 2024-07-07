@@ -17,7 +17,7 @@ Git needs to be installed for Nim/Nimble to work properly.
 Download and install [Nim 1.6.8](https://nim-lang.org/download/nim-1.6.8_x64.zip) and [Mingw64](https://sourceforge.net/projects/mingw-w64/files/) version 8.1.0 `x86_64-posix-seh`. You can either just use this GCC version or in addition install [GCC 12.1.0](https://sourceforge.net/projects/gcc-win64/files/12.1.0/). Don't use other GCC versions, as that breaks some functionality. But you need to place the Mingw64 DLL's around `libwinpthread-1.dll` into some `%PATH%` environment variable folder. Login/logout for the `%PATH%` changes to take effect.
 
 Install dependencies:
-`nimble install nimcrypto docopt ptr_math strenc winim https://github.com/S3cur3Th1sSh1t/nim-strenc/`
+`nimble install nimcrypto docopt ptr_math winim https://github.com/S3cur3Th1sSh1t/nim-strenc/`
 
 If you want to use LLVM obfuscator on windows you need to use my embedded denim version as it's modified code to make it work with the Packer. My modified code can be found [here]([denim](https://github.com/S3cur3Th1sSh1t/denim)). Install it via `denim\denim.exe setup`.
 
@@ -31,7 +31,7 @@ E.g. on Kali:
 
 `apt-get install mingw-64=8.0.0-1`
 
-`nimble install nimcrypto docopt ptr_math strenc winim`
+`nimble install nimcrypto docopt ptr_math winim https://github.com/S3cur3Th1sSh1t/nim-strenc/`
 
 If you cannot downgrade mingw-64 to 8.0.0-1 `--hellsgate` won't work.
 
