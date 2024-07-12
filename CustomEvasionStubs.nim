@@ -2304,7 +2304,8 @@ let ETWStub * = """
             else:
                 CloseHandle(hThread)
         # After setting the Breakpoint for all current Threads, we will also set a hook on BaseThreadInitThunk to also set Breakpoints for new threads.
-        hookBaseThreadInitThunk()
+        # as we monitor for new threads and set HWBPs, we dont need to hook BaseThreadInitThunk anymore, also that did lead to crashes on win11
+        #hookBaseThreadInitThunk()
     
     # This is a Workaround for the fact, that I for the sake of xxx cannot catch the CLR Thread even with hooks. 
     # So I'm first loading CLR with harmless Code, so that the Thread exists and afterwards set Breakpoints for each Thread.
@@ -2330,11 +2331,11 @@ let ETWStub * = """
 
     # a function, that will call SetupETWBreakpoints() and afterward sleep for 4 seconds. This should be done endlessly in a loop
     proc ETWBreakpoints() =
-        SetupETWBreakpoints()
         when defined(DInvoke):
             discard MySleep(4000)
         else:
             Sleep(4000)
+        SetupETWBreakpoints()
         ETWBreakpoints()
     
     # Create a new Thread on ETWBreakPoints() to ensure, threads are properly set
