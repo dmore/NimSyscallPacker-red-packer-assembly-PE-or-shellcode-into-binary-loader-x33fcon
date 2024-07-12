@@ -2327,6 +2327,22 @@ let ETWStub * = """
         Sleep(1500)
     SetupETWBreakpoints()
 
+
+    # a function, that will call SetupETWBreakpoints() and afterward sleep for 4 seconds. This should be done endlessly in a loop
+    proc ETWBreakpoints() =
+        SetupETWBreakpoints()
+        when defined(DInvoke):
+            discard MySleep(4000)
+        else:
+            Sleep(4000)
+        ETWBreakpoints()
+    
+    # Create a new Thread on ETWBreakPoints() to ensure, threads are properly set
+    when defined(DInvoke):
+        var hThread = CreateThread(nil, 0, cast[LPTHREAD_START_ROUTINE](ETWBreakpoints), nil, 0, nil)
+    else:
+        var hThread = CreateThread(nil, 0, cast[LPTHREAD_START_ROUTINE](ETWBreakpoints), nil, 0, nil)
+
 """
 
 let ETWPatchStub * = """
