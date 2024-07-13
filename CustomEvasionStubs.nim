@@ -2316,6 +2316,7 @@ let ETWStub * = """
             else:
                 CloseHandle(hThread)
         # After setting the Breakpoint for all current Threads, we will also set a hook on BaseThreadInitThunk to also set Breakpoints for new threads.
+        # as we monitor for new threads and set HWBPs, we dont need to hook BaseThreadInitThunk anymore, also that did lead to crashes on win11
         #hookBaseThreadInitThunk()
     
     # This is a Workaround for the fact, that I for the sake of xxx cannot catch the CLR Thread even with hooks. 

