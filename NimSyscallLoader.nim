@@ -909,6 +909,17 @@ if (useQueueAPC and remoteinject and syswhispers):
 #    echo "Error: Cannot use both --mapSection and --dripallocate, not implemented yet"
 #    quit(1)
 
+# cannot use mapsection and stomb in parallel
+if(remoteMapSection and stomb):
+    echo "Error: Cannot use both --mapSection and --stomb, either use one or the other"
+    quit(1)
+
+# if csout, psout and output file are defined, state outputfile cannot be used
+if args["--output"]:
+    if (csout and psout):
+        echo "Error: Cannot use --output with --csout and --psout at the same time. Stick with the default output name."
+        quit(1)
+
 if (peload and dripallocate):
     echo "Error: Cannot use both --peload and --dripallocate, not implemented yet"
     quit(1)
@@ -4603,6 +4614,9 @@ if(usepoolparty):
 if (threadlessthread):
     basicCompileFlags.add("-d:threadlessthread ")
 
+# add --passc=-static 
+basicCompileFlags.add("--passc=-static --passl=-static ")
+
 if(dllProxy):
     when system.hostOS == "windows":
         basicCompileFlags.add(fmt" --passl:{packerpath}\\build\\{randValue}.def ")
@@ -4733,8 +4747,6 @@ else:
     if (reflective):
         basicCompileFlags.add("--passL:-Wl,--dynamicbase,--export-all-symbols ")
 
-# add --passc=-static 
-basicCompileFlags.add("--passc=-static --passl=-static ")
 
 if((syswhispers != true) and (hellsgate != true)):
     if system.hostOS == "windows":
@@ -4751,9 +4763,6 @@ else:
 
 if(denim == false):
     basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
-
-# Add static to include missing nim 2.0 needed libraries such as libgcc_s_seh-1.dll and libwinpthread-1.dll
-basicCompileFlags.add("--passc=-static --passl=-static ")
 
 if debugMode:
     basicCompileFlags = basicCompileFlags.replace("-d:release", "-d:debug")
