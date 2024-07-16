@@ -31,7 +31,7 @@ E.g. on Kali:
 
 `apt-get install mingw-64=8.0.0-1`
 
-`nimble install nimcrypto docopt ptr_math strenc winim`
+`nimble install nimcrypto docopt ptr_math winim https://github.com/S3cur3Th1sSh1t/nim-strenc/`
 
 If you cannot downgrade mingw-64 to 8.0.0-1 `--hellsgate` won't work.
 

