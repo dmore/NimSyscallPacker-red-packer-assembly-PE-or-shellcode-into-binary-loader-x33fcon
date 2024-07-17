@@ -4471,9 +4471,9 @@ elif system.hostOS == "windows":
     if (denim):
         basicCompileFlags = "-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
     else:
-        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg " # -d:noRes is used to not embed a winim manifest in the loader
 
 if((existingprocessInjection == false) and (remoteinject) and (not conhostinject)):
     basicCompileFlags.add("-d:spawninject ")
@@ -4742,6 +4742,9 @@ else:
 
 if(denim == false):
     basicCompileFlags.add(fmt"--out={outfile} Loader.nim")
+
+# Add static to include missing nim 2.0 needed libraries such as libgcc_s_seh-1.dll and libwinpthread-1.dll
+basicCompileFlags.add("--passc=-static --passl=-static ")
 
 if debugMode:
     basicCompileFlags = basicCompileFlags.replace("-d:release", "-d:debug")
