@@ -599,6 +599,7 @@ let DInvokeUnhookStubs * = """
       MapViewOfFile_t = proc(hFileMappingObject: HANDLE, dwDesiredAccess: DWORD, dwFileOffsetHigh: DWORD, dwFileOffsetLow: DWORD, dwNumberOfBytesToMap: SIZE_T): LPVOID {.stdcall.}
       FreeLibrary_t = proc(hLibModule: HMODULE): WINBOOL {.stdcall.}
       MyLoadLibraryA_t = proc(lpLibFileName: LPCSTR): HMODULE {.stdcall.}
+      MyLoadLibraryW_t = proc(lpLibFileName: LPCWSTR): HMODULE {.stdcall.}
       GetModuleFileNameA_t = proc(hModule: HMODULE, lpFilename: LPCSTR, nSize: DWORD): DWORD {.stdcall.}
 
     const
@@ -616,6 +617,7 @@ let DInvokeUnhookStubs * = """
     var MyMapViewOfFile: MapViewOfFile_t
     var MyFreeLibrary: FreeLibrary_t
     var MyLoadLibraryA: MyLoadLibraryA_t
+    var MyLoadLibraryW: MyLoadLibraryW_t
     var MyGetModuleFileNameA: GetModuleFileNameA_t
 
     MyGetModuleHandleA = cast[GetModuleHandleA_t](cast[LPVOID](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleHandleA_HASH, 0, FALSE)))
@@ -630,7 +632,10 @@ let DInvokeUnhookStubs * = """
 
     MyLoadLibraryA = cast[MyLoadLibraryA_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE))
 
+    MyLoadLibraryW = cast[MyLoadLibraryW_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), LoadLibraryA_HASH, 0, FALSE))
+
     MyGetModuleFileNameA = cast[GetModuleFileNameA_t](get_function_address(cast[HMODULE](get_library_address(KERNEL32_DLL, TRUE)), GetModuleFileNameA_HASH, 0, FALSE))
+
 """
 
 let SyscallStubSizeStub * = """
