@@ -3829,6 +3829,21 @@ when not defined(DInvoke):
 
 proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
 
+    when defined(mutexoneshot):
+        var dontcontinue: BOOL = FALSE
+        var temp: array[MAX_PATH, char]
+        if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
+            let mutexName = &"Global\\REPLACEMUTEX"
+            var lastError: DWORD
+            let mutex = CreateMutexA(nil, TRUE, mutexName)
+            lastError = GetLastError()
+            if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
+                dontcontinue = FALSE
+            else:
+                dontcontinue = TRUE
+        if(dontcontinue):
+            quit(1)
+
 """
 
 let BeingDebugged * = fmt"""
