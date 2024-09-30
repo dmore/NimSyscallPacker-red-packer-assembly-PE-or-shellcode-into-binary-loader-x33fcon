@@ -314,16 +314,14 @@ let DInvokeStubThird * = """
   var randfive: string = obf("laiuazduixzuiyxnal")
   if (status != 0):
     when defined(verbose):
-        echo fmt"[-] Failed to load {Libname}, status: {status}\n"
+        echo fmt"[-] Failed to load \n", LibName, " status: ", status
     if (hLibrary == 0):
         when defined(verbose):
             echo "HLibrary still null"
     return 0
   else:
     when defined(verbose):
-        echo fmt"Loaded {LibName} successfully!"
-  when defined(verbose):
-      echo fmt"[+] Loaded {LibName} at {hLibrary}"
+        echo fmt"Loaded ", LibName, " successfully"
   return hLibrary
 
 """
