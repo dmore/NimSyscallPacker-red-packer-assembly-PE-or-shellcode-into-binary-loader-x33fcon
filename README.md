@@ -143,6 +143,7 @@ Options:
   --environmentalKey value    Use environmental key (domain,username) to encrypt with
                               domain -> enumerate the current domain on runtime and use that as key
                               username -> enumerate the current username on runtime and use that as key
+  --killdate yyyymmdd    Specify an date, after which the payload won't get executed anymore
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
@@ -170,7 +171,7 @@ Options:
 
 [Payload retrieval options]
 
-  By default, the Loader will embed the Payload into the output file. There are two alternatives to this:  
+  By default, the Loader will embed the Payload into the output file. There are two alternatives to this:
   --shellcodeFile shellcodefileLocation(s)    Filename to retrieve Payload from - on Runtime (No embedding). The first location will also be the output file location. You can specify multiple locations, separated by a comma.
   --shellcodeURL shellcodeURL    URL to retrieve Payload from
 
@@ -179,9 +180,13 @@ Options:
   --dll     Generate DLL instead of an executable
       --dllexportfunc exportfuncname    Comma separated names of DLL custom export functions for e.g. DLL-Sideloading
       --dllhijack    Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking
+      --perfectdllhijack    Add DllMain and execute the Payload via "Perfect DLL Hijacking" to avoid LoaderLock issues (https://elliotonsecurity.com/perfect-dll-hijacking/)
       --noNimMain    Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")
       --clone value    Specify a local DLL to clone the API-Exports from via Koppeling
+      --mutexoneshot    Use a Mutex to ensure the payload is only executed once per process tree
       --dllProxy    Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - https://github.com/byt3bl33d3r/NimDllSideload)
+          --payloadFunction funcName    The function to execute the Payload with to not use DllMain
+          --noRandom    Don't randomize the DLL-Name but forward to the original DLL instead (No need to copy the original DLL, only works for builtin windows DLLs)
       --cpl    Generate a CPL file (Control Panel Applet) instead of an executable
       --xll    Generate an XLL file (Excel Add-In) instead of an executable
 
@@ -253,11 +258,13 @@ Options:
       --remotepatchAMSI    Patch AMSI in the remote process before shellcode execution
       --remotepatchETW    Patch ETW in the remote process before shellcode execution
   --threadless    Use Threadless inject for shellcode execution (https://github.com/CCob/ThreadlessInject)
+  --threadlessthread    Use Threadless inject but the trampoline will create a thread instead of CALL to the target address (no impact on the target process but additional IoC)
       --threadlessDll dllname    Specify a DLL to use for the Threadless inject hook
       --threadlessFunc dllfunc    Specify a function to use for the Threadless inject hook
   --poolparty number    Use Poolparty technique 1,2,3,4 for execution
-  --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)  
-  --Caro-Kann-Thread   Same as Caro-Kann, but the Shellcode will not do a direct JMP but instead create a Thread on the start address 
+  --conhostinject    Inject into a remote conhost.exe process and trigger execution without Thread or APC or similar
+  --Caro-Kann    Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (https://github.com/S3cur3Th1sSh1t/Caro-Kann)
+  --Caro-Kann-Thread   Same as Caro-Kann, but the Shellcode will not do a direct JMP but instead create a Thread on the start address
   --stomb    Enable Module Stomping to not do memory allocations. By default, 'chakra.dll' is loaded and stomped.
       --stombDll dllname    Specify a DLL to use for the Module Stomping (default is 'chakra.dll')
       --stombFunc dllfunc    Specify a function to use for the Module Stomping
@@ -276,7 +283,7 @@ Options:
 
 ```
 
-By default, the Packer uses SandBox evasion and AntiDebug functionalities for every Payload. If you don't want them to be enabled (e.G. to remove their IoCs) or for any other reason you can use the flags `--noAntidebug` or `--noDefaultSandBox´. Every other SandBox check from the options will be added in addition to the existing ones and not as replacement.
+By default, the Packer uses SandBox evasion and AntiDebug functionalities for every Payload. If you don't want them to be enabled (e.G. to remove their IoCs) or for any other reason you can use the flags `--noAntidebug` or `--noDefaultSandBox`. Every other SandBox check from the options will be added in addition to the existing ones and not as replacement.
 
 All Payloads are by default executed in an `RX` memory region. Some Payloads won't work with `READ_EXECUTE` only. To use `RWX` instead you can enable that with the flag `--RWX`.
 
@@ -475,7 +482,7 @@ Some vendors, such as ESET flag binaries/dlls due to the encrypted Payload being
 
 ### ThreadlessInject - stuff to care for
 
-If you want to use ThreadlessInject - you should know what youre doing. As its hooking an API in the remote process, this technique needs to be adjusted for each different remote process. You first need to know, which APIs are typically called regularly by the remote process to know what to hook. You can for example monitor this for common windows processes via  (API Monitor)[http://www.rohitab.com/apimonitor]. Adjust the hook to your target process, or the Payload won't execute.
+If you want to use ThreadlessInject - you should know what youre doing. As its hooking an API in the remote process, this technique needs to be adjusted for each different remote process. You first need to know, which APIs are typically called regularly by the remote process to know what to hook. You can for example monitor this for common windows processes via  [API Monitor](http://www.rohitab.com/apimonitor). Adjust the hook to your target process, or the Payload won't execute.
 
 The default values are only useful for the builtin spawn/inject `rundll32.exe` target, as this process regularly calls `NtWaitForMultipleObjects` from `ntdll.dll`. Other processes also call this function, but the recommendation here is to adjust the options to your target process.
 
@@ -554,8 +561,8 @@ Read this:
 - [X] CPL Output files
 - [ ] Decoy HTTP requests option
 - [X] Download Shellcode from Webserver or read it from local file as alternative to embedding (default)
-- [ ] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
-- [ ] Use cloned Handles instead of OpenProcess (Handlekatz like) for remote process injection or as alternative Handle Elevation
+- [X] Use more compiler flags to overwrite dynlib to avoid Function IoCs plus reduze size `-d:nimNoLibc -d:noSignalHandler --gc:none -d:noSignalHandler --infChecks:off --stdout:off --hotCodeReloading:off --stackTraceMsgs:off --tlsEmulation:off --nanChecks:off -d:nimBuiltinSetjmp --sinkInference:off --deepcopy:off --styleCheck:off --skipParentCfg --passC:"-nostdlib -ffunction-sections -fno-ident -fno-asynchronous-unwind-tables -fno-exceptions" --passL:"-s --disable-runtime-pseudo-relo  --disable-reloc-section" --dynlibOverrideAll`
+- [X] Use cloned Handles instead of OpenProcess (Handlekatz like) for remote process injection or as alternative Handle Elevation
 - [X] Handle elevation
 - [X] Add ThreadlessInject for Remote Injection
 - [ ] Add Callback execution primitives for remote injection via a Nim Port of https://github.com/lem0nSec/CreateRemoteThreadPlus
