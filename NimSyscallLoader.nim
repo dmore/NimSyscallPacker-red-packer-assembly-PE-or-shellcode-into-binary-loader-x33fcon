@@ -3822,7 +3822,7 @@ proc EnumWindowsProc(enumhwnd: HWND, lParam: LPARAM): BOOL {.stdcall.} =
 """
 
 
-let  * = """
+let  MainStub * = """
 
 when not defined(DInvoke):
     when defined(unhook):
