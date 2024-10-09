@@ -3064,11 +3064,30 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
   # this is especially needed/usefull for COM Hijacking persistence.
   when defined(execute_in_proc):
     {.emit: @@@
+        #include <string.h>
+        #include <ctype.h>
+
         char temp[MAX_PATH];
         const char* exe_name = "EXENAME";
+
+        // Case-insensitive strstr implementation
+        const char* strcasestr(const char* haystack, const char* needle) {
+            if (!*needle) return haystack;
+            for (; *haystack; ++haystack) {
+                if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
+                    const char* h = haystack, *n = needle;
+                    for (; *h && *n; ++h, ++n) {
+                        if (tolower((unsigned char)*h) != tolower((unsigned char)*n)) break;
+                    }
+                    if (!*n) return haystack;
+                }
+            }
+            return NULL;
+        }
+
         if (GetModuleFileNameA((HMODULE)0, (LPSTR)temp, (DWORD)(sizeof(temp) / sizeof(temp[0]))) > 0) {
             const char* temp_str = temp;
-            if (strstr(temp_str, exe_name) == NULL) {
+            if (strcasestr(temp_str, exe_name) == NULL) {
                 return 0; // return true and exit DllMain
             }
         }
@@ -3103,11 +3122,30 @@ let DLLHijackStub = """
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
   when defined(execute_in_proc):
     {.emit: @@@
+    #include <string.h>
+        #include <ctype.h>
+
         char temp[MAX_PATH];
         const char* exe_name = "EXENAME";
+
+        // Case-insensitive strstr implementation
+        const char* strcasestr(const char* haystack, const char* needle) {
+            if (!*needle) return haystack;
+            for (; *haystack; ++haystack) {
+                if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
+                    const char* h = haystack, *n = needle;
+                    for (; *h && *n; ++h, ++n) {
+                        if (tolower((unsigned char)*h) != tolower((unsigned char)*n)) break;
+                    }
+                    if (!*n) return haystack;
+                }
+            }
+            return NULL;
+        }
+
         if (GetModuleFileNameA((HMODULE)0, (LPSTR)temp, (DWORD)(sizeof(temp) / sizeof(temp[0]))) > 0) {
             const char* temp_str = temp;
-            if (strstr(temp_str, exe_name) == NULL) {
+            if (strcasestr(temp_str, exe_name) == NULL) {
                 return 0; // return true and exit DllMain
             }
         }
@@ -3147,11 +3185,30 @@ proc NimMain() {.cdecl, importc.}
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
   when defined(execute_in_proc):
     {.emit: @@@
+    #include <string.h>
+        #include <ctype.h>
+
         char temp[MAX_PATH];
         const char* exe_name = "EXENAME";
+
+        // Case-insensitive strstr implementation
+        const char* strcasestr(const char* haystack, const char* needle) {
+            if (!*needle) return haystack;
+            for (; *haystack; ++haystack) {
+                if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
+                    const char* h = haystack, *n = needle;
+                    for (; *h && *n; ++h, ++n) {
+                        if (tolower((unsigned char)*h) != tolower((unsigned char)*n)) break;
+                    }
+                    if (!*n) return haystack;
+                }
+            }
+            return NULL;
+        }
+
         if (GetModuleFileNameA((HMODULE)0, (LPSTR)temp, (DWORD)(sizeof(temp) / sizeof(temp[0]))) > 0) {
             const char* temp_str = temp;
-            if (strstr(temp_str, exe_name) == NULL) {
+            if (strcasestr(temp_str, exe_name) == NULL) {
                 return 0; // return true and exit DllMain
             }
         }
