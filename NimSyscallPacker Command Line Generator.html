@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-	<!-- This HTML is in version 0.3 -->
+	<!-- This HTML is in version 0.4 -->
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -283,11 +283,6 @@
 					<td>Spawn a custom process (instead of notepad) for remote injection</td>
 				</tr>
 				<tr>
-					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="ruylopezToggle"><span class="slider"></span></label></td>
-					<td class="double-nested-option">--ruy-lopez</td>
-					<td>Use Ruy-Lopez to prevent AV/EDR DLLs from being loaded into the newly spawned process</td>
-				</tr>
-				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="remoteprocessToggle" onchange="toggleInput('remoteprocessInput', this)"><span class="slider"></span></label></td>
 					<td class="nested-option">--remoteprocess <input type="text" class="userInput" id="remoteprocessInput" placeholder="procname" disabled></td>
 				<td>Injects into the specified (existing) remote process name. The loader searches for the first process with that name.<br> Can be used for multiple process names, e.g., --remoteprocess=teams.exe,iexplore.exe,MicrosoftEdge.exe -> First try teams, else Internet Explorer, last Edge</td>
@@ -323,6 +318,11 @@
 					<td>Use Threadless inject for shellcode execution (<a href="https://github.com/CCob/ThreadlessInject" target="_blank">Threadless Inject</a>)</td>
 				</tr>
 				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="threadlessthreadToggle"><span class="slider"></span></label></td>
+					<td>--threadlessthread</td>
+					<td>Use Threadless inject but the trampoline will create a thread instead of CALL to the target address (no impact on the target process but additional IoC)</td>
+				</tr>
+				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="threadlessDllToggle" onchange="toggleInput('threadlessDllInput', this)"><span class="slider"></span></label></td>
 					<td class="nested-option">--threadlessDll <input type="text" class="userInput" id="threadlessDllInput" placeholder="dllname" disabled></td>
 					<td>Specify a DLL to use for the Threadless inject hook</td>
@@ -336,11 +336,21 @@
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="poolpartyToggle" onchange="toggleInput('poolpartyInput', this)"><span class="slider"></span></label></td>
 					<td>--poolparty <input type="text" class="userInput" id="poolpartyInput" placeholder="number" disabled></td>
 					<td>Use Poolparty technique 1,2,3,4 for execution.</td>
-				</tr>				
+				</tr>	
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="conhostinjectToggle"><span class="slider"></span></label></td>
+					<td>--conhostinject</td>
+					<td>Inject into a remote conhost.exe process and trigger execution without Thread or APC or similar</td>
+				</tr>
 				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="caroKannToggle"><span class="slider"></span></label></td>
 					<td>--Caro-Kann</td>
 					<td>Use Caro-Kann technique to bypass initial memory scan detections by injecting a second shellcode which sleeps and decrypts (<a href="https://github.com/S3cur3Th1sSh1t/Caro-Kann" target="_blank">Caro-Kann</a>)</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="caroKannThreadToggle"><span class="slider"></span></label></td>
+					<td>--Caro-Kann-Thread</td>
+					<td>Same as Caro-Kann, but the Shellcode will not do a direct JMP but instead create a Thread on the start address.</td>
 				</tr>
 				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="stombToggle"><span class="slider"></span></label></td>
@@ -440,6 +450,11 @@
 					<td>Add an DLLMain Export with DLL_PROCESS_ATTACH for Hijacking</td>
 				</tr>
 				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="perfectdllhijackToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--perfectdllhijack</td>
+					<td>Add DllMain and execute the Payload via "Perfect DLL Hijacking" to avoid LoaderLock issues <a href="https://elliotonsecurity.com/perfect-dll-hijacking/" target="_blank">Link</a></td>
+				</tr>
+				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noNimMainToggle"><span class="slider"></span></label></td>
 					<td class="nested-option">--noNimMain</td>
 					<td>Remove NimMain export to avoid this IoC (Use "--dllhijack" in addition to instead export DllMain or alternatively "--dllexportfunc DllMain")</td>
@@ -450,14 +465,34 @@
 					<td>Specify a local DLL to clone the API-Exports from via Koppeling</td>
 				</tr>
 				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="mutexoneshotToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--mutexoneshot</td>
+					<td>Use a Mutex to ensure the payload is only executed once per process tree</td>
+				</tr>
+				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="dllProxyToggle"><span class="slider"></span></label></td>
 					<td class="nested-option">--dllProxy</td>
 					<td>Generate a DLL-Proxying DLL - you need to put the legit DLL into the build directory. Two output DLLs will be generated: The proxy DLL and the randomly renamed legit DLL. (Credit to @byt3bl33d3r - <a href="https://github.com/byt3bl33d3r/NimDllSideload" target="_blank">Github Link</a>)</td>
 				</tr>
 				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="payloadFunctionToggle" onchange="toggleInput('payloadFunctionInput', this)"><span class="slider"></span></label></td>
+					<td class="double-nested-option">--payloadFunction <input type="text" class="userInput" id="payloadFunctionInput" placeholder="funcName" disabled></td>
+					<td>Specify a local DLL to clone the API-Exports from via Koppeling</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="noRandomToggle"><span class="slider"></span></label></td>
+					<td class="double-nested-option">--noRandom</td>
+				<td>Don't randomize the DLL-Name but forward to the original DLL instead (No need to copy the original DLL, only works for builtin windows DLLs)</td>
+				</tr>
+				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="cplToggle"><span class="slider"></span></label></td>
 					<td class="nested-option">--cpl</td>
 					<td>Generate a CPL file (Control Panel Applet) instead of an executable</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="xllToggle"><span class="slider"></span></label></td>
+					<td class="nested-option">--xll</td>
+					<td>Generate an XLL file (Excel Add-In) instead of an executable</td>
 				</tr>
 			</table>
 		</div>
@@ -507,6 +542,17 @@
 					<b> - domain:</b> Enumerate the current domain on runtime and use that as key<br>
 					<b> - username:</b> Enumerate the current username on runtime and use that as key
 				</td>
+			</tr>			
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="executeifToggle" onchange="toggleInput('executeifInput', this)"><span class="slider"></span></label></td>
+				<td>--execute-if <input type="text" class="userInput" id="executeifInput" placeholder="procname" disabled></td>
+				<td>Execute the payload only if the DLL is loaded from the defined process name. Or for executables if the exectable wasn't renamed.</td>
+			</tr>			
+			<tr>			
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="killdateToggle" onchange="toggleInput('killdateInput', this)"><span class="slider"></span></label></td>
+				<td>--killdate <input type="text" class="userInput" id="killdateInput" placeholder="yyyymmdd" disabled></td>
+				<td>Specify an date, after which the payload won't get executed anymore.</td>
 			</tr>			
 			<tr>
 				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="argumentsToggle" onchange="toggleInput('argumentsInput', this)"><span class="slider"></span></label></td>
@@ -594,6 +640,16 @@
 				<td>Add Lyrics as comments to avoid some more detections.</td>
 			</tr>
 			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="csoutToggle"><span class="slider"></span></label></td>
+				<td>--csout</td>
+				<td>C# Output format, reflectively loading the packed binary</td>
+			</tr>
+			<tr>
+				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="scoutToggle"><span class="slider"></span></label></td>
+				<td>--scout</td>
+				<td>Shellcode Output format, reflectively loading the packed binary via donut</td>
+			</tr>
+			<tr>
 				<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="sourceonlyToggle"><span class="slider"></span></label></td>
 				<td>--sourceonly</td>
 				<td>Dont compile but just create the source code and compile command.</td>
@@ -678,6 +734,11 @@
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="patchETWToggle"><span class="slider"></span></label></td>
 					<td>--PatchETW</td>
 					<td>Bypass ETW by patching ntdll.dll/NtTraceEvent via Syscalls.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="ClrPatchToggle"><span class="slider"></span></label></td>
+					<td>--ClrPatch</td>
+					<td>Patch the CLR to bypass AMSI.</td>
 				</tr>
 				<tr>
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="amsiProviderPatchToggle"><span class="slider"></span></label></td>
@@ -782,6 +843,11 @@
 					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="jmpEntryFuncToggle" onchange="toggleInput('jmpEntryFuncInput', this)"><span class="slider"></span></label></td>
 					<td class="nested-option">--jmpEntryFunc <input type="text" class="userInput" id="jmpEntryFuncInput" placeholder="value" disabled></td>
 					<td>Specify a function to use for the custom Shellcode Entrypoint.</td>
+				</tr>
+				<tr>
+					<td class="toggle-cell"><label class="toggle"><input type="checkbox" id="ruylopezToggle"><span class="slider"></span></label></td>
+					<td>--ruy-lopez</td>
+					<td>Use Ruy-Lopez to prevent AV/EDR DLLs from being loaded into the newly spawned process</td>
 				</tr>
 			</table>
 		</div>
@@ -949,6 +1015,8 @@
 				addOption('dnsKeyToggle', '--dnsKey');
 				addOption('dnsdomainToggle', '--dnsdomain' + getValueIfExists('dnsdomainToggle', 'dnsdomainInput', ''));
 				addOption('environmentalKeyToggle', '--environmentalKey' + getValueIfExists('environmentalKeyToggle', 'environmentalKeyInput', ''));
+				addOption('executeifToggle', '--execute-if' + getValueIfExists('executeifToggle', 'executeifInput', ''));
+				addOption('killdateToggle', '--killdate' + getValueIfExists('killdateToggle', 'killdateInput', ''));
 				addOption('argumentsToggle', '--arguments' + getValueIfExists('argumentsToggle', 'argumentsInput', ''));
 				addOption('metadataToggle', '--metadata');
 				addOption('noETWToggle', '--noETW');
@@ -966,6 +1034,8 @@
 				addOption('psoutToggle', '--psout');
 				addOption('psobfsToggle', '--psobfs');
 				addOption('pslyricsToggle', '--pslyrics');
+				addOption('csoutToggle', '--csout');
+				addOption('scoutToggle', '--scout');
 				addOption('sourceonlyToggle', '--sourceonly');
 				addOption('RWXToggle', '--RWX');
 				addOption('serviceToggle', '--service');
@@ -979,10 +1049,15 @@
 				addOption('dllToggle', '--dll');
 				addOption('dllexportfuncToggle', '--dllexportfunc' + getValueIfExists('dllexportfuncToggle', 'dllexportfuncInput', ''));
 				addOption('dllhijackToggle', '--dllhijack');
+				addOption('perfectdllhijackToggle', '--perfectdllhijack');
 				addOption('noNimMainToggle', '--noNimMain');
 				addOption('cloneToggle', '--clone' + getValueIfExists('cloneToggle', 'cloneInput', ''));
+				addOption('mutexoneshotToggle', '--mutexoneshot');
 				addOption('dllProxyToggle', '--dllProxy');
+				addOption('payloadFunctionToggle', '--payloadFunction' + getValueIfExists('payloadFunctionToggle', 'payloadFunctionInput', ''));
+				addOption('noRandomToggle', '--noRandom');
 				addOption('cplToggle', '--cpl');
+				addOption('xllToggle', '--xll');
 				
 				// PE Packing Options
 				addOption('peinjectToggle', '--peinject');
@@ -1004,6 +1079,7 @@
 				addOption('noOneShotToggle', '--noOneShot');
 				addOption('patchAMSIToggle', '--PatchAMSI');
 				addOption('patchETWToggle', '--PatchETW');
+				addOption('ClrPatchToggle', '--ClrPatch');
 				addOption('amsiProviderPatchToggle', '--AMSIProviderPatch');
 				addOption('amsiNtCreateSectionHookToggle', '--AMSINtCreateSectionHook');
 				addOption('sandboxToggle', '--sandbox' + getValueIfExists('sandboxToggle', 'sandboxInput', ''));
@@ -1022,6 +1098,7 @@
 				addOption('jmpEntryToggle', '--jmpEntry');
 				addOption('jmpEntryDLLToggle', '--jmpEntryDLL' + getValueIfExists('jmpEntryToggle', 'jmpEntryDLLInput', ''));
 				addOption('jmpEntryFuncToggle', '--jmpEntryFunc' + getValueIfExists('jmpEntryToggle', 'jmpEntryFuncInput', ''));
+				addOption('ruylopezToggle', '--ruy-lopez');
 				
 				// Syscall Retrieval Section
 				addOption('hellsgateToggle', '--hellsgate');
@@ -1039,7 +1116,6 @@
 				addOption('mapSectionToggle', '--mapSection');
 				addOption('remoteinjectToggle', '--remoteinject');
 				addOption('customprocessToggle', '--customprocess' + getValueIfExists('customprocessToggle', 'customprocessInput', ''));
-				addOption('ruylopezToggle', '--ruy-lopez');
 				addOption('remoteprocessToggle', '--remoteprocess' + getValueIfExists('remoteprocessToggle', 'remoteprocessInput', ''));
 				addOption('spoofArgsToggle', '--spoofArgs' + getValueIfExists('spoofArgsToggle', 'spoofArgsInput', ''));
 				addOption('parentProcessToggle', '--parentProcess' + getValueIfExists('parentProcessToggle', 'parentProcessInput', ''));
@@ -1047,10 +1123,13 @@
 				addOption('remotepatchAMSIToggle', '--remotepatchAMSI');
 				addOption('remotepatchETWToggle', '--remotepatchETW');
 				addOption('threadlessToggle', '--threadless');
+				addOption('threadlessthreadToggle', '--threadlessthread');
 				addOption('threadlessDllToggle', '--threadlessDll' + getValueIfExists('threadlessDllToggle', 'threadlessDllInput', ''));
 				addOption('threadlessFuncToggle', '--threadlessFunc' + getValueIfExists('threadlessFuncToggle', 'threadlessFuncInput', ''));
 				addOption('poolpartyToggle', '--poolparty' + getValueIfExists('poolpartyToggle', 'poolpartyInput', ''));
+				addOption('conhostinjectToggle', '--conhostinject');
 				addOption('caroKannToggle', '--Caro-Kann');
+				addOption('caroKannThreadToggle', '--Caro-Kann-Thread');
 				addOption('stombToggle', '--stomb');
 				addOption('stombDllToggle', '--stombDll' + getValueIfExists('stombDllToggle', 'stombDllInput', ''));
 				addOption('stombFuncToggle', '--stombFunc' + getValueIfExists('stombFuncToggle', 'stombFuncInput', ''));
