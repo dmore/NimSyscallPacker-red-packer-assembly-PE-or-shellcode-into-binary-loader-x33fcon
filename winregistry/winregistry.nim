@@ -63,7 +63,7 @@ proc `|`*(a, b: RegKeyRights): RegKeyRights {.inline.} =
   ## alias for ``or`` for ``RegKeyRights``.
   a or b
 
-when useWinUnicode:
+when true:
   type WinString* = WideCString ## ``cstring`` when ``useWinAscii``
                                 ## is declared or  ``WideCString`` otherwise.
 else:
@@ -102,7 +102,7 @@ proc regOpenCurrentUser(samDesired: RegKeyRights,
   phkResult: ptr RegHandle): LONG
   {.stdcall, dynlib: "advapi32", importc: "RegOpenCurrentUser".}
 
-when useWinUnicode:
+when true:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
     samDesired: RegKeyRights, phkResult: ptr RegHandle): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegOpenKeyExW".}
@@ -228,7 +228,7 @@ proc parseRegPath(path: string, outSubkey: var string): RegHandle =
     raise newException(OSError, "unsupported path root")
 
 proc allocWinString(str: string): WinString {.inline.} =
-  when useWinUnicode:
+  when true:
     return newWideCString(str)
   else:
     return cstring(str)
@@ -239,7 +239,7 @@ proc regThrowOnFailInternal(hresult: LONG): void =
   else:
     const langid = 0
   var result: string
-  when useWinUnicode:
+  when true:
     var msgbuf: WideCString
     if formatMessageW(0x00000100 or 0x00001000 or 0x00000200 or 0x000000FF,
                       nil, hresult.int32, langid, msgbuf.addr, 0, nil) != 0'i32:
@@ -266,7 +266,7 @@ template injectRegPathSplit(path: string) =
 
 proc reallen(x: WinString): int {.inline.} =
   ## returns real string length in bytes, counts chars and terminating null.
-  when declared(useWinUnicode):
+  when declared(true):
     len(x) * 2 + 2
   else:
     len(x) + 1
@@ -544,7 +544,7 @@ proc readMultiString*(handle: RegHandle, key: string): seq[string]
     nullchars = 0
   # each string separated by '\0', last string is `\0\0`
   # unicode string separated by '\0\0', last str is '\0\0\0\0'
-  when useWinUnicode:
+  when true:
     while running:
       #echo "iter", i, ", c: ", strbuff[i].byte, ", addr: ", cast[int](buff) + i
       if strbuff[i] == '\0' and strbuff[i+1] == '\0':
@@ -640,7 +640,7 @@ proc expandEnvString*(str: string): string =
     return ""
   # return value is in TCHARs, aka number of chars returned, not number of
   # bytes required to store string
-  # WinChar is `char` or `Utf16Char` depending on useWinUnicode const in winlean
+  # WinChar is `char` or `Utf16Char` depending on true const in winlean
   # actually needs to be checked because without this line everything works okay
   returnValue = returnValue * sizeof(WinChar).DWORD
   if returnValue > size:

