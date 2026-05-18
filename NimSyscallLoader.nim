@@ -226,7 +226,7 @@ Options:
 [C# assembly Packing]
 
   --csharp    Encrypt a C# assembly to load it on runtime
-  --interactivePS    Load an interactive unmanaged Powershell Runspace (https://github.com/S3cur3Th1sSh1t-Sponsors/PwnPowershell)
+  --interactivePS    Load an interactive unmanaged Powershell Runspace
 
 """
 
@@ -4845,8 +4845,13 @@ if(usepoolparty):
 if (threadlessthread):
     basicCompileFlags.add("-d:threadlessthread ")
 
-# add --passc=-static 
+# add --passc=-static
 basicCompileFlags.add("--passc=-static --passl=-static ")
+
+# Newer mingw-w64 / ld defaults to a high image base (e.g. 0x140000000) which
+# overflows 32-bit signed relocations (R_X86_64_32S against .bss) when linking
+# statically. Force a low image base to keep -static links working with modern GCC.
+basicCompileFlags.add("--passl:-Wl,--image-base=0x10000 ")
 
 if(dllProxy):
     when system.hostOS == "windows":

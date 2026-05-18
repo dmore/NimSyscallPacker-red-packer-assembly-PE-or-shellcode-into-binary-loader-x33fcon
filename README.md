@@ -1,6 +1,6 @@
 # NimSyscallPacker / Loader
 
-For some this might be self explanatory - but please don't upload the resulting payloads to VirusTotal or similar services. This will in the worst case lead to many signatures for the packed binaries and makes the tool useless. Use https://kleenscan.com/ or alternatives instead.
+This tool was made public after a talk at [x33fcon](https://x33fcon.com/#!s/FabianMosch.md). It was my private main coding project from 2020 - 2023 and it now considered deprecated and is not maintained anymore. Dont expect bug fixes or feature updates here from my side. Instead, [RustPack](https://msecops.de/products) is maintained now as a commercial and controlled version for vetted Red Teams and Pentesters which is even more feature rich but also much more OPSec save.
 
 This Packer can be used to pack any C# Assembly, PE-File or Shellcode into a Nim binary. It will encrypt the target payload, build the corresponding Nim source code according to the given arguments and compiles it to an Nim binary.
 
@@ -14,26 +14,45 @@ A Video - if you prefer that - can be found here:
 
 Git needs to be installed for Nim/Nimble to work properly.
 
-Download and install [Nim 2.0.4](https://nim-lang.org/download/nim-2.0.4_x64.zip) and [Mingw64](https://sourceforge.net/projects/mingw-w64/files/) version 8.1.0 `x86_64-posix-seh`. You can either just use this GCC version or in addition install [GCC 12.1.0](https://sourceforge.net/projects/gcc-win64/files/12.1.0/). Don't use other GCC versions, as that breaks some functionality. But you need to place the Mingw64 DLL's around `libwinpthread-1.dll` into some `%PATH%` environment variable folder. Login/logout for the `%PATH%` changes to take effect.
+Tested with **Nim 2.2.10** and the **MinGW-w64 GCC 11.1.0** bundle linked from the Nim Windows download page. Newer Nim releases default to a high PE image base on Windows, which breaks `-static` links with `relocation truncated to fit: R_X86_64_32S against .bss`; the packer now forces `-Wl,--image-base=0x10000` to keep static builds working, so any MinGW-w64 11.x build should be fine. Only **x64** is supported here — x86/`--x86`/`--wow64` is not maintained.
 
-Install dependencies:
-`nimble install nimcrypto@0.6.0 docopt ptr_math winim https://github.com/S3cur3Th1sSh1t/nim-strenc/`
+1. Download Nim and MinGW (x86_64):
+   - [`nim-2.2.10_x64.zip`](https://nim-lang.org/download/nim-2.2.10_x64.zip)
+   - [`mingw64.7z`](https://nim-lang.org/download/mingw64.7z) (linked from the Nim Windows install page)
+2. Extract Nim with **7-Zip** (not Windows' built-in `Expand-Archive` — it silently drops `lib\system.nim` because of the case-collision with the `lib\system\` directory). The Nim zip ships `bin\7zG.exe` which you can use to extract MinGW.
+3. Add `<nim>\bin` and `<mingw64>\bin` to your `%PATH%`. Logoff/logon (or restart your shell) for the change to take effect.
+4. Install nimble dependencies:
 
-If you want to use LLVM obfuscator on windows you need to use my embedded denim version as it's modified code to make it work with the Packer. My modified code can be found [here]([denim](https://github.com/S3cur3Th1sSh1t/denim)). Install it via `denim\denim.exe setup`.
+   ```batch
+   nimble install nimcrypto@0.6.0 docopt ptr_math winim https://github.com/S3cur3Th1sSh1t/nim-strenc/
+   ```
 
-Compile the Packer via `nim c NimSyscallLoader.nim`. Ready to go.
+   Versions known to work (as of Nim 2.2.10): `nimcrypto 0.6.0`, `docopt 0.7.1`, `ptr_math 0.3.0`, `winim 3.9.4`, `nim-strenc` (HEAD — the repo has no tagged releases).
+
+5. Disable Windows Defender Sample Submission (the Packer refuses to run otherwise):
+
+   ```powershell
+   Set-MpPreference -SubmitSamplesConsent 2
+   ```
+
+6. Compile the Packer:
+
+   ```batch
+   nim c NimSyscallLoader.nim
+   ```
+
+If you want to use the LLVM obfuscator on Windows, use the embedded modified denim version from [denim](https://github.com/S3cur3Th1sSh1t/denim). Install it via `denim\denim.exe setup`.
 
 #### Linux
 
-E.g. on Kali:
+E.g. on Kali / Debian. The packer historically required `nim 1.6.8` + `mingw-64 8.0.0-1`; with the static-link `--image-base=0x10000` workaround now baked in, newer toolchains should work too. The Windows build is what's actively tested — Linux is best-effort.
 
-`apt-get install nim=1.6.8`
+```bash
+apt-get install nim mingw-w64
+nimble install nimcrypto@0.6.0 docopt ptr_math winim https://github.com/S3cur3Th1sSh1t/nim-strenc/
+```
 
-`apt-get install mingw-64=8.0.0-1`
-
-`nimble install nimcrypto@0.6.0 docopt ptr_math winim https://github.com/S3cur3Th1sSh1t/nim-strenc/`
-
-If you cannot downgrade mingw-64 to 8.0.0-1 `--hellsgate` won't work.
+If `--hellsgate` fails to assemble on a newer mingw-w64, downgrade to `mingw-64=8.0.0-1`.
 
 Install donut via `pip3 install donut-shellcode`. `denim` cannot be used from Unix so obfuscation via LLVM is not possible here. Same for Callobfuscator.
 
@@ -279,7 +298,7 @@ Options:
 [C# assembly Packing]
 
   --csharp    Encrypt a C# assembly to load it on runtime
-  --interactivePS    Load an interactive unmanaged Powershell Runspace (https://github.com/S3cur3Th1sSh1t-Sponsors/PwnPowershell)
+  --interactivePS    Load an interactive unmanaged Powershell Runspace
 
 ```
 
@@ -527,6 +546,8 @@ Read this:
 - `--syswhispers --jump` in combination with `--peload` results in a crash. For the moment I can only recommend to not use this option as I have no clue where this sideeffect comes from
 - `--obfuscate` cannot handle ASM-Stubs well and therefore cannot compile binaries with `--hellsgate` or `--syswhispers`
 - XP/WS2k3 will only work with the flags `--syswhispers --noAntidebug --noDInvoke`
+- `--x86` / `--wow64` is no longer maintained and currently broken with the bundled (non-multilib) MinGW-w64 toolchain. Use x64 builds.
+- Newer MinGW-w64 linkers (11+) default to a high PE image base which breaks `-static` links with `relocation truncated to fit: R_X86_64_32S against .bss`. The packer now passes `-Wl,--image-base=0x10000` to the generated Loader compile command to work around this. If you build standalone Nim+static binaries with this stack you may need the same flag.
 
 ## TO-DO
 - [x] PELoader via syscalls
