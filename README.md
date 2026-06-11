@@ -1,6 +1,6 @@
 # NimSyscallPacker / Loader
 
-This tool was made public after a talk at [x33fcon](https://x33fcon.com/#!s/FabianMosch.md). It was my private main coding project from 2021 - 2024 and it now considered deprecated and is not maintained anymore. Dont expect bug fixes or feature updates here from my side. Instead, [RustPack](https://msecops.de/products) is maintained now as a commercial and controlled version for vetted Red Teams and Pentesters which is even more feature rich but also much more OPSec save.
+This tool was made public after a talk at [x33fcon](https://x33fcon.com/#!s/FabianMosch.md). It was my private main coding project from 2021 - 2024 and is now considered deprecated and is not maintained anymore. Dont expect bug fixes or feature updates here from my side. Instead, [RustPack](https://msecops.de/products) is maintained now as a commercial and controlled version for vetted Red Teams and Pentesters which is even more feature rich but also much more OPSec save.
 
 This Packer can be used to pack any C# Assembly, PE-File or Shellcode into a Nim binary. It will encrypt the target payload, build the corresponding Nim source code according to the given arguments and compiles it to an Nim binary.
 
